@@ -1,0 +1,255 @@
+/* BarangayReports.css */
+
+/* Main Container */
+.reports-page-wrapper {
+  padding: 24px;
+  background-color: #f8fafc;
+  min-height: 100vh;
+  font-family: 'Inter', -apple-system, sans-serif;
+  color: #0f172a !important;
+}
+
+.reports-main-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 24px;
+}
+
+/* 1. Top Filter Row */
+.top-filter-bar {
+  display: flex;
+  gap: 12px;
+  background-color: #ffffff;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 24px;
+  align-items: center;
+}
+
+.filter-dropdown, .filter-date-input {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background-color: #ffffff;
+  color: #334155 !important; /* Force readable text inside inputs */
+  font-size: 14px;
+}
+
+.btn-primary-generate {
+  background-color: #10b981;
+  color: #ffffff !important;
+  font-weight: 600;
+  padding: 10px 28px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+/* 2. Middle Panels (Flex Layout) */
+.middle-split-container {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.left-reports-box {
+  flex: 1.6;
+  background-color: #ffffff;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.right-stats-box {
+  flex: 1;
+  background-color: #ffffff;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.section-box-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 16px 0;
+  text-align: left;
+}
+
+/* Log Item Rows */
+.report-log-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background-color: #f1f5f9;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  border: none;
+}
+.report-log-item:last-child {
+  border-bottom: none;
+}
+
+.report-item-meta p {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #334155;
+}
+.report-item-meta small {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.action-btn-group {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-action-outline {
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  color: #475569 !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+/* Styles the 'View' button with the light green theme from your design image */
+.report-log-item .action-btn-group button:last-child {
+  background-color: #e6f4ea; 
+  border: 1px solid #bbf7d0;
+  color: #137333 !important;
+}
+
+.report-log-item .action-btn-group button:last-child:hover {
+  background-color: #dcfce7;
+}
+
+/* Quick Stats Grid */
+.quick-stats-2x2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.stat-square-card {
+  text-align: center;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background-color: #f8fafc;
+}
+
+.stat-square-card h4 {
+  margin: 0 0 4px 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.stat-square-card p {
+  margin: 0;
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+/* 3. Bottom Table Architecture */
+.bottom-table-card {
+  background-color: #ffffff;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.table-top-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.table-top-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.header-action-utilities {
+  display: flex;
+  gap: 8px;
+}
+
+.sub-toolbar-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.table-search-input {
+  padding: 8px 12px;
+  width: 220px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background-color: #ffffff;
+  color: #334155 !important;
+  font-size: 13px;
+}
+
+.sm-toolbar-select {
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background-color: #ffffff;
+  color: #334155 !important;
+  font-size: 13px;
+}
+
+/* Base Table Layout */
+.audit-log-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.audit-log-table th {
+  text-align: center;
+  padding: 14px 12px;
+  border-bottom: 2px solid #e2e8f0;
+  color: #475569 !important;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.audit-log-table td {
+  padding: 14px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155 !important;
+  font-size: 14px;
+}
+
+/* Badges */
+.status-badge {
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-block;
+}
+.badge-created { background-color: #dcfce7; color: #16a34a !important; }
+.badge-updated { background-color: #dbeafe; color: #2563eb !important; }
+.badge-deleted { background-color: #fee2e2; color: #dc2626 !important; }

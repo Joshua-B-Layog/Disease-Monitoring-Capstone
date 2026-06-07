@@ -1,0 +1,394 @@
+/* =========================================================
+   1. GLOBAL RESET & THEME VARIABLES
+   ========================================================= */
+* { 
+  box-sizing: border-box; 
+  font-family: 'Inter', system-ui, sans-serif; 
+}
+
+:root {
+  /* DARK MODE VARIABLES (This is now your default!) */
+  --bg-main: #0B1120;       
+  --bg-surface: #1E293B;    
+  --text-main: #FFFFFF;
+  --text-muted: #9CA3AF;
+  --input-bg: #0F172A;
+  --input-border: #334155;
+  --border-color: #334155;
+}
+
+[data-theme='light'] {
+  /* LIGHT MODE VARIABLES (Only triggers when admin clicks the toggle) */
+  --bg-main: #F3F4F6;
+  --bg-surface: #FFFFFF;
+  --text-main: #111827;
+  --text-muted: #6B7280;
+  --input-bg: #F9FAFB;
+  --input-border: #D1D5DB;
+  --border-color: #E5E7EB;
+}
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  overflow: hidden; 
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* =========================================================
+   2. LOGIN SCREEN (Figma Spec)
+   ========================================================= */
+.login-screen { 
+  display: flex; 
+  width: 100vw; 
+  height: 100vh; 
+  background-color: var(--bg-main); 
+}
+
+.login-left { 
+  flex: 1.2; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  /* Retains your specific Figma dark blue gradient */
+  background: linear-gradient(135deg, #1E3A8A 0%, var(--bg-main) 100%); 
+}
+
+.login-right { 
+  flex: 1; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  padding: 40px; 
+  background-color: var(--bg-main); 
+}
+
+.login-form-container {
+  width: 100%;
+  max-width: 500px; /* Wider readable width */
+  padding: 40px;
+  background-color: var(--bg-surface);
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+/* --- Form Elements --- */
+.role-toggle { 
+  display: flex; 
+  gap: 10px; 
+  margin-bottom: 30px; 
+  background-color: var(--input-bg); 
+  padding: 6px; 
+  border-radius: 8px; 
+  border: 1px solid var(--input-border);
+}
+
+.role-btn { 
+  flex: 1; 
+  padding: 12px; 
+  border: none; 
+  background: transparent; 
+  border-radius: 6px; 
+  cursor: pointer; 
+  font-weight: 600; 
+  color: var(--text-muted); 
+  transition: all 0.2s; 
+}
+
+/* Figma Active Role Color */
+.role-btn.active { 
+  background-color: #1E3A8A; 
+  color: #FFFFFF; 
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2); 
+}
+
+.form-group { margin-bottom: 20px; }
+.form-group label { 
+  display: block; 
+  font-size: 14px; 
+  color: var(--text-muted); 
+  margin-bottom: 8px; 
+  font-weight: 500; 
+}
+
+.form-input { 
+  width: 100%; 
+  padding: 14px; 
+  background-color: var(--input-bg); 
+  border: 1px solid var(--input-border); 
+  border-radius: 8px; 
+  font-size: 14px; 
+  color: var(--text-main); 
+  outline: none; 
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s; 
+}
+
+.form-input:focus { 
+  border-color: #3B82F6; 
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.form-input::placeholder { color: var(--text-muted); }
+
+/* Figma Green Submit Button */
+.submit-btn { 
+  width: 100%; 
+  padding: 14px; 
+  background-color: #10B981; 
+  color: #FFFFFF; 
+  border: none; 
+  border-radius: 8px; 
+  font-weight: bold; 
+  font-size: 16px; 
+  cursor: pointer; 
+  margin-top: 10px; 
+  transition: background-color 0.2s; 
+}
+.submit-btn:hover { background-color: #059669; }
+
+
+/* =========================================================
+   3. MAIN DASHBOARD LAYOUT & SIDEBAR
+   ========================================================= */
+.dashboard-layout { 
+  display: flex; 
+  height: 100vh; 
+  width: 100vw; 
+}
+
+.sidebar { 
+  width: 260px; 
+  background-color: var(--bg-surface); 
+  border-right: 1px solid var(--border-color); 
+  display: flex; 
+  flex-direction: column; 
+  height: 100vh;
+}
+
+.sidebar-logo { 
+  padding: 30px 20px; 
+  border-bottom: 1px solid var(--border-color); 
+}
+
+.sidebar-logo h3 { color: var(--text-main); font-size: 16px; letter-spacing: 1px; margin: 0; }
+
+.sidebar-menu { padding: 20px 0; display: flex; flex-direction: column; gap: 5px; }
+
+.menu-item { 
+  padding: 12px 20px; 
+  color: var(--text-muted); 
+  font-weight: 500; 
+  cursor: pointer; 
+  display: flex; 
+  align-items: center; 
+  gap: 15px; 
+}
+
+.menu-item.active { 
+  background-color: #1E3A8A; 
+  color: #FFFFFF; 
+  border-right: 4px solid #3B82F6; 
+}
+
+.menu-item:hover:not(.active) { 
+  background-color: var(--input-bg); 
+  color: var(--text-main); 
+}
+
+.main-content { 
+  flex: 1; 
+  display: flex; 
+  flex-direction: column; 
+  background-color: var(--bg-main);
+  overflow: hidden; /* Lets the inner scroller handle scrolling */
+}
+
+.top-nav { 
+  height: 70px; 
+  background-color: var(--bg-surface); 
+  border-bottom: 1px solid var(--border-color); 
+  display: flex; 
+  align-items: center; 
+  justify-content: space-between; 
+  padding: 0 30px; 
+  flex-shrink: 0; /* Prevents nav from squishing */
+}
+
+.nav-title h2 { font-size: 20px; color: var(--text-main); margin: 0; }
+
+.content-scroller {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 30px;
+}
+
+/* =========================================================
+   4. DASHBOARD COMPONENTS (Cards, Charts, Tables)
+   ========================================================= */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  padding: 30px;
+}
+
+.stat-card, .chart-main, .chart-side, .recent-records { 
+  background-color: var(--bg-surface); 
+  border: 1px solid var(--border-color); 
+  padding: 20px; 
+  border-radius: 12px; 
+}
+
+.stat-label { color: var(--text-muted); font-size: 12px; text-transform: uppercase; }
+.stat-value { color: var(--text-main); font-size: 24px; font-weight: bold; margin-top: 5px; }
+
+.chart-main { grid-column: span 3; height: 350px; }
+.chart-side { grid-column: span 1; }
+.recent-records { grid-column: span 4; color: var(--text-main); }
+
+/* --- Table Styling --- */
+.recent-records table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+.recent-records th {
+  text-align: left;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.recent-records td {
+  text-align: left;
+  padding: 16px 12px;
+  color: var(--text-main);
+  font-size: 14px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* =========================================================
+   5. UI UTILITIES (Dropdowns, Badges, Buttons)
+   ========================================================= */
+.user-profile { 
+  display: flex; align-items: center; gap: 15px; position: relative; cursor: pointer; flex-shrink: 0; 
+}
+.user-info { text-align: right; white-space: nowrap; }
+.user-name { color: var(--text-main); font-weight: 600; font-size: 14px; }
+.user-role { color: var(--text-muted); font-size: 12px; }
+
+.avatar {
+  width: 35px; height: 35px; background: #3B82F6; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-weight: bold; font-size: 12px;
+}
+
+.dropdown-menu {
+  position: absolute; top: 50px; right: 0; width: 200px;
+  background-color: var(--bg-surface); border: 1px solid var(--border-color);
+  border-radius: 8px; box-shadow: 0 10px 15px rgba(0,0,0,0.1);
+  padding: 10px; z-index: 1000;
+}
+
+.dropdown-item { padding: 10px; color: var(--text-muted); cursor: pointer; border-radius: 4px; }
+.dropdown-item:hover { background-color: var(--input-bg); color: var(--text-main); }
+
+/* Status Badges */
+.status-pill { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; display: inline-flex; align-items: center; gap: 5px; }
+.status-active { background: #1E3A8A; color: #60A5FA; }
+.status-recovered { background: #064E3B; color: #34D399; }
+.status-pending { background: #78350F; color: #FBBF24; }
+
+.cases-container { padding: 30px; }
+
+/* --- THEME TOGGLE BUTTON FOR LOGIN --- */
+.theme-toggle-login {
+  position: absolute;
+  top: 30px;
+  right: 40px;
+  padding: 8px 16px;
+  background-color: var(--bg-surface);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  cursor: pointer;
+  z-index: 100;
+  font-size: 14px;
+  font-weight: bold;
+  transition: all 0.2s;
+}
+
+.theme-toggle-login:hover {
+  opacity: 0.8;
+}
+
+.theme-toggle-btn {
+  padding: 8px 16px;
+  background-color: var(--bg-surface);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+
+
+/* Container for the specific list of bars */
+.bar-chart-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px; /* Space between rows */
+  margin-top: 20px;
+}
+
+/* Individual Row (Label + Bar + Number) */
+.chart-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Barangay Label */
+.chart-bar-label {
+  width: 130px; /* Fixed width so labels align perfectly */
+  font-size: 14px;
+  color: var(--text-main);
+  white-space: nowrap;
+}
+
+/* The Background Track of the bar */
+.chart-bar-track {
+  flex-grow: 1; /* Takes up all available space */
+  height: 12px;
+  background: var(--input-border); /* Dark/Light mode border color */
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+/* The Filled Colored Part */
+.chart-bar-fill {
+  height: 100%;
+  background: #3b82f6; /* Your primary theme blue */
+  border-radius: 6px;
+  transition: width 0.5s ease-in-out; /* Smooth animation */
+}
+
+/* The Numerical Value at the end */
+.chart-bar-value {
+  width: 40px;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+}
