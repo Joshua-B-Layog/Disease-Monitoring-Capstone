@@ -1,0 +1,582 @@
+/* --- Root Layout Wrapper --- */
+.settings-wrapper {
+  width: 100%;
+  min-height: 100vh;
+  background-color: #f8fafc;
+  padding: 40px 20px;
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.settings-container {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.settings-title {
+  font-size: 32px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 8px 0;
+  text-align: left;
+}
+
+.settings-subtitle {
+  font-size: 16px;
+  color: #64748b;
+  margin: 0 0 32px 0;
+  text-align: left;
+}
+
+/* --- Master View Navigation Grid --- */
+.menu-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.nav-box {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.nav-box:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border-color: #cbd5e1;
+}
+
+.nav-box.full-width {
+  grid-column: span 2;
+}
+
+.box-content-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.box-icon-wrapper {
+  font-size: 24px;
+}
+
+.box-title-text {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
+}
+
+.box-arrow-right {
+  color: #94a3b8;
+  font-size: 18px;
+}
+
+/* --- Detailed Settings Panes Layout --- */
+.detail-view-container {
+  background-color: transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.back-to-settings-btn {
+  background: none;
+  border: none;
+  color: #475569;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  padding: 0;
+  margin-bottom: 8px;
+}
+
+.back-to-settings-btn:hover {
+  color: #0f172a;
+}
+
+.sub-view-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 8px 0 0 0;
+  text-align: left;
+}
+
+.sub-view-subtitle {
+  font-size: 14px;
+  color: #64748b;
+  margin: -16px 0 8px 0;
+  text-align: left;
+}
+
+/* --- Profile Header Style --- */
+.profile-header-container {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.avatar-wrapper {
+  position: relative;
+}
+
+.profile-avatar-circle {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background-color: #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.profile-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-initials {
+  font-size: 28px;
+  font-weight: 600;
+  color: #475569;
+  text-transform: uppercase;
+}
+
+.camera-badge-badge {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  background-color: #0f172a;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #ffffff;
+  cursor: pointer;
+}
+
+.profile-meta-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.profile-display-name {
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 4px 0;
+}
+
+.profile-display-role {
+  font-size: 14px;
+  color: #64748b;
+  margin: 0 0 12px 0;
+}
+
+.change-photo-btn {
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.change-photo-btn:hover {
+  background-color: #f8fafc;
+}
+
+/* --- Split Input Configuration Layouts --- */
+.form-split-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  background-color: #ffffff;
+  padding: 24px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.input-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+.input-field-group label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.input-field-group input, 
+.input-field-group select {
+  padding: 10px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #0f172a;
+  outline: none;
+  background-color: #ffffff;
+}
+
+.input-field-group input[readonly] {
+  background-color: #f1f5f9;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+/* --- Figma Cards Layout Framework --- */
+.security-view-view {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.security-section-card {
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+  border: 1px solid #eef0f3;
+  text-align: left;
+}
+
+.security-section-card.row-layout-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.security-card-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.security-card-header.no-margin {
+  margin-bottom: 0;
+}
+
+.security-card-header.space-between-layout {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.header-flex-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.security-icon-box {
+  background-color: #f3f4f6;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.security-icon-box.green-icon-box {
+  background-color: #e8f7f0;
+}
+
+.security-header-text h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0 0 2px 0;
+}
+
+.security-timestamp {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.security-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+}
+
+.security-input-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.security-input-row label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #344054;
+}
+
+.security-password-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.security-password-wrapper input {
+  width: 100%;
+  padding: 12px 16px;
+  padding-right: 48px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background-color: #ffffff;
+  font-size: 14px;
+  color: #1d2939;
+  outline: none;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  box-sizing: border-box;
+}
+
+.security-eye-btn {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.security-action-blue-btn {
+  background-color: #003cb4;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  width: fit-content;
+  margin-top: 4px;
+}
+
+.security-manage-btn {
+  background-color: #ffffff;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #344054;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  transition: all 0.2s ease;
+}
+
+.security-manage-btn:hover {
+  background-color: #f9fafb;
+  border-color: #b2bbc8;
+}
+
+/* --- Custom Figma Toggle Switch Slider --- */
+.figma-toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+
+.figma-toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.figma-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  border: 2px solid #101828;
+  border-radius: 34px;
+  transition: .2s;
+  background-color: #ffffff;
+}
+
+.figma-slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #101828;
+  border-radius: 50%;
+  transition: .2s;
+}
+
+.figma-toggle-switch input:checked + .figma-slider:before {
+  transform: translateX(20px);
+}
+
+/* --- Dynamic Sub-List Rows --- */
+.security-sessions-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.session-list-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 0;
+  border-top: 1px solid #f2f4f7;
+  gap: 32px;
+}
+
+.session-info-meta {
+  flex: 1;
+  text-align: left;
+}
+
+.session-info-meta h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1d2939;
+  margin: 0 0 4px 0;
+}
+
+.session-info-meta p {
+  font-size: 13px;
+  color: #667085;
+  margin: 0;
+}
+
+.session-badge-active {
+  background-color: #ecfdf3;
+  color: #027a48;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 16px;
+}
+
+.session-revoke-btn {
+  background: none;
+  border: none;
+  color: #d92d20;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* --- Notifications Save Actions Footer --- */
+.notifications-action-container {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  margin-top: 8px;
+  margin-bottom: 24px;
+}
+
+.notifications-save-btn {
+  background-color: #0dd089;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 28px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.1);
+  transition: background-color 0.15s ease;
+}
+
+.notifications-save-btn:hover {
+  background-color: #0bb577;
+}
+
+/* --- Standard Forms Action Footers --- */
+.form-action-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.btn-secondary-cancel {
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+}
+
+.btn-primary-action {
+  background-color: #0f172a;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+/* --- Utility Data Manager Cards --- */
+.utility-row-action-card {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  width: 100%;
+}
+
+.utility-row-action-card:hover {
+  background-color: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.utility-row-action-card span:first-child {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.utility-row-action-card span:last-child {
+  color: #94a3b8;
+}

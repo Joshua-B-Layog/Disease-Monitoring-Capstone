@@ -1,0 +1,326 @@
+.map-view-container {
+  display: flex;
+  height: calc(100vh - 64px); /* Adjust to fit below top nav */
+  font-family: system-ui, -apple-system, sans-serif;
+  background-color: #f8fafc;
+}
+
+
+/* LEFT SIDE PANEL: FILTERS & LOCAL LEGEND */
+.map-view-filter-panel {
+  width: 320px;
+  background-color: #ffffff;
+  border-right: 1px solid #e2e8f0;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+.map-view-panel-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.map-view-form-group {
+  margin-bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.map-view-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.map-view-select,
+.map-view-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  font-size: 14px;
+  color: #334155;
+  background-color: #ffffff;
+  outline: none;
+  box-sizing: border-box;
+}
+
+
+.map-view-sidebar-legend {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.map-view-legend-section {
+  margin-top: 12px;
+  padding-top: 20px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.map-view-legend-title {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #94a3b8;
+  letter-spacing: 0.05em;
+  margin-bottom: 12px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: #475569;
+}
+
+.map-view-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: #475569;
+  margin-bottom: 10px;
+}
+
+.map-view-color-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.dot-high { background-color: #ef4444; }
+.dot-med { background-color: #f59e0b; }
+.dot-low { background-color: #10b981; }
+
+.map-view-action-container {
+  margin-top: auto; /* Pushes buttons flush to the lower edge layout barrier */
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 20px;
+}
+
+.map-view-apply-btn {
+  background-color: #10B981;
+  color: #ffffff;
+  padding: 12px;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  text-align: center;
+  transition: background-color 0.2s;
+}
+
+.map-view-apply-btn:hover {
+  background-color: #059669;
+}
+
+.map-view-reset-btn {
+  background-color: #EF4444;
+  color: #ffffff;
+  padding: 12px;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  text-align: center;
+  transition: background-color 0.2s;
+}
+
+.map-view-reset-btn:hover {
+  background-color: #dc2626;
+}
+
+/* RIGHT SIDE PANEL: INTERACTIVE MAP CANVAS WORKSPACE */
+.map-view-map-container {
+  flex: 1;
+  position: relative;
+  background-color: #e2e8f0;
+  height: 100%;
+}
+
+.map-view-map-placeholder {
+  width: 100%;
+  height: 100%;
+  background-color: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.map-view-map-graphics-mock {
+  text-align: center;
+  padding: 20px;
+}
+
+.map-view-floating-top-actions {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  gap: 10px;
+  z-index: 10;
+}
+
+.map-view-utility-btn {
+  background-color: #ffffff;
+  color: #1e293b;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+}
+
+.map-view-utility-btn:hover {
+  background-color: #f8fafc;
+}
+
+.map-view-floating-risk-card {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  background-color: #ffffff;
+  padding: 16px;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.1);
+  width: 160px;
+  z-index: 10;
+}
+
+.map-view-risk-card-title {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+
+.map-view-risk-card-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.map-view-color-dot-small {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.map-view-risk-text {
+  font-size: 12px;
+  color: #334155;
+}
+
+.map-view-action-buttons {
+  margin-top: auto; /* Forces buttons to stick cleanly to bottom of sidebar */
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.btn-apply-filters {
+  background-color: #00b87c;
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-apply-filters:hover { background-color: #009665; }
+
+.btn-reset-filters {
+  background-color: #ef4444;
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-reset-filters:hover { background-color: #dc2626; }
+
+
+.map-floating-top-actions {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 1000; /* Forces elements to sit safely above Leaflet graphics layer */
+  display: flex;
+  gap: 10px;
+}
+
+.map-utility-hud-btn {
+  background-color: #ffffff;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+.map-utility-hud-btn:hover { background-color: #f8fafc; }
+
+/* FLOATING BASE RISK LEGEND CARD ENGINE OVERLAY */
+.map-floating-risk-card {
+  position: absolute;
+  bottom: 24px;
+  left: 24px;
+  z-index: 1000;
+  background-color: #ffffff;
+  padding: 16px;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  border: 1px solid #f1f5f9;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 150px;
+}
+
+.risk-card-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.risk-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #334155;
+}
