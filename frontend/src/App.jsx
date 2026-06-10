@@ -6,7 +6,9 @@ import UserManagement from './UserManagement';
 import BarangayReports from './BarangayReports';
 import ChoSettings from './ChoSettings';
 import Login from './components/Login'; 
+import RecoverAccount from './components/RecoverAccount'; // 1. IMPORT RECOVER COMPONENT
 import MapView from './MapView';
+
 import './App.css';
 
 function App() {
@@ -19,6 +21,9 @@ function App() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedDisease, setSelectedDisease] = useState('Dengue');
   const [dateRange, setDateRange] = useState({ start: '2026-01-01', end: '2026-05-28' });
+
+  // --- AUTH VIEW STATE (Switches between 'login' and 'recover') ---
+  const [authView, setAuthView] = useState('login'); 
 
   // --- THEME LOGIC ---
   const [theme, setTheme] = useState('dark');
@@ -82,13 +87,28 @@ function App() {
 
   // --- CONNECTED GATEKEEPER CONDITION ---
   if (!isLoggedIn) {
-    return <Login onLoginSuccess={handleLoginSuccess} theme={theme} toggleTheme={toggleTheme} />;
+    if (authView === 'recover') {
+      return (
+        <RecoverAccount 
+          onBackToLogin={() => setAuthView('login')} 
+          theme={theme} 
+          toggleTheme={toggleTheme} 
+        />
+      );
+    }
+    return (
+      <Login 
+        onLoginSuccess={handleLoginSuccess} 
+        onForgotPassword={() => setAuthView('recover')} // Pass event handler to Login
+        theme={theme} 
+        toggleTheme={toggleTheme} 
+      />
+    );
   }
 
   // --- MAIN LAYOUT ENGINE ---
   return (
     <div className="dashboard-layout">
-      {/* Sidebar matches tabs natively via your existing state triggers */}
       <Sidebar role={loginRole} activeTab={activeTab} setActiveTab={setActiveTab} />
 
       <div className="main-content">
@@ -115,7 +135,6 @@ function App() {
 
               {isDropdownOpen && (
                 <div className="dropdown-menu">
-                  {/* 3. Updated tab destination string to hit the matching routing switch statement */}
                   <div className="dropdown-item" onClick={() => setActiveTab('Profile Settings')}>Profile Settings</div>
                   <div className="dropdown-item" style={{ color: '#ef4444' }} onClick={handleLogout}>Logout</div>
                 </div>
