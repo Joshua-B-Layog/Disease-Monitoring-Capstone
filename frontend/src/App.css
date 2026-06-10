@@ -65,6 +65,7 @@ html, body, #root {
   justify-content: center; 
   padding: 40px; 
   background-color: var(--bg-main); 
+  overflow-y: auto;
 }
 
 .login-form-container {
@@ -75,6 +76,7 @@ html, body, #root {
   border-radius: 12px;
   border: 1px solid var(--border-color);
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  margin: auto;
 }
 
 /* --- Form Elements --- */

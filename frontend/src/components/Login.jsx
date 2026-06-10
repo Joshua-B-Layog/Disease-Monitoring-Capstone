@@ -674,7 +674,7 @@
                   </div>
 
                   <button type="submit" className="submit-btn" style={{ backgroundColor: '#10B981', color: '#FFFFFF', marginTop: '20px', width: '100%' }}>
-                    Register Account Coordinates
+                    Register Account
                   </button>
                 </form>
               </>
