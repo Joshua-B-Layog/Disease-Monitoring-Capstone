@@ -54,8 +54,8 @@ function App() {
   // --- RENDERS THE CORRECT COMPONENT BASED ON TAB ---
   const renderContent = () => {
     switch (activeTab) {
-      case 'Dashboard':
-        return <Dashboard selectedDisease={selectedDisease} setSelectedDisease={setSelectedDisease} dateRange={dateRange} diseaseData={diseaseData} />;
+    case 'Dashboard':
+      return <Dashboard selectedDisease={selectedDisease} setSelectedDisease={setSelectedDisease} dateRange={dateRange} setActiveTab={setActiveTab}loggedUser={loggedUser}/>;
       case 'Manage Cases':
         return <ManageCases />;
       case 'Map View':
@@ -75,7 +75,7 @@ function App() {
     setIsLoggedIn(true);
     setLoginRole(sessionData.role);
     setSessionContext(sessionData.context);
-    setLoggedUser(sessionData.username);
+    setLoggedUser(sessionData.name || sessionData.username);
   };
 
   const handleLogout = () => { 

@@ -121,59 +121,109 @@ app.get('/api/reports', (req, res) => {
 
 // ROUTE: Login
 app.post('/api/login', (req, res) => {
-    const { email, password, role } = req.body;
+    const { email, password, role, context } = req.body;
 
-    console.log("--- Login Attempt ---", { email, role });
+    console.log("--- Login Attempt ---", { email, role, context });
 
     const query = `
-        SELECT * FROM users 
-        WHERE (username = ? OR email = ?) 
-        AND password = ? 
-        AND role = ? 
-        AND is_active = 1
+        SELECT u.*, b.name AS assigned_barangay_name
+        FROM users u
+        LEFT JOIN barangays b ON u.assigned_barangay_id = b.id
+        WHERE (u.username = ? OR u.email = ?)
+        AND u.password = ?
+        AND u.role = ?
+        AND u.is_active = 1
     `;
 
     db.query(query, [email, email, password, role], (err, results) => {
         if (err) {
             console.error("Database error:", err);
-            return res.status(500).json({ error: 'Internal server database error' });
+            return res.status(500).json({ error: 'Internal server error' });
         }
 
-        if (results.length > 0) {
-            const user = results[0];
-            return res.status(200).json({ 
-                message: 'Success', 
-                user: { id: user.user_id, name: user.full_name, role: user.role } 
-            });
-        } else {
-            return res.status(401).json({ error: 'Invalid credentials' });
+        if (results.length === 0) {
+            return res.status(401).json({ error: 'Invalid credentials or account not found.' });
         }
+
+        const user = results[0];
+
+        // BHW barangay validation
+        // context from frontend is like "Brgy. Mamatid"
+        // assigned_barangay_name from DB is like "Mamatid"
+        // We strip "Brgy. " from context and compare case-insensitively
+        if (role === 'BHW') {
+            const selectedBarangay = context.replace(/^Brgy\.\s*/i, '').trim().toLowerCase();
+            const assignedBarangay = (user.assigned_barangay_name || '').trim().toLowerCase();
+
+            console.log("BHW barangay check:", { selected: selectedBarangay, assigned: assignedBarangay });
+
+            if (!assignedBarangay) {
+                return res.status(403).json({ 
+                    error: 'Your account has no assigned barangay. Please contact your CHO administrator.' 
+                });
+            }
+
+            if (selectedBarangay !== assignedBarangay) {
+                return res.status(403).json({ 
+                    error: `Access denied. You are assigned to Brgy. ${user.assigned_barangay_name}, not Brgy. ${context.replace(/^Brgy\.\s*/i, '').trim()}.` 
+                });
+            }
+        }
+
+        // All checks passed
+        return res.status(200).json({
+            message: 'Success',
+            user: {
+                id: user.user_id,
+                name: user.full_name,
+                role: user.role,
+                barangay: user.assigned_barangay_name || null
+            }
+        });
     });
 });
 
 // ROUTE: Register new user — matches your actual DB columns
 app.post('/api/register', (req, res) => {
-    const { name, email, password, role, context } = req.body;
+    const { name, email, mobile, password, role, context } = req.body;
 
     console.log("--- Registration Request ---", { name, email, role, context });
 
-    // Auto-generate username from email prefix (e.g. "john@gmail.com" → "john")
     const username = email.split('@')[0];
 
+    // Determine assigned_barangay_id:
+    // BHW → context is barangay id (number string like "8")
+    // CHO → context is "CHO Unit I (Sala)" = id 18, "CHO Unit II (Pulo)" = id 17
+    // based on your barangays table: Sala=18, Pulo=17
+    let assignedBarangayId = null;
+
+    if (role === 'BHW' && context) {
+        const parsed = parseInt(context);
+        if (!isNaN(parsed)) assignedBarangayId = parsed;
+    } else if (role === 'CHO' && context) {
+        if (context.includes('Sala') || context.includes('Unit I')) {
+            assignedBarangayId = 18; // Sala = id 18
+        } else if (context.includes('Pulo') || context.includes('Unit II')) {
+            assignedBarangayId = 17; // Pulo = id 17
+        }
+    }
+
+    console.log("Resolved assignedBarangayId:", assignedBarangayId);
+
     const insertQuery = `
-        INSERT INTO users (username, full_name, email, password, role, is_active) 
-        VALUES (?, ?, ?, ?, ?, 1)
+        INSERT INTO users (username, full_name, email, mobile_number, password, role, assigned_barangay_id, is_active) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1)
     `;
 
-    db.query(insertQuery, [username, name, email, password, role], (err, result) => {
+    db.query(insertQuery, [username, name, email, mobile || null, password, role, assignedBarangayId], (err, result) => {
         if (err) {
             console.error("MySQL Registration Error:", err.message);
             if (err.code === 'ER_DUP_ENTRY') {
                 return res.status(409).json({ message: 'An account with this email already exists.' });
             }
-            return res.status(500).json({ message: 'Registration failed. Database error.' });
+            return res.status(500).json({ message: 'Registration failed: ' + err.message });
         }
-        console.log("✅ New user registered:", { username, name, email, role });
+        console.log("✅ Registered:", { username, role, assignedBarangayId });
         res.status(200).json({ message: 'Account registered successfully!' });
     });
 });

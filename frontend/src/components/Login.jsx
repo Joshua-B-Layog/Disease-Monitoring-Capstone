@@ -30,6 +30,10 @@
     const [signupContext, setSignupContext] = useState('CHO Unit I (Sala)');
     const [signupError, setSignupError] = useState('');
     const [signupSuccess, setSignupSuccess] = useState('');
+    const [signupMobile, setSignupMobile] = useState('');
+    const [showSignupPassword, setShowSignupPassword] = useState(false);
+    const [showSignupConfirm, setShowSignupConfirm] = useState(false);
+    const [barangayList, setBarangayList] = useState([]);
 
     const cabuyaoBarangays = [
       { name: 'Baclaran', district: 'CHO 1' }, { name: 'Banaybanay', district: 'CHO 2' },
@@ -51,7 +55,18 @@
         setEmail(savedEmail);
         setRememberMe(true);
       }
-    }, []);
+    }, []
+  );
+
+    useEffect(() => {
+      fetch('http://localhost:5000/api/barangays')
+        .then(res => res.json())
+        .then(data => setBarangayList(data))
+        .catch(err => console.error('Could not load barangays:', err));
+    }, []
+  );
+
+
 
     const handleRoleSelection = (role) => {
       setSelectedRole(role);
@@ -92,6 +107,8 @@
           }),
         });
 
+        const data = await response.json();
+
         if (response.ok) {
           if (rememberMe) {
             localStorage.setItem('remembered_user_email', email);
@@ -104,7 +121,9 @@
           onLoginSuccess({
             role: selectedRole,
             context: selectedContext,
-            username: email
+            username: email,
+            name: data.user.name,
+            barangay: data.user.barangay
           });
         } else {
           setLoginError('Invalid credentials or unauthorized role coordinates.');
@@ -117,44 +136,62 @@
 
     // --- REGISTER ACCOUNT SUBMISSION ---
     const handleSignupSubmit = async (e) => {
-      e.preventDefault();
-      setSignupError('');
-      setSignupSuccess('');
+    e.preventDefault();
+    setSignupError('');
+    setSignupSuccess('');
 
-      if (signupPassword !== signupConfirmPassword) {
+    if (signupPassword !== signupConfirmPassword) {
         setSignupError('Passwords do not match.');
         return;
-      }
+    }
+    if (signupMobile && signupMobile.length < 10) {
+        setSignupError('Please enter a valid mobile number (at least 10 digits).');
+        return;
+    }
 
-      try {
+    try {
         const response = await fetch('http://localhost:5000/api/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: signupName,
-            email: signupEmail,
-            password: signupPassword,
-            role: signupRole,
-            context: signupContext
-          })
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: signupName,
+                email: signupEmail,
+                mobile: signupMobile,
+                password: signupPassword,
+                role: signupRole,
+                context: signupContext
+            })
         });
 
         if (response.ok) {
-          setSignupSuccess('Account registered successfully! You can now log in.');
-          // Clear fields
-          setSignupName('');
-          setSignupEmail('');
-          setSignupPassword('');
-          setSignupConfirmPassword('');
+            // Clear all signup fields
+            setSignupName('');
+            setSignupEmail('');
+            setSignupMobile('');
+            setSignupPassword('');
+            setSignupConfirmPassword('');
+            setSignupRole('CHO');
+            setSignupContext('CHO Unit I (Sala)');
+            setSignupError('');
+
+            // Show brief success then go back to role selection
+            setSignupSuccess('Account registered successfully! Redirecting to login...');
+            setTimeout(() => {
+                setSignupSuccess('');
+                setSelectedContext('');
+                setSelectedRole('CHO');
+                setStep('role'); // ← back to the very beginning
+            }, 2000);
+
         } else {
-          const errData = await response.json();
-          setSignupError(errData.message || 'Registration failed. Verification required.');
+            const errData = await response.json();
+            setSignupError(errData.message || 'Registration failed.');
         }
-      } catch (error) {
+    } catch (error) {
         console.error("Registration Transmission Error:", error);
-        setSignupError('Unable to reach authentication registry server.');
-      }
-    };
+        setSignupError('Unable to reach server.');
+    }
+  };
 
     // --- PASSWORD RECOVERY SUBMISSION ---
    // --- INTEGRATED ACCOUNT RECOVERY ENGINE ---
@@ -382,7 +419,7 @@
                     ← Scope: {selectedContext}
                   </button>
                   <h2 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '8px' }}>Sign-In</h2>
-                  <p style={{ color: 'var(--text-muted)' }}>Please verify your account identity coordinates.</p>
+                  <p style={{ color: 'var(--text-muted)' }}>Please insert your account.</p>
                 </div>
 
                 <form onSubmit={handleFormSubmit}>
@@ -575,122 +612,190 @@
               </>
             )}
 
-            {/* SIGN UP SECTION FOR CHO ADMINS & USERS */}
+            {/* SIGN UP SECTION */}
             {step === 'signup' && (
-              <>
-                <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
-                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#10B981', cursor: 'pointer', fontSize: '14px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back</button>
-                  <h2 style={{ fontSize: '26px', color: 'var(--text-main)', marginBottom: '6px' }}>Create Account</h2>
-                  <p style={{ color: 'var(--text-muted)' }}>Register a new account terminal for surveillance database entry.</p>
-                </div>
-
-                <form onSubmit={handleSignupSubmit}>
-                  {signupError && (
-                    <div style={{ backgroundColor: '#fee2e2', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid #fca5a5', textAlign: 'left' }}>
-                      {signupError}
+                <>
+                    <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
+                        <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#10B981', cursor: 'pointer', fontSize: '14px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back</button>
+                        <h2 style={{ fontSize: '26px', color: 'var(--text-main)', marginBottom: '6px' }}>Create Account</h2>
+                        <p style={{ color: 'var(--text-muted)' }}>Register a new account for surveillance database entry.</p>
                     </div>
-                  )}
-                  {signupSuccess && (
-                    <div style={{ backgroundColor: '#d1fae5', color: '#065f46', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid #6ee7b7', textAlign: 'left' }}>
-                      {signupSuccess}
-                    </div>
-                  )}
 
-                  <div className="form-group" style={{ textAlign: 'left' }}>
-                    <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '13px', fontWeight: '500' }}>Full Name / Username</label>
-                    <input 
-                      type="text" 
-                      className="form-input" 
-                      placeholder="Juan Dela Cruz"
-                      value={signupName}
-                      onChange={(e) => setSignupName(e.target.value)}
-                      required 
-                    />
-                  </div>
+                    <form onSubmit={handleSignupSubmit}>
+                        {signupError && (
+                            <div style={{ backgroundColor: '#fee2e2', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid #fca5a5', textAlign: 'left' }}>
+                                {signupError}
+                            </div>
+                        )}
+                        {signupSuccess && (
+                            <div style={{ backgroundColor: '#d1fae5', color: '#065f46', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid #6ee7b7', textAlign: 'left' }}>
+                                {signupSuccess}
+                            </div>
+                        )}
 
-                  <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
-                    <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '13px', fontWeight: '500' }}>Email Address</label>
-                    <input 
-                      type="email" 
-                      className="form-input" 
-                      placeholder="juan@example.com"
-                      value={signupEmail}
-                      onChange={(e) => setSignupEmail(e.target.value)}
-                      required 
-                    />
-                  </div>
+                        {/* Full Name */}
+                        <div className="form-group" style={{ textAlign: 'left' }}>
+                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '13px', fontWeight: '500' }}>Full Name</label>
+                            <input
+                                type="text"
+                                className="form-input"
+                                placeholder="Juan Dela Cruz"
+                                value={signupName}
+                                onChange={(e) => setSignupName(e.target.value)}
+                                required
+                            />
+                        </div>
 
-                  <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
-                    <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '13px', fontWeight: '500' }}>Surveillance Role Group</label>
-                    <select 
-                      className="form-input"
-                      value={signupRole}
-                      onChange={(e) => {
-                        setSignupRole(e.target.value);
-                        setSignupContext(e.target.value === 'CHO' ? 'CHO Unit I (Sala)' : 'Brgy. Baclaran');
-                      }}
-                      style={{ width: '100%', height: '42px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0 10px' }}
-                    >
-                      <option value="CHO">City Health Office (CHO Admin)</option>
-                      <option value="BHW">Barangay Health Worker (BHW)</option>
-                    </select>
-                  </div>
+                        {/* Email */}
+                        <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
+                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '13px', fontWeight: '500' }}>Email Address</label>
+                            <input
+                                type="email"
+                                className="form-input"
+                                placeholder="juan@example.com"
+                                value={signupEmail}
+                                onChange={(e) => setSignupEmail(e.target.value)}
+                                required
+                            />
+                        </div>
 
-                  <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
-                    <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '13px', fontWeight: '500' }}>Assigned Station/Locality</label>
-                    {signupRole === 'CHO' ? (
-                      <select 
-                        className="form-input"
-                        value={signupContext}
-                        onChange={(e) => setSignupContext(e.target.value)}
-                        style={{ width: '100%', height: '42px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0 10px' }}
-                      >
-                        <option value="CHO Unit I (Sala)">CHO Unit I (Main - Sala)</option>
-                        <option value="CHO Unit II (Pulo)">CHO Unit II (Extension - Pulo)</option>
-                      </select>
-                    ) : (
-                      <select 
-                        className="form-input"
-                        value={signupContext}
-                        onChange={(e) => setSignupContext(e.target.value)}
-                        style={{ width: '100%', height: '42px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0 10px' }}
-                      >
-                        {cabuyaoBarangays.map(b => (
-                          <option key={b.name} value={`Brgy. ${b.name}`}>Brgy. {b.name} ({b.district})</option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
+                        {/* Mobile Number */}
+                        <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
+                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '13px', fontWeight: '500' }}>Mobile Number</label>
+                            <input
+                                type="text"
+                                className="form-input"
+                                placeholder="09123456789"
+                                value={signupMobile}
+                                onChange={(e) => setSignupMobile(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                                maxLength={11}
+                            />
+                        </div>
 
-                  <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
-                    <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '13px', fontWeight: '500' }}>Password</label>
-                    <input 
-                      type="password" 
-                      className="form-input" 
-                      placeholder="••••••••"
-                      value={signupPassword}
-                      onChange={(e) => setSignupPassword(e.target.value)}
-                      required 
-                    />
-                  </div>
+                        {/* Role */}
+                        <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
+                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '13px', fontWeight: '500' }}>Surveillance Role</label>
+                            <select
+                                className="form-input"
+                                value={signupRole}
+                                onChange={(e) => {
+                                    setSignupRole(e.target.value);
+                                    setSignupContext(e.target.value === 'CHO' ? 'CHO Unit I (Sala)' : '');
+                                }}
+                                style={{ width: '100%', height: '42px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0 10px' }}
+                            >
+                                <option value="CHO">City Health Office (CHO Admin)</option>
+                                <option value="BHW">Barangay Health Worker (BHW)</option>
+                            </select>
+                        </div>
 
-                  <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
-                    <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '13px', fontWeight: '500' }}>Confirm Password</label>
-                    <input 
-                      type="password" 
-                      className="form-input" 
-                      placeholder="••••••••"
-                      value={signupConfirmPassword}
-                      onChange={(e) => setSignupConfirmPassword(e.target.value)}
-                      required 
-                    />
-                  </div>
+                        {/* Assigned Station */}
+                        <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
+                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '13px', fontWeight: '500' }}>
+                                {signupRole === 'CHO' ? 'Unit Assignment' : 'Assigned Barangay'}
+                            </label>
+                            {signupRole === 'CHO' ? (
+                                <select
+                                    className="form-input"
+                                    value={signupContext}
+                                    onChange={(e) => setSignupContext(e.target.value)}
+                                    style={{ width: '100%', height: '42px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0 10px' }}
+                                >
+                                    <option value="CHO Unit I (Sala)">CHO Unit I (Main - Sala)</option>
+                                    <option value="CHO Unit II (Pulo)">CHO Unit II (Extension - Pulo)</option>
+                                </select>
+                            ) : (
+                                <select
+                                    className="form-input"
+                                    value={signupContext}
+                                    onChange={(e) => setSignupContext(e.target.value)}
+                                    style={{ width: '100%', height: '42px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0 10px' }}
+                                    required
+                                >
+                                    <option value="">— Select your barangay —</option>
+                                    {barangayList.map(b => (
+                                        <option key={b.id} value={b.id}>{b.name}</option>
+                                    ))}
+                                </select>
+                            )}
+                        </div>
 
-                  <button type="submit" className="submit-btn" style={{ backgroundColor: '#10B981', color: '#FFFFFF', marginTop: '20px', width: '100%' }}>
-                    Register Account
-                  </button>
-                </form>
-              </>
+                        {/* Password */}
+                        <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
+                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '13px', fontWeight: '500' }}>Password</label>
+                            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                <input
+                                    type={showSignupPassword ? 'text' : 'password'}
+                                    className="form-input"
+                                    placeholder="••••••••"
+                                    value={signupPassword}
+                                    onChange={(e) => setSignupPassword(e.target.value)}
+                                    style={{ paddingRight: '45px' }}
+                                    required
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowSignupPassword(!showSignupPassword)}
+                                    style={{ position: 'absolute', right: '14px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: 0 }}
+                                >
+                                    {showSignupPassword ? (
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                                            <line x1="1" y1="1" x2="23" y2="23"/>
+                                        </svg>
+                                    ) : (
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                            <circle cx="12" cy="12" r="3"/>
+                                        </svg>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Confirm Password */}
+                        <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
+                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '13px', fontWeight: '500' }}>Confirm Password</label>
+                            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                <input
+                                    type={showSignupConfirm ? 'text' : 'password'}
+                                    className="form-input"
+                                    placeholder="••••••••"
+                                    value={signupConfirmPassword}
+                                    onChange={(e) => setSignupConfirmPassword(e.target.value)}
+                                    style={{ paddingRight: '45px' }}
+                                    required
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowSignupConfirm(!showSignupConfirm)}
+                                    style={{ position: 'absolute', right: '14px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: 0 }}
+                                >
+                                    {showSignupConfirm ? (
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                                            <line x1="1" y1="1" x2="23" y2="23"/>
+                                        </svg>
+                                    ) : (
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                            <circle cx="12" cy="12" r="3"/>
+                                        </svg>
+                                    )}
+                                </button>
+                            </div>
+                            {signupConfirmPassword && (
+                                <p style={{ fontSize: '12px', marginTop: '5px', color: signupPassword === signupConfirmPassword ? '#10b981' : '#ef4444' }}>
+                                    {signupPassword === signupConfirmPassword ? '✓ Passwords match' : '✗ Passwords do not match'}
+                                </p>
+                            )}
+                        </div>
+
+                        <button type="submit" className="submit-btn" style={{ backgroundColor: '#10B981', color: '#FFFFFF', marginTop: '20px', width: '100%' }}>
+                            Register Account
+                        </button>
+                    </form>
+                </>
             )}
 
             {/* SHARED FOOTER ROUTING */}
