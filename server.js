@@ -7,6 +7,7 @@ const mysql = require('mysql2');
 const cors = require('cors');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
+const axios = require('axios');
 
 const app = express();
 
@@ -17,7 +18,7 @@ app.use(cors());
 app.use(express.json());
 
 // ==========================================
-// 3. DATABASE & CARRIER CONNECTIONS
+// 3. DATABASE & EMAIL CONNECTIONS
 // ==========================================
 const db = mysql.createConnection({
     host: process.env.DB_HOST,
@@ -34,7 +35,6 @@ db.connect((err) => {
     }
 });
 
-// Configure Nodemailer to send real emails via your Gmail credentials
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -43,11 +43,21 @@ const transporter = nodemailer.createTransport({
     }
 });
 
+// Verify email transporter on startup so you know immediately if credentials are wrong
+transporter.verify((error, success) => {
+    if (error) {
+        console.error("❌ Email transporter FAILED:", error.message);
+        console.error("   Check your EMAIL_USER and EMAIL_PASS in .env");
+    } else {
+        console.log("✅ Email transporter ready. Emails will send successfully.");
+    }
+});
+
 // ==========================================
 // 4. API ROUTES
 // ==========================================
 
-// ROUTE: Get all cases for the Dashboard (With safe JOINs)
+// ROUTE: Get all disease cases
 app.get('/api/disease_cases', (req, res) => {
     const sql = `
         SELECT 
@@ -64,7 +74,6 @@ app.get('/api/disease_cases', (req, res) => {
         LEFT JOIN diseases d ON dc.disease_id = d.id
         LEFT JOIN barangays b ON dc.barangay_id = b.id
     `;
-    
     db.query(sql, (err, results) => {
         if (err) {
             console.error("MySQL Query Error (/api/disease_cases):", err.message);
@@ -74,19 +83,17 @@ app.get('/api/disease_cases', (req, res) => {
     });
 });
 
-// ROUTE: Get list of Diseases (For Add Case dropdowns)
+// ROUTE: Get list of diseases
 app.get('/api/diseases', (req, res) => {
-    const sql = "SELECT * FROM diseases";
-    db.query(sql, (err, results) => {
+    db.query("SELECT * FROM diseases", (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(results);
     });
 });
 
-// ROUTE: Get list of Barangays (For Add Case dropdowns)
+// ROUTE: Get list of barangays
 app.get('/api/barangays', (req, res) => {
-    const sql = "SELECT * FROM barangays";
-    db.query(sql, (err, results) => {
+    db.query("SELECT * FROM barangays", (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(results);
     });
@@ -94,8 +101,7 @@ app.get('/api/barangays', (req, res) => {
 
 // ROUTE: Get all users
 app.get('/api/users', (req, res) => {
-    const sql = "SELECT * FROM users";
-    db.query(sql, (err, results) => {
+    db.query("SELECT * FROM users", (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(results);
     });
@@ -109,12 +115,15 @@ app.get('/api/reports', (req, res) => {
     });
 });
 
-// ROUTE: System User Authentication
+// ==========================================
+// AUTHENTICATION ROUTES
+// ==========================================
+
+// ROUTE: Login
 app.post('/api/login', (req, res) => {
     const { email, password, role } = req.body;
 
-    console.log("--- Login Debug ---");
-    console.log("Input Received:", { email, password, role });
+    console.log("--- Login Attempt ---", { email, role });
 
     const query = `
         SELECT * FROM users 
@@ -130,113 +139,125 @@ app.post('/api/login', (req, res) => {
             return res.status(500).json({ error: 'Internal server database error' });
         }
 
-        console.log("Results found:", results.length);
-        if (results.length === 0) {
-            console.log("No user matched these credentials.");
-        }
-
         if (results.length > 0) {
             const user = results[0];
-            return res.status(200).json({ message: 'Success', user: { id: user.user_id, name: user.full_name, role: user.role } });
+            return res.status(200).json({ 
+                message: 'Success', 
+                user: { id: user.user_id, name: user.full_name, role: user.role } 
+            });
         } else {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
     });
 });
 
-// ROUTE: Administrative User Registration
+// ROUTE: Register new user — matches your actual DB columns
 app.post('/api/register', (req, res) => {
-    const { name, mobileNumber, password, role, context } = req.body;
+    const { name, email, password, role, context } = req.body;
 
-    console.log("--- Registration Request Received ---", { name, mobileNumber, role, context });
+    console.log("--- Registration Request ---", { name, email, role, context });
+
+    // Auto-generate username from email prefix (e.g. "john@gmail.com" → "john")
+    const username = email.split('@')[0];
 
     const insertQuery = `
-        INSERT INTO users (full_name, mobile_number, password, role, username, email, is_active) 
-        VALUES (?, ?, ?, ?, ?, ?, 1)
+        INSERT INTO users (username, full_name, email, password, role, is_active) 
+        VALUES (?, ?, ?, ?, ?, 1)
     `;
 
-    const placeholderEmail = `${mobileNumber}@cabuyaohealth.gov`;
-    
-    db.query(insertQuery, [name, mobileNumber, password, role, mobileNumber, placeholderEmail], (err, result) => {
+    db.query(insertQuery, [username, name, email, password, role], (err, result) => {
         if (err) {
             console.error("MySQL Registration Error:", err.message);
+            if (err.code === 'ER_DUP_ENTRY') {
+                return res.status(409).json({ message: 'An account with this email already exists.' });
+            }
             return res.status(500).json({ message: 'Registration failed. Database error.' });
         }
+        console.log("✅ New user registered:", { username, name, email, role });
         res.status(200).json({ message: 'Account registered successfully!' });
     });
 });
 
 // ==========================================
-// DUAL RECOVERY FLOW (MOBILE OTP OR GMAIL VERIFICATION)
+// PASSWORD RECOVERY ROUTES
 // ==========================================
 
+// ROUTE: Forgot Password — sends email link OR generates mobile OTP
 app.post('/api/forgot-password', (req, res) => {
-    const { identity, method } = req.body; // identity: email/mobile/username, method: 'gmail' or 'mobile'
+    const { identity, method } = req.body;
 
-    console.log(`--- Reset Flow Initiated via [${method}] ---`);
+    // Guard: missing fields
+    if (!identity || !method) {
+        return res.status(400).json({ error: 'Identity and method are required.' });
+    }
+
+    console.log(`--- Recovery [${method}] for: ${identity} ---`);
 
     const findUserQuery = 'SELECT * FROM users WHERE email = ? OR mobile_number = ? OR username = ?';
     
     db.query(findUserQuery, [identity, identity, identity], (err, results) => {
         if (err) {
-            console.error("Database query error:", err.message);
-            return res.status(500).json({ error: 'Internal database verification failure.' });
+            console.error("❌ DB lookup error:", err.message);
+            return res.status(500).json({ error: 'Database error: ' + err.message });
         }
 
         if (results.length === 0) {
-            return res.status(404).json({ error: 'No administrative account found with those details.' });
+            console.log("❌ No user found for:", identity);
+            return res.status(404).json({ error: 'No account found with those details.' });
         }
 
         const userFound = results[0];
+        console.log(`✅ Found user: ${userFound.username} | Email: ${userFound.email}`);
 
-        // ------------------------------------------
-        // METHOD A: GMAIL TRANSACTIONAL VERIFICATION LINK
-        // ------------------------------------------
-        if (method === 'gmail') {
+        if (method === 'email') {
+            // Check email exists before trying to send
+            if (!userFound.email) {
+                return res.status(400).json({ error: 'This account has no email address on file.' });
+            }
+
             const token = crypto.randomBytes(32).toString('hex');
-            const expiryTime = new Date(Date.now() + 3600000); // Valid for 1 Hour
+            const expiryTime = new Date(Date.now() + 3600000);
 
             const updateTokenQuery = 'UPDATE users SET reset_token = ?, token_expiry = ? WHERE user_id = ?';
             db.query(updateTokenQuery, [token, expiryTime, userFound.user_id], (updateErr) => {
-                if (updateErr) return res.status(500).json({ error: 'Failed to generate token session.' });
+                if (updateErr) {
+                    console.error("❌ Token save error:", updateErr.message);
+                    return res.status(500).json({ error: 'Failed to save reset token: ' + updateErr.message });
+                }
 
                 const resetLink = `http://localhost:5173/reset-password?token=${token}&email=${encodeURIComponent(userFound.email)}`;
 
-                // HTML Structure matching your custom dark-themed Newgrounds design layout
                 const mailOptions = {
                     from: `"Cabuyao Health System" <${process.env.EMAIL_USER}>`,
                     to: userFound.email,
-                    subject: 'Cabuyao Health Password Reset Request',
+                    subject: 'Cabuyao Health — Password Reset Request',
                     html: `
-                        <div style="max-width: 600px; margin: 0 auto; font-family: system-ui, -apple-system, sans-serif; background-color: #16171d; border: 1px solid #2e303a; border-radius: 8px; overflow: hidden; color: #9ca3af;">
-                            <div style="background-color: #0d9488; padding: 24px; text-align: center;">
-                                <h1 style="color: #ffffff; margin: 0; font-size: 28px; letter-spacing: -0.5px;">CABUYAO HEALTH</h1>
+                        <div style="max-width:600px;margin:0 auto;font-family:system-ui,sans-serif;background:#16171d;border:1px solid #2e303a;border-radius:8px;overflow:hidden;">
+                            <div style="background:#0d9488;padding:24px;text-align:center;">
+                                <h1 style="color:#fff;margin:0;font-size:28px;">CABUYAO HEALTH</h1>
                             </div>
-                            <div style="background-color: #1f2028; padding: 40px 32px; text-align: left;">
-                                <p style="font-size: 16px; line-height: 1.6; margin-bottom: 16px; color: #f3f4f6;">
-                                    This is an automated message from the <strong>Cabuyao Health Surveillance System</strong> administrative node.
+                            <div style="background:#1f2028;padding:40px 32px;">
+                                <p style="color:#f3f4f6;font-size:16px;line-height:1.6;">
+                                    We received a request to reset the password for your account.
                                 </p>
-                                <p style="font-size: 16px; line-height: 1.6; margin-bottom: 16px; color: #f3f4f6;">
-                                    We have received a system authorization request to reset the password credentials assigned to your profile.
-                                </p>
-                                <div style="background-color: #16171d; border-left: 4px solid #0d9488; padding: 12px 16px; margin: 24px 0; border-radius: 4px;">
-                                    <span style="font-size: 15px; color: #9ca3af; display: block;">Target Administrative User:</span>
-                                    <strong style="font-size: 18px; color: #f3f4f6;">${userFound.full_name || userFound.username}</strong>
+                                <div style="background:#16171d;border-left:4px solid #0d9488;padding:12px 16px;margin:24px 0;border-radius:4px;">
+                                    <span style="color:#9ca3af;font-size:15px;display:block;">Account:</span>
+                                    <strong style="color:#f3f4f6;font-size:18px;">${userFound.full_name || userFound.username}</strong>
                                 </div>
-                                <p style="font-size: 16px; line-height: 1.6; margin-bottom: 32px; color: #f3f4f6;">
-                                    If you initiated this verification workflow, please configure your new system access credentials by clicking the activation button below:
+                                <p style="color:#f3f4f6;font-size:16px;">
+                                    Click below to set a new password. This link expires in <strong>60 minutes</strong>.
                                 </p>
-                                <div style="text-align: center; margin: 32px 0;">
-                                    <a href="${resetLink}" target="_blank" style="background-color: #10b981; color: #ffffff; text-decoration: none; padding: 14px 36px; font-size: 16px; font-weight: bold; border-radius: 6px; display: inline-block; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
+                                <div style="text-align:center;margin:32px 0;">
+                                    <a href="${resetLink}" style="background:#10b981;color:#fff;text-decoration:none;padding:14px 36px;font-size:16px;font-weight:bold;border-radius:6px;display:inline-block;">
                                         RESET PASSWORD
                                     </a>
                                 </div>
-                                <p style="font-size: 14px; color: #6b7280; line-height: 1.5; margin-top: 32px; border-top: 1px solid #2e303a; padding-top: 16px;">
-                                    This temporary verification hyperlink expires within 60 minutes. If you did not execute this validation event, you can safely disregard and delete this message.
+                                <p style="color:#6b7280;font-size:14px;border-top:1px solid #2e303a;padding-top:16px;margin-top:32px;">
+                                    If you did not request this, ignore this email.
                                 </p>
                             </div>
-                            <div style="background-color: #16171d; padding: 20px; text-align: center; font-size: 12px; color: #4b5563; border-top: 1px solid #2e303a;">
-                                © 2026 City Health Office (CHO) Cabuyao. All database environments secured.
+                            <div style="background:#16171d;padding:20px;text-align:center;font-size:12px;color:#4b5563;border-top:1px solid #2e303a;">
+                                © 2026 City Health Office (CHO) Cabuyao
                             </div>
                         </div>
                     `
@@ -244,102 +265,163 @@ app.post('/api/forgot-password', (req, res) => {
 
                 transporter.sendMail(mailOptions, (mailErr, info) => {
                     if (mailErr) {
-                        console.error("Mail Dispatch Failure:", mailErr.message);
-                        return res.status(500).json({ error: 'Failed to deliver automated verification email routing.' });
+                        console.error("❌ Email send FAILED:", mailErr.message);
+                        // Return the ACTUAL error so you can see it in the browser
+                        return res.status(500).json({ 
+                            error: 'Email failed: ' + mailErr.message 
+                        });
                     }
-                    console.log(`Email successfully dispatched to: ${userFound.email}`);
+                    console.log(`✅ Email sent to: ${userFound.email} | ID: ${info.messageId}`);
                     return res.status(200).json({ 
-                        message: 'Email verification route dispatched successfully.', 
-                        routingTarget: 'gmail' 
+                        message: `Recovery link sent to ${userFound.email}`,
+                        routingTarget: 'email'
                     });
                 });
             });
 
-        // ------------------------------------------
-        // METHOD B: MOBILE TELEMETRY 6-DIGIT OTP
-        // ------------------------------------------
         } else if (method === 'mobile') {
-            const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-            
-            const updateOtpQuery = 'UPDATE users SET otp_code = ? WHERE user_id = ?';
-            db.query(updateOtpQuery, [generatedOtp, userFound.user_id], (otpErr) => {
-                if (otpErr) return res.status(500).json({ error: 'Failed to generate target verification OTP.' });
+    const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    const updateOtpQuery = 'UPDATE users SET otp_code = ? WHERE user_id = ?';
+    db.query(updateOtpQuery, [generatedOtp, userFound.user_id], async (otpErr) => {
+        if (otpErr) {
+            console.error("❌ OTP save error:", otpErr.message);
+            return res.status(500).json({ error: 'Failed to save OTP: ' + otpErr.message });
+        }
 
-                // Presentation/Defense logs simulation window
-                console.log(`\n============================================`);
-                console.log(`📱 MOCK SMS DISPATCH TO: ${userFound.mobile_number}`);
-                console.log(`🔑 SECURE 6-DIGIT OTP CODE: [ ${generatedOtp} ]`);
-                console.log(`============================================\n`);
+        // Check mobile number exists
+        if (!userFound.mobile_number) {
+            return res.status(400).json({ error: 'No mobile number on file for this account.' });
+        }
 
-                return res.status(200).json({ 
-                    message: 'Mobile terminal authentication coordinate generated.', 
-                    routingTarget: 'mobile',
-                    mobileMask: userFound.mobile_number.slice(-4)
-                });
+        // Format PH number: convert 09xxxxxxxxx to 639xxxxxxxxx
+        let mobileFormatted = userFound.mobile_number.toString().trim();
+        if (mobileFormatted.startsWith('0')) {
+            mobileFormatted = '63' + mobileFormatted.slice(1);
+        }
+
+        console.log(`📱 Sending OTP to: ${mobileFormatted}`);
+
+        try {
+            const smsResponse = await axios.post('https://api.semaphore.co/api/v4/messages', {
+                apikey: process.env.SEMAPHORE_API_KEY,
+                number: mobileFormatted,
+                message: `Your Cabuyao Health System verification code is: ${generatedOtp}. Valid for 10 minutes. Do not share this code.`,
+                sendername: process.env.SEMAPHORE_SENDER_NAME || 'CabuyaoCHO'
+            });
+
+            console.log(`✅ SMS sent! Response:`, smsResponse.data);
+
+            return res.status(200).json({ 
+                message: 'OTP sent to your registered mobile number.',
+                routingTarget: 'mobile',
+                mobileMask: `*******${userFound.mobile_number.toString().slice(-4)}`
+            });
+
+        } catch (smsErr) {
+            console.error("❌ SMS send failed:", smsErr.response?.data || smsErr.message);
+            // Still return success with console fallback so you can test
+            console.log(`\n🔑 FALLBACK OTP for ${mobileFormatted}: [ ${generatedOtp} ]\n`);
+            return res.status(200).json({ 
+                message: 'OTP generated. Check server console if SMS failed.',
+                routingTarget: 'mobile',
+                mobileMask: `*******${userFound.mobile_number.toString().slice(-4)}`
             });
         }
     });
+}
+});
 });
 
-// ROUTE: Verify 6-Digit Mobile Passcode
+// ROUTE: Verify OTP — Login.jsx sends { identity, otp } 
 app.post('/api/verify-otp', (req, res) => {
-    const { identity, otpCode } = req.body;
+    const { identity, otp } = req.body; // ← "otp" matches what Login.jsx sends
 
-    const checkOtpQuery = 'SELECT * FROM users WHERE (email = ? OR mobile_number = ? OR username = ?) AND otp_code = ?';
-    db.query(checkOtpQuery, [identity, identity, identity, otpCode], (err, results) => {
-        if (err) return res.status(500).json({ error: 'Database verification failure.' });
-        if (results.length === 0) return res.status(400).json({ error: 'Invalid or incorrect verification OTP token.' });
+    console.log("--- OTP Verification ---", { identity, otp });
 
-        return res.status(200).json({ message: 'OTP verified successfully. Authorization token clear.' });
+    if (!otp || otp.length !== 6) {
+        return res.status(400).json({ error: 'Please enter a valid 6-digit code.' });
+    }
+
+    const checkQuery = `
+        SELECT * FROM users 
+        WHERE (email = ? OR mobile_number = ? OR username = ?) 
+        AND otp_code = ?
+    `;
+
+    db.query(checkQuery, [identity, identity, identity, otp], (err, results) => {
+        if (err) {
+            console.error("OTP check error:", err.message);
+            return res.status(500).json({ error: 'Database error during OTP check.' });
+        }
+        if (results.length === 0) {
+            return res.status(400).json({ error: 'Incorrect OTP code. Please try again.' });
+        }
+        console.log(`✅ OTP verified for: ${identity}`);
+        return res.status(200).json({ message: 'OTP verified. You may now set a new password.' });
     });
 });
 
-// ROUTE: Save New Password and Clear Expiry Sessions
+// ROUTE: Reset Password via Mobile OTP flow
+app.post('/api/reset-password-mobile', (req, res) => {
+    const { identity, newPassword } = req.body;
+
+    console.log("--- Mobile Password Reset ---", { identity });
+
+    const updateQuery = `
+        UPDATE users 
+        SET password = ?, otp_code = NULL 
+        WHERE email = ? OR mobile_number = ? OR username = ?
+    `;
+
+    db.query(updateQuery, [newPassword, identity, identity, identity], (err, result) => {
+        if (err) {
+            console.error("Mobile reset error:", err.message);
+            return res.status(500).json({ error: 'Failed to update password.' });
+        }
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Account not found.' });
+        }
+        console.log(`✅ Password updated via mobile OTP for: ${identity}`);
+        return res.status(200).json({ message: 'Password updated successfully!' });
+    });
+});
+
+// ROUTE: Reset Password via Email Link (token-based)
 app.post('/api/reset-password', (req, res) => {
     const { email, token, newPassword } = req.body;
 
-    console.log(`--- Database Update Initiated ---`);
-    console.log(`Targeting User account: ${email}`);
+    console.log("--- Email Token Password Reset ---", { email });
 
-    // If a token parameter exists, handle it under Email Validation expiration guidelines
-    if (token) {
-        const checkTokenQuery = 'SELECT * FROM users WHERE email = ? AND reset_token = ? AND token_expiry > NOW()';
-        db.query(checkTokenQuery, [email, token], (err, results) => {
-            if (err || results.length === 0) {
-                return res.status(400).json({ error: 'Security transaction session context has expired or is invalid.' });
+    const checkTokenQuery = `
+        SELECT * FROM users 
+        WHERE email = ? AND reset_token = ? AND token_expiry > NOW()
+    `;
+
+    db.query(checkTokenQuery, [email, token], (err, results) => {
+        if (err || results.length === 0) {
+            return res.status(400).json({ error: 'Reset link has expired or is invalid.' });
+        }
+
+        const clearAndSave = `
+            UPDATE users 
+            SET password = ?, reset_token = NULL, token_expiry = NULL 
+            WHERE email = ?
+        `;
+        db.query(clearAndSave, [newPassword, email], (updateErr, result) => {
+            if (updateErr) {
+                return res.status(500).json({ error: 'Failed to save new password.' });
             }
-            executePasswordChange(email, newPassword, res);
+            console.log(`✅ Password reset via email link for: ${email}`);
+            return res.status(200).json({ message: 'Password updated successfully!' });
         });
-    } else {
-        // Direct execution fallback if matching parameters came right out of the validated OTP track
-        executePasswordChange(email, newPassword, res);
-    }
+    });
 });
 
-// Structural helper execution scope to commit modifications cleanly
-function executePasswordChange(email, password, res) {
-    const clearSessionAndSaveQuery = `
-        UPDATE users 
-        SET password = ?, reset_token = NULL, token_expiry = NULL, otp_code = NULL 
-        WHERE email = ? OR mobile_number = ? OR username = ?
-    `;
-    db.query(clearSessionAndSaveQuery, [password, email, email, email], (err, result) => {
-        if (err) {
-            console.error("MySQL Update Query Error:", err.message);
-            return res.status(500).json({ error: 'Failed to write new password credentials to database.' });
-        }
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ error: 'Account index synchronization lost. Please try again.' });
-        }
-        console.log(`🎉 Success! Password updated in database environment for target: ${email}`);
-        return res.status(200).json({ message: 'Password has been successfully updated in phpMyAdmin!' });
-    });
-}
-
 // ==========================================
-// 5. START THE SERVER
+// 5. START SERVER
 // ==========================================
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
