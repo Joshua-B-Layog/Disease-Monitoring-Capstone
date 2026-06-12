@@ -2,32 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
 const ALL_DISEASES = [
-  'Acute Respiratory Infection',
-  'Avian Influenza',
-  'Chickenpox',
-  'Cholera',
-  'Dengue',
-  'Diarrhea',
-  'Diphtheria',
-  'Ebola',
-  'Hand Foot and Mouth Disease',
-  'Hepatitis A',
-  'Hepatitis B',
-  'Hepatitis C',
-  'HIV/AIDS',
-  'Influenza',
-  'Influenza A (H1N1)',
-  'Leprosy',
-  'Malaria',
-  'Measles',
-  'Meningococcemia',
-  'Pertussis',
-  'Poliomyelitis',
-  'Rabies',
-  'SARS',
-  'Sore Eyes',
-  'Tuberculosis',
-  'Typhoid Fever',
+  'Acute Respiratory Infection','Avian Influenza','Chickenpox','Cholera','Dengue',
+  'Diarrhea','Diphtheria','Ebola','Hand Foot and Mouth Disease','Hepatitis A',
+  'Hepatitis B','Hepatitis C','HIV/AIDS','Influenza','Influenza A (H1N1)',
+  'Leprosy','Malaria','Measles','Meningococcemia','Pertussis','Poliomyelitis',
+  'Rabies','SARS','Sore Eyes','Tuberculosis','Typhoid Fever',
 ];
 
 const CASES_PER_PAGE = 10;
@@ -47,7 +26,6 @@ const Dashboard = ({ setActiveTab, loggedUser }) => {
       .catch(() => setLoading(false));
   }, []);
 
-  // Close export dropdown when clicking outside
   useEffect(() => {
     const handler = (e) => {
       if (exportRef.current && !exportRef.current.contains(e.target)) {
@@ -68,31 +46,113 @@ const Dashboard = ({ setActiveTab, loggedUser }) => {
   const recoveredCases = cases.filter(c => c.status === 'Recovered').length;
   const deathCases = cases.filter(c => c.status === 'Deceased').length;
 
-  // --- BAR CHART: filter by disease, count by barangay, sort desc, show top 6 visible ---
+  // --- BAR CHART DATA ---
   const diseaseFilteredCases = cases.filter(
     c => c.disease_name && c.disease_name.toLowerCase() === selectedDisease.toLowerCase()
   );
-
   const barangayCounts = {};
   diseaseFilteredCases.forEach(item => {
     const name = item.barangay_name || `Barangay ${item.barangay_id}`;
     barangayCounts[name] = (barangayCounts[name] || 0) + 1;
   });
-
   const sortedBars = Object.entries(barangayCounts)
     .sort((a, b) => b[1] - a[1])
     .map(([label, count]) => ({ label, count }));
-
   const highestCount = sortedBars.length > 0 ? sortedBars[0].count : 1;
 
-  // --- PAGINATION for recent cases ---
+  // --- PAGINATION ---
   const totalPages = Math.ceil(cases.length / CASES_PER_PAGE);
   const paginatedCases = cases.slice(
     (currentPage - 1) * CASES_PER_PAGE,
     currentPage * CASES_PER_PAGE
   );
 
-  // --- EXPORT FUNCTIONS ---
+  // ─── SHARED: build bar chart HTML block for exports ───
+  const buildBarChartHTML = () => {
+    if (sortedBars.length === 0) {
+      return `<p style="color:#64748b;font-size:14px;">No cases found for ${selectedDisease}.</p>`;
+    }
+    const barRows = sortedBars.map((bar, i) => {
+      const pct = Math.round((bar.count / highestCount) * 100);
+      const color = i === 0 ? '#ef4444' : i === 1 ? '#f59e0b' : '#3b82f6';
+      return `
+        <tr>
+          <td style="padding:6px 10px 6px 0;font-size:13px;white-space:nowrap;min-width:160px;">${bar.label}</td>
+          <td style="padding:6px 0;width:100%;">
+            <div style="background:#e2e8f0;border-radius:4px;height:14px;width:100%;overflow:hidden;">
+              <div style="background:${color};height:100%;width:${pct}%;border-radius:4px;"></div>
+            </div>
+          </td>
+          <td style="padding:6px 0 6px 10px;font-size:13px;font-weight:600;white-space:nowrap;">${bar.count} case${bar.count !== 1 ? 's' : ''}</td>
+        </tr>`;
+    }).join('');
+    return `
+      <table style="width:100%;border-collapse:collapse;">
+        <tbody>${barRows}</tbody>
+      </table>`;
+  };
+
+  // ─── SHARED: build case table rows HTML ───
+  const buildTableRowsHTML = (caseList) => caseList.map(c =>
+    `<tr>
+      <td>${c.case_id}</td>
+      <td>${c.patient_name || ''}</td>
+      <td>${c.age || '--'}</td>
+      <td>${c.barangay_name || ''}</td>
+      <td>${c.disease_name || ''}</td>
+      <td>${c.severity || 'N/A'}</td>
+      <td>${c.status || ''}</td>
+    </tr>`
+  ).join('');
+
+  // --- EXPORT: WORD ---
+  const handleExportWord = () => {
+    const html = `
+      <html><head><meta charset="utf-8"><title>CDMS Report</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 32px; font-size: 13px; color: #111; }
+        h2 { color: #1e3a8a; margin-bottom: 4px; }
+        p { color: #555; margin: 0 0 20px 0; }
+        h3 { color: #1e3a8a; margin: 24px 0 10px 0; font-size: 15px; }
+        table.main { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        table.main th { background: #1e3a8a; color: white; padding: 9px 10px; text-align: center; font-size: 12px; }
+        table.main td { padding: 8px 10px; border-bottom: 1px solid #e5e7eb; text-align: center; font-size: 12px; }
+        table.main tr:nth-child(even) td { background: #f9fafb; }
+        .bar-section { margin: 8px 0 24px 0; }
+      </style></head><body>
+      <h2>Cabuyao Disease Monitoring System — Dashboard Export</h2>
+      <p>Generated: ${new Date().toLocaleDateString()} &nbsp;|&nbsp; Date Range: ${dateRange.start} to ${dateRange.end}</p>
+
+      <h3>${selectedDisease} Cases by Barangay</h3>
+      <div class="bar-section">${buildBarChartHTML()}</div>
+
+      <h3>Case Records</h3>
+      <table class="main">
+        <thead><tr><th>ID</th><th>Patient</th><th>Age</th><th>Barangay</th><th>Disease</th><th>Severity</th><th>Status</th></tr></thead>
+        <tbody>${buildTableRowsHTML(cases)}</tbody>
+      </table>
+      </body></html>`;
+    const blob = new Blob(['\ufeff' + html], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url;
+    a.download = 'CDMS_Dashboard_Export.doc'; a.click();
+    setShowExportMenu(false);
+  };
+
+  // --- EXPORT: EXCEL ---
+  const handleExportExcel = () => {
+    const headers = 'Case ID\tPatient Name\tAge\tBarangay\tDisease\tSeverity\tStatus\tDate Reported\n';
+    const rows = cases.map(c =>
+      `${c.case_id}\t${c.patient_name || ''}\t${c.age || ''}\t${c.barangay_name || ''}\t${c.disease_name || ''}\t${c.severity || ''}\t${c.status || ''}\t${c.date_reported || ''}`
+    ).join('\n');
+    const blob = new Blob([headers + rows], { type: 'application/vnd.ms-excel' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url;
+    a.download = 'CDMS_Dashboard_Export.xls'; a.click();
+    setShowExportMenu(false);
+  };
+
+  // --- EXPORT: CSV ---
   const handleExportCSV = () => {
     const headers = 'Case ID,Patient Name,Age,Barangay,Disease,Severity,Status,Date Reported\n';
     const rows = cases.map(c =>
@@ -105,68 +165,54 @@ const Dashboard = ({ setActiveTab, loggedUser }) => {
     setShowExportMenu(false);
   };
 
-  const handleExportExcel = () => {
-    // Tab-separated values saved as .xls — opens in Excel
-    const headers = 'Case ID\tPatient Name\tAge\tBarangay\tDisease\tSeverity\tStatus\tDate Reported\n';
-    const rows = cases.map(c =>
-      `${c.case_id}\t${c.patient_name || ''}\t${c.age || ''}\t${c.barangay_name || ''}\t${c.disease_name || ''}\t${c.severity || ''}\t${c.status || ''}\t${c.date_reported || ''}`
-    ).join('\n');
-    const blob = new Blob([headers + rows], { type: 'application/vnd.ms-excel' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url;
-    a.download = 'CDMS_Dashboard_Export.xls'; a.click();
-    setShowExportMenu(false);
-  };
-
-  const handleExportWord = () => {
-    const rows = cases.map(c =>
-      `<tr>
-        <td>${c.case_id}</td><td>${c.patient_name || ''}</td><td>${c.age || ''}</td>
-        <td>${c.barangay_name || ''}</td><td>${c.disease_name || ''}</td>
-        <td>${c.severity || ''}</td><td>${c.status || ''}</td><td>${c.date_reported || ''}</td>
-      </tr>`
-    ).join('');
-    const html = `
-      <html><head><meta charset="utf-8"><title>CDMS Report</title></head><body>
-      <h2>Cabuyao Disease Monitoring System — Dashboard Export</h2>
-      <p>Generated: ${new Date().toLocaleDateString()}</p>
-      <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:12px;">
-        <thead style="background:#1E3A8A;color:white;">
-          <tr><th>ID</th><th>Patient</th><th>Age</th><th>Barangay</th><th>Disease</th><th>Severity</th><th>Status</th><th>Date</th></tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table></body></html>`;
-    const blob = new Blob(['\ufeff' + html], { type: 'application/msword' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url;
-    a.download = 'CDMS_Dashboard_Export.doc'; a.click();
-    setShowExportMenu(false);
-  };
-
+  // --- EXPORT: PPT ---
   const handleExportPPT = () => {
-    // Creates a basic HTML file styled like a slide — user can copy to PPT
-    const topBarangays = sortedBars.slice(0, 5).map(b => `<li>${b.label}: <strong>${b.count} cases</strong></li>`).join('');
     const html = `
       <html><head><meta charset="utf-8"><title>CDMS Slide Export</title>
       <style>
         body { font-family: Arial, sans-serif; background: #0B1120; color: white; padding: 40px; }
-        h1 { color: #10b981; } h2 { color: #60a5fa; margin-top: 40px; }
-        .stat { display: inline-block; background: #1e293b; padding: 20px 30px; margin: 10px; border-radius: 8px; text-align: center; }
-        .stat .num { font-size: 36px; font-weight: bold; color: #10b981; }
-        .stat .lbl { font-size: 14px; color: #9ca3af; }
-        ul { font-size: 18px; line-height: 2; }
+        h1 { color: #10b981; margin-bottom: 4px; } 
+        h2 { color: #60a5fa; margin-top: 36px; margin-bottom: 12px; font-size: 18px; }
+        p { color: #9ca3af; margin: 0 0 24px 0; font-size: 13px; }
+        .stats { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+        .stat { background: #1e293b; padding: 18px 28px; border-radius: 8px; text-align: center; min-width: 100px; }
+        .stat .num { font-size: 32px; font-weight: bold; color: #10b981; }
+        .stat .lbl { font-size: 12px; color: #9ca3af; margin-top: 4px; }
+        table.bars { width: 100%; border-collapse: collapse; }
+        table.bars td { padding: 5px 8px; font-size: 13px; color: #e2e8f0; }
+        .track { background: #334155; border-radius: 4px; height: 14px; width: 100%; overflow: hidden; }
+        .fill-red { background: #ef4444; height: 100%; border-radius: 4px; }
+        .fill-amber { background: #f59e0b; height: 100%; border-radius: 4px; }
+        .fill-blue { background: #3b82f6; height: 100%; border-radius: 4px; }
+        footer { color: #4b5563; font-size: 11px; margin-top: 40px; border-top: 1px solid #1e293b; padding-top: 12px; }
       </style></head><body>
       <h1>Cabuyao Disease Monitoring System</h1>
-      <p style="color:#9ca3af;">Generated: ${new Date().toLocaleDateString()}</p>
-      <div>
+      <p>Dashboard Export &nbsp;|&nbsp; Generated: ${new Date().toLocaleDateString()} &nbsp;|&nbsp; ${dateRange.start} to ${dateRange.end}</p>
+
+      <div class="stats">
         <div class="stat"><div class="num">${totalCases}</div><div class="lbl">Total Cases</div></div>
-        <div class="stat"><div class="num">${activeCases}</div><div class="lbl">Active</div></div>
+        <div class="stat"><div class="num" style="color:#f59e0b;">${activeCases}</div><div class="lbl">Active</div></div>
         <div class="stat"><div class="num">${recoveredCases}</div><div class="lbl">Recovered</div></div>
-        <div class="stat"><div class="num">${deathCases}</div><div class="lbl">Deaths</div></div>
+        <div class="stat"><div class="num" style="color:#ef4444;">${deathCases}</div><div class="lbl">Deaths</div></div>
       </div>
-      <h2>Top Affected Barangays — ${selectedDisease}</h2>
-      <ul>${topBarangays || '<li>No data for selected disease</li>'}</ul>
-      <p style="color:#6b7280;font-size:12px;margin-top:40px;">Copy this content into PowerPoint for presentation use.</p>
+
+      <h2>${selectedDisease} Cases by Barangay</h2>
+      ${sortedBars.length === 0
+        ? `<p>No cases found for ${selectedDisease}.</p>`
+        : `<table class="bars"><tbody>
+            ${sortedBars.map((bar, i) => {
+              const pct = Math.round((bar.count / highestCount) * 100);
+              const fillClass = i === 0 ? 'fill-red' : i === 1 ? 'fill-amber' : 'fill-blue';
+              return `<tr>
+                <td style="min-width:170px;white-space:nowrap;">${bar.label}</td>
+                <td style="width:100%;"><div class="track"><div class="${fillClass}" style="width:${pct}%;"></div></div></td>
+                <td style="min-width:60px;text-align:right;">${bar.count}</td>
+              </tr>`;
+            }).join('')}
+          </tbody></table>`
+      }
+
+      <footer>Copy content into PowerPoint for presentation. &copy; 2026 City Health Office (CHO) Cabuyao</footer>
       </body></html>`;
     const blob = new Blob([html], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
@@ -175,6 +221,7 @@ const Dashboard = ({ setActiveTab, loggedUser }) => {
     setShowExportMenu(false);
   };
 
+  // --- PRINT ---
   const handlePrint = () => {
     const rows = paginatedCases.map(c =>
       `<tr>
@@ -187,25 +234,35 @@ const Dashboard = ({ setActiveTab, loggedUser }) => {
         <td>${c.status || ''}</td>
       </tr>`
     ).join('');
+
     const printWindow = window.open('', '_blank');
     printWindow.document.write(`
       <html><head><title>CDMS Print Report</title>
       <style>
-        body { font-family: Arial, sans-serif; padding: 20px; font-size: 13px; }
-        h2 { color: #1e3a8a; } p { color: #555; }
-        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-        th { background: #1e3a8a; color: white; padding: 10px; text-align: left; }
-        td { padding: 8px 10px; border-bottom: 1px solid #e5e7eb; }
-        tr:nth-child(even) { background: #f9fafb; }
+        body { font-family: Arial, sans-serif; padding: 28px; font-size: 13px; color: #111; }
+        h2 { color: #1e3a8a; margin-bottom: 2px; }
+        p { color: #555; margin: 0 0 20px 0; }
+        h3 { color: #1e3a8a; margin: 20px 0 8px 0; font-size: 14px; }
+        table.main { width: 100%; border-collapse: collapse; }
+        table.main th { background: #1e3a8a; color: white; padding: 9px 10px; text-align: center; font-size: 12px; }
+        table.main td { padding: 8px 10px; border-bottom: 1px solid #e5e7eb; text-align: center; font-size: 12px; }
+        table.main tr:nth-child(even) td { background: #f9fafb; }
+        .bar-section { margin-bottom: 24px; }
         @media print { button { display: none; } }
       </style></head><body>
       <h2>Cabuyao Disease Monitoring System</h2>
-      <p>Report generated: ${new Date().toLocaleString()} &nbsp;|&nbsp; Showing page ${currentPage} of ${totalPages}</p>
-      <table>
+      <p>Report generated: ${new Date().toLocaleString()} &nbsp;|&nbsp; Page ${currentPage} of ${totalPages} &nbsp;|&nbsp; Date Range: ${dateRange.start} to ${dateRange.end}</p>
+
+      <h3>${selectedDisease} Cases by Barangay</h3>
+      <div class="bar-section">${buildBarChartHTML()}</div>
+
+      <h3>Case Records (Page ${currentPage})</h3>
+      <table class="main">
         <thead><tr><th>ID</th><th>Patient Name</th><th>Age</th><th>Barangay</th><th>Disease</th><th>Severity</th><th>Status</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <br/><button onclick="window.print();" style="padding:10px 24px;background:#1e3a8a;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">
+      <br/>
+      <button onclick="window.print();" style="padding:10px 24px;background:#1e3a8a;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">
         🖨️ Print / Save as PDF
       </button>
       </body></html>`);
@@ -246,13 +303,11 @@ const Dashboard = ({ setActiveTab, loggedUser }) => {
           <h4 style={{ color: 'var(--text-main)', margin: '0 0 16px 0', fontSize: '15px', fontWeight: '600' }}>
             {selectedDisease} Cases by Barangay
           </h4>
-
           {sortedBars.length === 0 ? (
             <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '20px 0' }}>
               No cases found for {selectedDisease}.
             </div>
           ) : (
-            /* Scrollable container — shows 6, scroll for rest */
             <div style={{ maxHeight: '240px', overflowY: 'auto', paddingRight: '4px' }}>
               {sortedBars.map((bar, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
@@ -263,9 +318,7 @@ const Dashboard = ({ setActiveTab, loggedUser }) => {
                     <div style={{
                       width: `${(bar.count / highestCount) * 100}%`,
                       background: i === 0 ? '#ef4444' : i === 1 ? '#f59e0b' : '#3b82f6',
-                      height: '100%',
-                      borderRadius: '6px',
-                      transition: 'width 0.4s ease'
+                      height: '100%', borderRadius: '6px', transition: 'width 0.4s ease'
                     }} />
                   </div>
                 </div>
@@ -274,43 +327,42 @@ const Dashboard = ({ setActiveTab, loggedUser }) => {
           )}
         </div>
 
-        {/* FILTER & CONTROLS */}
+        {/* FILTER & CONTROLS — FIX: date inputs no longer overflow */}
         <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <h4 style={{ color: 'var(--text-main)', margin: '0', fontSize: '15px', fontWeight: '600' }}>Filter & Controls</h4>
 
-          {/* Disease dropdown — all 26 */}
+          {/* Disease dropdown */}
           <div>
             <label style={{ color: 'var(--text-muted)', fontSize: '11px', display: 'block', marginBottom: '4px' }}>Disease</label>
             <select
               value={selectedDisease}
               onChange={(e) => setSelectedDisease(e.target.value)}
-              style={{ width: '100%', padding: '7px 10px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '13px' }}
+              style={{ width: '100%', padding: '7px 10px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box' }}
             >
               {ALL_DISEASES.map(d => <option key={d} value={d}>{d}</option>)}
             </select>
           </div>
 
-          {/* Date range — compact */}
+          {/* ── FIX: Date range — stacked so neither overflows ── */}
           <div>
             <label style={{ color: 'var(--text-muted)', fontSize: '11px', display: 'block', marginBottom: '4px' }}>Date Range</label>
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <input
                 type="date"
                 value={dateRange.start}
                 onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                style={{ flex: 1, padding: '6px 8px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '12px' }}
+                style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '12px', boxSizing: 'border-box' }}
               />
-              <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>to</span>
               <input
                 type="date"
                 value={dateRange.end}
                 onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-                style={{ flex: 1, padding: '6px 8px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '12px' }}
+                style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '12px', boxSizing: 'border-box' }}
               />
             </div>
           </div>
 
-          {/* EXPORT dropdown button */}
+          {/* EXPORT dropdown */}
           <div style={{ position: 'relative' }} ref={exportRef}>
             <button
               onClick={() => setShowExportMenu(!showExportMenu)}
@@ -340,7 +392,7 @@ const Dashboard = ({ setActiveTab, loggedUser }) => {
             )}
           </div>
 
-          {/* PRINT button */}
+          {/* PRINT */}
           <button
             onClick={handlePrint}
             style={{ width: '100%', padding: '8px', background: '#065f46', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}
@@ -352,8 +404,6 @@ const Dashboard = ({ setActiveTab, loggedUser }) => {
 
       {/* ── RECENT CASE REPORTS ── */}
       <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '20px' }}>
-
-        {/* Header row */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <h4 style={{ color: 'var(--text-main)', margin: 0, fontSize: '15px', fontWeight: '600' }}>
             Recent Case Reports
@@ -369,12 +419,16 @@ const Dashboard = ({ setActiveTab, loggedUser }) => {
           </button>
         </div>
 
-        {/* Table */}
+        {/* ── FIX: All headers centered, all cells centered ── */}
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
               {['ID', 'Patient Name', 'Age', 'Barangay', 'Disease', 'Severity', 'Status'].map(h => (
-                <th key={h} style={{ textAlign: 'left', color: 'var(--text-muted)', fontSize: '11px', fontWeight: '600', padding: '10px 12px', borderBottom: '1px solid var(--border-color)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <th key={h} style={{
+                  textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px',
+                  fontWeight: '600', padding: '10px 12px', borderBottom: '1px solid var(--border-color)',
+                  textTransform: 'uppercase', letterSpacing: '0.05em'
+                }}>
                   {h}
                 </th>
               ))}
@@ -383,13 +437,13 @@ const Dashboard = ({ setActiveTab, loggedUser }) => {
           <tbody>
             {paginatedCases.map((c) => (
               <tr key={c.case_id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                <td style={{ padding: '12px', color: 'var(--text-muted)', fontSize: '13px' }}>#{String(c.case_id).padStart(3, '0')}</td>
-                <td style={{ padding: '12px', color: 'var(--text-main)', fontSize: '14px', fontWeight: '500' }}>{c.patient_name || 'Unknown'}</td>
-                <td style={{ padding: '12px', color: 'var(--text-main)', fontSize: '13px' }}>{c.age || '--'}</td>
-                <td style={{ padding: '12px', color: 'var(--text-main)', fontSize: '13px' }}>{c.barangay_name || `ID: ${c.barangay_id}`}</td>
-                <td style={{ padding: '12px', color: 'var(--text-main)', fontSize: '13px' }}>{c.disease_name || '--'}</td>
-                <td style={{ padding: '12px', color: 'var(--text-main)', fontSize: '13px' }}>{c.severity || 'N/A'}</td>
-                <td style={{ padding: '12px' }}>
+                <td style={{ padding: '12px', color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center' }}>#{String(c.case_id).padStart(3, '0')}</td>
+                <td style={{ padding: '12px', color: 'var(--text-main)', fontSize: '14px', fontWeight: '500', textAlign: 'center' }}>{c.patient_name || 'Unknown'}</td>
+                <td style={{ padding: '12px', color: 'var(--text-main)', fontSize: '13px', textAlign: 'center' }}>{c.age || '--'}</td>
+                <td style={{ padding: '12px', color: 'var(--text-main)', fontSize: '13px', textAlign: 'center' }}>{c.barangay_name || `ID: ${c.barangay_id}`}</td>
+                <td style={{ padding: '12px', color: 'var(--text-main)', fontSize: '13px', textAlign: 'center' }}>{c.disease_name || '--'}</td>
+                <td style={{ padding: '12px', color: 'var(--text-main)', fontSize: '13px', textAlign: 'center' }}>{c.severity || 'N/A'}</td>
+                <td style={{ padding: '12px', textAlign: 'center' }}>
                   <span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '500', ...getStatusStyle(c.status) }}>
                     {c.status}
                   </span>
