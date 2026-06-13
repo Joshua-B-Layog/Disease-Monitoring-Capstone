@@ -3,7 +3,7 @@ import axios from 'axios';
 
 const ALL_DISEASES = [
   'Acute Respiratory Infection','Avian Influenza','Chickenpox','Cholera','Dengue',
-  'Diarrhea','Diphtheria','Ebola','Hand Foot and Mouth Disease','Hepatitis A',
+  'Covid-19','Diphtheria','Ebola','Hand Foot and Mouth Disease','Hepatitis A',
   'Hepatitis B','Hepatitis C','HIV/AIDS','Influenza','Influenza A (H1N1)',
   'Leprosy','Malaria','Measles','Meningococcemia','Pertussis','Poliomyelitis',
   'Rabies','SARS','Sore Eyes','Tuberculosis','Typhoid Fever',
