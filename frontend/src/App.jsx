@@ -63,7 +63,7 @@ function App() {
       case 'User Accounts': 
         return <UserManagement />; 
       case 'Barangay Reports':
-        return <BarangayReports />;
+        return <BarangayReports activeUser={{ role: loginRole, context: sessionContext }} />;
       case 'Settings':
         return <ChoSettings activeUser={{ role: loginRole, context: sessionContext }} />;
       default:

@@ -593,10 +593,12 @@ export default function ManageCases() {
     const isEdit = view === 'edit';
     const currentDisease = formData.diseaseType;
     const isOther = currentDisease === 'Other Communicable Diseases' || currentDisease === 'Other';
-    const hasCoords = formData.lat && formData.lng;
+    const latVal = String(formData.lat || '').trim();
+    const lngVal = String(formData.lng || '').trim();
+    const hasCoords = latVal !== '' && lngVal !== '' && !isNaN(parseFloat(latVal)) && !isNaN(parseFloat(lngVal));
     const mapSrc = hasCoords
-      ? `https://www.openstreetmap.org/export/embed.html?bbox=${parseFloat(formData.lng)-0.01},${parseFloat(formData.lat)-0.01},${parseFloat(formData.lng)+0.01},${parseFloat(formData.lat)+0.01}&layer=mapnik&marker=${formData.lat},${formData.lng}`
-      : null;
+    ? `https://www.openstreetmap.org/export/embed.html?bbox=${parseFloat(lngVal)-0.01},${parseFloat(latVal)-0.01},${parseFloat(lngVal)+0.01},${parseFloat(latVal)+0.01}&layer=mapnik&marker=${latVal},${lngVal}`
+    : null;
 
     return (
       <div style={{ padding: '28px' }}>
@@ -723,39 +725,72 @@ export default function ManageCases() {
                 value={formData.symptoms} onChange={e => setFormData({ ...formData, symptoms: e.target.value })} />
             </div>
 
-            {/* Location & Coordinates + optional map */}
+            {/* Location & Coordinates + map preview */}
             <div style={{ marginBottom: '28px' }}>
-              <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '8px', fontWeight: '500' }}>
-                Location & Coordinates <span style={{ color: '#9ca3af', fontWeight: '400' }}>(optional)</span>
+              <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '10px', fontWeight: '600' }}>
+                Location & Coordinates{' '}
+                <span style={{ color: '#9ca3af', fontWeight: '400', fontSize: '12px' }}>(optional)</span>
               </label>
-              <div style={{ display: 'grid', gridTemplateColumns: hasCoords ? '1fr 1fr' : '1fr', gap: '16px', alignItems: 'start' }}>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <div style={{ flex: 1 }}>
-                    <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', marginBottom: '4px' }}>Latitude (N)</label>
-                    <input type="text" placeholder="e.g. 14.2253" style={inputStyle}
-                      value={formData.lat} onChange={e => setFormData({ ...formData, lat: e.target.value })} />
+
+              <div style={{ display: 'grid', gridTemplateColumns: hasCoords ? '1fr 1fr' : '1fr', gap: '20px', alignItems: 'start' }}>
+                
+                {/* Left: coordinate inputs + display */}
+                <div>
+                  {/* Show formatted coords if both filled */}
+                  {hasCoords && (
+                    <div style={{
+                      background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px',
+                      padding: '10px 14px', marginBottom: '12px', fontSize: '14px',
+                      color: '#334155', fontWeight: '500'
+                    }}>
+                      {parseFloat(latVal).toFixed(4)}° N, {parseFloat(lngVal).toFixed(4)}° E
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', marginBottom: '4px' }}>Latitude (N)</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 14.2253"
+                        style={inputStyle}
+                        value={formData.lat}
+                        onChange={e => setFormData({ ...formData, lat: e.target.value })}
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', marginBottom: '4px' }}>Longitude (E)</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 121.3025"
+                        style={inputStyle}
+                        value={formData.lng}
+                        onChange={e => setFormData({ ...formData, lng: e.target.value })}
+                      />
+                    </div>
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', marginBottom: '4px' }}>Longitude (E)</label>
-                    <input type="text" placeholder="e.g. 121.3025" style={inputStyle}
-                      value={formData.lng} onChange={e => setFormData({ ...formData, lng: e.target.value })} />
-                  </div>
+
+                  {!hasCoords && (
+                    <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#9ca3af' }}>
+                      Enter coordinates above to see a map preview.
+                    </p>
+                  )}
                 </div>
+
+                {/* Right: map preview — only when coords are valid */}
                 {hasCoords && (
-                  <div style={{ height: '120px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+                  <div style={{ height: '140px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
                     <iframe
                       title="location-preview"
                       src={mapSrc}
-                      width="100%" height="100%" style={{ border: 'none' }}
+                      width="100%"
+                      height="100%"
+                      style={{ border: 'none', display: 'block' }}
+                      loading="lazy"
                     />
                   </div>
                 )}
               </div>
-              {!hasCoords && (
-                <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: '#9ca3af' }}>
-                  Enter coordinates above to see a map preview.
-                </p>
-              )}
             </div>
 
             {/* Action buttons */}
