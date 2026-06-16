@@ -62,7 +62,7 @@ function App() {
         return <MapView />;
       case 'User Accounts': 
         return <UserManagement />; 
-      case 'Barangay Reports':
+      case 'Audit Reports':
         return <BarangayReports activeUser={{ role: loginRole, context: sessionContext }} />;
       case 'Settings':
         return <ChoSettings activeUser={{ role: loginRole, context: sessionContext }} />;

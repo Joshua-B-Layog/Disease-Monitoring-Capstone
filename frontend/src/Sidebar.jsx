@@ -6,9 +6,9 @@ const Sidebar = ({ role, activeTab, setActiveTab }) => {
     CHO: [
       { name: 'Dashboard', icon: '📊' },
       { name: 'Manage Cases', icon: '📁' },
-      { name: 'Barangay Reports', icon: '🏘️' },
+      { name: 'Audit Reports', icon: '🏘️' },
       { name: 'Map View', icon: '📍' },
-      { name: 'User Accounts', icon: '👤' }, // 🔥 CHANGED to match App.jsx and Figma!
+      { name: 'User Accounts', icon: '👤' },
       { name: 'Settings', icon: '⚙️' }
     ],
     BHW: [
