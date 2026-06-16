@@ -42,7 +42,7 @@ const Dashboard = ({ setActiveTab, loggedUser }) => {
 
   // --- STAT CARDS ---
   const totalCases = cases.length;
-  const activeCases = cases.filter(c => c.status === 'Approved' || c.status === 'Pending').length;
+  const activeCases = cases.filter(c => ['Active', 'Pending', 'Under Treatment'].includes(c.status)).length;
   const recoveredCases = cases.filter(c => c.status === 'Recovered').length;
   const deathCases = cases.filter(c => c.status === 'Deceased').length;
 
@@ -271,11 +271,14 @@ const Dashboard = ({ setActiveTab, loggedUser }) => {
 
   // --- STATUS BADGE STYLE ---
   const getStatusStyle = (status) => {
-    if (status === 'Approved' || status === 'Pending') return { background: '#1E3A8A', color: '#60A5FA' };
+    if (status === 'Active') return { background: '#1E3A8A', color: '#60A5FA' };
+    if (status === 'Pending') return { background: '#1e3a8a', color: '#93c5fd' };
+    if (status === 'Under Treatment') return { background: '#3b0764', color: '#c4b5fd' };
     if (status === 'Recovered') return { background: '#064E3B', color: '#34D399' };
     if (status === 'Deceased') return { background: '#7f1d1d', color: '#fca5a5' };
+    if (status === 'Draft') return { background: '#374151', color: '#9ca3af' };
     return { background: '#374151', color: '#9ca3af' };
-  };
+};
 
   return (
     <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>

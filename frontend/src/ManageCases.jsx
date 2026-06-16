@@ -147,7 +147,9 @@ export default function ManageCases() {
   );
 
   const getStatusStyle = (status) => {
-    if (['Active', 'Approved', 'Pending'].includes(status)) return { background: '#fef3c7', color: '#d97706' };
+    if (status === 'Active') return { background: '#fef3c7', color: '#d97706' };
+    if (status === 'Pending') return { background: '#dbeafe', color: '#2563eb' };
+    if (status === 'Under Treatment') return { background: '#ede9fe', color: '#7c3aed' };
     if (status === 'Recovered') return { background: '#d1fae5', color: '#059669' };
     if (status === 'Deceased') return { background: '#fee2e2', color: '#dc2626' };
     if (status === 'Draft') return { background: '#e2e8f0', color: '#64748b' };
@@ -476,7 +478,12 @@ export default function ManageCases() {
             <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setTablePage(1); }}
               style={{ padding: '8px 12px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)', fontSize: '13px' }}>
               <option>All Status</option>
-              <option>Active</option><option>Recovered</option><option>Deceased</option><option>Pending</option><option>Draft</option>
+              <option>Active</option>
+              <option>Pending</option>
+              <option>Under Treatment</option>
+              <option>Recovered</option>
+              <option>Deceased</option>
+              <option>Draft</option>
             </select>
             <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontSize: '13px' }}>
               {filteredCases.length} case{filteredCases.length !== 1 ? 's' : ''} found
@@ -701,7 +708,11 @@ export default function ManageCases() {
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Patient Status</label>
                   <select style={inputStyle} value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })}>
-                    <option>Active</option><option>Under Treatment</option><option>Recovered</option><option>Deceased</option><option>Pending</option>
+                    <option>Active</option>
+                    <option>Pending</option>
+                    <option>Under Treatment</option>
+                    <option>Recovered</option>
+                    <option>Deceased</option>
                   </select>
                 </div>
                 <div>
