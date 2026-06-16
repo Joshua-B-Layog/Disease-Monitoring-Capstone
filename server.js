@@ -544,6 +544,108 @@ app.post('/api/reset-password', (req, res) => {
     });
 });
 
+
+// ROUTE: Admin-create a user account (from User Accounts panel)
+app.post('/api/users', (req, res) => {
+    const { firstName, lastName, username, email, mobile, barangayId, isActive, password, generateTempPassword } = req.body;
+
+    if (!firstName || !lastName || !username || !email || !barangayId) {
+        return res.status(400).json({ error: 'First name, last name, username, email, and barangay are required.' });
+    }
+
+    const fullName = `${firstName.trim()} ${lastName.trim()}`;
+    let finalPassword = password;
+    let tempPasswordGenerated = null;
+
+    if (generateTempPassword || !password) {
+        tempPasswordGenerated = crypto.randomBytes(4).toString('hex'); // 8-character temp password
+        finalPassword = tempPasswordGenerated;
+    }
+
+    const insertQuery = `
+        INSERT INTO users (username, full_name, email, mobile_number, password, role, assigned_barangay_id, is_active)
+        VALUES (?, ?, ?, ?, ?, 'BHW', ?, ?)
+    `;
+
+    db.query(insertQuery, [username, fullName, email, mobile || null, finalPassword, barangayId, isActive ? 1 : 0], (err, result) => {
+        if (err) {
+            console.error("Add user error:", err.message);
+            if (err.code === 'ER_DUP_ENTRY') {
+                return res.status(409).json({ error: 'A user with this username or email already exists.' });
+            }
+            return res.status(500).json({ error: err.message });
+        }
+
+        if (tempPasswordGenerated) {
+            const mailOptions = {
+                from: `"Cabuyao Health System" <${process.env.EMAIL_USER}>`,
+                to: email,
+                subject: 'Your Cabuyao Health System Account',
+                html: `
+                    <div style="font-family:system-ui,sans-serif;padding:24px;">
+                        <h2 style="color:#1e3a8a;">Welcome to Cabuyao Health System</h2>
+                        <p>An account has been created for you as a Barangay Health Worker.</p>
+                        <p><strong>Username:</strong> ${username}<br/>
+                        <strong>Temporary Password:</strong> ${tempPasswordGenerated}</p>
+                        <p>Please log in and change your password as soon as possible.</p>
+                    </div>
+                `
+            };
+            transporter.sendMail(mailOptions, (mailErr) => {
+                if (mailErr) console.error("Temp password email failed:", mailErr.message);
+            });
+        }
+
+        console.log("✅ User added:", { username, fullName, barangayId });
+        res.status(200).json({ message: 'User account created successfully.', user_id: result.insertId, tempPassword: tempPasswordGenerated });
+    });
+});
+
+// ROUTE: Admin-edit a user account
+app.put('/api/users/:id', (req, res) => {
+    const { id } = req.params;
+    const { firstName, lastName, username, email, mobile, barangayId, isActive } = req.body;
+    const fullName = `${firstName.trim()} ${lastName.trim()}`;
+
+    const updateQuery = `
+        UPDATE users SET
+            username = ?, full_name = ?, email = ?, mobile_number = ?,
+            assigned_barangay_id = ?, is_active = ?
+        WHERE user_id = ?
+    `;
+
+    db.query(updateQuery, [username, fullName, email, mobile || null, barangayId, isActive ? 1 : 0, id], (err, result) => {
+        if (err) {
+            console.error("Update user error:", err.message);
+            if (err.code === 'ER_DUP_ENTRY') {
+                return res.status(409).json({ error: 'A user with this username or email already exists.' });
+            }
+            return res.status(500).json({ error: err.message });
+        }
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+        console.log("✅ User updated:", id);
+        res.status(200).json({ message: 'User updated successfully.' });
+    });
+});
+
+// ROUTE: Delete a user account
+app.delete('/api/users/:id', (req, res) => {
+    const { id } = req.params;
+    db.query('DELETE FROM users WHERE user_id = ?', [id], (err, result) => {
+        if (err) {
+            console.error("Delete user error:", err.message);
+            return res.status(500).json({ error: err.message });
+        }
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+        console.log(`✅ User ${id} deleted.`);
+        res.status(200).json({ message: 'User deleted successfully.' });
+    });
+});
+
 // ==========================================
 // 5. START SERVER
 // ==========================================

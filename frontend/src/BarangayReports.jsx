@@ -25,11 +25,6 @@ const ITEMS_PER_PAGE = 10;
 const REPORT_TYPE_SORT_OPTIONS = [
   { value: 'newest', label: 'Newest First' },
   { value: 'oldest', label: 'Oldest First' },
-  { value: 'most_disease', label: 'Most Disease Cases' },
-  { value: 'most_by_user', label: 'Most Active BHW/User' },
-  { value: 'most_created', label: 'Most Cases Added' },
-  { value: 'most_updated', label: 'Most Cases Updated' },
-  { value: 'most_deleted', label: 'Most Cases Deleted' },
 ];
 
 export default function BarangayReports({ activeUser }) {
@@ -210,18 +205,30 @@ export default function BarangayReports({ activeUser }) {
   }, []);
 
   // ── Sort report logs by Report Type ──
+  // ── Filter report logs by the top bar (Period, Date Range, Type), then sort Newest/Oldest ──
   const getSortedReportLogs = () => {
-    const logs = [...reportLogs];
-    switch (reportSortType) {
-      case 'newest': return logs.sort((a, b) => b.createdAt - a.createdAt);
-      case 'oldest': return logs.sort((a, b) => a.createdAt - b.createdAt);
-      case 'most_disease': return logs.sort((a, b) => (b.diseaseCount || 0) - (a.diseaseCount || 0));
-      case 'most_by_user': return logs.sort((a, b) => (b.userActivity || 0) - (a.userActivity || 0));
-      case 'most_created': return logs.sort((a, b) => (b.created || 0) - (a.created || 0));
-      case 'most_updated': return logs.sort((a, b) => (b.updated || 0) - (a.updated || 0));
-      case 'most_deleted': return logs.sort((a, b) => (b.deleted || 0) - (a.deleted || 0));
-      default: return logs;
+    let logs = [...reportLogs];
+
+    if (reportPeriod) {
+      logs = logs.filter(r => r.period === reportPeriod);
     }
+    if (reportType) {
+      logs = logs.filter(r => r.entity === reportType);
+    }
+    if (reportDateStart) {
+      const startD = new Date(reportDateStart);
+      startD.setHours(0, 0, 0, 0);
+      logs = logs.filter(r => r.createdAt >= startD);
+    }
+    if (reportDateEnd) {
+      const endD = new Date(reportDateEnd);
+      endD.setHours(23, 59, 59, 999);
+      logs = logs.filter(r => r.createdAt <= endD);
+    }
+
+    return logs.sort((a, b) =>
+      reportSortType === 'oldest' ? a.createdAt - b.createdAt : b.createdAt - a.createdAt
+    );
   };
 
   // ── Filter audit logs ──
@@ -514,6 +521,7 @@ export default function BarangayReports({ activeUser }) {
           {/* ── FIX: Title LEFT aligned + Sort dropdown on the RIGHT ── */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#1e293b' }}>Generated Reports Logs</h3>
+            <span style={{ fontSize: '12px', color: '#94a3b8' }}>{sortedReportLogs.length} of {reportLogs.length} reports</span>
 
             {/* ── Report Type sort dropdown ── */}
             <div style={{ position: 'relative' }} ref={reportSortRef}>
@@ -539,10 +547,12 @@ export default function BarangayReports({ activeUser }) {
           </div>
 
           {sortedReportLogs.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '32px', color: '#94a3b8', fontSize: '14px' }}>
-              No reports generated yet. Click "Generate Report" to create one.
-            </div>
-          )}
+          <div style={{ textAlign: 'center', padding: '32px', color: '#94a3b8', fontSize: '14px' }}>
+            {reportLogs.length === 0
+              ? 'No reports generated yet. Click "Generate Report" to create one.'
+              : 'No reports match your current filters. Try adjusting the Report Period, Date Range, or Report Type above.'}
+          </div>
+        )}
 
           {sortedReportLogs.map(file => (
             <div key={file.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#f8fafc', borderRadius: '8px', marginBottom: '10px', position: 'relative' }}>
