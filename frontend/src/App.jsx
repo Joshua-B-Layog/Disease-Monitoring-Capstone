@@ -21,6 +21,7 @@ function App() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedDisease, setSelectedDisease] = useState('Dengue');
   const [dateRange, setDateRange] = useState({ start: '2026-01-01', end: '2026-05-28' });
+  const [caseFilter, setCaseFilter] = useState({ disease: '', barangay: '' });
 
   // --- AUTH VIEW STATE (Switches between 'login' and 'recover') ---
   const [authView, setAuthView] = useState('login'); 
@@ -57,9 +58,9 @@ function App() {
     case 'Dashboard':
       return <Dashboard selectedDisease={selectedDisease} setSelectedDisease={setSelectedDisease} dateRange={dateRange} setActiveTab={setActiveTab}loggedUser={loggedUser}/>;
       case 'Manage Cases':
-        return <ManageCases />;
+        return <ManageCases caseFilter={caseFilter} setCaseFilter={setCaseFilter} />;
       case 'Map View':
-        return <MapView />;
+        return <MapView setActiveTab={setActiveTab} setCaseFilter={setCaseFilter} />;
       case 'User Accounts': 
         return <UserManagement />; 
       case 'Audit Reports':

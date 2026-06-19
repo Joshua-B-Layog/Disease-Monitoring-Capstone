@@ -109,7 +109,16 @@ app.get('/api/barangays', (req, res) => {
 
 // ROUTE: Get all users
 app.get('/api/users', (req, res) => {
-    db.query("SELECT * FROM users", (err, results) => {
+    const sql = `
+        SELECT 
+            u.user_id, u.username, u.full_name, u.email, u.mobile_number,
+            u.role, u.is_active, u.last_login, u.assigned_barangay_id,
+            b.name AS barangay_name
+        FROM users u
+        LEFT JOIN barangays b ON u.assigned_barangay_id = b.id
+        ORDER BY u.user_id ASC
+    `;
+    db.query(sql, (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(results);
     });
@@ -301,7 +310,8 @@ app.post('/api/login', (req, res) => {
                 });
             }
         }
-
+        
+        db.query('UPDATE users SET last_login = NOW() WHERE user_id = ?', [user.user_id], () => {});
         return res.status(200).json({
             message: 'Success',
             user: {

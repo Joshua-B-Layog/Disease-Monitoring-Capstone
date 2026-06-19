@@ -275,7 +275,14 @@ export default function UserManagement() {
                         {user.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td style={{ padding: '15px 10px', color: '#94a3b8' }}>—</td>
+                    <td style={{ padding: '15px 10px', color: '#94a3b8', fontSize: '13px' }}>
+                      {user.last_login
+                          ? new Date(user.last_login).toLocaleDateString('en-PH', {
+                              month: 'short', day: 'numeric', year: 'numeric',
+                              hour: '2-digit', minute: '2-digit'
+                            })
+                      : '—'}
+                    </td>
                     <td style={{ padding: '15px 10px' }}>
                       <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
                         <button onClick={() => openEdit(user)} title="Edit"
