@@ -22,6 +22,8 @@ const DISEASE_PAGES = [
   ],
 ];
 
+const OTHER_CARD = DISEASE_PAGES[1][5]; // the "Other" card object
+
 // All known disease dbNames for "Other" matching
 const KNOWN_DB_NAMES = DISEASE_PAGES.flat()
   .filter(d => d.dbName !== 'Other')
@@ -50,11 +52,27 @@ const EMPTY_FORM = {
   lat: '', lng: '', specificDisease: ''
 };
 
-export default function ManageCases() {
+// Helper: find which card a disease_name belongs to
+const findCardForDisease = (diseaseName) => {
+  if (!diseaseName) return null;
+  const dn = diseaseName.toLowerCase();
+  // Check all named cards first
+  for (const page of DISEASE_PAGES) {
+    for (const card of page) {
+      if (card.dbName === 'Other') continue;
+      if (dn === card.dbName.toLowerCase()) return card;
+    }
+  }
+  // If not found in named cards → it belongs to "Other"
+  if (!KNOWN_DB_NAMES.includes(dn)) return OTHER_CARD;
+  return null;
+};
+
+export default function ManageCases({ caseFilter, setCaseFilter }) {
   const [view, setView] = useState('categories'); // 'categories' | 'list' | 'add' | 'edit'
   const [cardPage, setCardPage] = useState(0);
-  const [selectedDisease, setSelectedDisease] = useState(null); // card object
-  const [editingCase, setEditingCase] = useState(null); // case object for edit
+  const [selectedDisease, setSelectedDisease] = useState(null);
+  const [editingCase, setEditingCase] = useState(null);
 
   const [allCases, setAllCases] = useState([]);
   const [loadingCases, setLoadingCases] = useState(false);
@@ -64,6 +82,8 @@ export default function ManageCases() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterBarangay, setFilterBarangay] = useState('All Barangays');
   const [filterStatus, setFilterStatus] = useState('All Status');
+  // ── NEW: sub-disease filter for the "Other" card ──
+  const [filterSubDisease, setFilterSubDisease] = useState('All Remaining Diseases');
   const [tablePage, setTablePage] = useState(1);
 
   // Export dropdown
@@ -71,13 +91,44 @@ export default function ManageCases() {
   const exportRef = useRef(null);
 
   // Delete modal
-  const [deleteTarget, setDeleteTarget] = useState(null); // case object
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Add/Edit form
   const [formData, setFormData] = useState({ ...EMPTY_FORM });
   const [submitMsg, setSubmitMsg] = useState('');
   const [submitLoading, setSubmitLoading] = useState(false);
+
+  // ── Handle incoming caseFilter from MapView "Go To →" ──
+  useEffect(() => {
+    if (!caseFilter || (!caseFilter.disease && !caseFilter.barangay)) return;
+
+    const targetDisease = caseFilter.disease || '';
+    const targetBarangay = caseFilter.barangay || 'All Barangays';
+
+    const card = findCardForDisease(targetDisease);
+
+    if (card) {
+      setSelectedDisease(card);
+      setFilterBarangay(targetBarangay || 'All Barangays');
+      setSearchQuery('');
+      setFilterStatus('All Status');
+      setTablePage(1);
+
+      // If the disease lands in "Other", pre-set the sub-disease filter
+      if (card.dbName === 'Other') {
+        setFilterSubDisease(targetDisease || 'All Remaining Diseases');
+      } else {
+        setFilterSubDisease('All Remaining Diseases');
+      }
+
+      setView('list');
+    }
+
+    // Clear the filter so navigating back works normally
+    if (setCaseFilter) setCaseFilter({ disease: '', barangay: '' });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [caseFilter]);
 
   // Fetch all cases
   const fetchCases = () => {
@@ -117,11 +168,34 @@ export default function ManageCases() {
 
   const getCaseCount = (card) => allCases.filter(c => matchesCard(c, card)).length;
 
+  // ── Get unique "Other" disease names from allCases for the sub-filter dropdown ──
+  const getOtherDiseaseNames = () => {
+    const names = new Set();
+    allCases.forEach(c => {
+      if (!c.disease_name) return;
+      const dn = c.disease_name.toLowerCase();
+      if (!KNOWN_DB_NAMES.includes(dn)) {
+        names.add(c.disease_name); // preserve original casing
+      }
+    });
+    return Array.from(names).sort();
+  };
+
   // ── Filter cases for list ──
   const getFilteredCases = () => {
     let result = selectedDisease
       ? allCases.filter(c => matchesCard(c, selectedDisease))
       : allCases;
+
+    // ── Sub-disease filter (only active for "Other" card) ──
+    if (
+      selectedDisease?.dbName === 'Other' &&
+      filterSubDisease !== 'All Remaining Diseases'
+    ) {
+      result = result.filter(
+        c => (c.disease_name || '').toLowerCase() === filterSubDisease.toLowerCase()
+      );
+    }
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -216,7 +290,6 @@ export default function ManageCases() {
 
   // ── OPEN EDIT ──
   const openEdit = (caseItem) => {
-    // Find barangay id from list
     const brgy = barangayList.find(b => b.name === caseItem.barangay_name);
     setFormData({
       patientName: caseItem.patient_name || '',
@@ -255,7 +328,6 @@ export default function ManageCases() {
     setSubmitLoading(true);
     setSubmitMsg('');
 
-    // Find disease_id from diseases list — we'll pass the name and let server handle it
     const diseaseNameToSave = formData.diseaseType === 'Other Communicable Diseases'
       ? (formData.specificDisease || 'Other')
       : formData.diseaseType;
@@ -334,7 +406,15 @@ export default function ManageCases() {
             const count = getCaseCount(disease);
             return (
               <div key={disease.id}
-                onClick={() => { setSelectedDisease(disease); setTablePage(1); setSearchQuery(''); setFilterBarangay('All Barangays'); setFilterStatus('All Status'); setView('list'); }}
+                onClick={() => {
+                  setSelectedDisease(disease);
+                  setTablePage(1);
+                  setSearchQuery('');
+                  setFilterBarangay('All Barangays');
+                  setFilterStatus('All Status');
+                  setFilterSubDisease('All Remaining Diseases');
+                  setView('list');
+                }}
                 style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '24px', cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s' }}
                 onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.15)'; }}
                 onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
@@ -371,13 +451,15 @@ export default function ManageCases() {
   // VIEW: CASE LIST
   // ═══════════════════════════════════
   if (view === 'list') {
+    const isOtherCard = selectedDisease?.dbName === 'Other';
+    const otherDiseaseNames = isOtherCard ? getOtherDiseaseNames() : [];
+
     return (
       <div style={{ padding: '28px', color: 'var(--text-main)' }}>
         {/* DELETE MODAL */}
         {deleteTarget && (
           <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
             <div style={{ background: '#fff', borderRadius: '16px', padding: '40px 32px', width: '420px', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
-              {/* Warning icon */}
               <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px auto' }}>
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
@@ -386,9 +468,8 @@ export default function ManageCases() {
               </div>
               <h3 style={{ margin: '0 0 8px 0', fontSize: '22px', fontWeight: '700', color: '#111827' }}>Are you sure?</h3>
               <p style={{ margin: '0 0 20px 0', color: '#6b7280', fontSize: '14px', lineHeight: '1.6' }}>
-                This action cannot be undone.<br />This will permanently delete the account of:
+                This action cannot be undone.<br />This will permanently delete the case record of:
               </p>
-              {/* Case info block */}
               <div style={{ background: '#f9fafb', border: 'none', borderLeft: '4px solid #ef4444', borderRadius: '6px', padding: '14px 18px', marginBottom: '20px', textAlign: 'left' }}>
                 <div style={{ fontWeight: '700', color: '#111827', fontSize: '15px', marginBottom: '4px' }}>
                   Case ID: D-{String(deleteTarget.case_id).padStart(4, '0')}
@@ -453,7 +534,7 @@ export default function ManageCases() {
               )}
             </div>
 
-            <button onClick={() => { setView('categories'); setSearchQuery(''); }}
+            <button onClick={() => { setView('categories'); setSearchQuery(''); setFilterSubDisease('All Remaining Diseases'); }}
               style={{ padding: '8px 18px', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', fontSize: '13px' }}>
               ← Back
             </button>
@@ -467,14 +548,19 @@ export default function ManageCases() {
         {/* Table card */}
         <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '20px' }}>
           <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+            {/* Search */}
             <input type="text" placeholder="Search Cases..."
               value={searchQuery} onChange={e => { setSearchQuery(e.target.value); setTablePage(1); }}
-              style={{ padding: '8px 12px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)', fontSize: '13px', width: '200px' }} />
+              style={{ padding: '8px 12px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)', fontSize: '13px', width: '180px' }} />
+
+            {/* Barangay filter */}
             <select value={filterBarangay} onChange={e => { setFilterBarangay(e.target.value); setTablePage(1); }}
               style={{ padding: '8px 12px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)', fontSize: '13px' }}>
               <option>All Barangays</option>
               {CABUYAO_BARANGAYS.map(b => <option key={b}>{b}</option>)}
             </select>
+
+            {/* Status filter */}
             <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setTablePage(1); }}
               style={{ padding: '8px 12px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)', fontSize: '13px' }}>
               <option>All Status</option>
@@ -485,6 +571,31 @@ export default function ManageCases() {
               <option>Deceased</option>
               <option>Draft</option>
             </select>
+
+            {/* ── NEW: Remaining Diseases sub-filter (only for "Other" card) ── */}
+            {isOtherCard && (
+              <select
+                value={filterSubDisease}
+                onChange={e => { setFilterSubDisease(e.target.value); setTablePage(1); }}
+                style={{
+                  padding: '8px 12px',
+                  background: 'var(--input-bg)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '6px',
+                  color: filterSubDisease === 'All Remaining Diseases' ? 'var(--text-muted)' : 'var(--text-main)',
+                  fontSize: '13px',
+                  minWidth: '180px',
+                }}
+              >
+                <option value="All Remaining Diseases" style={{ color: 'var(--text-muted)' }}>
+                  Remaining Diseases
+                </option>
+                {otherDiseaseNames.map(name => (
+                  <option key={name} value={name} style={{ color: 'var(--text-main)' }}>{name}</option>
+                ))}
+              </select>
+            )}
+
             <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontSize: '13px' }}>
               {filteredCases.length} case{filteredCases.length !== 1 ? 's' : ''} found
             </span>
@@ -508,7 +619,8 @@ export default function ManageCases() {
                   <tr>
                     <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '14px' }}>
                       No cases found for <strong>{selectedDisease?.name}</strong>
-                      {(searchQuery || filterBarangay !== 'All Barangays' || filterStatus !== 'All Status') ? ' with current filters.' : '.'}
+                      {(searchQuery || filterBarangay !== 'All Barangays' || filterStatus !== 'All Status' || (isOtherCard && filterSubDisease !== 'All Remaining Diseases'))
+                        ? ' with current filters.' : '.'}
                     </td>
                   </tr>
                 ) : (
@@ -543,15 +655,11 @@ export default function ManageCases() {
                       </td>
                       <td style={{ padding: '12px', textAlign: 'center' }}>
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                          {/* EDIT — always available */}
-                          <button onClick={() => openEdit(c)}
-                            title="Edit case"
+                          <button onClick={() => openEdit(c)} title="Edit case"
                             style={{ padding: '5px 10px', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer', color: 'var(--text-main)', fontSize: '13px' }}>
                             ✏️
                           </button>
-                          {/* DELETE */}
-                          <button onClick={() => setDeleteTarget(c)}
-                            title="Delete case"
+                          <button onClick={() => setDeleteTarget(c)} title="Delete case"
                             style={{ padding: '5px 10px', background: 'transparent', border: '1px solid #ef4444', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>
                             🗑️
                           </button>
@@ -604,8 +712,8 @@ export default function ManageCases() {
     const lngVal = String(formData.lng || '').trim();
     const hasCoords = latVal !== '' && lngVal !== '' && !isNaN(parseFloat(latVal)) && !isNaN(parseFloat(lngVal));
     const mapSrc = hasCoords
-    ? `https://www.openstreetmap.org/export/embed.html?bbox=${parseFloat(lngVal)-0.01},${parseFloat(latVal)-0.01},${parseFloat(lngVal)+0.01},${parseFloat(latVal)+0.01}&layer=mapnik&marker=${latVal},${lngVal}`
-    : null;
+      ? `https://www.openstreetmap.org/export/embed.html?bbox=${parseFloat(lngVal)-0.01},${parseFloat(latVal)-0.01},${parseFloat(lngVal)+0.01},${parseFloat(latVal)+0.01}&layer=mapnik&marker=${latVal},${lngVal}`
+      : null;
 
     return (
       <div style={{ padding: '28px' }}>
@@ -702,7 +810,7 @@ export default function ManageCases() {
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Severity Level</label>
                   <select style={inputStyle} value={formData.severity} onChange={e => setFormData({ ...formData, severity: e.target.value })}>
-                    <option>Mild</option><option>Moderate</option><option>Severe</option>
+                    <option>Mild</option><option>Moderate</option><option>Severe</option><option>Asymptomatic</option>
                   </select>
                 </div>
                 <div>
@@ -731,7 +839,7 @@ export default function ManageCases() {
             {/* Symptoms full width */}
             <div style={{ marginBottom: '20px' }}>
               <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Symptoms & Observations</label>
-              <textarea placeholder="e.g. Fever (39.5°C), Severe Headache, Muscle and Joint Pain, Rash on arms and legs..." rows="3"
+              <textarea placeholder="e.g. Fever (39.5°C), Severe Headache, Muscle and Joint Pain..." rows="3"
                 style={{ ...inputStyle, resize: 'vertical' }}
                 value={formData.symptoms} onChange={e => setFormData({ ...formData, symptoms: e.target.value })} />
             </div>
@@ -744,43 +852,24 @@ export default function ManageCases() {
               </label>
 
               <div style={{ display: 'grid', gridTemplateColumns: hasCoords ? '1fr 1fr' : '1fr', gap: '20px', alignItems: 'start' }}>
-                
-                {/* Left: coordinate inputs + display */}
                 <div>
-                  {/* Show formatted coords if both filled */}
                   {hasCoords && (
-                    <div style={{
-                      background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px',
-                      padding: '10px 14px', marginBottom: '12px', fontSize: '14px',
-                      color: '#334155', fontWeight: '500'
-                    }}>
+                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '10px 14px', marginBottom: '12px', fontSize: '14px', color: '#334155', fontWeight: '500' }}>
                       {parseFloat(latVal).toFixed(4)}° N, {parseFloat(lngVal).toFixed(4)}° E
                     </div>
                   )}
-
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <div style={{ flex: 1 }}>
                       <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', marginBottom: '4px' }}>Latitude (N)</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. 14.2253"
-                        style={inputStyle}
-                        value={formData.lat}
-                        onChange={e => setFormData({ ...formData, lat: e.target.value })}
-                      />
+                      <input type="text" placeholder="e.g. 14.2253" style={inputStyle}
+                        value={formData.lat} onChange={e => setFormData({ ...formData, lat: e.target.value })} />
                     </div>
                     <div style={{ flex: 1 }}>
                       <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', marginBottom: '4px' }}>Longitude (E)</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. 121.3025"
-                        style={inputStyle}
-                        value={formData.lng}
-                        onChange={e => setFormData({ ...formData, lng: e.target.value })}
-                      />
+                      <input type="text" placeholder="e.g. 121.3025" style={inputStyle}
+                        value={formData.lng} onChange={e => setFormData({ ...formData, lng: e.target.value })} />
                     </div>
                   </div>
-
                   {!hasCoords && (
                     <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#9ca3af' }}>
                       Enter coordinates above to see a map preview.
@@ -788,17 +877,10 @@ export default function ManageCases() {
                   )}
                 </div>
 
-                {/* Right: map preview — only when coords are valid */}
                 {hasCoords && (
                   <div style={{ height: '140px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-                    <iframe
-                      title="location-preview"
-                      src={mapSrc}
-                      width="100%"
-                      height="100%"
-                      style={{ border: 'none', display: 'block' }}
-                      loading="lazy"
-                    />
+                    <iframe title="location-preview" src={mapSrc} width="100%" height="100%"
+                      style={{ border: 'none', display: 'block' }} loading="lazy" />
                   </div>
                 )}
               </div>
