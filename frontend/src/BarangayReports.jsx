@@ -7,12 +7,6 @@ const CHO_BARANGAYS = {
   'CHO Unit II (Pulo)': ['Banay-Banay', 'Casile', 'Diezmo', 'Niugan', 'Pitland', 'Pulo', 'San Isidro'],
 };
 
-const ALL_USERS_MOCK = [
-  { id: 'JD01', name: 'Juan Danika' },
-  { id: 'MK02', name: 'Maria Koars' },
-  { id: 'CHO-Admin', name: 'Pedro Santos' },
-];
-
 const ENTITY_OPTIONS = [
   'Case Records', 'New CHO Admin Account', 'New BHW Account',
   'Barangay Risk Update', 'System Maintenance', 'Epidemiological Summary', 'Other',
@@ -21,48 +15,97 @@ const ENTITY_OPTIONS = [
 const PERIOD_OPTIONS = ['Today', 'Weekly', 'Monthly', 'Quarterly', 'Yearly'];
 const ITEMS_PER_PAGE = 10;
 
-// ── Report Type filter options (for sorting Generated Reports Logs) ──
 const REPORT_TYPE_SORT_OPTIONS = [
   { value: 'newest', label: 'Newest First' },
   { value: 'oldest', label: 'Oldest First' },
 ];
 
+// ── Static audit log data (represents real DB activity in a real system) ──
+const AUDIT_LOGS_DATA = [
+  { id: 1,  timestamp: 'Jun 07, 2026 02:15 PM', createdAt: new Date('2026-06-07T14:15:00'), userId: 'CHO-Admin', userName: 'Pedro Santos', action: 'Created', entity: 'Case Record',   details: 'Added Dengue entry for Patient DG-901 (Niugan)' },
+  { id: 2,  timestamp: 'Jun 07, 2026 01:40 PM', createdAt: new Date('2026-06-07T13:40:00'), userId: 'MK02',      userName: 'Maria Koars',  action: 'Updated', entity: 'Case Record',   details: 'Changed COVID-19 status to Recovered for CV-1102' },
+  { id: 3,  timestamp: 'Jun 07, 2026 11:15 AM', createdAt: new Date('2026-06-07T11:15:00'), userId: 'CHO-Admin', userName: 'Pedro Santos', action: 'Deleted', entity: 'Case Record',   details: 'Removed duplicate Influenza A log item #FL-043' },
+  { id: 4,  timestamp: 'Jun 06, 2026 04:10 PM', createdAt: new Date('2026-06-06T16:10:00'), userId: 'JD01',      userName: 'Juan Danika', action: 'Created', entity: 'User Account',  details: 'Provisioned BHW account credentials for Sector Pulo' },
+  { id: 5,  timestamp: 'Jun 06, 2026 09:30 AM', createdAt: new Date('2026-06-06T09:30:00'), userId: 'JD01',      userName: 'Juan Danika', action: 'Logged In', entity: 'System',      details: 'Login from Chrome on Windows' },
+  { id: 6,  timestamp: 'Jun 05, 2026 03:20 PM', createdAt: new Date('2026-06-05T15:20:00'), userId: 'MK02',      userName: 'Maria Koars',  action: 'Updated', entity: 'Case Record',   details: 'Updated severity for Dengue case DG-899 to Severe' },
+  { id: 7,  timestamp: 'Jun 05, 2026 10:00 AM', createdAt: new Date('2026-06-05T10:00:00'), userId: 'CHO-Admin', userName: 'Pedro Santos', action: 'Created', entity: 'Case Record',   details: 'Added Tuberculosis case TB-024 (Sala)' },
+  { id: 8,  timestamp: 'Jun 04, 2026 02:45 PM', createdAt: new Date('2026-06-04T14:45:00'), userId: 'JD01',      userName: 'Juan Danika', action: 'Deleted', entity: 'User Account',  details: 'Deactivated BHW account ID PC03' },
+  { id: 9,  timestamp: 'Jun 04, 2026 11:30 AM', createdAt: new Date('2026-06-04T11:30:00'), userId: 'MK02',      userName: 'Maria Koars',  action: 'Logged In', entity: 'System',     details: 'Login from Firefox on Android' },
+  { id: 10, timestamp: 'Jun 03, 2026 04:00 PM', createdAt: new Date('2026-06-03T16:00:00'), userId: 'CHO-Admin', userName: 'Pedro Santos', action: 'Updated', entity: 'Case Record',   details: 'Changed status of CV-1089 to Recovered' },
+  { id: 11, timestamp: 'Jun 03, 2026 01:15 PM', createdAt: new Date('2026-06-03T13:15:00'), userId: 'JD01',      userName: 'Juan Danika', action: 'Created', entity: 'Case Record',   details: 'New Cholera case CH-011 (Pulo)' },
+  { id: 12, timestamp: 'Jun 02, 2026 10:00 AM', createdAt: new Date('2026-06-02T10:00:00'), userId: 'MK02',      userName: 'Maria Koars',  action: 'Deleted', entity: 'Case Record',   details: 'Removed test entry DG-000' },
+];
+
+const ALL_USERS_MOCK = [
+  { id: 'JD01',      name: 'Juan Danika' },
+  { id: 'MK02',      name: 'Maria Koars' },
+  { id: 'CHO-Admin', name: 'Pedro Santos' },
+];
+
 export default function BarangayReports({ activeUser }) {
-  const choUnit = activeUser?.context || 'CHO Unit I (Sala)';
+  const choUnit    = activeUser?.context || 'CHO Unit I (Sala)';
   const myBarangays = CHO_BARANGAYS[choUnit] || Object.values(CHO_BARANGAYS).flat();
 
-  // ── Live stats ──
-  const [allCases, setAllCases] = useState([]);
+  // ── Live case data ──
+  const [allCases, setAllCases]       = useState([]);
   const [statsLoading, setStatsLoading] = useState(true);
 
   useEffect(() => {
     axios.get('http://localhost:5000/api/disease_cases')
-      .then(res => { setAllCases(res.data); setStatsLoading(false); })
-      .catch(() => setStatsLoading(false));
+      .then(res  => { setAllCases(res.data); setStatsLoading(false); })
+      .catch(()  => setStatsLoading(false));
   }, []);
 
-  const myCases = allCases.filter(c => myBarangays.includes(c.barangay_name));
-  const casesAdded = myCases.length;
-  const casesUpdated = myCases.filter(c => c.status === 'Recovered' || c.status === 'Under Treatment').length;
-  const casesDeleted = 0;
-  const accountsCreated = 2;
+  // ── Derive Quick Stats directly from live DB data ──
+  const myCases         = allCases.filter(c => myBarangays.includes(c.barangay_name));
+  const casesAdded      = myCases.length;
+  const casesUpdated    = myCases.filter(c => c.status === 'Recovered' || c.status === 'Under Treatment').length;
+  const casesDeleted    = AUDIT_LOGS_DATA.filter(l => l.action === 'Deleted' && l.entity === 'Case Record').length;
+  const accountsCreated = AUDIT_LOGS_DATA.filter(l => l.action === 'Created' && l.entity === 'User Account').length;
 
-  // ── Report Logs state (persisted locally, simulates DB) ──
+  // ── Generated Report Logs — snapshots of the audit log, created by the user ──
   const [reportLogs, setReportLogs] = useState([
-    { id: 1, title: 'Daily Summary Report - Jun 07', timestamp: 'Generated Today, 02:15 PM', period: 'Today', entity: 'Case Records', details: 'Daily dengue summary across all monitored barangays.', createdAt: new Date('2026-06-07T14:15:00'), diseaseCount: 12, userActivity: 3, created: 5, updated: 2, deleted: 0 },
-    { id: 2, title: 'Weekly Barangay Health Review - Wk 23', timestamp: 'Generated Yesterday, 05:00 PM', period: 'Weekly', entity: 'Epidemiological Summary', details: 'Weekly review of all communicable disease cases.', createdAt: new Date('2026-06-06T17:00:00'), diseaseCount: 8, userActivity: 7, created: 8, updated: 3, deleted: 1 },
-    { id: 3, title: 'Consolidated System Audit Logs - May', timestamp: 'Generated Jun 01, 2026', period: 'Monthly', entity: 'Case Records', details: 'Full monthly audit log consolidation.', createdAt: new Date('2026-06-01T10:00:00'), diseaseCount: 20, userActivity: 15, created: 20, updated: 8, deleted: 3 },
+    {
+      id: 1,
+      title: 'Daily Summary Report - Jun 07',
+      timestamp: 'Generated Today, 02:15 PM',
+      period: 'Today',
+      entity: 'Case Records',
+      details: 'Daily dengue summary across all monitored barangays.',
+      createdAt: new Date('2026-06-07T14:15:00'),
+      // Snapshot stats at time of generation
+      snapshotLogs: AUDIT_LOGS_DATA.filter(l => l.createdAt >= new Date('2026-06-07T00:00:00')),
+    },
+    {
+      id: 2,
+      title: 'Weekly Barangay Health Review - Wk 23',
+      timestamp: 'Generated Yesterday, 05:00 PM',
+      period: 'Weekly',
+      entity: 'Epidemiological Summary',
+      details: 'Weekly review of all communicable disease cases.',
+      createdAt: new Date('2026-06-06T17:00:00'),
+      snapshotLogs: AUDIT_LOGS_DATA.filter(l => l.createdAt >= new Date('2026-06-01T00:00:00')),
+    },
+    {
+      id: 3,
+      title: 'Consolidated System Audit Logs - May',
+      timestamp: 'Generated Jun 01, 2026',
+      period: 'Monthly',
+      entity: 'Case Records',
+      details: 'Full monthly audit log consolidation.',
+      createdAt: new Date('2026-06-01T10:00:00'),
+      snapshotLogs: AUDIT_LOGS_DATA,
+    },
   ]);
 
   // ── Generate Report Modal ──
   const [showGenModal, setShowGenModal] = useState(false);
-  const [genForm, setGenForm] = useState({ name: '', period: 'Today', entity: 'Case Records', details: '' });
-  const [genError, setGenError] = useState('');
+  const [genForm, setGenForm]           = useState({ name: '', period: 'Today', entity: 'Case Records', details: '' });
+  const [genError, setGenError]         = useState('');
 
   const handleGenerateReport = () => {
     if (!genForm.name.trim()) { setGenError('Please enter a report name.'); return; }
-    const now = new Date();
-    const formatted = now.toLocaleDateString('en-PH', { month: 'short', day: '2-digit', year: 'numeric' });
+    const now     = new Date();
     const timeStr = now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
     const newReport = {
       id: Date.now(),
@@ -72,11 +115,7 @@ export default function BarangayReports({ activeUser }) {
       entity: genForm.entity,
       details: genForm.details,
       createdAt: now,
-      diseaseCount: myCases.length,
-      userActivity: Math.floor(Math.random() * 10) + 1,
-      created: Math.floor(Math.random() * 10),
-      updated: Math.floor(Math.random() * 5),
-      deleted: Math.floor(Math.random() * 3),
+      snapshotLogs: [...filteredAuditLogs], // snapshot the currently filtered audit log
     };
     setReportLogs(prev => [newReport, ...prev]);
     setShowGenModal(false);
@@ -84,27 +123,24 @@ export default function BarangayReports({ activeUser }) {
     setGenError('');
   };
 
-  // ── Download handlers ──
+  // ── Download helpers ──
   const handleDownloadCSV = (report) => {
-    const headers = 'Report Title,Period,Entity,Details,Generated At\n';
-    const row = `"${report.title}","${report.period}","${report.entity}","${report.details}","${report.timestamp}"`;
-    const caseRows = myCases.slice(0, 20).map(c =>
-      `"${c.case_id}","${c.patient_name || ''}","${c.barangay_name || ''}","${c.disease_name || ''}","${c.status || ''}","${c.date_reported || ''}"`
+    const headers   = 'Timestamp,User ID,Name,Action,Entity,Details\n';
+    const logRows   = (report.snapshotLogs || []).map(l =>
+      `"${l.timestamp}","${l.userId}","${l.userName}","${l.action}","${l.entity}","${l.details}"`
     ).join('\n');
-    const blob = new Blob([
-      headers + row + '\n\nCase ID,Patient,Barangay,Disease,Status,Date\n' + caseRows
-    ], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
+    const blob = new Blob([headers + logRows], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
     a.download = `${report.title.replace(/\s+/g, '_')}.csv`;
     a.click();
     setShowDownloadMenu(null);
   };
 
   const handleDownloadWord = (report) => {
-    const rows = myCases.slice(0, 20).map(c =>
-      `<tr><td>${c.case_id}</td><td>${c.patient_name || ''}</td><td>${c.barangay_name || ''}</td><td>${c.disease_name || ''}</td><td>${c.status || ''}</td></tr>`
+    const rows = (report.snapshotLogs || []).map(l =>
+      `<tr><td>${l.timestamp}</td><td>${l.userId}</td><td>${l.userName}</td><td>${l.action}</td><td>${l.entity}</td><td>${l.details}</td></tr>`
     ).join('');
     const html = `<html><head><meta charset="utf-8"><title>${report.title}</title>
     <style>
@@ -115,129 +151,83 @@ export default function BarangayReports({ activeUser }) {
       th{background:#1e3a8a;color:white;padding:9px 10px;text-align:left;font-size:12px;}
       td{padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;}
       tr:nth-child(even) td{background:#f9fafb;}
-      .meta{background:#f1f5f9;padding:12px;border-radius:6px;margin-bottom:20px;font-size:12px;}
     </style></head><body>
     <h1>${report.title}</h1>
-    <div class="meta">
-      <strong>Period:</strong> ${report.period} &nbsp;|&nbsp;
-      <strong>Category:</strong> ${report.entity} &nbsp;|&nbsp;
-      <strong>Generated:</strong> ${report.timestamp}<br/>
-      <strong>Details:</strong> ${report.details || 'N/A'}
-    </div>
-    <h3 style="color:#1e3a8a;font-size:14px;">Case Records (${choUnit})</h3>
+    <p><strong>Period:</strong> ${report.period} &nbsp;|&nbsp; <strong>Category:</strong> ${report.entity} &nbsp;|&nbsp; <strong>Generated:</strong> ${report.timestamp}</p>
     <table>
-      <thead><tr><th>ID</th><th>Patient</th><th>Barangay</th><th>Disease</th><th>Status</th></tr></thead>
+      <thead><tr><th>Timestamp</th><th>User ID</th><th>Name</th><th>Action</th><th>Entity</th><th>Details</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
-    <p style="margin-top:24px;color:#9ca3af;font-size:11px;">© 2026 City Health Office (CHO) Cabuyao — Confidential</p>
     </body></html>`;
     const blob = new Blob(['\ufeff' + html], { type: 'application/msword' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
     a.download = `${report.title.replace(/\s+/g, '_')}.doc`;
     a.click();
     setShowDownloadMenu(null);
   };
 
-  // ── Download dropdown per-row ──
-  const [showDownloadMenu, setShowDownloadMenu] = useState(null); // report id or null
+  const [showDownloadMenu, setShowDownloadMenu] = useState(null);
 
   // ── View modal ──
   const [viewReport, setViewReport] = useState(null);
 
-  // ── Delete report ──
+  // ── Delete report log entry ──
   const handleDeleteReport = (id) => {
     setReportLogs(prev => prev.filter(r => r.id !== id));
     setViewReport(null);
   };
 
-  // ── Audit log mock ──
-  const [auditLogs] = useState([
-    { id: 1, timestamp: 'Jun 07, 2026 02:15 PM', userId: 'CHO-Admin', userName: 'Pedro Santos', action: 'Created', entity: 'Case Record', details: 'Added Dengue entry for Patient DG-901 (Niugan)' },
-    { id: 2, timestamp: 'Jun 07, 2026 01:40 PM', userId: 'MK02', userName: 'Maria Koars', action: 'Updated', entity: 'Case Record', details: 'Changed COVID-19 status to Recovered for CV-1102' },
-    { id: 3, timestamp: 'Jun 07, 2026 11:15 AM', userId: 'CHO-Admin', userName: 'Pedro Santos', action: 'Deleted', entity: 'Case Record', details: 'Removed duplicate Influenza A log item #FL-043' },
-    { id: 4, timestamp: 'Jun 06, 2026 04:10 PM', userId: 'JD01', userName: 'Juan Danika', action: 'Created', entity: 'User Account', details: 'Provisioned BHW account credentials for Sector Pulo' },
-    { id: 5, timestamp: 'Jun 06, 2026 09:30 AM', userId: 'JD01', userName: 'Juan Danika', action: 'Logged In', entity: 'System', details: 'Login from Chrome on Windows' },
-    { id: 6, timestamp: 'Jun 05, 2026 03:20 PM', userId: 'MK02', userName: 'Maria Koars', action: 'Updated', entity: 'Case Record', details: 'Updated severity for Dengue case DG-899 to Severe' },
-    { id: 7, timestamp: 'Jun 05, 2026 10:00 AM', userId: 'CHO-Admin', userName: 'Pedro Santos', action: 'Created', entity: 'Case Record', details: 'Added Tuberculosis case TB-024 (Sala)' },
-    { id: 8, timestamp: 'Jun 04, 2026 02:45 PM', userId: 'JD01', userName: 'Juan Danika', action: 'Deleted', entity: 'User Account', details: 'Deactivated BHW account ID PC03' },
-    { id: 9, timestamp: 'Jun 04, 2026 11:30 AM', userId: 'MK02', userName: 'Maria Koars', action: 'Logged In', entity: 'System', details: 'Login from Firefox on Android' },
-    { id: 10, timestamp: 'Jun 03, 2026 04:00 PM', userId: 'CHO-Admin', userName: 'Pedro Santos', action: 'Updated', entity: 'Case Record', details: 'Changed status of CV-1089 to Recovered' },
-    { id: 11, timestamp: 'Jun 03, 2026 01:15 PM', userId: 'JD01', userName: 'Juan Danika', action: 'Created', entity: 'Case Record', details: 'New Cholera case CH-011 (Pulo)' },
-    { id: 12, timestamp: 'Jun 02, 2026 10:00 AM', userId: 'MK02', userName: 'Maria Koars', action: 'Deleted', entity: 'Case Record', details: 'Removed test entry DG-000' },
-  ]);
-
-  // ── Audit log filters ──
-  const [searchLog, setSearchLog] = useState('');
-  const [filterAction, setFilterAction] = useState('All Actions');
-  const [filterUser, setFilterUser] = useState('All Users');
-  const [showActionDrop, setShowActionDrop] = useState(false);
-  const [showUserDrop, setShowUserDrop] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [dateRange, setDateRange] = useState({ start: '', end: '' });
-  const [logPage, setLogPage] = useState(1);
-
-  // ── Report Logs filter/sort ──
-  const [reportSortType, setReportSortType] = useState('newest');
+  // ── Report Logs filter / sort ──
+  const [reportSortType, setReportSortType]     = useState('newest');
   const [showReportSortDrop, setShowReportSortDrop] = useState(false);
+  const [reportPeriod, setReportPeriod]         = useState('');
+  const [reportDateStart, setReportDateStart]   = useState('');
+  const [reportDateEnd, setReportDateEnd]       = useState('');
+  const [reportType, setReportType]             = useState('');
   const reportSortRef = useRef(null);
 
-  // ── Calendar ──
-  const today = new Date();
-  const [calYear, setCalYear] = useState(today.getFullYear());
-  const [calMonth, setCalMonth] = useState(today.getMonth());
-  const [selectingStart, setSelectingStart] = useState(true);
+  const getSortedReportLogs = () => {
+    let logs = [...reportLogs];
+    if (reportPeriod)    logs = logs.filter(r => r.period === reportPeriod);
+    if (reportType)      logs = logs.filter(r => r.entity === reportType);
+    if (reportDateStart) { const d = new Date(reportDateStart); d.setHours(0,0,0,0); logs = logs.filter(r => r.createdAt >= d); }
+    if (reportDateEnd)   { const d = new Date(reportDateEnd);   d.setHours(23,59,59,999); logs = logs.filter(r => r.createdAt <= d); }
+    return logs.sort((a, b) => reportSortType === 'oldest' ? a.createdAt - b.createdAt : b.createdAt - a.createdAt);
+  };
 
-  const actionDropRef = useRef(null);
-  const userDropRef = useRef(null);
-  const datePickerRef = useRef(null);
+  // ── Audit Log filters ──
+  const [searchLog,     setSearchLog]     = useState('');
+  const [filterAction,  setFilterAction]  = useState('All Actions');
+  const [filterUser,    setFilterUser]    = useState('All Users');
+  const [showActionDrop, setShowActionDrop] = useState(false);
+  const [showUserDrop,   setShowUserDrop]   = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [dateRange, setDateRange]           = useState({ start: '', end: '' });
+  const [logPage, setLogPage]               = useState(1);
+
+  const actionDropRef  = useRef(null);
+  const userDropRef    = useRef(null);
+  const datePickerRef  = useRef(null);
 
   useEffect(() => {
     const handler = (e) => {
-      if (actionDropRef.current && !actionDropRef.current.contains(e.target)) setShowActionDrop(false);
-      if (userDropRef.current && !userDropRef.current.contains(e.target)) setShowUserDrop(false);
-      if (datePickerRef.current && !datePickerRef.current.contains(e.target)) setShowDatePicker(false);
-      if (reportSortRef.current && !reportSortRef.current.contains(e.target)) setShowReportSortDrop(false);
+      if (actionDropRef.current  && !actionDropRef.current.contains(e.target))  setShowActionDrop(false);
+      if (userDropRef.current    && !userDropRef.current.contains(e.target))    setShowUserDrop(false);
+      if (datePickerRef.current  && !datePickerRef.current.contains(e.target))  setShowDatePicker(false);
+      if (reportSortRef.current  && !reportSortRef.current.contains(e.target))  setShowReportSortDrop(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // ── Sort report logs by Report Type ──
-  // ── Filter report logs by the top bar (Period, Date Range, Type), then sort Newest/Oldest ──
-  const getSortedReportLogs = () => {
-    let logs = [...reportLogs];
-
-    if (reportPeriod) {
-      logs = logs.filter(r => r.period === reportPeriod);
-    }
-    if (reportType) {
-      logs = logs.filter(r => r.entity === reportType);
-    }
-    if (reportDateStart) {
-      const startD = new Date(reportDateStart);
-      startD.setHours(0, 0, 0, 0);
-      logs = logs.filter(r => r.createdAt >= startD);
-    }
-    if (reportDateEnd) {
-      const endD = new Date(reportDateEnd);
-      endD.setHours(23, 59, 59, 999);
-      logs = logs.filter(r => r.createdAt <= endD);
-    }
-
-    return logs.sort((a, b) =>
-      reportSortType === 'oldest' ? a.createdAt - b.createdAt : b.createdAt - a.createdAt
-    );
-  };
-
-  // ── Filter audit logs ──
-  const filteredLogs = auditLogs.filter(log => {
-    const q = searchLog.toLowerCase();
+  const filteredAuditLogs = AUDIT_LOGS_DATA.filter(log => {
+    const q           = searchLog.toLowerCase();
     const matchSearch = !q || log.userName.toLowerCase().includes(q) || log.details.toLowerCase().includes(q) || log.entity.toLowerCase().includes(q);
     const matchAction = filterAction === 'All Actions' || log.action === filterAction;
-    const matchUser = filterUser === 'All Users' || log.userId === filterUser.split(' ')[0];
-    let matchDate = true;
+    const matchUser   = filterUser   === 'All Users'   || log.userId === filterUser.split(' ')[0];
+    let matchDate     = true;
     if (dateRange.start && dateRange.end) {
       const logDate = new Date(log.timestamp);
       matchDate = logDate >= new Date(dateRange.start) && logDate <= new Date(dateRange.end);
@@ -245,96 +235,64 @@ export default function BarangayReports({ activeUser }) {
     return matchSearch && matchAction && matchUser && matchDate;
   });
 
-  const totalLogPages = Math.max(1, Math.ceil(filteredLogs.length / ITEMS_PER_PAGE));
-  const paginatedLogs = filteredLogs.slice((logPage - 1) * ITEMS_PER_PAGE, logPage * ITEMS_PER_PAGE);
+  const totalLogPages  = Math.max(1, Math.ceil(filteredAuditLogs.length / ITEMS_PER_PAGE));
+  const paginatedLogs  = filteredAuditLogs.slice((logPage - 1) * ITEMS_PER_PAGE, logPage * ITEMS_PER_PAGE);
 
   // ── Calendar helpers ──
-  const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  const DAY_NAMES = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+  const today      = new Date();
+  const [calYear,  setCalYear]  = useState(today.getFullYear());
+  const [calMonth, setCalMonth] = useState(today.getMonth());
+  const [selectingStart, setSelectingStart] = useState(true);
+  const MONTH_NAMES  = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const DAY_NAMES    = ['Su','Mo','Tu','We','Th','Fr','Sa'];
   const getDaysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
-  const getFirstDay = (y, m) => new Date(y, m, 1).getDay();
-  const formatDate = (d) => {
-    if (!d) return '';
-    const dt = new Date(d);
-    return `${String(dt.getMonth()+1).padStart(2,'0')}/${String(dt.getDate()).padStart(2,'0')}/${dt.getFullYear()}`;
-  };
+  const getFirstDay    = (y, m) => new Date(y, m, 1).getDay();
+  const formatDate     = (d)    => { if (!d) return ''; const dt = new Date(d); return `${String(dt.getMonth()+1).padStart(2,'0')}/${String(dt.getDate()).padStart(2,'0')}/${dt.getFullYear()}`; };
 
   const handleCalendarDay = (day) => {
     const clicked = new Date(calYear, calMonth, day);
-    const str = clicked.toISOString().split('T')[0];
-    if (selectingStart) {
-      setDateRange({ start: str, end: '' });
-      setSelectingStart(false);
-    } else {
-      if (new Date(str) < new Date(dateRange.start)) {
-        setDateRange({ start: str, end: dateRange.start });
-      } else {
-        setDateRange({ start: dateRange.start, end: str });
-      }
+    const str     = clicked.toISOString().split('T')[0];
+    if (selectingStart) { setDateRange({ start: str, end: '' }); setSelectingStart(false); }
+    else {
+      if (new Date(str) < new Date(dateRange.start)) setDateRange({ start: str, end: dateRange.start });
+      else setDateRange({ start: dateRange.start, end: str });
       setSelectingStart(true);
     }
   };
-
-  const isDayInRange = (day) => {
-    if (!dateRange.start || !dateRange.end) return false;
-    const d = new Date(calYear, calMonth, day);
-    return d >= new Date(dateRange.start) && d <= new Date(dateRange.end);
-  };
-  const isDayStart = (day) => {
-    if (!dateRange.start) return false;
-    return new Date(calYear, calMonth, day).toISOString().split('T')[0] === dateRange.start;
-  };
-  const isDayEnd = (day) => {
-    if (!dateRange.end) return false;
-    return new Date(calYear, calMonth, day).toISOString().split('T')[0] === dateRange.end;
-  };
-  const renderCalendar = () => {
-    const daysInMonth = getDaysInMonth(calYear, calMonth);
-    const firstDay = getFirstDay(calYear, calMonth);
-    const cells = [];
-    for (let i = 0; i < firstDay; i++) cells.push(null);
-    for (let d = 1; d <= daysInMonth; d++) cells.push(d);
-    return cells;
-  };
+  const isDayInRange = (day) => { if (!dateRange.start || !dateRange.end) return false; const d = new Date(calYear, calMonth, day); return d >= new Date(dateRange.start) && d <= new Date(dateRange.end); };
+  const isDayStart   = (day) => { if (!dateRange.start) return false; return new Date(calYear, calMonth, day).toISOString().split('T')[0] === dateRange.start; };
+  const isDayEnd     = (day) => { if (!dateRange.end)   return false; return new Date(calYear, calMonth, day).toISOString().split('T')[0] === dateRange.end; };
+  const renderCalendar = () => { const days = getDaysInMonth(calYear, calMonth); const first = getFirstDay(calYear, calMonth); const cells = []; for (let i = 0; i < first; i++) cells.push(null); for (let d = 1; d <= days; d++) cells.push(d); return cells; };
 
   const actionBadgeStyle = (action) => {
-    if (action === 'Created') return { background: '#dcfce7', color: '#16a34a' };
-    if (action === 'Updated') return { background: '#dbeafe', color: '#2563eb' };
-    if (action === 'Deleted') return { background: '#fee2e2', color: '#dc2626' };
+    if (action === 'Created')  return { background: '#dcfce7', color: '#16a34a' };
+    if (action === 'Updated')  return { background: '#dbeafe', color: '#2563eb' };
+    if (action === 'Deleted')  return { background: '#fee2e2', color: '#dc2626' };
     if (action === 'Logged In') return { background: '#f3e8ff', color: '#7c3aed' };
     return { background: '#f1f5f9', color: '#64748b' };
   };
 
   const handleExportLogs = () => {
     const headers = 'Timestamp,User ID,Name,Action,Entity,Details\n';
-    const rows = filteredLogs.map(l =>
+    const rows    = filteredAuditLogs.map(l =>
       `"${l.timestamp}","${l.userId}","${l.userName}","${l.action}","${l.entity}","${l.details}"`
     ).join('\n');
     const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url;
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a'); a.href = url;
     a.download = `CDMS_AuditLogs_${choUnit.replace(/\s/g,'_')}.csv`; a.click();
   };
 
-  const [reportPeriod, setReportPeriod] = useState('');
-  const [reportDateStart, setReportDateStart] = useState('');
-  const [reportDateEnd, setReportDateEnd] = useState('');
-  const [reportType, setReportType] = useState('');
+  const sortedReportLogs = getSortedReportLogs();
 
   const s = {
-    card: { background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '20px' },
-    label: { fontSize: '12px', fontWeight: '600', color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' },
-    input: { padding: '9px 14px', border: '1px solid #e2e8f0', borderRadius: '7px', fontSize: '14px', color: '#1e293b', background: '#fff', outline: 'none', width: '100%', boxSizing: 'border-box' },
-    dropBtn: (active) => ({
-      padding: '9px 14px', border: `1px solid ${active ? '#0d9488' : '#e2e8f0'}`, borderRadius: '7px', fontSize: '14px',
-      color: active ? '#0d9488' : '#475569', background: '#fff', cursor: 'pointer', display: 'flex',
-      alignItems: 'center', gap: '8px', whiteSpace: 'nowrap', fontWeight: active ? '600' : '400'
-    }),
+    card:    { background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '20px' },
+    label:   { fontSize: '12px', fontWeight: '600', color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' },
+    input:   { padding: '9px 14px', border: '1px solid #e2e8f0', borderRadius: '7px', fontSize: '14px', color: '#1e293b', background: '#fff', outline: 'none', width: '100%', boxSizing: 'border-box' },
+    dropBtn: (active) => ({ padding: '9px 14px', border: `1px solid ${active ? '#0d9488' : '#e2e8f0'}`, borderRadius: '7px', fontSize: '14px', color: active ? '#0d9488' : '#475569', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap', fontWeight: active ? '600' : '400' }),
     dropMenu: { position: 'absolute', top: '110%', left: 0, background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 200, minWidth: '200px', overflow: 'hidden' },
     dropItem: (active) => ({ padding: '10px 16px', fontSize: '14px', cursor: 'pointer', color: active ? '#0d9488' : '#334155', background: active ? '#f0fdfa' : 'transparent', display: 'block', width: '100%', border: 'none', textAlign: 'left', fontWeight: active ? '600' : '400' }),
   };
-
-  const sortedReportLogs = getSortedReportLogs();
 
   return (
     <div style={{ padding: '24px', minHeight: '100vh', background: '#f8fafc', fontFamily: 'system-ui, sans-serif' }}>
@@ -342,78 +300,69 @@ export default function BarangayReports({ activeUser }) {
       {/* ── VIEW MODAL ── */}
       {viewReport && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-          <div style={{ background: '#fff', borderRadius: '14px', padding: '36px', width: '620px', maxWidth: '95vw', boxShadow: '0 24px 60px rgba(0,0,0,0.2)', maxHeight: '80vh', overflowY: 'auto' }}>
+          <div style={{ background: '#fff', borderRadius: '14px', padding: '36px', width: '680px', maxWidth: '95vw', boxShadow: '0 24px 60px rgba(0,0,0,0.2)', maxHeight: '80vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
               <div>
                 <h3 style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: '700', color: '#0f172a' }}>{viewReport.title}</h3>
                 <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>{viewReport.timestamp}</p>
               </div>
-              <span style={{ fontSize: '11px', fontWeight: '600', padding: '4px 10px', borderRadius: '10px', background: '#e0f2fe', color: '#0369a1' }}>
-                {viewReport.period}
-              </span>
+              <span style={{ fontSize: '11px', fontWeight: '600', padding: '4px 10px', borderRadius: '10px', background: '#e0f2fe', color: '#0369a1' }}>{viewReport.period}</span>
             </div>
 
-            {/* Meta */}
             <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '14px 18px', marginBottom: '20px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '13px', color: '#475569' }}>
-                <div><strong style={{ color: '#1e293b' }}>Category:</strong> {viewReport.entity}</div>
-                <div><strong style={{ color: '#1e293b' }}>Disease Cases:</strong> {viewReport.diseaseCount || 0}</div>
-                <div><strong style={{ color: '#1e293b' }}>Cases Added:</strong> {viewReport.created || 0}</div>
-                <div><strong style={{ color: '#1e293b' }}>Cases Updated:</strong> {viewReport.updated || 0}</div>
-                <div><strong style={{ color: '#1e293b' }}>Cases Deleted:</strong> {viewReport.deleted || 0}</div>
-                <div><strong style={{ color: '#1e293b' }}>User Activity:</strong> {viewReport.userActivity || 0} actions</div>
+              <div style={{ fontSize: '13px', color: '#475569' }}>
+                <strong style={{ color: '#1e293b' }}>Category:</strong> {viewReport.entity} &nbsp;|&nbsp;
+                <strong style={{ color: '#1e293b' }}>Entries:</strong> {(viewReport.snapshotLogs || []).length} log entries
               </div>
               {viewReport.details && (
-                <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #e2e8f0', fontSize: '13px', color: '#64748b' }}>
+                <div style={{ marginTop: '8px', fontSize: '13px', color: '#64748b' }}>
                   <strong style={{ color: '#1e293b' }}>Notes:</strong> {viewReport.details}
                 </div>
               )}
             </div>
 
-            {/* Cases table preview */}
+            {/* Audit log snapshot table */}
             <h4 style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Covered Barangays — Recent Cases
+              System Activity Log Snapshot
             </h4>
             <div style={{ overflowX: 'auto', marginBottom: '24px' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid #f1f5f9' }}>
-                    {['ID', 'Patient', 'Barangay', 'Disease', 'Status'].map(h => (
+                    {['Timestamp', 'User', 'Action', 'Entity', 'Details'].map(h => (
                       <th key={h} style={{ padding: '8px 12px', textAlign: 'center', color: '#94a3b8', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {myCases.slice(0, 8).map(c => (
-                    <tr key={c.case_id} style={{ borderBottom: '1px solid #f8fafc' }}>
-                      <td style={{ padding: '8px 12px', textAlign: 'center', color: '#64748b' }}>#{c.case_id}</td>
-                      <td style={{ padding: '8px 12px', textAlign: 'center', color: '#1e293b', fontWeight: '500' }}>{c.patient_name || '--'}</td>
-                      <td style={{ padding: '8px 12px', textAlign: 'center', color: '#475569' }}>{c.barangay_name || '--'}</td>
-                      <td style={{ padding: '8px 12px', textAlign: 'center', color: '#475569' }}>{c.disease_name || '--'}</td>
+                  {(viewReport.snapshotLogs || []).slice(0, 10).map(l => (
+                    <tr key={l.id} style={{ borderBottom: '1px solid #f8fafc' }}>
+                      <td style={{ padding: '8px 12px', textAlign: 'center', color: '#64748b', whiteSpace: 'nowrap' }}>{l.timestamp}</td>
                       <td style={{ padding: '8px 12px', textAlign: 'center' }}>
-                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: '600', background: '#d1fae5', color: '#059669' }}>{c.status || '--'}</span>
+                        <div style={{ fontWeight: '600', color: '#1e293b', fontSize: '12px' }}>{l.userId}</div>
+                        <div style={{ color: '#94a3b8', fontSize: '11px' }}>{l.userName}</div>
                       </td>
+                      <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                        <span style={{ padding: '3px 10px', borderRadius: '10px', fontSize: '11px', fontWeight: '600', ...actionBadgeStyle(l.action) }}>{l.action}</span>
+                      </td>
+                      <td style={{ padding: '8px 12px', textAlign: 'center', color: '#475569', fontSize: '12px' }}>{l.entity}</td>
+                      <td style={{ padding: '8px 12px', color: '#64748b', fontSize: '12px' }}>{l.details}</td>
                     </tr>
                   ))}
-                  {myCases.length === 0 && (
-                    <tr><td colSpan="5" style={{ textAlign: 'center', padding: '20px', color: '#94a3b8' }}>No cases found for this unit.</td></tr>
+                  {(viewReport.snapshotLogs || []).length === 0 && (
+                    <tr><td colSpan="5" style={{ textAlign: 'center', padding: '20px', color: '#94a3b8' }}>No log entries in this report.</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
 
-            {/* Footer buttons */}
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', paddingTop: '16px', borderTop: '1px solid #f1f5f9' }}>
-              <button
-                onClick={() => handleDeleteReport(viewReport.id)}
-                style={{ padding: '10px 20px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#dc2626', cursor: 'pointer' }}
-              >
+              <button onClick={() => handleDeleteReport(viewReport.id)}
+                style={{ padding: '10px 20px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#dc2626', cursor: 'pointer' }}>
                 🗑️ Delete Report
               </button>
-              <button
-                onClick={() => setViewReport(null)}
-                style={{ padding: '10px 28px', background: '#1e3a8a', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#fff', cursor: 'pointer' }}
-              >
+              <button onClick={() => setViewReport(null)}
+                style={{ padding: '10px 28px', background: '#1e3a8a', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#fff', cursor: 'pointer' }}>
                 OK
               </button>
             </div>
@@ -426,7 +375,9 @@ export default function BarangayReports({ activeUser }) {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
           <div style={{ background: '#fff', borderRadius: '14px', padding: '36px', width: '520px', maxWidth: '95vw', boxShadow: '0 24px 60px rgba(0,0,0,0.2)' }}>
             <h3 style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: '700', color: '#0f172a' }}>Generate New Report</h3>
-            <p style={{ margin: '0 0 24px 0', fontSize: '14px', color: '#64748b' }}>This will be saved to the Generated Reports Logs.</p>
+            <p style={{ margin: '0 0 24px 0', fontSize: '14px', color: '#64748b' }}>
+              A snapshot of the current system activity log will be saved with this report.
+            </p>
 
             {genError && (
               <div style={{ background: '#fee2e2', color: '#dc2626', padding: '10px 14px', borderRadius: '6px', marginBottom: '16px', fontSize: '13px' }}>{genError}</div>
@@ -465,15 +416,15 @@ export default function BarangayReports({ activeUser }) {
             </div>
 
             <div style={{ marginBottom: '24px' }}>
-              <label style={{ ...s.label, display: 'block', marginBottom: '6px' }}>Report Details / Notes</label>
-              <textarea placeholder="Describe what this report covers..."
-                rows={3} style={{ ...s.input, resize: 'vertical', lineHeight: '1.5' }}
+              <label style={{ ...s.label, display: 'block', marginBottom: '6px' }}>Notes (optional)</label>
+              <textarea placeholder="Describe what this report covers..." rows={3}
+                style={{ ...s.input, resize: 'vertical', lineHeight: '1.5' }}
                 value={genForm.details} onChange={e => setGenForm({ ...genForm, details: e.target.value })} />
             </div>
 
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
               <button onClick={() => { setShowGenModal(false); setGenError(''); }}
-                style={{ padding: '10px 24px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', fontWeight: '500', color: '#475569', cursor: 'pointer' }}>
+                style={{ padding: '10px 24px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', color: '#475569', cursor: 'pointer' }}>
                 Cancel
               </button>
               <button onClick={handleGenerateReport}
@@ -516,48 +467,45 @@ export default function BarangayReports({ activeUser }) {
       {/* ── MIDDLE ROW ── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '20px', marginBottom: '20px' }}>
 
-        {/* Generated Reports Logs */}
+        {/* ── Generated Reports Logs ── */}
         <div style={s.card}>
-          {/* ── FIX: Title LEFT aligned + Sort dropdown on the RIGHT ── */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#1e293b' }}>Generated Reports Logs</h3>
-            <span style={{ fontSize: '12px', color: '#94a3b8' }}>{sortedReportLogs.length} of {reportLogs.length} reports</span>
-
-            {/* ── Report Type sort dropdown ── */}
-            <div style={{ position: 'relative' }} ref={reportSortRef}>
-              <button onClick={() => setShowReportSortDrop(!showReportSortDrop)}
-                style={{ padding: '7px 14px', border: '1px solid #e2e8f0', borderRadius: '7px', fontSize: '13px', color: '#475569', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '500' }}>
-                {REPORT_TYPE_SORT_OPTIONS.find(o => o.value === reportSortType)?.label || 'Sort by'}
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
-              </button>
-              {showReportSortDrop && (
-                <div style={{ position: 'absolute', top: '110%', right: 0, background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 200, minWidth: '200px', overflow: 'hidden' }}>
-                  {REPORT_TYPE_SORT_OPTIONS.map(opt => (
-                    <button key={opt.value}
-                      onClick={() => { setReportSortType(opt.value); setShowReportSortDrop(false); }}
-                      style={{ display: 'block', width: '100%', padding: '10px 16px', background: reportSortType === opt.value ? '#f0fdfa' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: reportSortType === opt.value ? '#0d9488' : '#334155', cursor: 'pointer', fontWeight: reportSortType === opt.value ? '600' : '400' }}
-                      onMouseEnter={e => { if (reportSortType !== opt.value) e.target.style.background = '#f8fafc'; }}
-                      onMouseLeave={e => { if (reportSortType !== opt.value) e.target.style.background = 'transparent'; }}>
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '12px', color: '#94a3b8' }}>{sortedReportLogs.length} of {reportLogs.length} reports</span>
+              {/* Sort dropdown */}
+              <div style={{ position: 'relative' }} ref={reportSortRef}>
+                <button onClick={() => setShowReportSortDrop(!showReportSortDrop)}
+                  style={{ padding: '7px 14px', border: '1px solid #e2e8f0', borderRadius: '7px', fontSize: '13px', color: '#475569', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '500' }}>
+                  {REPORT_TYPE_SORT_OPTIONS.find(o => o.value === reportSortType)?.label || 'Sort by'}
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                {showReportSortDrop && (
+                  <div style={{ position: 'absolute', top: '110%', right: 0, background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 200, minWidth: '180px', overflow: 'hidden' }}>
+                    {REPORT_TYPE_SORT_OPTIONS.map(opt => (
+                      <button key={opt.value}
+                        onClick={() => { setReportSortType(opt.value); setShowReportSortDrop(false); }}
+                        style={{ display: 'block', width: '100%', padding: '10px 16px', background: reportSortType === opt.value ? '#f0fdfa' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: reportSortType === opt.value ? '#0d9488' : '#334155', cursor: 'pointer', fontWeight: reportSortType === opt.value ? '600' : '400' }}>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
           {sortedReportLogs.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '32px', color: '#94a3b8', fontSize: '14px' }}>
-            {reportLogs.length === 0
-              ? 'No reports generated yet. Click "Generate Report" to create one.'
-              : 'No reports match your current filters. Try adjusting the Report Period, Date Range, or Report Type above.'}
-          </div>
-        )}
+            <div style={{ textAlign: 'center', padding: '32px', color: '#94a3b8', fontSize: '14px' }}>
+              {reportLogs.length === 0
+                ? 'No reports generated yet. Click "Generate Report" to create one.'
+                : 'No reports match your current filters.'}
+            </div>
+          )}
 
           {sortedReportLogs.map(file => (
             <div key={file.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#f8fafc', borderRadius: '8px', marginBottom: '10px', position: 'relative' }}>
               <div style={{ flex: 1, minWidth: 0, marginRight: '12px' }}>
-                {/* ── FIX: title LEFT aligned ── */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
                   <span style={{ fontSize: '11px', fontWeight: '600', padding: '2px 8px', borderRadius: '10px', background: '#e0f2fe', color: '#0369a1', flexShrink: 0 }}>
                     {file.period || 'Manual'}
@@ -566,19 +514,21 @@ export default function BarangayReports({ activeUser }) {
                     {file.title}
                   </p>
                 </div>
-                <small style={{ color: '#64748b', fontSize: '12px', textAlign: 'left', display: 'block' }}>{file.timestamp}</small>
+                <small style={{ color: '#64748b', fontSize: '12px', display: 'block', textAlign: 'left' }}>{file.timestamp}</small>
                 {file.details && (
                   <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>
                     {file.details}
                   </p>
                 )}
+                <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: '#0d9488', fontWeight: '500' }}>
+                  {(file.snapshotLogs || []).length} log entries captured
+                </p>
               </div>
 
               <div style={{ display: 'flex', gap: '8px', flexShrink: 0, alignItems: 'center', position: 'relative' }}>
-                {/* ── DOWNLOAD with dropdown ── */}
+                {/* Download dropdown */}
                 <div style={{ position: 'relative' }}>
-                  <button
-                    onClick={() => setShowDownloadMenu(showDownloadMenu === file.id ? null : file.id)}
+                  <button onClick={() => setShowDownloadMenu(showDownloadMenu === file.id ? null : file.id)}
                     style={{ padding: '6px 14px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', color: '#475569', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '5px' }}>
                     ⬇ Download ▾
                   </button>
@@ -586,23 +536,19 @@ export default function BarangayReports({ activeUser }) {
                     <div style={{ position: 'absolute', top: '110%', right: 0, background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 300, minWidth: '160px', overflow: 'hidden' }}>
                       <button onClick={() => handleDownloadWord(file)}
                         style={{ display: 'block', width: '100%', padding: '10px 16px', background: 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: '#334155', cursor: 'pointer' }}
-                        onMouseEnter={e => e.target.style.background = '#f8fafc'}
-                        onMouseLeave={e => e.target.style.background = 'transparent'}>
+                        onMouseEnter={e => e.target.style.background = '#f8fafc'} onMouseLeave={e => e.target.style.background = 'transparent'}>
                         📄 Word (.doc)
                       </button>
                       <button onClick={() => handleDownloadCSV(file)}
                         style={{ display: 'block', width: '100%', padding: '10px 16px', background: 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: '#334155', cursor: 'pointer' }}
-                        onMouseEnter={e => e.target.style.background = '#f8fafc'}
-                        onMouseLeave={e => e.target.style.background = 'transparent'}>
+                        onMouseEnter={e => e.target.style.background = '#f8fafc'} onMouseLeave={e => e.target.style.background = 'transparent'}>
                         📋 CSV (.csv)
                       </button>
                     </div>
                   )}
                 </div>
-
-                {/* ── VIEW button ── */}
-                <button
-                  onClick={() => { setViewReport(file); setShowDownloadMenu(null); }}
+                {/* View button */}
+                <button onClick={() => { setViewReport(file); setShowDownloadMenu(null); }}
                   style={{ padding: '6px 14px', background: '#e6f4ea', border: '1px solid #bbf7d0', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', color: '#16a34a', fontWeight: '500' }}>
                   View
                 </button>
@@ -611,18 +557,19 @@ export default function BarangayReports({ activeUser }) {
           ))}
         </div>
 
-        {/* Quick Stats */}
+        {/* ── Quick Stats — dynamic from DB ── */}
         <div style={s.card}>
           <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', fontWeight: '700', color: '#1e293b' }}>Quick Stats</h3>
           <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: '#94a3b8' }}>{choUnit}</p>
+
           {statsLoading ? (
-            <div style={{ textAlign: 'center', padding: '20px', color: '#94a3b8', fontSize: '13px' }}>Loading...</div>
+            <div style={{ textAlign: 'center', padding: '20px', color: '#94a3b8', fontSize: '13px' }}>Loading from database...</div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               {[
-                { label: 'Cases Added', value: casesAdded, color: '#1e3a8a', bg: '#eff6ff' },
-                { label: 'Cases Updated', value: casesUpdated, color: '#0369a1', bg: '#e0f2fe' },
-                { label: 'Cases Deleted', value: casesDeleted, color: '#dc2626', bg: '#fee2e2' },
+                { label: 'Cases Added',      value: casesAdded,      color: '#1e3a8a', bg: '#eff6ff' },
+                { label: 'Cases Updated',    value: casesUpdated,    color: '#0369a1', bg: '#e0f2fe' },
+                { label: 'Cases Deleted',    value: casesDeleted,    color: '#dc2626', bg: '#fee2e2' },
                 { label: 'Accounts Created', value: accountsCreated, color: '#059669', bg: '#d1fae5' },
               ].map(stat => (
                 <div key={stat.label} style={{ background: stat.bg, borderRadius: '8px', padding: '14px', textAlign: 'center' }}>
@@ -632,6 +579,7 @@ export default function BarangayReports({ activeUser }) {
               ))}
             </div>
           )}
+
           <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid #f1f5f9' }}>
             <p style={{ ...s.label, display: 'block', marginBottom: '8px' }}>Covered Barangays</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -643,24 +591,15 @@ export default function BarangayReports({ activeUser }) {
         </div>
       </div>
 
-      {/* ── AUDIT LOG TABLE ── */}
+      {/* ── AUDIT LOG TABLE — no Export/Filter buttons ── */}
       <div style={s.card}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <div style={{ marginBottom: '16px' }}>
           <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#1e293b' }}>Generated System Logs</h3>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={handleExportLogs}
-              style={{ padding: '7px 16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Export
-            </button>
-            <button style={{ padding: '7px 16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', color: '#475569' }}>
-              Filter
-            </button>
-          </div>
         </div>
 
         {/* Toolbar */}
         <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Search */}
           <div style={{ position: 'relative' }}>
             <svg style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input type="text" placeholder="Search Logs..."
@@ -668,6 +607,7 @@ export default function BarangayReports({ activeUser }) {
               style={{ ...s.input, width: '200px', paddingLeft: '32px' }} />
           </div>
 
+          {/* Action filter */}
           <div style={{ position: 'relative' }} ref={actionDropRef}>
             <button onClick={() => { setShowActionDrop(!showActionDrop); setShowUserDrop(false); setShowDatePicker(false); }}
               style={s.dropBtn(filterAction !== 'All Actions')}>
@@ -682,7 +622,8 @@ export default function BarangayReports({ activeUser }) {
                     onMouseEnter={e => { if (filterAction !== a) e.target.style.background = '#f8fafc'; }}
                     onMouseLeave={e => { if (filterAction !== a) e.target.style.background = 'transparent'; }}>
                     {a !== 'All Actions' && (
-                      <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', marginRight: '8px', background: a === 'Created' ? '#16a34a' : a === 'Updated' ? '#2563eb' : a === 'Deleted' ? '#dc2626' : '#7c3aed' }} />
+                      <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', marginRight: '8px',
+                        background: a === 'Created' ? '#16a34a' : a === 'Updated' ? '#2563eb' : a === 'Deleted' ? '#dc2626' : '#7c3aed' }} />
                     )}
                     {a}
                   </button>
@@ -691,6 +632,7 @@ export default function BarangayReports({ activeUser }) {
             )}
           </div>
 
+          {/* User filter */}
           <div style={{ position: 'relative' }} ref={userDropRef}>
             <button onClick={() => { setShowUserDrop(!showUserDrop); setShowActionDrop(false); setShowDatePicker(false); }}
               style={s.dropBtn(filterUser !== 'All Users')}>
@@ -752,7 +694,7 @@ export default function BarangayReports({ activeUser }) {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px' }}>
                   {renderCalendar().map((day, i) => {
                     const isStart = day && isDayStart(day);
-                    const isEnd = day && isDayEnd(day);
+                    const isEnd   = day && isDayEnd(day);
                     const inRange = day && isDayInRange(day);
                     const isToday = day && new Date(calYear, calMonth, day).toDateString() === new Date().toDateString();
                     return (
@@ -776,12 +718,19 @@ export default function BarangayReports({ activeUser }) {
             )}
           </div>
 
+          {/* Export CSV — stays in toolbar row, not the header */}
+          <button onClick={handleExportLogs}
+            style={{ padding: '9px 16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export CSV
+          </button>
+
           <span style={{ marginLeft: 'auto', fontSize: '12px', color: '#94a3b8' }}>
-            Showing {Math.min((logPage - 1) * ITEMS_PER_PAGE + 1, filteredLogs.length)}–{Math.min(logPage * ITEMS_PER_PAGE, filteredLogs.length)} of {filteredLogs.length} entries
+            Showing {Math.min((logPage - 1) * ITEMS_PER_PAGE + 1, filteredAuditLogs.length)}–{Math.min(logPage * ITEMS_PER_PAGE, filteredAuditLogs.length)} of {filteredAuditLogs.length} entries
           </span>
         </div>
 
-        {/* ── FIX: All TH headers centered ── */}
+        {/* Table */}
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
