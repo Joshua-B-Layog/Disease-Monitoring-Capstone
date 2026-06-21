@@ -119,6 +119,7 @@
           }
 
           onLoginSuccess({
+            id: data.user.id,
             role: selectedRole,
             context: selectedContext,
             username: email,

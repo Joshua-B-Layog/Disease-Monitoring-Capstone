@@ -15,7 +15,7 @@ const app = express();
 // 2. MIDDLEWARE
 // ==========================================
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' })); // increased for base64 photo if needed later
 
 // ==========================================
 // 3. DATABASE & EMAIL CONNECTIONS
@@ -107,18 +107,17 @@ app.get('/api/barangays', (req, res) => {
     });
 });
 
-// ROUTE: Get all users
+// ROUTE: Get all users (no passwords)
 app.get('/api/users', (req, res) => {
-    const sql = `
-        SELECT 
-            u.user_id, u.username, u.full_name, u.email, u.mobile_number,
-            u.role, u.is_active, u.last_login, u.assigned_barangay_id,
-            b.name AS barangay_name
+    const query = `
+        SELECT u.user_id, u.username, u.full_name, u.email, u.mobile_number,
+               u.role, u.is_active, u.last_login, u.assigned_barangay_id,
+               b.name AS barangay_name
         FROM users u
         LEFT JOIN barangays b ON u.assigned_barangay_id = b.id
         ORDER BY u.user_id ASC
     `;
-    db.query(sql, (err, results) => {
+    db.query(query, (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(results);
     });
@@ -129,6 +128,59 @@ app.get('/api/reports', (req, res) => {
     db.query("SELECT * FROM barangay_reports", (err, results) => {
         if (err) res.status(500).send(err);
         else res.json(results);
+    });
+});
+
+// ==========================================
+// PROFILE ROUTES
+// ==========================================
+
+// ROUTE: Get single user profile by ID
+app.get('/api/users/:id/profile', (req, res) => {
+    const { id } = req.params;
+    const query = `
+        SELECT u.user_id, u.username, u.full_name, u.email, u.mobile_number,
+               u.role, u.assigned_barangay_id, u.is_active,
+               b.name AS assigned_barangay_name
+        FROM users u
+        LEFT JOIN barangays b ON u.assigned_barangay_id = b.id
+        WHERE u.user_id = ?
+    `;
+    db.query(query, [id], (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (results.length === 0) return res.status(404).json({ error: 'User not found.' });
+        res.json(results[0]);
+    });
+});
+
+// ROUTE: Update user profile (name, email, phone, barangay assignment)
+app.put('/api/users/:id/profile', (req, res) => {
+    const { id } = req.params;
+    const { firstName, lastName, email, mobile, assignedBarangayId } = req.body;
+
+    if (!firstName || !lastName) {
+        return res.status(400).json({ error: 'First and last name are required.' });
+    }
+
+    const fullName = `${firstName.trim()} ${lastName.trim()}`;
+
+    const updateQuery = `
+        UPDATE users SET
+            full_name = ?,
+            email = ?,
+            mobile_number = ?,
+            assigned_barangay_id = ?
+        WHERE user_id = ?
+    `;
+
+    db.query(updateQuery, [fullName, email || null, mobile || null, assignedBarangayId || null, id], (err, result) => {
+        if (err) {
+            console.error('Profile update error:', err.message);
+            return res.status(500).json({ error: err.message });
+        }
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'User not found.' });
+        console.log(`✅ Profile updated for user ${id}: ${fullName}`);
+        res.status(200).json({ message: 'Profile updated successfully.', fullName });
     });
 });
 
@@ -242,7 +294,7 @@ app.put('/api/cases/:id', (req, res) => {
     });
 });
 
-// ROUTE: Delete disease case (hard delete from DB)
+// ROUTE: Delete disease case
 app.delete('/api/cases/:id', (req, res) => {
     const { id } = req.params;
     console.log("--- Delete Case ---", { id });
@@ -310,8 +362,10 @@ app.post('/api/login', (req, res) => {
                 });
             }
         }
-        
-        db.query('UPDATE users SET last_login = NOW() WHERE user_id = ?', [user.user_id], () => {});
+
+        // Update last_login
+        db.query('UPDATE users SET last_login = NOW() WHERE user_id = ?', [user.user_id]);
+
         return res.status(200).json({
             message: 'Success',
             user: {
@@ -467,7 +521,7 @@ app.post('/api/forgot-password', (req, res) => {
                 }
 
                 try {
-                    const smsResponse = await axios.post('https://api.semaphore.co/api/v4/messages', {
+                    await axios.post('https://api.semaphore.co/api/v4/messages', {
                         apikey: process.env.SEMAPHORE_API_KEY,
                         number: mobileFormatted,
                         message: `Your Cabuyao Health System verification code is: ${generatedOtp}. Valid for 10 minutes. Do not share this code.`,
@@ -554,8 +608,11 @@ app.post('/api/reset-password', (req, res) => {
     });
 });
 
+// ==========================================
+// USER MANAGEMENT ROUTES (Admin panel)
+// ==========================================
 
-// ROUTE: Admin-create a user account (from User Accounts panel)
+// ROUTE: Admin-create a user account
 app.post('/api/users', (req, res) => {
     const { firstName, lastName, username, email, mobile, barangayId, isActive, password, generateTempPassword } = req.body;
 
@@ -568,7 +625,7 @@ app.post('/api/users', (req, res) => {
     let tempPasswordGenerated = null;
 
     if (generateTempPassword || !password) {
-        tempPasswordGenerated = crypto.randomBytes(4).toString('hex'); // 8-character temp password
+        tempPasswordGenerated = crypto.randomBytes(4).toString('hex');
         finalPassword = tempPasswordGenerated;
     }
 
