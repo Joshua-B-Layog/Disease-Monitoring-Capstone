@@ -20,14 +20,17 @@ app.use(express.json({ limit: '10mb' })); // increased for base64 photo if neede
 // ==========================================
 // 3. DATABASE & EMAIL CONNECTIONS
 // ==========================================
-const db = mysql.createConnection({
+const db = mysql.createPool({
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME
+    database: process.env.DB_NAME,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
 });
 
-db.connect((err) => {
+db.query('SELECT 1', (err) => {
     if (err) {
         console.error("Database connection failed:", err.message);
     } else {
@@ -141,6 +144,8 @@ app.get('/api/users/:id/profile', (req, res) => {
     const query = `
         SELECT u.user_id, u.username, u.full_name, u.email, u.mobile_number,
                u.role, u.assigned_barangay_id, u.is_active,
+               u.last_login, u.last_login_location, u.last_login_device,
+               u.previous_login, u.previous_login_location, u.previous_login_device,
                b.name AS assigned_barangay_name
         FROM users u
         LEFT JOIN barangays b ON u.assigned_barangay_id = b.id
@@ -294,6 +299,59 @@ app.put('/api/cases/:id', (req, res) => {
     });
 });
 
+// ROUTE: Admin-edit a user account
+app.put('/api/users/:id', (req, res) => {
+    const { id } = req.params;
+    const { firstName, lastName, username, email, mobile, barangayId, isActive } = req.body;
+    const fullName = `${firstName.trim()} ${lastName.trim()}`;
+
+    const updateQuery = `
+        UPDATE users SET
+            username = ?, full_name = ?, email = ?, mobile_number = ?,
+            assigned_barangay_id = ?, is_active = ?
+        WHERE user_id = ?
+    `;
+
+    db.query(updateQuery, [username, fullName, email, mobile || null, barangayId, isActive ? 1 : 0, id], (err, result) => {
+        if (err) {
+            console.error("Update user error:", err.message);
+            if (err.code === 'ER_DUP_ENTRY') {
+                return res.status(409).json({ error: 'A user with this username or email already exists.' });
+            }
+            return res.status(500).json({ error: err.message });
+        }
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+        console.log("✅ User updated:", id);
+        res.status(200).json({ message: 'User updated successfully.' });
+    });
+});
+
+
+// ROUTE: Change password (verified against current password)
+app.put('/api/users/:id/change-password', (req, res) => {
+    const { id } = req.params;
+    const { currentPassword, newPassword } = req.body;
+
+    db.query('SELECT password FROM users WHERE user_id = ?', [id], (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (results.length === 0) return res.status(404).json({ error: 'User not found.' });
+
+        if (results[0].password !== currentPassword) {
+            return res.status(401).json({ error: 'Current password is incorrect.' });
+        }
+
+        db.query('UPDATE users SET password = ? WHERE user_id = ?', [newPassword, id], (updateErr) => {
+            if (updateErr) return res.status(500).json({ error: updateErr.message });
+            return res.status(200).json({ message: 'Password updated successfully.' });
+        });
+    });
+});
+
+
+
+
 // ROUTE: Delete disease case
 app.delete('/api/cases/:id', (req, res) => {
     const { id } = req.params;
@@ -314,13 +372,30 @@ app.delete('/api/cases/:id', (req, res) => {
     });
 });
 
+// ROUTE: Delete a user account
+app.delete('/api/users/:id', (req, res) => {
+    const { id } = req.params;
+    db.query('DELETE FROM users WHERE user_id = ?', [id], (err, result) => {
+        if (err) {
+            console.error("Delete user error:", err.message);
+            return res.status(500).json({ error: err.message });
+        }
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+        console.log(`✅ User ${id} deleted.`);
+        res.status(200).json({ message: 'User deleted successfully.' });
+    });
+});
+
+
 // ==========================================
 // AUTHENTICATION ROUTES
 // ==========================================
 
 // ROUTE: Login
 app.post('/api/login', (req, res) => {
-    const { email, password, role, context } = req.body;
+    const { email, password, role, context, device, location } = req.body;
 
     console.log("--- Login Attempt ---", { email, role, context });
 
@@ -363,8 +438,23 @@ app.post('/api/login', (req, res) => {
             }
         }
 
-        // Update last_login
-        db.query('UPDATE users SET last_login = NOW() WHERE user_id = ?', [user.user_id]);
+        // Save previous login before overwriting
+        const savePreviousQuery = `
+            UPDATE users SET
+                previous_login = last_login,
+                previous_login_location = last_login_location,
+                previous_login_device = last_login_device,
+                last_login = NOW(),
+                last_login_location = ?,
+                last_login_device = ?
+            WHERE user_id = ?
+        `;
+
+        db.query(savePreviousQuery, [
+            location || 'Unknown Location',
+            device || 'Unknown Device',
+            user.user_id
+        ]);
 
         return res.status(200).json({
             message: 'Success',
@@ -668,50 +758,39 @@ app.post('/api/users', (req, res) => {
     });
 });
 
-// ROUTE: Admin-edit a user account
-app.put('/api/users/:id', (req, res) => {
-    const { id } = req.params;
-    const { firstName, lastName, username, email, mobile, barangayId, isActive } = req.body;
-    const fullName = `${firstName.trim()} ${lastName.trim()}`;
-
-    const updateQuery = `
-        UPDATE users SET
-            username = ?, full_name = ?, email = ?, mobile_number = ?,
-            assigned_barangay_id = ?, is_active = ?
-        WHERE user_id = ?
-    `;
-
-    db.query(updateQuery, [username, fullName, email, mobile || null, barangayId, isActive ? 1 : 0, id], (err, result) => {
-        if (err) {
-            console.error("Update user error:", err.message);
-            if (err.code === 'ER_DUP_ENTRY') {
-                return res.status(409).json({ error: 'A user with this username or email already exists.' });
-            }
-            return res.status(500).json({ error: err.message });
-        }
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ error: 'User not found.' });
-        }
-        console.log("✅ User updated:", id);
-        res.status(200).json({ message: 'User updated successfully.' });
+// ROUTE: Send 2FA verification email (mock — sends real email)
+app.post('/api/send-2fa-email', (req, res) => {
+    const { userId } = req.body;
+    db.query('SELECT email, full_name FROM users WHERE user_id = ?', [userId], (err, results) => {
+        if (err || results.length === 0) return res.status(404).json({ error: 'User not found.' });
+        const user = results[0];
+        const mailOptions = {
+            from: `"Cabuyao Health System" <${process.env.EMAIL_USER}>`,
+            to: user.email,
+            subject: 'Cabuyao Health — Verify Your Email for 2FA',
+            html: `
+                <div style="max-width:600px;margin:0 auto;font-family:system-ui,sans-serif;background:#16171d;border:1px solid #2e303a;border-radius:8px;overflow:hidden;">
+                    <div style="background:#0d9488;padding:24px;text-align:center;">
+                        <h1 style="color:#fff;margin:0;font-size:28px;">CABUYAO HEALTH</h1>
+                    </div>
+                    <div style="background:#1f2028;padding:40px 32px;">
+                        <p style="color:#f3f4f6;font-size:16px;">Hi ${user.full_name},</p>
+                        <p style="color:#f3f4f6;font-size:16px;">You requested to enable Two-Factor Authentication on your account.</p>
+                        <div style="text-align:center;margin:32px 0;">
+                            <a href="#" style="background:#10b981;color:#fff;text-decoration:none;padding:14px 36px;font-size:16px;font-weight:bold;border-radius:6px;display:inline-block;">✅ Verify Email</a>
+                        </div>
+                        <p style="color:#6b7280;font-size:14px;">If you did not request this, ignore this email.</p>
+                    </div>
+                </div>
+            `
+        };
+        transporter.sendMail(mailOptions, (mailErr) => {
+            if (mailErr) return res.status(500).json({ error: 'Failed to send email.' });
+            return res.status(200).json({ message: '2FA verification email sent.' });
+        });
     });
 });
 
-// ROUTE: Delete a user account
-app.delete('/api/users/:id', (req, res) => {
-    const { id } = req.params;
-    db.query('DELETE FROM users WHERE user_id = ?', [id], (err, result) => {
-        if (err) {
-            console.error("Delete user error:", err.message);
-            return res.status(500).json({ error: err.message });
-        }
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ error: 'User not found.' });
-        }
-        console.log(`✅ User ${id} deleted.`);
-        res.status(200).json({ message: 'User deleted successfully.' });
-    });
-});
 
 // ==========================================
 // 5. START SERVER

@@ -92,48 +92,85 @@
     };
 
     const handleFormSubmit = async (e) => {
-      e.preventDefault();
-      setLoginError(''); 
+    e.preventDefault();
+    setLoginError('');
 
-      try {
+    // ── Capture device info from user agent ──
+    const getDeviceInfo = () => {
+        const ua = navigator.userAgent;
+        let browser = 'Browser';
+        let os = 'Device';
+
+        if (ua.includes('Chrome') && !ua.includes('Edg')) browser = 'Chrome';
+        else if (ua.includes('Firefox')) browser = 'Firefox';
+        else if (ua.includes('Safari') && !ua.includes('Chrome')) browser = 'Safari';
+        else if (ua.includes('Edg')) browser = 'Edge';
+
+        if (ua.includes('Windows')) os = 'Windows';
+        else if (ua.includes('Android')) os = 'Android';
+        else if (ua.includes('iPhone')) os = 'iPhone';
+        else if (ua.includes('iPad')) os = 'iPad';
+        else if (ua.includes('Mac')) os = 'Mac';
+        else if (ua.includes('Linux')) os = 'Linux';
+
+        return `${browser} on ${os}`;
+    };
+
+    // ── Capture location from IP ──
+    const getLocation = async () => {
+        try {
+            const res = await fetch('https://ipapi.co/json/');
+            const data = await res.json();
+            return `${data.city || 'Unknown'}, ${data.region || ''}, ${data.country_name || ''}`.trim();
+        } catch {
+            return 'Cabuyao, Calabarzon, Philippines';
+        }
+    };
+
+    try {
+        const device = getDeviceInfo();
+        const location = await getLocation();
+
         const response = await fetch('http://localhost:5000/api/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            email: email, 
-            password: password, 
-            role: selectedRole,
-            context: selectedContext 
-          }),
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                email: email, 
+                password: password, 
+                role: selectedRole,
+                context: selectedContext,
+                device: device,
+                location: location
+            }),
         });
 
         const data = await response.json();
 
         if (response.ok) {
-          if (rememberMe) {
-            localStorage.setItem('remembered_user_email', email);
-            localStorage.setItem('remember_me_status', 'true');
-          } else {
-            localStorage.removeItem('remembered_user_email');
-            localStorage.removeItem('remember_me_status');
-          }
+            if (rememberMe) {
+                localStorage.setItem('remembered_user_email', email);
+                localStorage.setItem('remember_me_status', 'true');
+            } else {
+                localStorage.removeItem('remembered_user_email');
+                localStorage.removeItem('remember_me_status');
+            }
 
-          onLoginSuccess({
-            id: data.user.id,
-            role: selectedRole,
-            context: selectedContext,
-            username: email,
-            name: data.user.name,
-            barangay: data.user.barangay
-          });
+            onLoginSuccess({
+                id: data.user.id,
+                role: selectedRole,
+                context: selectedContext,
+                username: email,
+                name: data.user.name,
+                barangay: data.user.barangay
+            });
         } else {
-          setLoginError('Invalid credentials or unauthorized role coordinates.');
+            setLoginError(data.error || 'Invalid credentials or account not found.');
         }
-      } catch (error) {
+    } catch (error) {
         console.error("Transmission Error:", error);
         setLoginError('Cannot connect to surveillance gateway. Confirm backend runtime.');
-      }
-    };
+    }
+};
 
     // --- REGISTER ACCOUNT SUBMISSION ---
     const handleSignupSubmit = async (e) => {
