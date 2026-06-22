@@ -146,6 +146,7 @@ app.get('/api/users/:id/profile', (req, res) => {
                u.role, u.assigned_barangay_id, u.is_active,
                u.last_login, u.last_login_location, u.last_login_device,
                u.previous_login, u.previous_login_location, u.previous_login_device,
+               u.two_fa_enabled,
                b.name AS assigned_barangay_name
         FROM users u
         LEFT JOIN barangays b ON u.assigned_barangay_id = b.id
@@ -458,6 +459,7 @@ app.post('/api/login', (req, res) => {
 
         return res.status(200).json({
             message: 'Success',
+            requires2FA: !!user.two_fa_enabled,
             user: {
                 id: user.user_id,
                 name: user.full_name,
@@ -758,35 +760,151 @@ app.post('/api/users', (req, res) => {
     });
 });
 
-// ROUTE: Send 2FA verification email (mock — sends real email)
+// ROUTE: Send 2FA verification email — generates a real token now
 app.post('/api/send-2fa-email', (req, res) => {
     const { userId } = req.body;
     db.query('SELECT email, full_name FROM users WHERE user_id = ?', [userId], (err, results) => {
         if (err || results.length === 0) return res.status(404).json({ error: 'User not found.' });
         const user = results[0];
-        const mailOptions = {
-            from: `"Cabuyao Health System" <${process.env.EMAIL_USER}>`,
-            to: user.email,
-            subject: 'Cabuyao Health — Verify Your Email for 2FA',
-            html: `
-                <div style="max-width:600px;margin:0 auto;font-family:system-ui,sans-serif;background:#16171d;border:1px solid #2e303a;border-radius:8px;overflow:hidden;">
-                    <div style="background:#0d9488;padding:24px;text-align:center;">
-                        <h1 style="color:#fff;margin:0;font-size:28px;">CABUYAO HEALTH</h1>
-                    </div>
-                    <div style="background:#1f2028;padding:40px 32px;">
-                        <p style="color:#f3f4f6;font-size:16px;">Hi ${user.full_name},</p>
-                        <p style="color:#f3f4f6;font-size:16px;">You requested to enable Two-Factor Authentication on your account.</p>
-                        <div style="text-align:center;margin:32px 0;">
-                            <a href="#" style="background:#10b981;color:#fff;text-decoration:none;padding:14px 36px;font-size:16px;font-weight:bold;border-radius:6px;display:inline-block;">✅ Verify Email</a>
+
+        const token = crypto.randomBytes(32).toString('hex');
+        const expiry = new Date(Date.now() + 3600000); // 1 hour
+
+        db.query('UPDATE users SET two_fa_token = ?, two_fa_token_expiry = ? WHERE user_id = ?',
+            [token, expiry, userId], (updateErr) => {
+            if (updateErr) return res.status(500).json({ error: 'Failed to save verification token.' });
+
+            const verifyLink = `http://localhost:5173/verify-2fa?token=${token}&userId=${userId}`;
+
+            const mailOptions = {
+                from: `"Cabuyao Health System" <${process.env.EMAIL_USER}>`,
+                to: user.email,
+                subject: 'Cabuyao Health — Verify Your Email for 2FA',
+                html: `
+                    <div style="max-width:600px;margin:0 auto;font-family:system-ui,sans-serif;background:#16171d;border:1px solid #2e303a;border-radius:8px;overflow:hidden;">
+                        <div style="background:#0d9488;padding:24px;text-align:center;">
+                            <h1 style="color:#fff;margin:0;font-size:28px;">CABUYAO HEALTH</h1>
                         </div>
-                        <p style="color:#6b7280;font-size:14px;">If you did not request this, ignore this email.</p>
+                        <div style="background:#1f2028;padding:40px 32px;">
+                            <p style="color:#f3f4f6;font-size:16px;">Hi ${user.full_name},</p>
+                            <p style="color:#f3f4f6;font-size:16px;">You requested to enable Two-Factor Authentication on your account.</p>
+                            <div style="text-align:center;margin:32px 0;">
+                                <a href="${verifyLink}" style="background:#10b981;color:#fff;text-decoration:none;padding:14px 36px;font-size:16px;font-weight:bold;border-radius:6px;display:inline-block;">✅ Verify Email</a>
+                            </div>
+                            <p style="color:#6b7280;font-size:14px;border-top:1px solid #2e303a;padding-top:16px;">This link expires in 60 minutes. If you did not request this, ignore this email.</p>
+                        </div>
                     </div>
-                </div>
-            `
-        };
-        transporter.sendMail(mailOptions, (mailErr) => {
-            if (mailErr) return res.status(500).json({ error: 'Failed to send email.' });
-            return res.status(200).json({ message: '2FA verification email sent.' });
+                `
+            };
+            transporter.sendMail(mailOptions, (mailErr) => {
+                if (mailErr) return res.status(500).json({ error: 'Failed to send email.' });
+                return res.status(200).json({ message: '2FA verification email sent.' });
+            });
+        });
+    });
+});
+
+// ROUTE: Confirm 2FA token from email link → activates 2FA
+app.post('/api/verify-2fa-token', (req, res) => {
+    const { userId, token } = req.body;
+
+    const query = `
+        SELECT * FROM users
+        WHERE user_id = ? AND two_fa_token = ? AND two_fa_token_expiry > NOW()
+    `;
+    db.query(query, [userId, token], (err, results) => {
+        if (err) return res.status(500).json({ error: 'Database error.' });
+        if (results.length === 0) {
+            return res.status(400).json({ error: 'This verification link has expired or is invalid.' });
+        }
+
+        db.query(
+            'UPDATE users SET two_fa_enabled = 1, two_fa_token = NULL, two_fa_token_expiry = NULL WHERE user_id = ?',
+            [userId],
+            (updateErr) => {
+                if (updateErr) return res.status(500).json({ error: 'Failed to activate 2FA.' });
+                return res.status(200).json({ message: '2FA has been activated for your account.' });
+            }
+        );
+    });
+});
+
+// ROUTE: Disable 2FA
+app.post('/api/disable-2fa', (req, res) => {
+    const { userId } = req.body;
+    db.query('UPDATE users SET two_fa_enabled = 0, two_fa_token = NULL, two_fa_token_expiry = NULL WHERE user_id = ?',
+        [userId], (err) => {
+        if (err) return res.status(500).json({ error: 'Failed to disable 2FA.' });
+        return res.status(200).json({ message: '2FA disabled.' });
+    });
+});
+
+// ROUTE: Send login OTP (called after password is verified, only if 2FA is enabled)
+app.post('/api/send-login-otp', (req, res) => {
+    const { userId } = req.body;
+    db.query('SELECT email, full_name FROM users WHERE user_id = ?', [userId], (err, results) => {
+        if (err || results.length === 0) return res.status(404).json({ error: 'User not found.' });
+        const user = results[0];
+
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiry = new Date(Date.now() + 600000); // 10 minutes
+
+        db.query('UPDATE users SET login_otp = ?, login_otp_expiry = ? WHERE user_id = ?',
+            [otp, expiry, userId], (updateErr) => {
+            if (updateErr) return res.status(500).json({ error: 'Failed to generate code.' });
+
+            const mailOptions = {
+                from: `"Cabuyao Health System" <${process.env.EMAIL_USER}>`,
+                to: user.email,
+                subject: 'Cabuyao Health — Your Login Verification Code',
+                html: `
+                    <div style="max-width:600px;margin:0 auto;font-family:system-ui,sans-serif;background:#16171d;border:1px solid #2e303a;border-radius:8px;overflow:hidden;">
+                        <div style="background:#0d9488;padding:24px;text-align:center;">
+                            <h1 style="color:#fff;margin:0;font-size:28px;">CABUYAO HEALTH</h1>
+                        </div>
+                        <div style="background:#1f2028;padding:40px 32px;text-align:center;">
+                            <p style="color:#f3f4f6;font-size:16px;">Hi ${user.full_name}, here is your login code:</p>
+                            <div style="font-size:36px;font-weight:bold;color:#10b981;letter-spacing:8px;margin:24px 0;">${otp}</div>
+                            <p style="color:#6b7280;font-size:14px;">This code expires in 10 minutes. If you did not attempt to log in, please secure your account.</p>
+                        </div>
+                    </div>
+                `
+            };
+            transporter.sendMail(mailOptions, (mailErr) => {
+                if (mailErr) {
+                    console.log(`\n🔑 FALLBACK LOGIN OTP for ${user.email}: [ ${otp} ]\n`);
+                    return res.status(200).json({ message: 'Code generated. Check server console if email failed.' });
+                }
+                return res.status(200).json({ message: 'Verification code sent to your email.' });
+            });
+        });
+    });
+});
+
+// ROUTE: Verify login OTP — completes the 2FA login step
+app.post('/api/verify-login-otp', (req, res) => {
+    const { userId, otp } = req.body;
+
+    const query = `
+        SELECT * FROM users
+        WHERE user_id = ? AND login_otp = ? AND login_otp_expiry > NOW()
+    `;
+    db.query(query, [userId, otp], (err, results) => {
+        if (err) return res.status(500).json({ error: 'Database error.' });
+        if (results.length === 0) {
+            return res.status(400).json({ error: 'Invalid or expired code.' });
+        }
+
+        db.query('UPDATE users SET login_otp = NULL, login_otp_expiry = NULL WHERE user_id = ?', [userId]);
+
+        const user = results[0];
+        return res.status(200).json({
+            message: 'Login verified.',
+            user: {
+                id: user.user_id,
+                name: user.full_name,
+                role: user.role,
+            }
         });
     });
 });

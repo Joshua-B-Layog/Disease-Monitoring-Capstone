@@ -37,6 +37,8 @@ export default function CHOSettings({
     previous_login_device: null,
   });
   const [otherSessionsCleared, setOtherSessionsCleared] = useState(false);
+  const [showSessionsModal, setShowSessionsModal] = useState(false);
+  const [revokedSessionIds, setRevokedSessionIds] = useState([]);
 
   // ── Barangay list ──
   const [barangayList, setBarangayList] = useState([]);
@@ -53,6 +55,9 @@ export default function CHOSettings({
   const [twoFaStep, setTwoFaStep] = useState('idle'); // 'idle' | 'email_sent' | 'verified'
   const [twoFaLoading, setTwoFaLoading] = useState(false);
   const [twoFaMsg, setTwoFaMsg] = useState('');
+  const [disableOtp, setDisableOtp] = useState('');
+  const [disableOtpError, setDisableOtpError] = useState('');
+  const [disableOtpLoading, setDisableOtpLoading] = useState(false);
 
   // ── Notifications ──
   const [notifications, setNotifications] = useState({
@@ -108,6 +113,7 @@ export default function CHOSettings({
           previous_login_location: d.previous_login_location,
           previous_login_device: d.previous_login_device,
         });
+        setIsTwoFactorEnabled(!!d.two_fa_enabled);
         setProfileLoading(false);
       })
       .catch(() => setProfileLoading(false));
@@ -190,10 +196,20 @@ export default function CHOSettings({
   // ── 2FA Toggle ──
   const handle2FAToggle = async () => {
     if (isTwoFactorEnabled) {
-      // Turning OFF
-      setIsTwoFactorEnabled(false);
-      setTwoFaStep('idle');
+      // Turning OFF — require a 6-digit code first, don't disable instantly
+      setTwoFaLoading(true);
       setTwoFaMsg('');
+      setDisableOtpError('');
+      setDisableOtp('');
+      try {
+        await axios.post('http://localhost:5000/api/send-login-otp', { userId });
+        setTwoFaStep('disable_otp_sent');
+        setTwoFaMsg(`📧 A 6-digit code was sent to ${maskEmail(profile.email)}. Enter it below to disable 2FA.`);
+      } catch (err) {
+        setTwoFaMsg('❌ Failed to send verification code. Please try again.');
+      } finally {
+        setTwoFaLoading(false);
+      }
       return;
     }
 
@@ -209,6 +225,40 @@ export default function CHOSettings({
     } finally {
       setTwoFaLoading(false);
     }
+  };
+
+  // ── Confirm disable 2FA with OTP ──
+  const handleConfirmDisable2FA = async () => {
+    setDisableOtpError('');
+    if (disableOtp.length !== 6) {
+      setDisableOtpError('Please enter the 6-digit code sent to your email.');
+      return;
+    }
+    setDisableOtpLoading(true);
+    try {
+      const verifyRes = await axios.post('http://localhost:5000/api/verify-login-otp', {
+        userId, otp: disableOtp,
+      });
+      if (verifyRes.status === 200) {
+        await axios.post('http://localhost:5000/api/disable-2fa', { userId });
+        setIsTwoFactorEnabled(false);
+        setTwoFaStep('idle');
+        setTwoFaMsg('✅ Two-Factor Authentication has been disabled.');
+        setDisableOtp('');
+      }
+    } catch (err) {
+      setDisableOtpError(err.response?.data?.error || 'Invalid or expired code.');
+    } finally {
+      setDisableOtpLoading(false);
+    }
+  };
+
+  // ── Cancel the disable flow ──
+  const handleCancelDisable2FA = () => {
+    setTwoFaStep('idle');
+    setTwoFaMsg('');
+    setDisableOtp('');
+    setDisableOtpError('');
   };
 
   // ── Format helpers ──
@@ -485,7 +535,7 @@ export default function CHOSettings({
                 </div>
                 <label className="figma-toggle-switch" style={{ flexShrink: 0, marginLeft: '16px', marginTop: '4px' }}>
                   <input type="checkbox" checked={isTwoFactorEnabled}
-                    onChange={handle2FAToggle} disabled={twoFaLoading} />
+                    onChange={handle2FAToggle} disabled={twoFaLoading || twoFaStep === 'disable_otp_sent'} />
                   <span className="figma-slider" />
                 </label>
               </div>
@@ -493,8 +543,8 @@ export default function CHOSettings({
               {twoFaMsg && (
                 <div style={{
                   padding: '12px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: '500', marginTop: '12px',
-                  background: twoFaMsg.startsWith('✅') ? '#d1fae5' : '#fee2e2',
-                  color: twoFaMsg.startsWith('✅') ? '#065f46' : '#991b1b',
+                  background: twoFaMsg.startsWith('✅') ? '#d1fae5' : twoFaMsg.startsWith('📧') ? '#eff6ff' : '#fee2e2',
+                  color: twoFaMsg.startsWith('✅') ? '#065f46' : twoFaMsg.startsWith('📧') ? '#1e40af' : '#991b1b',
                 }}>
                   {twoFaMsg}
                 </div>
@@ -505,9 +555,54 @@ export default function CHOSettings({
                   📧 Check your email and click <strong>"Verify Email"</strong> to complete 2FA setup. Once verified, 2FA will be active on your next login.
                 </div>
               )}
+
+              {twoFaStep === 'disable_otp_sent' && (
+                <div style={{ marginTop: '14px', padding: '16px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#991b1b', marginBottom: '8px' }}>
+                    Enter the 6-digit code to confirm disabling 2FA
+                  </label>
+                  {disableOtpError && (
+                    <div style={{ fontSize: '12px', color: '#dc2626', marginBottom: '8px' }}>{disableOtpError}</div>
+                  )}
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <input
+                      type="text"
+                      maxLength="6"
+                      placeholder="######"
+                      value={disableOtp}
+                      onChange={e => setDisableOtp(e.target.value.replace(/\D/g, ''))}
+                      style={{
+                        flex: 1, padding: '10px 12px', borderRadius: '6px', border: '1px solid #fca5a5',
+                        fontSize: '18px', letterSpacing: '6px', textAlign: 'center', fontWeight: 'bold',
+                        background: '#ffffff', color: '#111827', outline: 'none',
+                      }}
+                    />
+                    <button
+                      onClick={handleConfirmDisable2FA}
+                      disabled={disableOtpLoading}
+                      style={{
+                        padding: '10px 20px', background: disableOtpLoading ? '#fca5a5' : '#dc2626',
+                        color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px',
+                        fontWeight: '600', cursor: disableOtpLoading ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {disableOtpLoading ? 'Verifying...' : 'Confirm Disable'}
+                    </button>
+                  </div>
+                  <button
+                    onClick={handleCancelDisable2FA}
+                    style={{
+                      marginTop: '10px', background: 'none', border: 'none', color: '#6b7280',
+                      fontSize: '12px', cursor: 'pointer', padding: 0, textDecoration: 'underline',
+                    }}
+                  >
+                    Cancel and keep 2FA enabled
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* ── 3. LOGIN SESSIONS ── */}
+           {/* ── 3. LOGIN SESSIONS ── */}
             <div className="security-section-card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <div className="security-card-header" style={{ marginBottom: 0 }}>
@@ -524,20 +619,18 @@ export default function CHOSettings({
                     </span>
                   </div>
                 </div>
-                {!otherSessionsCleared && sessionData.previous_login && (
-                  <button
-                    onClick={() => setOtherSessionsCleared(true)}
-                    style={{ padding: '8px 16px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', fontSize: '13px', fontWeight: '600', color: '#dc2626', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                    Log Out of All Other Sessions
-                  </button>
-                )}
+                <button
+                  onClick={() => setShowSessionsModal(true)}
+                  className="security-manage-btn">
+                  Manage
+                </button>
               </div>
 
-              {/* Current Session */}
+              {/* Current Session preview (always visible) */}
               <div style={{
                 display: 'flex', alignItems: 'center', gap: '16px',
                 padding: '16px', background: '#f0fdf4', border: '1px solid #bbf7d0',
-                borderRadius: '10px', marginBottom: '12px',
+                borderRadius: '10px',
               }}>
                 <div style={{ fontSize: '28px', flexShrink: 0 }}>
                   {getDeviceIcon(sessionData.last_login_device)}
@@ -548,9 +641,6 @@ export default function CHOSettings({
                       {sessionData.last_login_device || 'Current Device'}
                     </span>
                     <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px', background: '#10b981', color: 'white' }}>
-                      TRUSTED
-                    </span>
-                    <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px', background: '#dcfce7', color: '#16a34a' }}>
                       THIS DEVICE
                     </span>
                   </div>
@@ -563,50 +653,138 @@ export default function CHOSettings({
                 </div>
               </div>
 
-              {/* Previous Session */}
-              {sessionData.previous_login && !otherSessionsCleared && (
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: '16px',
-                  padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0',
-                  borderRadius: '10px', marginBottom: '12px',
-                }}>
-                  <div style={{ fontSize: '28px', flexShrink: 0 }}>
-                    {getDeviceIcon(sessionData.previous_login_device)}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '15px', fontWeight: '600', color: '#0f172a' }}>
-                        {sessionData.previous_login_device || 'Unknown Device'}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: '13px', color: '#475569' }}>
-                      {sessionData.previous_login_location || 'Unknown Location'}
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>
-                      {formatLoginTime(sessionData.previous_login)}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setOtherSessionsCleared(true)}
-                    style={{ padding: '6px 14px', background: 'transparent', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '12px', fontWeight: '600', color: '#dc2626', cursor: 'pointer' }}>
-                    Revoke
-                  </button>
-                </div>
-              )}
-
-              {otherSessionsCleared && (
-                <div style={{ padding: '12px 16px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', fontSize: '13px', color: '#16a34a', fontWeight: '500' }}>
-                  ✅ All other sessions have been logged out successfully.
-                </div>
-              )}
-
-              {!sessionData.previous_login && !otherSessionsCleared && (
-                <div style={{ padding: '12px 16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#94a3b8', textAlign: 'center' }}>
+              {!sessionData.previous_login && (
+                <p style={{ margin: '10px 0 0 0', fontSize: '12px', color: '#94a3b8', textAlign: 'center' }}>
                   No other active sessions found.
-                </div>
+                </p>
               )}
             </div>
-          </div>
+
+            {/* ── SESSIONS MANAGE MODAL ── */}
+            {showSessionsModal && (
+              <div
+                onClick={() => setShowSessionsModal(false)}
+                style={{
+                  position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  zIndex: 9999,
+                }}
+              >
+                <div
+                  onClick={e => e.stopPropagation()}
+                  style={{
+                    background: '#ffffff', borderRadius: '16px', width: '520px', maxWidth: '95vw',
+                    maxHeight: '85vh', overflowY: 'auto',
+                    boxShadow: '0 24px 60px rgba(0,0,0,0.25)',
+                    padding: '28px 28px 24px 28px',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#0f172a' }}>Manage Sessions</h3>
+                    <button onClick={() => setShowSessionsModal(false)}
+                      style={{ background: 'none', border: 'none', fontSize: '22px', color: '#94a3b8', cursor: 'pointer', lineHeight: 1, padding: 0 }}>
+                      ×
+                    </button>
+                  </div>
+                  <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: '#64748b' }}>
+                    Devices currently signed in to your account.
+                  </p>
+
+                  {/* Current Session — cannot be revoked */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: '14px',
+                    padding: '14px 16px', background: '#f0fdf4', border: '1px solid #bbf7d0',
+                    borderRadius: '10px', marginBottom: '12px',
+                  }}>
+                    <div style={{ fontSize: '26px', flexShrink: 0 }}>
+                      {getDeviceIcon(sessionData.last_login_device)}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '14px', fontWeight: '600', color: '#0f172a' }}>
+                          {sessionData.last_login_device || 'Current Device'}
+                        </span>
+                        <span style={{ fontSize: '10px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px', background: '#10b981', color: 'white' }}>
+                          TRUSTED
+                        </span>
+                        <span style={{ fontSize: '10px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px', background: '#dcfce7', color: '#16a34a' }}>
+                          THIS DEVICE
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#475569' }}>
+                        {sessionData.last_login_location || 'Cabuyao, Calabarzon, Philippines'}
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                        {formatLoginTime(sessionData.last_login)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Previous / Other Sessions — individually revokable */}
+                  {sessionData.previous_login && !otherSessionsCleared && !revokedSessionIds.includes('previous') && (
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: '14px',
+                      padding: '14px 16px', background: '#f8fafc', border: '1px solid #e2e8f0',
+                      borderRadius: '10px', marginBottom: '12px',
+                    }}>
+                      <div style={{ fontSize: '26px', flexShrink: 0 }}>
+                        {getDeviceIcon(sessionData.previous_login_device)}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '14px', fontWeight: '600', color: '#0f172a', marginBottom: '3px' }}>
+                          {sessionData.previous_login_device || 'Unknown Device'}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#475569' }}>
+                          {sessionData.previous_login_location || 'Unknown Location'}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                          {formatLoginTime(sessionData.previous_login)}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setRevokedSessionIds(prev => [...prev, 'previous'])}
+                        style={{ padding: '7px 14px', background: 'transparent', border: '1px solid #fca5a5', borderRadius: '6px', fontSize: '12px', fontWeight: '600', color: '#dc2626', cursor: 'pointer', flexShrink: 0 }}>
+                        Revoke
+                      </button>
+                    </div>
+                  )}
+
+                  {(otherSessionsCleared || revokedSessionIds.includes('previous')) && sessionData.previous_login && (
+                    <div style={{ padding: '12px 16px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', fontSize: '13px', color: '#16a34a', fontWeight: '500', marginBottom: '12px' }}>
+                      ✅ This session has been logged out.
+                    </div>
+                  )}
+
+                  {!sessionData.previous_login && (
+                    <div style={{ padding: '14px 16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#94a3b8', textAlign: 'center', marginBottom: '12px' }}>
+                      No other active sessions found.
+                    </div>
+                  )}
+
+                  {/* Log Out of All Other Sessions */}
+                  {sessionData.previous_login && !otherSessionsCleared && !revokedSessionIds.includes('previous') && (
+                    <button
+                      onClick={() => setOtherSessionsCleared(true)}
+                      style={{
+                        width: '100%', marginTop: '8px', padding: '12px',
+                        background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px',
+                        fontSize: '13px', fontWeight: '600', color: '#dc2626', cursor: 'pointer',
+                      }}>
+                      Log Out of All Other Sessions
+                    </button>
+                  )}
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #f1f5f9' }}>
+                    <button
+                      onClick={() => setShowSessionsModal(false)}
+                      style={{ padding: '10px 24px', background: '#1e3a8a', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#fff', cursor: 'pointer' }}>
+                      Done
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+            </div>
         )}
 
         {/* ── NOTIFICATIONS VIEW ── */}

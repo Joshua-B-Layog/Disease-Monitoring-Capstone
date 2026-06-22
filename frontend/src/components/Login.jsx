@@ -2,6 +2,10 @@
 
   export default function Login({ onLoginSuccess, onForgotPassword, theme, toggleTheme }) {
     const [step, setStep] = useState('role'); // 'role', 'cho_select', 'bhw_select', 'auth', 'forgot_password', 'signup'
+    const [pendingUser, setPendingUser] = useState(null); // holds session data while waiting for OTP
+    const [loginOtp, setLoginOtp] = useState('');
+    const [otpError, setOtpError] = useState('');
+    const [otpLoading, setOtpLoading] = useState(false);
     const [selectedRole, setSelectedRole] = useState('CHO'); 
     const [selectedContext, setSelectedContext] = useState(''); 
     
@@ -146,7 +150,7 @@
 
         const data = await response.json();
 
-        if (response.ok) {
+       if (response.ok) {
             if (rememberMe) {
                 localStorage.setItem('remembered_user_email', email);
                 localStorage.setItem('remember_me_status', 'true');
@@ -155,20 +159,62 @@
                 localStorage.removeItem('remember_me_status');
             }
 
-            onLoginSuccess({
+            const sessionPayload = {
                 id: data.user.id,
                 role: selectedRole,
                 context: selectedContext,
                 username: email,
                 name: data.user.name,
                 barangay: data.user.barangay
-            });
+            };
+
+            if (data.requires2FA) {
+                // Hold off on logging in — send OTP and move to verification step
+                setPendingUser(sessionPayload);
+                try {
+                    await fetch('http://localhost:5000/api/send-login-otp', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ userId: data.user.id })
+                    });
+                } catch (e) { /* fallback OTP will print server-side */ }
+                setStep('otp_login');
+            } else {
+                onLoginSuccess(sessionPayload);
+            }
         } else {
             setLoginError(data.error || 'Invalid credentials or account not found.');
         }
     } catch (error) {
         console.error("Transmission Error:", error);
         setLoginError('Cannot connect to surveillance gateway. Confirm backend runtime.');
+    }
+};
+
+const handleLoginOtpSubmit = async (e) => {
+    e.preventDefault();
+    setOtpError('');
+    if (loginOtp.length !== 6) {
+        setOtpError('Please enter the 6-digit code sent to your email.');
+        return;
+    }
+    setOtpLoading(true);
+    try {
+        const response = await fetch('http://localhost:5000/api/verify-login-otp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: pendingUser.id, otp: loginOtp })
+        });
+        const data = await response.json();
+        if (response.ok) {
+            onLoginSuccess(pendingUser);
+        } else {
+            setOtpError(data.error || 'Invalid or expired code.');
+        }
+    } catch (error) {
+        setOtpError('Could not reach the verification service.');
+    } finally {
+        setOtpLoading(false);
     }
 };
 
@@ -537,6 +583,46 @@
                 </form>
               </>
             )}
+
+            {/* STEP 3.5: LOGIN OTP VERIFICATION */}
+            {step === 'otp_login' && (
+              <>
+                <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
+                  <h2 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '8px' }}>Verify It's You</h2>
+                  <p style={{ color: 'var(--text-muted)' }}>
+                    We sent a 6-digit code to your registered email. Enter it below to complete sign-in.
+                  </p>
+                </div>
+
+                <form onSubmit={handleLoginOtpSubmit}>
+                  {otpError && (
+                    <div style={{ backgroundColor: '#fee2e2', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid #fca5a5' }}>
+                      {otpError}
+                    </div>
+                  )}
+
+                  <div className="form-group" style={{ textAlign: 'left' }}>
+                    <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontSize: '14px', fontWeight: '500' }}>Verification Code</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="######"
+                      maxLength="6"
+                      value={loginOtp}
+                      onChange={(e) => setLoginOtp(e.target.value.replace(/\D/g, ''))}
+                      style={{ letterSpacing: '6px', textAlign: 'center', fontSize: '20px', fontWeight: 'bold' }}
+                      required
+                    />
+                  </div>
+
+                  <button type="submit" disabled={otpLoading} className="submit-btn" style={{ backgroundColor: '#10B981', color: '#FFFFFF', marginTop: '20px' }}>
+                    {otpLoading ? 'Verifying...' : 'Verify & Continue'}
+                  </button>
+                </form>
+              </>
+            )}
+
+
 
             {/* FORGOT PASSWORD SECTION */}
             {step === 'forgot_password' && (
