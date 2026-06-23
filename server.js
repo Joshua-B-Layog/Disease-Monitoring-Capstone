@@ -303,17 +303,17 @@ app.put('/api/cases/:id', (req, res) => {
 // ROUTE: Admin-edit a user account
 app.put('/api/users/:id', (req, res) => {
     const { id } = req.params;
-    const { firstName, lastName, username, email, mobile, barangayId, isActive } = req.body;
+    const { firstName, lastName, username, email, mobile, barangayId, isActive, role } = req.body;
     const fullName = `${firstName.trim()} ${lastName.trim()}`;
 
     const updateQuery = `
         UPDATE users SET
             username = ?, full_name = ?, email = ?, mobile_number = ?,
-            assigned_barangay_id = ?, is_active = ?
+            assigned_barangay_id = ?, is_active = ?, role = ?
         WHERE user_id = ?
     `;
 
-    db.query(updateQuery, [username, fullName, email, mobile || null, barangayId, isActive ? 1 : 0, id], (err, result) => {
+    db.query(updateQuery, [username, fullName, email, mobile || null, barangayId, isActive ? 1 : 0, role || 'BHW', id], (err, result) => {
         if (err) {
             console.error("Update user error:", err.message);
             if (err.code === 'ER_DUP_ENTRY') {
@@ -706,7 +706,7 @@ app.post('/api/reset-password', (req, res) => {
 
 // ROUTE: Admin-create a user account
 app.post('/api/users', (req, res) => {
-    const { firstName, lastName, username, email, mobile, barangayId, isActive, password, generateTempPassword } = req.body;
+    const { firstName, lastName, username, email, mobile, barangayId, isActive, password, generateTempPassword, role } = req.body;
 
     if (!firstName || !lastName || !username || !email || !barangayId) {
         return res.status(400).json({ error: 'First name, last name, username, email, and barangay are required.' });
@@ -723,10 +723,10 @@ app.post('/api/users', (req, res) => {
 
     const insertQuery = `
         INSERT INTO users (username, full_name, email, mobile_number, password, role, assigned_barangay_id, is_active)
-        VALUES (?, ?, ?, ?, ?, 'BHW', ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
-    db.query(insertQuery, [username, fullName, email, mobile || null, finalPassword, barangayId, isActive ? 1 : 0], (err, result) => {
+    db.query(insertQuery, [username, fullName, email, mobile || null, finalPassword, role || 'BHW', barangayId, isActive ? 1 : 0], (err, result) => {
         if (err) {
             console.error("Add user error:", err.message);
             if (err.code === 'ER_DUP_ENTRY') {

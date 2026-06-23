@@ -7,6 +7,13 @@ const CHO_BARANGAYS = {
   'CHO Unit II (Pulo)': ['Banay-Banay', 'Casile', 'Diezmo', 'Niugan', 'Pitland', 'Pulo', 'San Isidro'],
 };
 
+// Barangays shown in the "Covered Barangays" card (Unit I scope)
+const COVERED_BARANGAYS_UNIT_I = [
+  'Baclaran', 'Banlic', 'Bigaa', 'Butong', 'Gulod',
+  'Mamatid', 'Marinig', 'Sala',
+  'Barangay Uno (Poblacion)', 'Barangay Dos (Poblacion)', 'Barangay Tres (Poblacion)',
+];
+
 const ENTITY_OPTIONS = [
   'Case Records', 'New CHO Admin Account', 'New BHW Account',
   'Barangay Risk Update', 'System Maintenance', 'Epidemiological Summary', 'Other',
@@ -20,26 +27,20 @@ const REPORT_TYPE_SORT_OPTIONS = [
   { value: 'oldest', label: 'Oldest First' },
 ];
 
-// ── Static audit log data (represents real DB activity in a real system) ──
+// ── Static audit log data ──
 const AUDIT_LOGS_DATA = [
-  { id: 1,  timestamp: 'Jun 07, 2026 02:15 PM', createdAt: new Date('2026-06-07T14:15:00'), userId: 'CHO-Admin', userName: 'Pedro Santos', action: 'Created', entity: 'Case Record',   details: 'Added Dengue entry for Patient DG-901 (Niugan)' },
-  { id: 2,  timestamp: 'Jun 07, 2026 01:40 PM', createdAt: new Date('2026-06-07T13:40:00'), userId: 'MK02',      userName: 'Maria Koars',  action: 'Updated', entity: 'Case Record',   details: 'Changed COVID-19 status to Recovered for CV-1102' },
-  { id: 3,  timestamp: 'Jun 07, 2026 11:15 AM', createdAt: new Date('2026-06-07T11:15:00'), userId: 'CHO-Admin', userName: 'Pedro Santos', action: 'Deleted', entity: 'Case Record',   details: 'Removed duplicate Influenza A log item #FL-043' },
-  { id: 4,  timestamp: 'Jun 06, 2026 04:10 PM', createdAt: new Date('2026-06-06T16:10:00'), userId: 'JD01',      userName: 'Juan Danika', action: 'Created', entity: 'User Account',  details: 'Provisioned BHW account credentials for Sector Pulo' },
-  { id: 5,  timestamp: 'Jun 06, 2026 09:30 AM', createdAt: new Date('2026-06-06T09:30:00'), userId: 'JD01',      userName: 'Juan Danika', action: 'Logged In', entity: 'System',      details: 'Login from Chrome on Windows' },
-  { id: 6,  timestamp: 'Jun 05, 2026 03:20 PM', createdAt: new Date('2026-06-05T15:20:00'), userId: 'MK02',      userName: 'Maria Koars',  action: 'Updated', entity: 'Case Record',   details: 'Updated severity for Dengue case DG-899 to Severe' },
-  { id: 7,  timestamp: 'Jun 05, 2026 10:00 AM', createdAt: new Date('2026-06-05T10:00:00'), userId: 'CHO-Admin', userName: 'Pedro Santos', action: 'Created', entity: 'Case Record',   details: 'Added Tuberculosis case TB-024 (Sala)' },
-  { id: 8,  timestamp: 'Jun 04, 2026 02:45 PM', createdAt: new Date('2026-06-04T14:45:00'), userId: 'JD01',      userName: 'Juan Danika', action: 'Deleted', entity: 'User Account',  details: 'Deactivated BHW account ID PC03' },
-  { id: 9,  timestamp: 'Jun 04, 2026 11:30 AM', createdAt: new Date('2026-06-04T11:30:00'), userId: 'MK02',      userName: 'Maria Koars',  action: 'Logged In', entity: 'System',     details: 'Login from Firefox on Android' },
-  { id: 10, timestamp: 'Jun 03, 2026 04:00 PM', createdAt: new Date('2026-06-03T16:00:00'), userId: 'CHO-Admin', userName: 'Pedro Santos', action: 'Updated', entity: 'Case Record',   details: 'Changed status of CV-1089 to Recovered' },
-  { id: 11, timestamp: 'Jun 03, 2026 01:15 PM', createdAt: new Date('2026-06-03T13:15:00'), userId: 'JD01',      userName: 'Juan Danika', action: 'Created', entity: 'Case Record',   details: 'New Cholera case CH-011 (Pulo)' },
-  { id: 12, timestamp: 'Jun 02, 2026 10:00 AM', createdAt: new Date('2026-06-02T10:00:00'), userId: 'MK02',      userName: 'Maria Koars',  action: 'Deleted', entity: 'Case Record',   details: 'Removed test entry DG-000' },
-];
-
-const ALL_USERS_MOCK = [
-  { id: 'JD01',      name: 'Juan Danika' },
-  { id: 'MK02',      name: 'Maria Koars' },
-  { id: 'CHO-Admin', name: 'Pedro Santos' },
+  { id: 1,  timestamp: 'Jun 07, 2026 02:15 PM', createdAt: new Date('2026-06-07T14:15:00'), userId: 'CHO-Admin', userName: 'Pedro Santos', userRole: 'CHO', choUnit: 'CHO Unit I', barangay: null,           action: 'Created',  entity: 'Case Record',  details: 'Added Dengue entry for Patient DG-901 (Niugan)' },
+  { id: 2,  timestamp: 'Jun 07, 2026 01:40 PM', createdAt: new Date('2026-06-07T13:40:00'), userId: 'MK02',      userName: 'Maria Koars',  userRole: 'BHW', choUnit: null,       barangay: 'Marinig',      action: 'Updated',  entity: 'Case Record',  details: 'Changed COVID-19 status to Recovered for CV-1102' },
+  { id: 3,  timestamp: 'Jun 07, 2026 11:15 AM', createdAt: new Date('2026-06-07T11:15:00'), userId: 'CHO-Admin', userName: 'Pedro Santos', userRole: 'CHO', choUnit: 'CHO Unit I', barangay: null,           action: 'Deleted',  entity: 'Case Record',  details: 'Removed duplicate Influenza A log item #FL-043' },
+  { id: 4,  timestamp: 'Jun 06, 2026 04:10 PM', createdAt: new Date('2026-06-06T16:10:00'), userId: 'JD01',      userName: 'Juan Danika', userRole: 'CHO', choUnit: 'CHO Unit II', barangay: null,          action: 'Created',  entity: 'User Account', details: 'Provisioned BHW account credentials for Sector Pulo' },
+  { id: 5,  timestamp: 'Jun 06, 2026 09:30 AM', createdAt: new Date('2026-06-06T09:30:00'), userId: 'JD01',      userName: 'Juan Danika', userRole: 'CHO', choUnit: 'CHO Unit II', barangay: null,          action: 'Logged In', entity: 'System',      details: 'Login from Chrome on Windows' },
+  { id: 6,  timestamp: 'Jun 05, 2026 03:20 PM', createdAt: new Date('2026-06-05T15:20:00'), userId: 'MK02',      userName: 'Maria Koars',  userRole: 'BHW', choUnit: null,       barangay: 'Marinig',      action: 'Updated',  entity: 'Case Record',  details: 'Updated severity for Dengue case DG-899 to Severe' },
+  { id: 7,  timestamp: 'Jun 05, 2026 10:00 AM', createdAt: new Date('2026-06-05T10:00:00'), userId: 'CHO-Admin', userName: 'Pedro Santos', userRole: 'CHO', choUnit: 'CHO Unit I', barangay: null,           action: 'Created',  entity: 'Case Record',  details: 'Added Tuberculosis case TB-024 (Sala)' },
+  { id: 8,  timestamp: 'Jun 04, 2026 02:45 PM', createdAt: new Date('2026-06-04T14:45:00'), userId: 'JD01',      userName: 'Juan Danika', userRole: 'CHO', choUnit: 'CHO Unit II', barangay: null,          action: 'Deleted',  entity: 'User Account', details: 'Deactivated BHW account ID PC03' },
+  { id: 9,  timestamp: 'Jun 04, 2026 11:30 AM', createdAt: new Date('2026-06-04T11:30:00'), userId: 'MK02',      userName: 'Maria Koars',  userRole: 'BHW', choUnit: null,       barangay: 'Marinig',      action: 'Logged In', entity: 'System',     details: 'Login from Firefox on Android' },
+  { id: 10, timestamp: 'Jun 03, 2026 04:00 PM', createdAt: new Date('2026-06-03T16:00:00'), userId: 'CHO-Admin', userName: 'Pedro Santos', userRole: 'CHO', choUnit: 'CHO Unit I', barangay: null,           action: 'Updated',  entity: 'Case Record',  details: 'Changed status of CV-1089 to Recovered' },
+  { id: 11, timestamp: 'Jun 03, 2026 01:15 PM', createdAt: new Date('2026-06-03T13:15:00'), userId: 'BHW-Pulo',  userName: 'Rosa Mendoza', userRole: 'BHW', choUnit: null,       barangay: 'Pulo',         action: 'Created',  entity: 'Case Record',  details: 'New Cholera case CH-011 (Pulo)' },
+  { id: 12, timestamp: 'Jun 02, 2026 10:00 AM', createdAt: new Date('2026-06-02T10:00:00'), userId: 'MK02',      userName: 'Maria Koars',  userRole: 'BHW', choUnit: null,       barangay: 'Marinig',      action: 'Deleted',  entity: 'Case Record',  details: 'Removed test entry DG-000' },
 ];
 
 export default function BarangayReports({ activeUser }) {
@@ -47,7 +48,7 @@ export default function BarangayReports({ activeUser }) {
   const myBarangays = CHO_BARANGAYS[choUnit] || Object.values(CHO_BARANGAYS).flat();
 
   // ── Live case data ──
-  const [allCases, setAllCases]       = useState([]);
+  const [allCases, setAllCases]         = useState([]);
   const [statsLoading, setStatsLoading] = useState(true);
 
   useEffect(() => {
@@ -56,14 +57,13 @@ export default function BarangayReports({ activeUser }) {
       .catch(()  => setStatsLoading(false));
   }, []);
 
-  // ── Derive Quick Stats directly from live DB data ──
   const myCases         = allCases.filter(c => myBarangays.includes(c.barangay_name));
   const casesAdded      = myCases.length;
   const casesUpdated    = myCases.filter(c => c.status === 'Recovered' || c.status === 'Under Treatment').length;
   const casesDeleted    = AUDIT_LOGS_DATA.filter(l => l.action === 'Deleted' && l.entity === 'Case Record').length;
   const accountsCreated = AUDIT_LOGS_DATA.filter(l => l.action === 'Created' && l.entity === 'User Account').length;
 
-  // ── Generated Report Logs — snapshots of the audit log, created by the user ──
+  // ── Generated Report Logs ──
   const [reportLogs, setReportLogs] = useState([
     {
       id: 1,
@@ -73,7 +73,6 @@ export default function BarangayReports({ activeUser }) {
       entity: 'Case Records',
       details: 'Daily dengue summary across all monitored barangays.',
       createdAt: new Date('2026-06-07T14:15:00'),
-      // Snapshot stats at time of generation
       snapshotLogs: AUDIT_LOGS_DATA.filter(l => l.createdAt >= new Date('2026-06-07T00:00:00')),
     },
     {
@@ -115,7 +114,7 @@ export default function BarangayReports({ activeUser }) {
       entity: genForm.entity,
       details: genForm.details,
       createdAt: now,
-      snapshotLogs: [...filteredAuditLogs], // snapshot the currently filtered audit log
+      snapshotLogs: [...filteredAuditLogs],
     };
     setReportLogs(prev => [newReport, ...prev]);
     setShowGenModal(false);
@@ -124,17 +123,17 @@ export default function BarangayReports({ activeUser }) {
   };
 
   // ── Download helpers ──
+  const [showDownloadMenu, setShowDownloadMenu] = useState(null);
+
   const handleDownloadCSV = (report) => {
-    const headers   = 'Timestamp,User ID,Name,Action,Entity,Details\n';
-    const logRows   = (report.snapshotLogs || []).map(l =>
+    const headers = 'Timestamp,User ID,Name,Action,Entity,Details\n';
+    const logRows = (report.snapshotLogs || []).map(l =>
       `"${l.timestamp}","${l.userId}","${l.userName}","${l.action}","${l.entity}","${l.details}"`
     ).join('\n');
     const blob = new Blob([headers + logRows], { type: 'text/csv;charset=utf-8;' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
-    a.href     = url;
-    a.download = `${report.title.replace(/\s+/g, '_')}.csv`;
-    a.click();
+    a.href = url; a.download = `${report.title.replace(/\s+/g, '_')}.csv`; a.click();
     setShowDownloadMenu(null);
   };
 
@@ -162,30 +161,25 @@ export default function BarangayReports({ activeUser }) {
     const blob = new Blob(['\ufeff' + html], { type: 'application/msword' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
-    a.href     = url;
-    a.download = `${report.title.replace(/\s+/g, '_')}.doc`;
-    a.click();
+    a.href = url; a.download = `${report.title.replace(/\s+/g, '_')}.doc`; a.click();
     setShowDownloadMenu(null);
   };
-
-  const [showDownloadMenu, setShowDownloadMenu] = useState(null);
 
   // ── View modal ──
   const [viewReport, setViewReport] = useState(null);
 
-  // ── Delete report log entry ──
   const handleDeleteReport = (id) => {
     setReportLogs(prev => prev.filter(r => r.id !== id));
     setViewReport(null);
   };
 
   // ── Report Logs filter / sort ──
-  const [reportSortType, setReportSortType]     = useState('newest');
+  const [reportSortType, setReportSortType]         = useState('newest');
   const [showReportSortDrop, setShowReportSortDrop] = useState(false);
-  const [reportPeriod, setReportPeriod]         = useState('');
-  const [reportDateStart, setReportDateStart]   = useState('');
-  const [reportDateEnd, setReportDateEnd]       = useState('');
-  const [reportType, setReportType]             = useState('');
+  const [reportPeriod, setReportPeriod]             = useState('');
+  const [reportDateStart, setReportDateStart]       = useState('');
+  const [reportDateEnd, setReportDateEnd]           = useState('');
+  const [reportType, setReportType]                 = useState('');
   const reportSortRef = useRef(null);
 
   const getSortedReportLogs = () => {
@@ -198,23 +192,30 @@ export default function BarangayReports({ activeUser }) {
   };
 
   // ── Audit Log filters ──
-  const [searchLog,     setSearchLog]     = useState('');
-  const [filterAction,  setFilterAction]  = useState('All Actions');
-  const [filterUser,    setFilterUser]    = useState('All Users');
-  const [showActionDrop, setShowActionDrop] = useState(false);
-  const [showUserDrop,   setShowUserDrop]   = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [dateRange, setDateRange]           = useState({ start: '', end: '' });
-  const [logPage, setLogPage]               = useState(1);
+  const [searchLog,      setSearchLog]      = useState('');
+  const [filterAction,   setFilterAction]   = useState('All Actions');
+  // ── NEW two-level user filter ──
+  const [filterUserRole, setFilterUserRole] = useState('All Users');   // 'All Users' | 'CHO Users' | 'BHW Users'
+  const [filterUserSub,  setFilterUserSub]  = useState('All');          // 'All' | 'CHO Unit I' | 'CHO Unit II' | <barangay>
+
+  const [showActionDrop,  setShowActionDrop]  = useState(false);
+  const [showUserDrop,    setShowUserDrop]    = useState(false);
+  const [showSubDrop,     setShowSubDrop]     = useState(false);
+  const [showDatePicker,  setShowDatePicker]  = useState(false);
+  const [dateRange, setDateRange]             = useState({ start: '', end: '' });
+  const [logPage, setLogPage]                 = useState(1);
 
   const actionDropRef  = useRef(null);
   const userDropRef    = useRef(null);
+  const subDropRef     = useRef(null);
   const datePickerRef  = useRef(null);
 
+  // Close dropdowns on outside click
   useEffect(() => {
     const handler = (e) => {
       if (actionDropRef.current  && !actionDropRef.current.contains(e.target))  setShowActionDrop(false);
       if (userDropRef.current    && !userDropRef.current.contains(e.target))    setShowUserDrop(false);
+      if (subDropRef.current     && !subDropRef.current.contains(e.target))     setShowSubDrop(false);
       if (datePickerRef.current  && !datePickerRef.current.contains(e.target))  setShowDatePicker(false);
       if (reportSortRef.current  && !reportSortRef.current.contains(e.target))  setShowReportSortDrop(false);
     };
@@ -222,16 +223,49 @@ export default function BarangayReports({ activeUser }) {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  // When role changes, reset sub-filter
+  const handleRoleSelect = (role) => {
+    setFilterUserRole(role);
+    setFilterUserSub('All');
+    setShowUserDrop(false);
+    setLogPage(1);
+  };
+
+  // Sub-filter options depending on selected role
+  const subFilterOptions = filterUserRole === 'CHO Users'
+    ? ['All', 'CHO Unit I', 'CHO Unit II']
+    : filterUserRole === 'BHW Users'
+      ? ['All', ...COVERED_BARANGAYS_UNIT_I]
+      : [];
+
   const filteredAuditLogs = AUDIT_LOGS_DATA.filter(log => {
-    const q           = searchLog.toLowerCase();
-    const matchSearch = !q || log.userName.toLowerCase().includes(q) || log.details.toLowerCase().includes(q) || log.entity.toLowerCase().includes(q);
+    const q = searchLog.toLowerCase();
+    const matchSearch = !q ||
+      log.userName.toLowerCase().includes(q) ||
+      log.details.toLowerCase().includes(q) ||
+      log.entity.toLowerCase().includes(q);
+
     const matchAction = filterAction === 'All Actions' || log.action === filterAction;
-    const matchUser   = filterUser   === 'All Users'   || log.userId === filterUser.split(' ')[0];
-    let matchDate     = true;
+
+    let matchUser = true;
+    if (filterUserRole === 'CHO Users') {
+      matchUser = log.userRole === 'CHO';
+      if (filterUserSub !== 'All') {
+        matchUser = matchUser && log.choUnit === filterUserSub;
+      }
+    } else if (filterUserRole === 'BHW Users') {
+      matchUser = log.userRole === 'BHW';
+      if (filterUserSub !== 'All') {
+        matchUser = matchUser && log.barangay === filterUserSub;
+      }
+    }
+
+    let matchDate = true;
     if (dateRange.start && dateRange.end) {
       const logDate = new Date(log.timestamp);
       matchDate = logDate >= new Date(dateRange.start) && logDate <= new Date(dateRange.end);
     }
+
     return matchSearch && matchAction && matchUser && matchDate;
   });
 
@@ -265,23 +299,28 @@ export default function BarangayReports({ activeUser }) {
   const renderCalendar = () => { const days = getDaysInMonth(calYear, calMonth); const first = getFirstDay(calYear, calMonth); const cells = []; for (let i = 0; i < first; i++) cells.push(null); for (let d = 1; d <= days; d++) cells.push(d); return cells; };
 
   const actionBadgeStyle = (action) => {
-    if (action === 'Created')  return { background: '#dcfce7', color: '#16a34a' };
-    if (action === 'Updated')  return { background: '#dbeafe', color: '#2563eb' };
-    if (action === 'Deleted')  return { background: '#fee2e2', color: '#dc2626' };
+    if (action === 'Created')   return { background: '#dcfce7', color: '#16a34a' };
+    if (action === 'Updated')   return { background: '#dbeafe', color: '#2563eb' };
+    if (action === 'Deleted')   return { background: '#fee2e2', color: '#dc2626' };
     if (action === 'Logged In') return { background: '#f3e8ff', color: '#7c3aed' };
     return { background: '#f1f5f9', color: '#64748b' };
   };
 
-  const handleExportLogs = () => {
-    const headers = 'Timestamp,User ID,Name,Action,Entity,Details\n';
-    const rows    = filteredAuditLogs.map(l =>
-      `"${l.timestamp}","${l.userId}","${l.userName}","${l.action}","${l.entity}","${l.details}"`
-    ).join('\n');
-    const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a'); a.href = url;
-    a.download = `CDMS_AuditLogs_${choUnit.replace(/\s/g,'_')}.csv`; a.click();
+  // ── User role badge label helpers ──
+  const userRoleLabel = () => {
+    if (filterUserRole === 'All Users') return 'All Users';
+    if (filterUserRole === 'CHO Users') {
+      if (filterUserSub === 'All') return 'CHO Users';
+      return `CHO — ${filterUserSub}`;
+    }
+    if (filterUserRole === 'BHW Users') {
+      if (filterUserSub === 'All') return 'BHW Users';
+      return `BHW — ${filterUserSub}`;
+    }
+    return 'All Users';
   };
+
+  const isUserFilterActive = filterUserRole !== 'All Users';
 
   const sortedReportLogs = getSortedReportLogs();
 
@@ -321,7 +360,6 @@ export default function BarangayReports({ activeUser }) {
               )}
             </div>
 
-            {/* Audit log snapshot table */}
             <h4 style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               System Activity Log Snapshot
             </h4>
@@ -473,7 +511,6 @@ export default function BarangayReports({ activeUser }) {
             <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#1e293b' }}>Generated Reports Logs</h3>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span style={{ fontSize: '12px', color: '#94a3b8' }}>{sortedReportLogs.length} of {reportLogs.length} reports</span>
-              {/* Sort dropdown */}
               <div style={{ position: 'relative' }} ref={reportSortRef}>
                 <button onClick={() => setShowReportSortDrop(!showReportSortDrop)}
                   style={{ padding: '7px 14px', border: '1px solid #e2e8f0', borderRadius: '7px', fontSize: '13px', color: '#475569', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '500' }}>
@@ -526,7 +563,6 @@ export default function BarangayReports({ activeUser }) {
               </div>
 
               <div style={{ display: 'flex', gap: '8px', flexShrink: 0, alignItems: 'center', position: 'relative' }}>
-                {/* Download dropdown */}
                 <div style={{ position: 'relative' }}>
                   <button onClick={() => setShowDownloadMenu(showDownloadMenu === file.id ? null : file.id)}
                     style={{ padding: '6px 14px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', color: '#475569', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '5px' }}>
@@ -547,7 +583,6 @@ export default function BarangayReports({ activeUser }) {
                     </div>
                   )}
                 </div>
-                {/* View button */}
                 <button onClick={() => { setViewReport(file); setShowDownloadMenu(null); }}
                   style={{ padding: '6px 14px', background: '#e6f4ea', border: '1px solid #bbf7d0', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', color: '#16a34a', fontWeight: '500' }}>
                   View
@@ -557,7 +592,7 @@ export default function BarangayReports({ activeUser }) {
           ))}
         </div>
 
-        {/* ── Quick Stats — dynamic from DB ── */}
+        {/* ── Quick Stats ── */}
         <div style={s.card}>
           <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', fontWeight: '700', color: '#1e293b' }}>Quick Stats</h3>
           <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: '#94a3b8' }}>{choUnit}</p>
@@ -591,14 +626,15 @@ export default function BarangayReports({ activeUser }) {
         </div>
       </div>
 
-      {/* ── AUDIT LOG TABLE — no Export/Filter buttons ── */}
+      {/* ── AUDIT LOG TABLE ── */}
       <div style={s.card}>
         <div style={{ marginBottom: '16px' }}>
           <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#1e293b' }}>Generated System Logs</h3>
         </div>
 
-        {/* Toolbar */}
+        {/* ── TOOLBAR — Export CSV removed, two-level user filter added ── */}
         <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+
           {/* Search */}
           <div style={{ position: 'relative' }}>
             <svg style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -609,7 +645,7 @@ export default function BarangayReports({ activeUser }) {
 
           {/* Action filter */}
           <div style={{ position: 'relative' }} ref={actionDropRef}>
-            <button onClick={() => { setShowActionDrop(!showActionDrop); setShowUserDrop(false); setShowDatePicker(false); }}
+            <button onClick={() => { setShowActionDrop(!showActionDrop); setShowUserDrop(false); setShowSubDrop(false); setShowDatePicker(false); }}
               style={s.dropBtn(filterAction !== 'All Actions')}>
               {filterAction}
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
@@ -632,35 +668,65 @@ export default function BarangayReports({ activeUser }) {
             )}
           </div>
 
-          {/* User filter */}
+          {/* ── LEVEL 1: Role filter (CHO Users / BHW Users) ── */}
           <div style={{ position: 'relative' }} ref={userDropRef}>
-            <button onClick={() => { setShowUserDrop(!showUserDrop); setShowActionDrop(false); setShowDatePicker(false); }}
-              style={s.dropBtn(filterUser !== 'All Users')}>
-              {filterUser}
+            <button
+              onClick={() => { setShowUserDrop(!showUserDrop); setShowActionDrop(false); setShowSubDrop(false); setShowDatePicker(false); }}
+              style={s.dropBtn(filterUserRole !== 'All Users')}
+            >
+              {filterUserRole === 'All Users' ? 'All Users' : filterUserRole}
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
             {showUserDrop && (
               <div style={s.dropMenu}>
-                <button style={s.dropItem(filterUser === 'All Users')}
-                  onClick={() => { setFilterUser('All Users'); setShowUserDrop(false); setLogPage(1); }}>
-                  All Users
-                </button>
-                {ALL_USERS_MOCK.map(u => (
-                  <button key={u.id} style={s.dropItem(filterUser === `${u.id} - ${u.name}`)}
-                    onClick={() => { setFilterUser(`${u.id} - ${u.name}`); setShowUserDrop(false); setLogPage(1); }}
-                    onMouseEnter={e => { if (filterUser !== `${u.id} - ${u.name}`) e.target.style.background = '#f8fafc'; }}
-                    onMouseLeave={e => { if (filterUser !== `${u.id} - ${u.name}`) e.target.style.background = 'transparent'; }}>
-                    <span style={{ fontWeight: '600', color: '#0f172a' }}>{u.id}</span>
-                    <span style={{ color: '#64748b', marginLeft: '6px' }}>— {u.name}</span>
+                {['All Users', 'CHO Users', 'BHW Users'].map(role => (
+                  <button key={role} style={s.dropItem(filterUserRole === role)}
+                    onClick={() => handleRoleSelect(role)}
+                    onMouseEnter={e => { if (filterUserRole !== role) e.target.style.background = '#f8fafc'; }}
+                    onMouseLeave={e => { if (filterUserRole !== role) e.target.style.background = 'transparent'; }}>
+                    {/* Icon hint */}
+                    {role === 'CHO Users' && <span style={{ marginRight: '8px' }}>🏢</span>}
+                    {role === 'BHW Users' && <span style={{ marginRight: '8px' }}>📍</span>}
+                    {role === 'All Users' && <span style={{ marginRight: '8px' }}>👥</span>}
+                    {role}
                   </button>
                 ))}
               </div>
             )}
           </div>
 
+          {/* ── LEVEL 2: Sub-filter — only visible when a role is selected ── */}
+          {filterUserRole !== 'All Users' && (
+            <div style={{ position: 'relative' }} ref={subDropRef}>
+              <button
+                onClick={() => { setShowSubDrop(!showSubDrop); setShowActionDrop(false); setShowUserDrop(false); setShowDatePicker(false); }}
+                style={s.dropBtn(filterUserSub !== 'All')}
+              >
+                {filterUserRole === 'CHO Users'
+                  ? (filterUserSub === 'All' ? 'All CHO Units' : filterUserSub)
+                  : (filterUserSub === 'All' ? 'All Barangays' : filterUserSub)}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              {showSubDrop && (
+                <div style={{ ...s.dropMenu, maxHeight: '260px', overflowY: 'auto' }}>
+                  {subFilterOptions.map(opt => (
+                    <button key={opt} style={s.dropItem(filterUserSub === opt)}
+                      onClick={() => { setFilterUserSub(opt); setShowSubDrop(false); setLogPage(1); }}
+                      onMouseEnter={e => { if (filterUserSub !== opt) e.target.style.background = '#f8fafc'; }}
+                      onMouseLeave={e => { if (filterUserSub !== opt) e.target.style.background = 'transparent'; }}>
+                      {opt === 'All'
+                        ? (filterUserRole === 'CHO Users' ? '🏢 All CHO Units' : '📍 All Barangays')
+                        : opt}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Date Range */}
           <div style={{ position: 'relative' }} ref={datePickerRef}>
-            <button onClick={() => { setShowDatePicker(!showDatePicker); setShowActionDrop(false); setShowUserDrop(false); }}
+            <button onClick={() => { setShowDatePicker(!showDatePicker); setShowActionDrop(false); setShowUserDrop(false); setShowSubDrop(false); }}
               style={s.dropBtn(!!dateRange.start)}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
               {dateRange.start ? `${formatDate(dateRange.start)}${dateRange.end ? ' — ' + formatDate(dateRange.end) : ''}` : 'Date Range'}
@@ -718,12 +784,17 @@ export default function BarangayReports({ activeUser }) {
             )}
           </div>
 
-          {/* Export CSV — stays in toolbar row, not the header */}
-          <button onClick={handleExportLogs}
-            style={{ padding: '9px 16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Export CSV
-          </button>
+          {/* Active filter summary badge */}
+          {(filterUserRole !== 'All Users' || filterUserSub !== 'All') && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', background: '#f0fdfa', border: '1px solid #0d9488', borderRadius: '20px', fontSize: '12px', color: '#0d9488', fontWeight: '600' }}>
+              {userRoleLabel()}
+              <button
+                onClick={() => { setFilterUserRole('All Users'); setFilterUserSub('All'); setLogPage(1); }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0d9488', padding: 0, fontSize: '14px', lineHeight: 1, display: 'flex', alignItems: 'center' }}>
+                ×
+              </button>
+            </div>
+          )}
 
           <span style={{ marginLeft: 'auto', fontSize: '12px', color: '#94a3b8' }}>
             Showing {Math.min((logPage - 1) * ITEMS_PER_PAGE + 1, filteredAuditLogs.length)}–{Math.min(logPage * ITEMS_PER_PAGE, filteredAuditLogs.length)} of {filteredAuditLogs.length} entries
@@ -754,6 +825,18 @@ export default function BarangayReports({ activeUser }) {
                     <td style={{ padding: '13px 14px', textAlign: 'center' }}>
                       <div style={{ fontSize: '13px', fontWeight: '600', color: '#1e293b' }}>{log.userId}</div>
                       <div style={{ fontSize: '12px', color: '#94a3b8' }}>{log.userName}</div>
+                      {/* Role tag */}
+                      <div style={{ marginTop: '3px' }}>
+                        <span style={{
+                          fontSize: '10px', fontWeight: '700', padding: '1px 7px', borderRadius: '10px',
+                          background: log.userRole === 'CHO' ? '#eff6ff' : '#f0fdf4',
+                          color: log.userRole === 'CHO' ? '#2563eb' : '#16a34a',
+                        }}>
+                          {log.userRole === 'CHO'
+                            ? (log.choUnit || 'CHO')
+                            : (log.barangay ? `BHW · ${log.barangay}` : 'BHW')}
+                        </span>
+                      </div>
                     </td>
                     <td style={{ padding: '13px 14px', textAlign: 'center' }}>
                       <span style={{ padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: '600', ...actionBadgeStyle(log.action) }}>

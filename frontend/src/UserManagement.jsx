@@ -3,7 +3,7 @@ import axios from 'axios';
 
 const CHO_BARANGAYS = {
   'CHO Unit I': ['Baclaran', 'Banlic', 'Bigaa', 'Butong', 'Gulod', 'Mamatid', 'Marinig', 'Sala', 'Barangay Uno (Poblacion)', 'Barangay Dos (Poblacion)', 'Barangay Tres (Poblacion)'],
-  'CHO Unit II': ['Banay-Banay', 'Casile', 'Diezmo', 'Niugan', 'Pitland', 'Pulo', 'San Isidro'],
+  'CHO Unit II': ['Banay-Banay', 'Casile', 'Diezmo', 'Niugan', 'Pittland', 'Pulo', 'San Isidro'],
 };
 
 const normalize = (s) => (s || '').toLowerCase().replace(/[\s\-().]/g, '');
@@ -21,6 +21,7 @@ const USERS_PER_PAGE = 10;
 const EMPTY_FORM = {
   firstName: '', lastName: '', username: '', email: '', mobile: '',
   barangayId: '', isActive: true, password: '', generateTempPassword: true,
+  role: 'BHW',
 };
 
 export default function UserManagement() {
@@ -131,6 +132,7 @@ export default function UserManagement() {
       mobile: formData.mobile,
       barangayId: formData.barangayId,
       isActive: formData.isActive,
+      role: formData.role,
     };
     if (!editingUser) {
       payload.password = formData.password;
@@ -355,6 +357,16 @@ export default function UserManagement() {
                   <input type="email" required placeholder="Email" style={inputStyle}
                     value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
                 </div>
+                <div>
+                <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Role *</label>
+                <select required style={inputStyle} value={formData.role}
+                  onChange={e => {
+                    setFormData({ ...formData, role: e.target.value, barangayId: '' });
+                  }}>
+                  <option value="BHW">Barangay Health Worker (BHW)</option>
+                  <option value="CHO">City Health Office (CHO)</option>
+                </select>
+              </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Contact Number *</label>
                   <input type="text" required placeholder="Contact Number" style={inputStyle}
