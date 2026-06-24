@@ -12,12 +12,13 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.105.0",
     "axios": "^1.17.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "mysql2": "^3.22.4",
-    "nodemailer": "^8.0.10",
+    "nodemailer": "^9.0.1",
     "react-router-dom": "^7.17.0"
   },
   "devDependencies": {
