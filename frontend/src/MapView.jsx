@@ -22,7 +22,7 @@ const ALL_BARANGAYS = [
   'Baclaran', 'Banay-Banay', 'Banlic',
   'Barangay Dos (Poblacion)', 'Barangay Tres (Poblacion)', 'Barangay Uno (Poblacion)',
   'Bigaa', 'Butong', 'Casile', 'Diezmo', 'Gulod',
-  'Mamatid', 'Marinig', 'Niugan', 'Pitland', 'Pulo', 'Sala', 'San Isidro',
+  'Mamatid', 'Marinig', 'Niugan', 'Pittland', 'Pulo', 'Sala', 'San Isidro',
 ];
 
 // Coordinates for each barangay — fuzzy matched so minor spelling diffs are OK
@@ -41,7 +41,7 @@ const BARANGAY_COORDS = {
   'Mamatid':                   [14.2350, 121.1450],
   'Marinig':                   [14.2150, 121.1500],
   'Niugan':                    [14.2450, 121.1200],
-  'Pitland':                   [14.1980, 121.0950],
+  'Pittland':                  [14.1980, 121.0950],
   'Pulo':                      [14.2500, 121.1100],
   'Sala':                      [14.2300, 121.1300],
   'San Isidro':                [14.2420, 121.0980],

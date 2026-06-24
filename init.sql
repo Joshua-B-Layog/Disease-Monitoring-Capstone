@@ -187,6 +187,21 @@ INSERT INTO `users` (`user_id`, `username`, `password`, `full_name`, `role`, `as
 (8, 'weq', '58b17aa4', 'asda dasd', 'BHW', 11, 1, 'sda@gmail.com', '09442241520', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL),
 (9, 'pohai', '184acad5', 'Kyle Lantern', 'CHO', 10, 1, 'joshling212@gmail.com', '09566423158', NULL, NULL, NULL, '2026-06-23 10:10:44', 'Cabuyao, Calabarzon, Philippines', 'Chrome on Windows', NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL);
 
+
+
+CREATE TABLE notifications (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT,
+  title VARCHAR(255),
+  message TEXT,
+  type VARCHAR(50),
+  is_read TINYINT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  link_to VARCHAR(100),
+  FOREIGN KEY (user_id) REFERENCES users(user_id)
+);
+
+
 --
 -- Indexes for dumped tables
 --

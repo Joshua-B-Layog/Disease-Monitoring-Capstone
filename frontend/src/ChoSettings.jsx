@@ -294,6 +294,28 @@ export default function CHOSettings({
     return '🖥️';
   };
 
+  const handleNotificationToggle = (key, value) => {
+  if (key === 'pushNotifications' && !value) {
+    // When push is turned OFF, turn everything else off too
+    setNotifications(prev => ({
+      ...prev,
+      pushNotifications: false,
+      emailNotifications: false,
+      smsNotifications: false,
+      newCaseReported: false,
+      caseStatusUpdated: false,
+      highRiskAlert: false,
+      weeklySummary: false,
+      systemMaintenance: false,
+    }));
+  } else if (key !== 'pushNotifications' && value && !notifications.pushNotifications) {
+    // Can't turn on sub-toggles if push is off
+    return;
+  } else {
+    setNotifications(prev => ({ ...prev, [key]: value }));
+  }
+};
+
   // Derive display name
   const displayName = `${profile.firstName} ${profile.lastName}`.trim() || loggedUser || 'CHO Admin';
   const initials = (() => {
@@ -799,8 +821,8 @@ export default function CHOSettings({
                 icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#101828" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
                 title: 'Notification Channels', subtitle: 'Choose how you want to receive notifications',
                 rows: [
-                  { key: 'emailNotifications', label: 'Email Notifications', sub: 'Receive notifications via email' },
                   { key: 'pushNotifications', label: 'Push Notifications', sub: 'Receive push notifications in browser' },
+                  { key: 'emailNotifications', label: 'Email Notifications', sub: 'Receive notifications via email' },
                   { key: 'smsNotifications', label: 'SMS Notifications', sub: 'Receive notifications via text message' },
                 ],
               },
@@ -832,13 +854,22 @@ export default function CHOSettings({
                 </div>
                 <div className="security-sessions-container">
                   {section.rows.map(row => (
-                    <div key={row.key} className="session-list-row">
+                    <div key={row.key} className="session-list-row"
+                        style={{ 
+                          opacity: row.key !== 'pushNotifications' && !notifications.pushNotifications ? 0.4 : 1,
+                          pointerEvents: row.key !== 'pushNotifications' && !notifications.pushNotifications ? 'none' : 'auto'
+                        }}>
                       <div className="session-info-meta"><h4>{row.label}</h4><p>{row.sub}</p></div>
-                      <label className="figma-toggle-switch">
-                        <input type="checkbox" checked={notifications[row.key]}
-                          onChange={e => setNotifications({ ...notifications, [row.key]: e.target.checked })} />
-                        <span className="figma-slider" />
-                      </label>
+                      <label className="figma-toggle-switch" style={{
+                      opacity: row.key !== 'pushNotifications' && !notifications.pushNotifications ? 0.4 : 1,
+                      cursor: row.key !== 'pushNotifications' && !notifications.pushNotifications ? 'not-allowed' : 'pointer'
+                      }}>
+                      <input type="checkbox"
+                        checked={notifications[row.key]}
+                        disabled={row.key !== 'pushNotifications' && !notifications.pushNotifications}
+                        onChange={e => handleNotificationToggle(row.key, e.target.checked)} />
+                      <span className="figma-slider" />
+                    </label>
                     </div>
                   ))}
                 </div>

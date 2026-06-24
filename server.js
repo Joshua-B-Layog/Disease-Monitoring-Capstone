@@ -1,7 +1,8 @@
 // ==========================================
 // 1. IMPORT REQUIRED PACKAGES
 // ==========================================
-require('dotenv').config();
+require('dotenv').config({ path: '.env.local' });
+//require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
@@ -229,6 +230,26 @@ app.post('/api/cases', (req, res) => {
                     return res.status(500).json({ error: insertErr.message });
                 }
                 console.log("✅ Case inserted, ID:", result.insertId);
+                
+                // Trigger auto-notifications
+                db.query(`
+                    SELECT dc.patient_name, d.name AS disease_name, b.name AS barangay_name, dc.barangay_id, dc.severity
+                    FROM disease_cases dc
+                    LEFT JOIN diseases d ON dc.disease_id = d.id
+                    LEFT JOIN barangays b ON dc.barangay_id = b.id
+                    WHERE dc.case_id = ?
+                `, [result.insertId], (err, caseResults) => {
+                    if (!err && caseResults && caseResults.length > 0) {
+                        const caseInfo = caseResults[0];
+                        const title = 'New Case Reported';
+                        const message = `A new case of ${caseInfo.disease_name} (${caseInfo.severity}) has been reported for ${caseInfo.patient_name} in Barangay ${caseInfo.barangay_name || 'N/A'}.`;
+                        createNotificationForUsers(title, message, 'info', 'ManageCases', caseInfo.barangay_id);
+                        
+                        // Check for high risk
+                        checkAndAlertHighRisk(caseInfo.barangay_id, caseInfo.barangay_name);
+                    }
+                });
+
                 return res.status(200).json({ message: 'Case added successfully', case_id: result.insertId });
             });
         };
@@ -285,6 +306,26 @@ app.put('/api/cases/:id', (req, res) => {
                     return res.status(404).json({ error: 'Case not found.' });
                 }
                 console.log("✅ Case updated:", id);
+
+                // Trigger status updated notification
+                db.query(`
+                    SELECT dc.patient_name, d.name AS disease_name, b.name AS barangay_name, dc.barangay_id, dc.status
+                    FROM disease_cases dc
+                    LEFT JOIN diseases d ON dc.disease_id = d.id
+                    LEFT JOIN barangays b ON dc.barangay_id = b.id
+                    WHERE dc.case_id = ?
+                `, [id], (err, caseResults) => {
+                    if (!err && caseResults && caseResults.length > 0) {
+                        const caseInfo = caseResults[0];
+                        const title = 'Case Status Updated';
+                        const message = `The case status for ${caseInfo.patient_name} (${caseInfo.disease_name}) in Barangay ${caseInfo.barangay_name || 'N/A'} has been changed to ${caseInfo.status}.`;
+                        createNotificationForUsers(title, message, 'info', 'ManageCases', caseInfo.barangay_id);
+                        
+                        // Check for high risk
+                        checkAndAlertHighRisk(caseInfo.barangay_id, caseInfo.barangay_name);
+                    }
+                });
+
                 return res.status(200).json({ message: 'Case updated successfully' });
             });
         };
@@ -907,6 +948,141 @@ app.post('/api/verify-login-otp', (req, res) => {
             }
         });
     });
+});
+
+
+// ==========================================
+// NOTIFICATIONS SYSTEM ROUTES & HELPERS
+// ==========================================
+
+// Helper function to create notification for active users
+function createNotificationForUsers(title, message, type, link_to, barangayId = null) {
+    db.query('SELECT user_id, role, assigned_barangay_id FROM users WHERE is_active = 1', (err, users) => {
+        if (err) {
+            console.error('Error fetching active users for notifications:', err.message);
+            return;
+        }
+        
+        users.forEach(user => {
+            const isCho = user.role === 'CHO';
+            const isAssignedBhw = user.role === 'BHW' && (barangayId === null || Number(user.assigned_barangay_id) === Number(barangayId));
+            
+            if (isCho || isAssignedBhw) {
+                db.query(
+                    'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
+                    [user.user_id, title, message, type, link_to],
+                    (insertErr) => {
+                        if (insertErr) {
+                            console.error(`Failed to insert notification for user ${user.user_id}:`, insertErr.message);
+                        }
+                    }
+                );
+            }
+        });
+    });
+}
+
+// Helper to check for high-risk status (> 20 cases)
+function checkAndAlertHighRisk(barangay_id, barangay_name) {
+    if (!barangay_id) return;
+    
+    const countQuery = `
+        SELECT COUNT(*) AS count 
+        FROM disease_cases 
+        WHERE barangay_id = ? AND status IN ('Active', 'Under Treatment', 'Pending')
+    `;
+    
+    db.query(countQuery, [barangay_id], (err, results) => {
+        if (err || results.length === 0) return;
+        const activeCount = results[0].count;
+        
+        if (activeCount > 20) {
+            const title = '🚨 High Risk Barangay Alert';
+            const message = `Barangay ${barangay_name} is now designated as High Risk with ${activeCount} active cases!`;
+            
+            const checkDuplicateQuery = `
+                SELECT id FROM notifications 
+                WHERE type = 'high_risk' AND title LIKE ? AND created_at > NOW() - INTERVAL 1 HOUR
+                LIMIT 1
+            `;
+            db.query(checkDuplicateQuery, [`%${barangay_name}%`], (dupErr, dupResults) => {
+                if (!dupErr && dupResults.length === 0) {
+                    createNotificationForUsers(title, message, 'high_risk', 'MapView', barangay_id);
+                }
+            });
+        }
+    });
+}
+
+// GET: Fetch all notifications for a user
+app.get('/api/notifications', (req, res) => {
+    const { userId } = req.query;
+    if (!userId) {
+        return res.status(400).json({ error: 'userId is required' });
+    }
+    db.query(
+        'SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC',
+        [userId],
+        (err, results) => {
+            if (err) return res.status(500).json({ error: err.message });
+            return res.json(results);
+        }
+    );
+});
+
+// POST: Manually create a notification (optional but useful)
+app.post('/api/notifications', (req, res) => {
+    const { user_id, title, message, type, link_to } = req.body;
+    db.query(
+        'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
+        [user_id, title, message, type || 'info', link_to || null],
+        (err, result) => {
+            if (err) return res.status(500).json({ error: err.message });
+            return res.status(201).json({ message: 'Notification created', id: result.insertId });
+        }
+    );
+});
+
+// PUT: Mark notification as read
+app.put('/api/notifications/:id/read', (req, res) => {
+    const { id } = req.params;
+    db.query(
+        'UPDATE notifications SET is_read = 1 WHERE id = ?',
+        [id],
+        (err, result) => {
+            if (err) return res.status(500).json({ error: err.message });
+            return res.json({ message: 'Notification marked as read' });
+        }
+    );
+});
+
+// DELETE: Dismiss a specific notification
+app.delete('/api/notifications/:id', (req, res) => {
+    const { id } = req.params;
+    db.query(
+        'DELETE FROM notifications WHERE id = ?',
+        [id],
+        (err, result) => {
+            if (err) return res.status(500).json({ error: err.message });
+            return res.json({ message: 'Notification dismissed' });
+        }
+    );
+});
+
+// DELETE (bulk): Dismiss all notifications for a specific user
+app.delete('/api/notifications', (req, res) => {
+    const { userId } = req.query;
+    if (!userId) {
+        return res.status(400).json({ error: 'userId is required' });
+    }
+    db.query(
+        'DELETE FROM notifications WHERE user_id = ?',
+        [userId],
+        (err, result) => {
+            if (err) return res.status(500).json({ error: err.message });
+            return res.json({ message: 'All notifications dismissed' });
+        }
+    );
 });
 
 

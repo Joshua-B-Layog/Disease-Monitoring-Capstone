@@ -20,12 +20,15 @@ services:
     depends_on:
       - db
     env_file:
-      - .env  # 🌟 This tells Docker to inject your .env variables automatically!
+      - .env 
 
   frontend:
     build: ./frontend
     ports:
-      - "5173:5173"
+      - "3000:5173"
+    volumes:
+    - ./frontend:/app        
+    - /app/node_modules
     depends_on:
       - backend
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Sidebar from './Sidebar';
 import ManageCases from './ManageCases';  
 import Dashboard from './Dashboard'; 
@@ -33,6 +33,11 @@ function App() {
   const [profileData, setProfileData]           = useState(null);
   const [profileLoading, setProfileLoading]     = useState(false);
 
+  // ── Notifications ──
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const notifRef = useRef(null);
+
   // ── THEME ──
   const [theme, setTheme] = useState('dark');
   useEffect(() => {
@@ -45,6 +50,33 @@ function App() {
     const saved = localStorage.getItem('cdms_profile_photo');
     if (saved) setProfilePhoto(saved);
   }, []);
+
+  // ── Notification polling every 30 seconds ──
+useEffect(() => {
+  if (!loggedUserId) return;
+
+  const fetchNotifications = () => {
+    fetch(`http://localhost:5000/api/notifications?userId=${loggedUserId}`)
+      .then(res => res.json())
+      .then(data => setNotifications(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  };
+
+  fetchNotifications();
+  const interval = setInterval(fetchNotifications, 30000);
+  return () => clearInterval(interval);
+}, [loggedUserId]);
+
+// ── Close notification dropdown on outside click ──
+useEffect(() => {
+  const handler = (e) => {
+    if (notifRef.current && !notifRef.current.contains(e.target)) {
+      setShowNotifications(false);
+    }
+  };
+  document.addEventListener('mousedown', handler);
+  return () => document.removeEventListener('mousedown', handler);
+}, []);
 
   const handleProfilePhotoChange = (dataUrl) => {
     setProfilePhoto(dataUrl);
@@ -71,6 +103,25 @@ function App() {
       setProfileLoading(false);
     }
   };
+
+  const handleDismissNotification = (id) => {
+  fetch(`http://localhost:5000/api/notifications/${id}`, { method: 'DELETE' })
+    .then(() => setNotifications(prev => prev.filter(n => n.id !== id)));
+  };
+
+  const handleDismissAll = () => {
+    fetch(`http://localhost:5000/api/notifications?userId=${loggedUserId}`, { method: 'DELETE' })
+      .then(() => setNotifications([]));
+  };
+
+  const handleMarkRead = (id) => {
+    fetch(`http://localhost:5000/api/notifications/${id}/read`, { method: 'PUT' })
+      .then(() => setNotifications(prev =>
+        prev.map(n => n.id === id ? { ...n, is_read: 1 } : n)
+      ));
+  };
+
+const unreadCount = notifications.filter(n => n.is_read === 0).length;
 
   // ── Derive initials ──
   const getInitials = () => {
@@ -177,6 +228,159 @@ function App() {
             <button onClick={toggleTheme} className="theme-toggle-btn" style={{ position: 'static' }}>
               {theme === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode'}
             </button>
+
+                        {/* ── BELL ICON + NOTIFICATION DROPDOWN ── */}
+            <div style={{ position: 'relative' }} ref={notifRef}>
+              <button
+                onClick={() => {
+                  setShowNotifications(!showNotifications);
+                  setIsDropdownOpen(false);
+                }}
+                style={{
+                  position: 'relative', background: 'none', border: 'none',
+                  cursor: 'pointer', padding: '6px', color: 'var(--text-main)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                </svg>
+                {unreadCount > 0 && (
+                  <span style={{
+                    position: 'absolute', top: '2px', right: '2px',
+                    background: '#ef4444', color: 'white', borderRadius: '50%',
+                    width: '16px', height: '16px', fontSize: '10px', fontWeight: '700',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    lineHeight: 1
+                  }}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {/* DROPDOWN PANEL */}
+              {showNotifications && (
+                <div style={{
+                  position: 'absolute', top: '44px', right: 0, width: '360px',
+                  background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
+                  borderRadius: '12px', boxShadow: '0 12px 32px rgba(0,0,0,0.3)',
+                  zIndex: 9999, overflow: 'hidden'
+                }}>
+                  {/* Header */}
+                  <div style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '14px 16px', borderBottom: '1px solid var(--border-color)'
+                  }}>
+                    <span style={{ fontWeight: '700', fontSize: '15px', color: 'var(--text-main)' }}>
+                      Notifications {unreadCount > 0 && (
+                        <span style={{
+                          background: '#ef4444', color: 'white', borderRadius: '10px',
+                          padding: '1px 7px', fontSize: '11px', marginLeft: '6px'
+                        }}>{unreadCount}</span>
+                      )}
+                    </span>
+                    {notifications.length > 0 && (
+                      <button onClick={handleDismissAll} style={{
+                        background: 'none', border: 'none', color: '#ef4444',
+                        cursor: 'pointer', fontSize: '12px', fontWeight: '600'
+                      }}>
+                        Clear All
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Notification List */}
+                  <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                    {notifications.length === 0 ? (
+                      <div style={{
+                        padding: '32px', textAlign: 'center',
+                        color: 'var(--text-muted)', fontSize: '14px'
+                      }}>
+                        <div style={{ fontSize: '32px', marginBottom: '8px' }}>🔔</div>
+                        No notifications yet
+                      </div>
+                    ) : (
+                      notifications.map(n => (
+                        <div key={n.id} style={{
+                          padding: '12px 16px',
+                          background: n.is_read === 0 ? 'rgba(59,130,246,0.06)' : 'transparent',
+                          borderBottom: '1px solid var(--border-color)',
+                          display: 'flex', gap: '12px', alignItems: 'flex-start',
+                          transition: 'background 0.2s'
+                        }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--input-bg)'}
+                          onMouseLeave={e => e.currentTarget.style.background = n.is_read === 0 ? 'rgba(59,130,246,0.06)' : 'transparent'}
+                        >
+                          {/* Icon */}
+                          <div style={{
+                            width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px',
+                            background: n.type === 'high_risk' ? '#fee2e2' : '#dbeafe'
+                          }}>
+                            {n.type === 'high_risk' ? '🚨' : '📋'}
+                          </div>
+
+                          {/* Content */}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{
+                              fontSize: '13px', fontWeight: n.is_read === 0 ? '600' : '400',
+                              color: 'var(--text-main)', marginBottom: '3px'
+                            }}>
+                              {n.title}
+                            </div>
+                            <div style={{
+                              fontSize: '12px', color: 'var(--text-muted)',
+                              lineHeight: '1.4', marginBottom: '6px'
+                            }}>
+                              {n.message}
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                {new Date(n.created_at).toLocaleString('en-PH', {
+                                  month: 'short', day: 'numeric',
+                                  hour: '2-digit', minute: '2-digit'
+                                })}
+                              </span>
+                              {n.is_read === 0 && (
+                                <button onClick={() => handleMarkRead(n.id)} style={{
+                                  background: 'none', border: 'none', color: '#3b82f6',
+                                  cursor: 'pointer', fontSize: '11px', fontWeight: '600', padding: 0
+                                }}>
+                                  Mark read
+                                </button>
+                              )}
+                              {n.link_to && (
+                                <button onClick={() => {
+                                  handleMarkRead(n.id);
+                                  setActiveTab(n.link_to);
+                                  setShowNotifications(false);
+                                }} style={{
+                                  background: 'none', border: 'none', color: '#10b981',
+                                  cursor: 'pointer', fontSize: '11px', fontWeight: '600', padding: 0
+                                }}>
+                                  View →
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Dismiss */}
+                          <button onClick={() => handleDismissNotification(n.id)} style={{
+                            background: 'none', border: 'none', color: 'var(--text-muted)',
+                            cursor: 'pointer', fontSize: '18px', lineHeight: 1,
+                            padding: '0 2px', flexShrink: 0
+                          }}>
+                            ×
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div className="user-profile" onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
               <div className="user-info">

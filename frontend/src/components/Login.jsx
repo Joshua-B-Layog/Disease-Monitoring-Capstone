@@ -124,6 +124,7 @@
     const getLocation = async () => {
         try {
             const res = await fetch('https://ipapi.co/json/');
+            if (!res.ok) throw new Error('geo failed');
             const data = await res.json();
             return `${data.city || 'Unknown'}, ${data.region || ''}, ${data.country_name || ''}`.trim();
         } catch {
