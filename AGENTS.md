@@ -47,7 +47,7 @@ Poliomyelitis, SARS, Sore Eyes
 - Never hardcode colors — always use CSS variables for themed components
 - Status values: Active, Pending, Under Treatment, Recovered, Deceased, Draft
 - All API calls go to http://localhost:5000
-- Frontend runs on http://localhost:5173
+- Frontend runs on http://localhost:3000
 - Always preserve existing working features when adding new ones
 - MySQL passwords are stored as plain text (no hashing yet)
 - The .env file holds DB credentials and email/SMS keys
