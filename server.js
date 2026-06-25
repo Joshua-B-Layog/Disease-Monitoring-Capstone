@@ -1116,7 +1116,150 @@ app.delete('/api/notifications', (req, res) => {
 
 
 // ==========================================
-// 5. START SERVER
+// 5. STORAGE AND EXPORT ROUTES
+// ==========================================
+
+// GET /api/storage-stats — real counts and estimated storage usage
+app.get('/api/storage-stats', (req, res) => {
+  const queries = {
+    cases: 'SELECT COUNT(*) AS count FROM disease_cases',
+    users: 'SELECT COUNT(*) AS count FROM users',
+    notifications: 'SELECT COUNT(*) AS count FROM notifications',
+  };
+
+  Promise.all([
+    new Promise((resolve, reject) =>
+      db.query(queries.cases, (err, r) => err ? reject(err) : resolve(r[0].count))),
+    new Promise((resolve, reject) =>
+      db.query(queries.users, (err, r) => err ? reject(err) : resolve(r[0].count))),
+    new Promise((resolve, reject) =>
+      db.query(queries.notifications, (err, r) => err ? reject(err) : resolve(r[0].count))),
+  ])
+  .then(([cases, users, notifications]) => {
+    const caseDataKB = cases * 2;
+    const userDataKB = users * 1;
+    const notifKB = notifications * 0.5;
+    const totalKB = caseDataKB + userDataKB + notifKB;
+
+    res.json({
+      cases,
+      users,
+      notifications,
+      caseDataMB: (caseDataKB / 1024).toFixed(2),
+      userDataMB: (userDataKB / 1024).toFixed(2),
+      otherMB: (notifKB / 1024).toFixed(2),
+      totalMB: (totalKB / 1024).toFixed(2),
+      totalGB: (totalKB / 1024 / 1024).toFixed(3),
+      maxGB: 10,
+      usedPercent: Math.min(((totalKB / 1024 / 1024) / 10) * 100, 100).toFixed(1),
+    });
+  })
+  .catch(err => res.status(500).json({ error: err.message }));
+});
+
+// GET /api/export-all — export all cases as JSON or CSV
+app.get('/api/export-all', (req, res) => {
+  const { format } = req.query;
+
+  const sql = `
+    SELECT dc.case_id, dc.patient_name, dc.age, dc.gender, dc.contact,
+           dc.address, dc.symptoms, dc.physician, dc.onset_date,
+           dc.severity, dc.status, dc.date_reported,
+           dc.latitude, dc.longitude,
+           d.name AS disease_name,
+           b.name AS barangay_name
+    FROM disease_cases dc
+    LEFT JOIN diseases d ON dc.disease_id = d.id
+    LEFT JOIN barangays b ON dc.barangay_id = b.id
+    ORDER BY dc.date_reported DESC
+  `;
+
+  db.query(sql, (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    if (format === 'csv') {
+      const headers = 'Case ID,Patient Name,Age,Gender,Contact,Address,' +
+        'Disease,Barangay,Severity,Status,Onset Date,Date Reported\n';
+      const rows = results.map(r =>
+        `"${r.case_id}","${r.patient_name||''}","${r.age||''}",` +
+        `"${r.gender||''}","${r.contact||''}","${r.address||''}",` +
+        `"${r.disease_name||''}","${r.barangay_name||''}",` +
+        `"${r.severity||''}","${r.status||''}","${r.onset_date||''}",` +
+        `"${r.date_reported||''}"`
+      ).join('\n');
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition',
+        'attachment; filename=CDMS_Export.csv');
+      return res.send(headers + rows);
+    }
+
+    res.json(results);
+  });
+});
+
+// ==========================================
+// 6. BACKUP AND DATA CLEAR ROUTES
+// ==========================================
+
+// GET /api/backup — full data export as JSON download
+app.get('/api/backup', (req, res) => {
+  const results = {};
+
+  db.query('SELECT * FROM disease_cases', (err, cases) => {
+    if (err) return res.status(500).json({ error: err.message });
+    results.disease_cases = cases;
+
+    db.query('SELECT user_id, username, full_name, role, assigned_barangay_id, is_active, email, mobile_number, last_login FROM users',
+      (err, users) => {
+      if (err) return res.status(500).json({ error: err.message });
+      results.users = users;
+
+      db.query('SELECT * FROM barangays', (err, barangays) => {
+        if (err) return res.status(500).json({ error: err.message });
+        results.barangays = barangays;
+
+        db.query('SELECT * FROM diseases', (err, diseases) => {
+          if (err) return res.status(500).json({ error: err.message });
+          results.diseases = diseases;
+
+          results.backup_date = new Date().toISOString();
+          results.system = 'Cabuyao CDMS';
+          results.version = '1.0';
+
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Content-Disposition',
+            `attachment; filename=CDMS_Backup_${new Date().toISOString().split('T')[0]}.json`);
+          res.json(results);
+        });
+      });
+    });
+  });
+});
+
+// DELETE /api/users/:id/my-data — clear current user's personal data
+app.delete('/api/users/:id/my-data', (req, res) => {
+  const { id } = req.params;
+
+  db.query('SELECT assigned_barangay_id FROM users WHERE user_id = ?',
+    [id], (err, userResults) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (userResults.length === 0)
+      return res.status(404).json({ error: 'User not found.' });
+
+    db.query('DELETE FROM notifications WHERE user_id = ?', [id],
+      (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+
+      console.log(`Cleared personal data for user ${id}`);
+      res.status(200).json({
+        message: 'Your personal data has been cleared successfully.'
+      });
+    });
+  });
+});
+
+// ==========================================
+// 7. START SERVER
 // ==========================================
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

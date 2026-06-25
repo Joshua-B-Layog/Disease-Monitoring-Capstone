@@ -43,7 +43,7 @@ const AUDIT_LOGS_DATA = [
   { id: 12, timestamp: 'Jun 02, 2026 10:00 AM', createdAt: new Date('2026-06-02T10:00:00'), userId: 'MK02',      userName: 'Maria Koars',  userRole: 'BHW', choUnit: null,       barangay: 'Marinig',      action: 'Deleted',  entity: 'Case Record',  details: 'Removed test entry DG-000' },
 ];
 
-export default function BarangayReports({ activeUser }) {
+export default function BarangayReports({ activeUser, fontScale, compactMode, dateFormat }) {
   const choUnit    = activeUser?.context || 'CHO Unit I (Sala)';
   const myBarangays = CHO_BARANGAYS[choUnit] || Object.values(CHO_BARANGAYS).flat();
 
@@ -281,7 +281,18 @@ export default function BarangayReports({ activeUser }) {
   const DAY_NAMES    = ['Su','Mo','Tu','We','Th','Fr','Sa'];
   const getDaysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
   const getFirstDay    = (y, m) => new Date(y, m, 1).getDay();
-  const formatDate     = (d)    => { if (!d) return ''; const dt = new Date(d); return `${String(dt.getMonth()+1).padStart(2,'0')}/${String(dt.getDate()).padStart(2,'0')}/${dt.getFullYear()}`; };
+  const formatDate = (d) => {
+    if (!d) return '';
+    const dt = new Date(d);
+    if (isNaN(dt)) return '';
+    const m = String(dt.getMonth() + 1).padStart(2, '0');
+    const day = String(dt.getDate()).padStart(2, '0');
+    const y = String(dt.getFullYear());
+    const yy = y.slice(2);
+    if (dateFormat === 'DD/MM/YY') return `${day}/${m}/${yy}`;
+    if (dateFormat === 'YYYY-MM-DD') return `${y}-${m}-${day}`;
+    return `${m}/${day}/${yy}`;
+  };
 
   const handleCalendarDay = (day) => {
     const clicked = new Date(calYear, calMonth, day);
@@ -325,7 +336,7 @@ export default function BarangayReports({ activeUser }) {
   const sortedReportLogs = getSortedReportLogs();
 
   const s = {
-    card:    { background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '20px' },
+    card:    { background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: compactMode ? '12px' : '20px' },
     label:   { fontSize: '12px', fontWeight: '600', color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' },
     input:   { padding: '9px 14px', border: '1px solid #e2e8f0', borderRadius: '7px', fontSize: '14px', color: '#1e293b', background: '#fff', outline: 'none', width: '100%', boxSizing: 'border-box' },
     dropBtn: (active) => ({ padding: '9px 14px', border: `1px solid ${active ? '#0d9488' : '#e2e8f0'}`, borderRadius: '7px', fontSize: '14px', color: active ? '#0d9488' : '#475569', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap', fontWeight: active ? '600' : '400' }),
@@ -334,7 +345,7 @@ export default function BarangayReports({ activeUser }) {
   };
 
   return (
-    <div style={{ padding: '24px', minHeight: '100vh', background: '#f8fafc', fontFamily: 'system-ui, sans-serif' }}>
+    <div style={{ padding: compactMode ? '14px' : '24px', minHeight: '100vh', background: '#f8fafc', fontFamily: 'system-ui, sans-serif' }}>
 
       {/* ── VIEW MODAL ── */}
       {viewReport && (
@@ -807,7 +818,7 @@ export default function BarangayReports({ activeUser }) {
             <thead>
               <tr style={{ borderBottom: '2px solid #f1f5f9' }}>
                 {['Timestamp', 'User', 'Action', 'Entity', 'Details'].map(h => (
-                  <th key={h} style={{ padding: '10px 14px', textAlign: 'center', fontSize: '11px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>
+                  <th key={h} style={{ padding: compactMode ? '6px 8px' : '10px 14px', textAlign: 'center', fontSize: '11px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>
                     {h}
                   </th>
                 ))}
@@ -821,8 +832,8 @@ export default function BarangayReports({ activeUser }) {
                   <tr key={log.id} style={{ borderBottom: '1px solid #f8fafc' }}
                     onMouseEnter={e => e.currentTarget.style.background = '#fafafa'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                    <td style={{ padding: '13px 14px', fontSize: '13px', color: '#64748b', whiteSpace: 'nowrap', textAlign: 'center' }}>{log.timestamp}</td>
-                    <td style={{ padding: '13px 14px', textAlign: 'center' }}>
+                    <td style={{ padding: compactMode ? '7px 8px' : '13px 14px', fontSize: '13px', color: '#64748b', whiteSpace: 'nowrap', textAlign: 'center' }}>{log.timestamp}</td>
+                    <td style={{ padding: compactMode ? '7px 8px' : '13px 14px', textAlign: 'center' }}>
                       <div style={{ fontSize: '13px', fontWeight: '600', color: '#1e293b' }}>{log.userId}</div>
                       <div style={{ fontSize: '12px', color: '#94a3b8' }}>{log.userName}</div>
                       {/* Role tag */}
@@ -838,13 +849,13 @@ export default function BarangayReports({ activeUser }) {
                         </span>
                       </div>
                     </td>
-                    <td style={{ padding: '13px 14px', textAlign: 'center' }}>
+                    <td style={{ padding: compactMode ? '7px 8px' : '13px 14px', textAlign: 'center' }}>
                       <span style={{ padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: '600', ...actionBadgeStyle(log.action) }}>
                         {log.action}
                       </span>
                     </td>
-                    <td style={{ padding: '13px 14px', fontSize: '13px', color: '#475569', textAlign: 'center' }}>{log.entity}</td>
-                    <td style={{ padding: '13px 14px', fontSize: '13px', color: '#64748b', maxWidth: '320px', textAlign: 'left' }}>{log.details}</td>
+                    <td style={{ padding: compactMode ? '7px 8px' : '13px 14px', fontSize: '13px', color: '#475569', textAlign: 'center' }}>{log.entity}</td>
+                    <td style={{ padding: compactMode ? '7px 8px' : '13px 14px', fontSize: '13px', color: '#64748b', maxWidth: '320px', textAlign: 'left' }}>{log.details}</td>
                   </tr>
                 ))
               )}

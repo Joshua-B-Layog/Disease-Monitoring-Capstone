@@ -1,6 +1,15 @@
 import React from 'react';
 
-const Sidebar = ({ role, activeTab, setActiveTab }) => {
+const translations = {
+  en: { 'Dashboard':'Dashboard','Manage Cases':'Manage Cases','Audit Reports':'Audit Reports','Map View':'Map View','User Accounts':'User Accounts','Settings':'Settings' },
+  fil: { 'Dashboard':'Dashboard','Manage Cases':'Pamahalaan ang mga Kaso','Audit Reports':'Mga Ulat ng Pag-audit','Map View':'Pananaw ng Mapa','User Accounts':'Mga Account ng User','Settings':'Mga Setting' },
+  id: { 'Dashboard':'Dasbor','Manage Cases':'Kelola Kasus','Audit Reports':'Laporan Audit','Map View':'Tampilan Peta','User Accounts':'Akun Pengguna','Settings':'Pengaturan' },
+  vi: { 'Dashboard':'Bảng điều khiển','Manage Cases':'Quản lý ca bệnh','Audit Reports':'Báo cáo kiểm toán','Map View':'Xem bản đồ','User Accounts':'Tài khoản người dùng','Settings':'Cài đặt' },
+  th: { 'Dashboard':'แดชบอร์ด','Manage Cases':'จัดการเคส','Audit Reports':'รายงานการตรวจสอบ','Map View':'มุมมองแผนที่','User Accounts':'บัญชีผู้ใช้','Settings':'การตั้งค่า' },
+};
+
+const Sidebar = ({ role, activeTab, setActiveTab, language }) => {
+  const t = (key) => translations[language]?.[key] || key;
   // Define menu configurations
   const menuConfig = {
     CHO: [
@@ -34,7 +43,7 @@ const Sidebar = ({ role, activeTab, setActiveTab }) => {
             className={`menu-item ${activeTab === item.name ? 'active' : ''}`}
             onClick={() => setActiveTab(item.name)}
           >
-            {item.icon} {item.name}
+            {item.icon} {t(item.name)}
           </div>
         ))}
       </div>

@@ -68,7 +68,20 @@ const findCardForDisease = (diseaseName) => {
   return null;
 };
 
-export default function ManageCases({ caseFilter, setCaseFilter }) {
+const formatDateStr = (dateStr, fmt) => {
+  if (!dateStr) return '--';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '--';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const shortY = String(y).slice(-2);
+  if (fmt === 'DD/MM/YY') return `${day}/${m}/${shortY}`;
+  if (fmt === 'YYYY-MM-DD') return `${y}-${m}-${day}`;
+  return `${m}/${day}/${shortY}`;
+};
+
+export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, autoSave, confirmDelete, keyboardShortcuts, fontScale, compactMode }) {
   const [view, setView] = useState('categories'); // 'categories' | 'list' | 'add' | 'edit'
   const [cardPage, setCardPage] = useState(0);
   const [selectedDisease, setSelectedDisease] = useState(null);
@@ -85,6 +98,10 @@ export default function ManageCases({ caseFilter, setCaseFilter }) {
   // ── NEW: sub-disease filter for the "Other" card ──
   const [filterSubDisease, setFilterSubDisease] = useState('All Remaining Diseases');
   const [tablePage, setTablePage] = useState(1);
+
+  // Auto-save toast state
+  const [autoSaveToast, setAutoSaveToast] = useState('');
+  const fs = fontScale || '1';
 
   // Export dropdown
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -162,6 +179,58 @@ export default function ManageCases({ caseFilter, setCaseFilter }) {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  // ── Auto-save draft every 4 minutes ──
+  useEffect(() => {
+    if (!autoSave || (view !== 'add' && view !== 'edit')) return;
+    if (!formData.patientName) return;
+
+    const interval = setInterval(() => {
+      const payload = { ...formData, status: 'Draft' };
+      const request = editingCase
+        ? axios.put(`http://localhost:5000/api/disease_cases/${editingCase.id}`, payload)
+        : axios.post('http://localhost:5000/api/disease_cases', payload);
+
+      request
+        .then(() => {
+          setAutoSaveToast('Draft auto-saved at ' + new Date().toLocaleTimeString());
+          fetchCases();
+        })
+        .catch(() => {});
+    }, 240000);
+
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSave, view, formData.patientName, editingCase]);
+
+  // ── Keyboard shortcuts ──
+  useEffect(() => {
+    if (!keyboardShortcuts) return;
+
+    const handler = (e) => {
+      const tag = document.activeElement?.tagName || '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      if (e.key === 'Escape') {
+        if (deleteTarget) { setDeleteTarget(null); return; }
+        if (view === 'add' || view === 'edit') { setView('list'); }
+      }
+
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        const form = document.querySelector('#case-form');
+        if (form) form.requestSubmit();
+      }
+
+      if (view === 'list' && (e.key === 'n' || e.key === 'N') && !e.ctrlKey && !e.metaKey) {
+        setView('add');
+      }
+    };
+
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [keyboardShortcuts, view, deleteTarget]);
 
   // ── Match cases to disease card ──
   const matchesCard = (caseItem, card) => {
@@ -281,7 +350,7 @@ export default function ManageCases({ caseFilter, setCaseFilter }) {
   };
 
   // ── DELETE ──
-  const confirmDelete = async () => {
+  const executeDelete = async () => {
     if (!deleteTarget) return;
     setDeleteLoading(true);
     try {
@@ -384,7 +453,7 @@ export default function ManageCases({ caseFilter, setCaseFilter }) {
   if (view === 'categories') {
     const pageCards = DISEASE_PAGES[cardPage];
     return (
-      <div style={{ padding: '28px', color: 'var(--text-main)' }}>
+      <div style={{ padding: compactMode ? '14px' : '28px', color: 'var(--text-main)', fontSize: `calc(14px * ${fs})` }}>
         <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>
           Dashboard / Manage Cases
         </div>
@@ -408,7 +477,7 @@ export default function ManageCases({ caseFilter, setCaseFilter }) {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: compactMode ? '12px' : '20px' }}>
           {pageCards.map(disease => {
             const count = getCaseCount(disease);
             return (
@@ -422,7 +491,7 @@ export default function ManageCases({ caseFilter, setCaseFilter }) {
                   setFilterSubDisease('All Remaining Diseases');
                   setView('list');
                 }}
-                style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '24px', cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s' }}
+                style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: compactMode ? '14px' : '24px', cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s' }}
                 onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.15)'; }}
                 onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' }}>
@@ -462,7 +531,7 @@ export default function ManageCases({ caseFilter, setCaseFilter }) {
     const otherDiseaseNames = isOtherCard ? getOtherDiseaseNames() : [];
 
     return (
-      <div style={{ padding: '28px', color: 'var(--text-main)' }}>
+      <div style={{ padding: compactMode ? '14px' : '28px', color: 'var(--text-main)', fontSize: `calc(14px * ${fs})` }}>
         {/* DELETE MODAL */}
         {deleteTarget && (
           <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
@@ -493,7 +562,7 @@ export default function ManageCases({ caseFilter, setCaseFilter }) {
                   style={{ flex: 1, padding: '14px', background: 'transparent', border: 'none', borderRight: '1px solid #e5e7eb', cursor: 'pointer', fontSize: '16px', fontWeight: '500', color: '#374151', borderRadius: '0 0 0 16px' }}>
                   Cancel
                 </button>
-                <button onClick={confirmDelete} disabled={deleteLoading}
+                <button onClick={executeDelete} disabled={deleteLoading}
                   style={{ flex: 1, padding: '14px', background: '#ef4444', border: 'none', cursor: deleteLoading ? 'not-allowed' : 'pointer', fontSize: '16px', fontWeight: '600', color: '#fff', borderRadius: '0 0 16px 0' }}>
                   {deleteLoading ? 'Deleting...' : 'Delete'}
                 </button>
@@ -553,7 +622,7 @@ export default function ManageCases({ caseFilter, setCaseFilter }) {
         </div>
 
         {/* Table card */}
-        <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '20px' }}>
+        <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' }}>
           <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
             {/* Search */}
             <input type="text" placeholder="Search Cases..."
@@ -635,7 +704,7 @@ export default function ManageCases({ caseFilter, setCaseFilter }) {
               <thead>
                 <tr>
                   {['Case ID', 'Patient Name', 'Age', 'Barangay', 'Date Reported', 'Severity', 'Status', 'Actions'].map(h => (
-                    <th key={h} style={{ textAlign: 'center', padding: '10px 12px', color: 'var(--text-muted)', fontSize: '12px', fontWeight: '600', borderBottom: '1px solid var(--border-color)', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
+                    <th key={h} style={{ textAlign: 'center', padding: compactMode ? '6px 8px' : '10px 12px', color: 'var(--text-muted)', fontSize: '12px', fontWeight: '600', borderBottom: '1px solid var(--border-color)', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
                       {h}
                     </th>
                   ))}
@@ -655,38 +724,44 @@ export default function ManageCases({ caseFilter, setCaseFilter }) {
                     <tr key={c.case_id} style={{ borderBottom: '1px solid var(--border-color)', opacity: c.status === 'Draft' ? 0.6 : 1 }}
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--input-bg)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                      <td style={{ padding: '12px', fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                      <td style={{ padding: compactMode ? '7px 8px' : '12px', fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center' }}>
                         #{String(c.case_id).padStart(3, '0')}
                       </td>
-                      <td style={{ padding: '12px', fontSize: '14px', fontWeight: '500', color: 'var(--text-main)', textAlign: 'center' }}>
+                      <td style={{ padding: compactMode ? '7px 8px' : '12px', fontSize: '14px', fontWeight: '500', color: 'var(--text-main)', textAlign: 'center' }}>
                         {c.patient_name || 'Unknown'}
                       </td>
-                      <td style={{ padding: '12px', fontSize: '13px', color: 'var(--text-main)', textAlign: 'center' }}>
+                      <td style={{ padding: compactMode ? '7px 8px' : '12px', fontSize: '13px', color: 'var(--text-main)', textAlign: 'center' }}>
                         {c.age || '--'}
                       </td>
-                      <td style={{ padding: '12px', fontSize: '13px', color: 'var(--text-main)', textAlign: 'center' }}>
+                      <td style={{ padding: compactMode ? '7px 8px' : '12px', fontSize: '13px', color: 'var(--text-main)', textAlign: 'center' }}>
                         {c.barangay_name || '--'}
                       </td>
-                      <td style={{ padding: '12px', fontSize: '13px', color: 'var(--text-main)', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                        {c.date_reported
-                          ? new Date(c.date_reported).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
-                          : '--'}
+                      <td style={{ padding: compactMode ? '7px 8px' : '12px', fontSize: '13px', color: 'var(--text-main)', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        {formatDateStr(c.date_reported, dateFormat)}
                       </td>
-                      <td style={{ padding: '12px', fontSize: '13px', color: 'var(--text-main)', textAlign: 'center' }}>
+                      <td style={{ padding: compactMode ? '7px 8px' : '12px', fontSize: '13px', color: 'var(--text-main)', textAlign: 'center' }}>
                         {c.severity || 'N/A'}
                       </td>
-                      <td style={{ padding: '12px', textAlign: 'center' }}>
+                      <td style={{ padding: compactMode ? '7px 8px' : '12px', textAlign: 'center' }}>
                         <span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '500', ...getStatusStyle(c.status) }}>
                           {c.status}
                         </span>
                       </td>
-                      <td style={{ padding: '12px', textAlign: 'center' }}>
+                      <td style={{ padding: compactMode ? '7px 8px' : '12px', textAlign: 'center' }}>
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
                           <button onClick={() => openEdit(c)} title="Edit case"
                             style={{ padding: '5px 10px', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer', color: 'var(--text-main)', fontSize: '13px' }}>
                             ✏️
                           </button>
-                          <button onClick={() => setDeleteTarget(c)} title="Delete case"
+                          <button onClick={() => {
+                              if (confirmDelete) {
+                                setDeleteTarget(c);
+                              } else {
+                                axios.delete(`http://localhost:5000/api/cases/${c.case_id}`)
+                                  .then(() => fetchCases())
+                                  .catch(err => alert('Delete failed: ' + (err.response?.data?.error || err.message)));
+                              }
+                            }} title="Delete case"
                             style={{ padding: '5px 10px', background: 'transparent', border: '1px solid #ef4444', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>
                             🗑️
                           </button>
@@ -743,7 +818,7 @@ export default function ManageCases({ caseFilter, setCaseFilter }) {
       : null;
 
     return (
-      <div style={{ padding: '28px' }}>
+      <div style={{ padding: compactMode ? '14px' : '28px', fontSize: `calc(14px * ${fs})` }}>
         <button onClick={() => setView('list')}
           style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', marginBottom: '20px', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
           ← Back to {selectedDisease?.name} Cases
@@ -764,6 +839,12 @@ export default function ManageCases({ caseFilter, setCaseFilter }) {
           {submitMsg && (
             <div style={{ background: submitMsg.startsWith('Error') ? '#fee2e2' : '#d1fae5', color: submitMsg.startsWith('Error') ? '#991b1b' : '#065f46', padding: '12px', borderRadius: '8px', marginBottom: '20px', textAlign: 'center', fontSize: '14px', fontWeight: '500' }}>
               {submitMsg.startsWith('Error') ? '❌' : '✅'} {submitMsg}
+            </div>
+          )}
+
+          {autoSaveToast && (
+            <div style={{ background: '#fef3c7', color: '#92400e', padding: '8px 16px', borderRadius: '8px', marginBottom: '12px', textAlign: 'center', fontSize: '13px', fontWeight: '500' }}>
+              💾 {autoSaveToast}
             </div>
           )}
 

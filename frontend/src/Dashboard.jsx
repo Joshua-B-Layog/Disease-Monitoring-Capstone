@@ -11,7 +11,20 @@ const ALL_DISEASES = [
 
 const CASES_PER_PAGE = 10;
 
-const Dashboard = ({ setActiveTab, loggedUser }) => {
+const formatDateStr = (dateStr, fmt) => {
+  if (!dateStr) return '--';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '--';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const shortY = String(y).slice(-2);
+  if (fmt === 'DD/MM/YY') return `${day}/${m}/${shortY}`;
+  if (fmt === 'YYYY-MM-DD') return `${y}-${m}-${day}`;
+  return `${m}/${day}/${shortY}`;
+};
+
+const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMode }) => {
   const [cases, setCases] = useState([]);
   const [selectedDisease, setSelectedDisease] = useState('Dengue');
   const [loading, setLoading] = useState(true);
@@ -287,17 +300,17 @@ const Dashboard = ({ setActiveTab, loggedUser }) => {
 };
 
   return (
-    <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ padding: compactMode ? '14px' : '24px', display: 'flex', flexDirection: 'column', gap: compactMode ? '12px' : '20px', fontSize: `calc(14px * ${fontScale || '1'})` }}>
 
       {/* ── STAT CARDS ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: compactMode ? '10px' : '16px' }}>
         {[
           { label: 'Total Cases', value: totalCases, color: '#3b82f6' },
           { label: 'Active', value: activeCases, color: '#f59e0b' },
           { label: 'Recovered', value: recoveredCases, color: '#10b981' },
           { label: 'Deaths', value: deathCases, color: '#ef4444' },
         ].map(card => (
-          <div key={card.label} style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '20px' }}>
+            <div key={card.label} style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' }}>
             <div style={{ color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{card.label}</div>
             <div style={{ color: card.color, fontSize: '32px', fontWeight: '700', marginTop: '6px' }}>{card.value}</div>
           </div>
@@ -308,7 +321,7 @@ const Dashboard = ({ setActiveTab, loggedUser }) => {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '16px' }}>
 
         {/* BAR CHART */}
-        <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '20px' }}>
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' }}>
           <h4 style={{ color: 'var(--text-main)', margin: '0 0 16px 0', fontSize: '15px', fontWeight: '600' }}>
             {selectedDisease} Cases by Barangay
           </h4>
@@ -337,7 +350,7 @@ const Dashboard = ({ setActiveTab, loggedUser }) => {
         </div>
 
         {/* FILTER & CONTROLS — FIX: date inputs no longer overflow */}
-        <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <h4 style={{ color: 'var(--text-main)', margin: '0', fontSize: '15px', fontWeight: '600' }}>Filter & Controls</h4>
 
           {/* Disease dropdown */}
@@ -439,8 +452,8 @@ const Dashboard = ({ setActiveTab, loggedUser }) => {
       </div>
 
       {/* ── RECENT CASE REPORTS ── */}
-      <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <h4 style={{ color: 'var(--text-main)', margin: 0, fontSize: '15px', fontWeight: '600' }}>
             Recent Case Reports
             <span style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: '400', marginLeft: '8px' }}>
@@ -459,10 +472,10 @@ const Dashboard = ({ setActiveTab, loggedUser }) => {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              {['ID', 'Patient Name', 'Age', 'Barangay', 'Disease', 'Severity', 'Status'].map(h => (
+              {['ID', 'Patient Name', 'Age', 'Barangay', 'Disease', 'Date Reported', 'Severity', 'Status'].map(h => (
                 <th key={h} style={{
                   textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px',
-                  fontWeight: '600', padding: '10px 12px', borderBottom: '1px solid var(--border-color)',
+                  fontWeight: '600', padding: compactMode ? '6px 8px' : '10px 12px', borderBottom: '1px solid var(--border-color)',
                   textTransform: 'uppercase', letterSpacing: '0.05em'
                 }}>
                   {h}
@@ -473,13 +486,14 @@ const Dashboard = ({ setActiveTab, loggedUser }) => {
           <tbody>
             {paginatedCases.map((c) => (
               <tr key={c.case_id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                <td style={{ padding: '12px', color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center' }}>#{String(c.case_id).padStart(3, '0')}</td>
-                <td style={{ padding: '12px', color: 'var(--text-main)', fontSize: '14px', fontWeight: '500', textAlign: 'center' }}>{c.patient_name || 'Unknown'}</td>
-                <td style={{ padding: '12px', color: 'var(--text-main)', fontSize: '13px', textAlign: 'center' }}>{c.age || '--'}</td>
-                <td style={{ padding: '12px', color: 'var(--text-main)', fontSize: '13px', textAlign: 'center' }}>{c.barangay_name || `ID: ${c.barangay_id}`}</td>
-                <td style={{ padding: '12px', color: 'var(--text-main)', fontSize: '13px', textAlign: 'center' }}>{c.disease_name || '--'}</td>
-                <td style={{ padding: '12px', color: 'var(--text-main)', fontSize: '13px', textAlign: 'center' }}>{c.severity || 'N/A'}</td>
-                <td style={{ padding: '12px', textAlign: 'center' }}>
+                <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center' }}>#{String(c.case_id).padStart(3, '0')}</td>
+                <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-main)', fontSize: '14px', fontWeight: '500', textAlign: 'center' }}>{c.patient_name || 'Unknown'}</td>
+                <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-main)', fontSize: '13px', textAlign: 'center' }}>{c.age || '--'}</td>
+                <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-main)', fontSize: '13px', textAlign: 'center' }}>{c.barangay_name || `ID: ${c.barangay_id}`}</td>
+                <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-main)', fontSize: '13px', textAlign: 'center' }}>{c.disease_name || '--'}</td>
+                <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-main)', fontSize: '13px', textAlign: 'center', whiteSpace: 'nowrap' }}>{formatDateStr(c.date_reported, dateFormat)}</td>
+                <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-main)', fontSize: '13px', textAlign: 'center' }}>{c.severity || 'N/A'}</td>
+                <td style={{ padding: compactMode ? '7px 8px' : '12px', textAlign: 'center' }}>
                   <span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '500', ...getStatusStyle(c.status) }}>
                     {c.status}
                   </span>

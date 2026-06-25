@@ -24,7 +24,7 @@ const EMPTY_FORM = {
   role: 'BHW',
 };
 
-export default function UserManagement() {
+export default function UserManagement({ confirmDelete, fontScale, compactMode, dateFormat }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [barangayList, setBarangayList] = useState([]);
@@ -46,6 +46,23 @@ export default function UserManagement() {
 
   const [barangayOpen, setBarangayOpen] = useState(false);
   const barangayRef = useRef(null);
+
+  const formatDate = (d) => {
+    if (!d) return '\u2014';
+    const dt = new Date(d);
+    if (isNaN(dt)) return '\u2014';
+    const m = String(dt.getMonth() + 1).padStart(2, '0');
+    const day = String(dt.getDate()).padStart(2, '0');
+    const y = String(dt.getFullYear());
+    const yy = y.slice(2);
+    const h = dt.getHours();
+    const min = String(dt.getMinutes()).padStart(2, '0');
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    if (dateFormat === 'DD/MM/YY') return `${day}/${m}/${yy} ${h12}:${min} ${ampm}`;
+    if (dateFormat === 'YYYY-MM-DD') return `${y}-${m}-${day} ${h12}:${min} ${ampm}`;
+    return `${m}/${day}/${yy} ${h12}:${min} ${ampm}`;
+  };
 
   const fetchUsers = () => {
     setLoading(true);
@@ -168,7 +185,7 @@ export default function UserManagement() {
     }
   };
 
-  const confirmDelete = async () => {
+  const executeDelete = async () => {
     if (!deleteTarget) return;
     setDeleteLoading(true);
     try {
@@ -205,7 +222,7 @@ export default function UserManagement() {
   };
 
   return (
-    <div style={{ padding: '24px', color: '#1e293b' }}>
+    <div style={{ padding: compactMode ? '14px' : '24px', color: '#1e293b' }}>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h2 style={{ margin: 0, fontSize: '22px', color: '#0f172a', fontWeight: '700' }}>User Accounts</h2>
@@ -216,7 +233,7 @@ export default function UserManagement() {
         </button>
       </div>
 
-      <div style={{ background: 'white', borderRadius: '10px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0' }}>
+      <div style={{ background: 'white', borderRadius: '10px', padding: compactMode ? '12px' : '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0' }}>
 
         <div style={{ display: 'flex', gap: '10px', marginBottom: '18px', flexWrap: 'wrap', alignItems: 'center' }}>
           <input type="text" placeholder="Search Accounts..."
@@ -287,18 +304,18 @@ export default function UserManagement() {
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#64748b', fontSize: '13px' }}>
-                <th style={{ padding: '12px 10px' }}>
+                <th style={{ padding: compactMode ? '7px 6px' : '12px 10px' }}>
                   <input type="checkbox"
                     checked={paginatedUsers.length > 0 && selectedIds.length === paginatedUsers.length}
                     onChange={toggleSelectAll} />
                 </th>
-                <th style={{ padding: '12px 10px', fontWeight: '600' }}>User ID</th>
-                <th style={{ padding: '12px 10px', fontWeight: '600' }}>Name</th>
-                <th style={{ padding: '12px 10px', fontWeight: '600' }}>Barangay</th>
-                <th style={{ padding: '12px 10px', fontWeight: '600' }}>Role</th>
-                <th style={{ padding: '12px 10px', fontWeight: '600' }}>Status</th>
-                <th style={{ padding: '12px 10px', fontWeight: '600' }}>Last Login</th>
-                <th style={{ padding: '12px 10px', fontWeight: '600', textAlign: 'center' }}>Actions</th>
+                <th style={{ padding: compactMode ? '7px 6px' : '12px 10px', fontWeight: '600' }}>User ID</th>
+                <th style={{ padding: compactMode ? '7px 6px' : '12px 10px', fontWeight: '600' }}>Name</th>
+                <th style={{ padding: compactMode ? '7px 6px' : '12px 10px', fontWeight: '600' }}>Barangay</th>
+                <th style={{ padding: compactMode ? '7px 6px' : '12px 10px', fontWeight: '600' }}>Role</th>
+                <th style={{ padding: compactMode ? '7px 6px' : '12px 10px', fontWeight: '600' }}>Status</th>
+                <th style={{ padding: compactMode ? '7px 6px' : '12px 10px', fontWeight: '600' }}>Last Login</th>
+                <th style={{ padding: compactMode ? '7px 6px' : '12px 10px', fontWeight: '600', textAlign: 'center' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -307,14 +324,14 @@ export default function UserManagement() {
               ) : (
                 paginatedUsers.map(user => (
                   <tr key={user.user_id} style={{ borderBottom: '1px solid #e2e8f0', fontSize: '14px', color: '#334155' }}>
-                    <td style={{ padding: '15px 10px' }}>
+                    <td style={{ padding: compactMode ? '8px 6px' : '15px 10px' }}>
                       <input type="checkbox" checked={selectedIds.includes(user.user_id)} onChange={() => toggleSelect(user.user_id)} />
                     </td>
-                    <td style={{ padding: '15px 10px' }}>U-{String(user.user_id).padStart(3, '0')}</td>
-                    <td style={{ padding: '15px 10px', fontWeight: '500' }}>{user.full_name}</td>
-                    <td style={{ padding: '15px 10px' }}>{user.barangay_name || '—'}</td>
-                    <td style={{ padding: '15px 10px' }}>{user.role}</td>
-                    <td style={{ padding: '15px 10px' }}>
+                    <td style={{ padding: compactMode ? '8px 6px' : '15px 10px' }}>U-{String(user.user_id).padStart(3, '0')}</td>
+                    <td style={{ padding: compactMode ? '8px 6px' : '15px 10px', fontWeight: '500' }}>{user.full_name}</td>
+                    <td style={{ padding: compactMode ? '8px 6px' : '15px 10px' }}>{user.barangay_name || '—'}</td>
+                    <td style={{ padding: compactMode ? '8px 6px' : '15px 10px' }}>{user.role}</td>
+                    <td style={{ padding: compactMode ? '8px 6px' : '15px 10px' }}>
                       <span style={{
                         padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '500',
                         background: user.is_active ? '#dcfce7' : '#e2e8f0',
@@ -323,21 +340,24 @@ export default function UserManagement() {
                         {user.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td style={{ padding: '15px 10px', color: '#94a3b8', fontSize: '13px' }}>
-                      {user.last_login
-                          ? new Date(user.last_login).toLocaleDateString('en-PH', {
-                              month: 'short', day: 'numeric', year: 'numeric',
-                              hour: '2-digit', minute: '2-digit'
-                            })
-                      : '—'}
+                    <td style={{ padding: compactMode ? '8px 6px' : '15px 10px', color: '#94a3b8', fontSize: '13px' }}>
+                      {formatDate(user.last_login)}
                     </td>
-                    <td style={{ padding: '15px 10px' }}>
+                    <td style={{ padding: compactMode ? '8px 6px' : '15px 10px' }}>
                       <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
                         <button onClick={() => openEdit(user)} title="Edit"
                           style={{ padding: '6px 10px', border: '1px solid #93c5fd', background: '#eff6ff', borderRadius: '6px', cursor: 'pointer' }}>
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                         </button>
-                        <button onClick={() => setDeleteTarget(user)} title="Delete"
+                        <button onClick={() => {
+                              if (confirmDelete) {
+                                setDeleteTarget(user);
+                              } else {
+                                axios.delete(`http://localhost:5000/api/users/${user.user_id}`)
+                                  .then(() => fetchUsers())
+                                  .catch(err => alert('Delete failed: ' + (err.response?.data?.error || err.message)));
+                              }
+                            }} title="Delete"
                           style={{ padding: '6px 10px', border: '1px solid #fca5a5', background: '#fee2e2', borderRadius: '6px', cursor: 'pointer' }}>
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
                         </button>
@@ -500,7 +520,7 @@ export default function UserManagement() {
                 style={{ flex: 1, padding: '14px', background: 'transparent', border: 'none', borderRight: '1px solid #e5e7eb', cursor: 'pointer', fontSize: '16px', fontWeight: '500', color: '#374151' }}>
                 Cancel
               </button>
-              <button onClick={confirmDelete} disabled={deleteLoading}
+              <button onClick={executeDelete} disabled={deleteLoading}
                 style={{ flex: 1, padding: '14px', background: '#ef4444', border: 'none', cursor: deleteLoading ? 'not-allowed' : 'pointer', fontSize: '16px', fontWeight: '600', color: '#fff' }}>
                 {deleteLoading ? 'Deleting...' : 'Delete'}
               </button>

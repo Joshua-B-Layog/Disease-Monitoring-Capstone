@@ -2,6 +2,15 @@ import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import './ChoSettings.css';
 
+const translations = {
+  en: { 'Profile Settings':'Profile Settings','Account Security':'Account Security','Notifications':'Notifications','System Preferences':'System Preferences','Data Management':'Data Management','Save Preferences':'Save Preferences','Save Changes':'Save Changes','Cancel':'Cancel' },
+  fil: { 'Profile Settings':'Mga Setting ng Profile','Account Security':'Seguridad ng Account','Notifications':'Mga Abiso','System Preferences':'Mga Kagustuhan ng System','Data Management':'Pamamahala ng Data','Save Preferences':'I-save ang Mga Kagustuhan','Save Changes':'I-save ang Mga Pagbabago','Cancel':'Kanselahin' },
+  id: { 'Profile Settings':'Pengaturan Profil','Account Security':'Keamanan Akun','Notifications':'Notifikasi','System Preferences':'Preferensi Sistem','Data Management':'Manajemen Data','Save Preferences':'Simpan Preferensi','Save Changes':'Simpan Perubahan','Cancel':'Batal' },
+  vi: { 'Profile Settings':'Cài đặt hồ sơ','Account Security':'Bảo mật tài khoản','Notifications':'Thông báo','System Preferences':'Tùy chọn hệ thống','Data Management':'Quản lý dữ liệu','Save Preferences':'Lưu tùy chọn','Save Changes':'Lưu thay đổi','Cancel':'Hủy' },
+  th: { 'Profile Settings':'การตั้งค่าโปรไฟล์','Account Security':'ความปลอดภัยของบัญชี','Notifications':'การแจ้งเตือน','System Preferences':'การตั้งค่าระบบ','Data Management':'การจัดการข้อมูล','Save Preferences':'บันทึกการตั้งค่า','Save Changes':'บันทึกการเปลี่ยนแปลง','Cancel':'ยกเลิก' },
+};
+const langCodeMap = { 'English':'en','Filipino':'fil','Bahasa Indonesia':'id','Tiếng Việt':'vi','ไทย':'th' };
+
 export default function CHOSettings({
   activeUser,
   userId,
@@ -11,9 +20,30 @@ export default function CHOSettings({
   onProfilePhotoChange,
   theme,
   toggleTheme,
+  onLanguageChange,
+  onTimeZoneChange,
+  onDateFormatChange,
+  onAutoSaveChange,
+  onConfirmDeleteChange,
+  onKeyboardShortcutsChange,
+  onFontSizeChange,
+  onCompactChange,
+  savedFontScale,
+  savedCompactMode,
+  savedDateFormat,
+  savedConfirmDelete,
 }) {
   const [currentView, setCurrentView] = useState('menu');
   const fileInputRef = useRef(null);
+  const [storageStats, setStorageStats] = useState(null);
+  const [storageLoading, setStorageLoading] = useState(false);
+  const [lastBackupDate, setLastBackupDate] = useState(() => localStorage.getItem('cdms_last_backup') || null);
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [showClearModal, setShowClearModal] = useState(false);
+  const [clearCountdown, setClearCountdown] = useState(3);
+  const [clearLoading, setClearLoading] = useState(false);
+  const [clearSuccess, setClearSuccess] = useState('');
+  const [autoBackupEnabled, setAutoBackupEnabled] = useState(() => localStorage.getItem('cdms_auto_backup') !== 'false');
 
   // ── Profile data from DB ──
   const [profile, setProfile] = useState({
@@ -69,12 +99,120 @@ export default function CHOSettings({
   });
 
   // ── System Prefs ──
+  const scaleToLabel = (scale) => {
+    if (scale === '0.9') return 'Small';
+    if (scale === '1.15') return 'Large';
+    return 'Medium';
+  };
   const [systemPrefs, setSystemPrefs] = useState({
-    darkMode: false, fontSize: 'Medium', compactView: false,
-    displayLanguage: 'English', timeZone: 'Asia/Manila (GMT+8)',
-    dateFormat: 'MM/DD/YY', autoSave: false, confirmDelete: false,
+    darkMode: false,
+    fontSize: scaleToLabel(savedFontScale || '1'),
+    compactView: savedCompactMode === true || savedCompactMode === 'true' ? true : false,
+    displayLanguage: 'English',
+    timeZone: 'Asia/Manila',
+    dateFormat: savedDateFormat || 'MM/DD/YY',
+    autoSave: false,
+    confirmDelete: savedConfirmDelete !== undefined ? savedConfirmDelete : true,
     keyboardShortcuts: false,
   });
+
+  const t = (key) => {
+    const code = langCodeMap[systemPrefs.displayLanguage] || 'en';
+    return translations[code]?.[key] || key;
+  };
+
+  // ── Notify App.jsx of language/timezone/dateFormat changes ──
+  useEffect(() => {
+    if (onLanguageChange) onLanguageChange(langCodeMap[systemPrefs.displayLanguage] || 'en');
+  }, [systemPrefs.displayLanguage, onLanguageChange]);
+  useEffect(() => {
+    if (onTimeZoneChange) onTimeZoneChange(systemPrefs.timeZone);
+  }, [systemPrefs.timeZone, onTimeZoneChange]);
+  useEffect(() => {
+    if (onDateFormatChange) onDateFormatChange(systemPrefs.dateFormat);
+  }, [systemPrefs.dateFormat, onDateFormatChange]);
+  useEffect(() => {
+    setSystemPrefs(prev => ({ ...prev, dateFormat: savedDateFormat || 'MM/DD/YY' }));
+  }, [savedDateFormat]);
+  useEffect(() => {
+    setSystemPrefs(prev => ({
+      ...prev,
+      confirmDelete: savedConfirmDelete !== undefined ? savedConfirmDelete : true,
+    }));
+  }, [savedConfirmDelete]);
+  useEffect(() => {
+    if (onAutoSaveChange) onAutoSaveChange(systemPrefs.autoSave);
+  }, [systemPrefs.autoSave, onAutoSaveChange]);
+  useEffect(() => {
+    if (onConfirmDeleteChange) onConfirmDeleteChange(systemPrefs.confirmDelete);
+  }, [systemPrefs.confirmDelete, onConfirmDeleteChange]);
+  useEffect(() => {
+    if (onKeyboardShortcutsChange) onKeyboardShortcutsChange(systemPrefs.keyboardShortcuts);
+  }, [systemPrefs.keyboardShortcuts, onKeyboardShortcutsChange]);
+  useEffect(() => {
+    if (currentView === 'data') {
+      setStorageLoading(true);
+      axios.get('http://localhost:5000/api/storage-stats')
+        .then(res => { setStorageStats(res.data); setStorageLoading(false); })
+        .catch(() => setStorageLoading(false));
+    }
+  }, [currentView]);
+
+  // ── Auto-backup check on mount ──
+  useEffect(() => {
+    if (!autoBackupEnabled) return;
+    const last = localStorage.getItem('cdms_last_backup');
+    if (!last) return;
+    const daysSince = (Date.now() - new Date(last).getTime()) / (1000 * 60 * 60 * 24);
+    if (daysSince >= 7) handleCreateBackup(true);
+  }, []);
+
+  // ── Countdown timer for clear modal ──
+  useEffect(() => {
+    if (!showClearModal) { setClearCountdown(3); return; }
+    if (clearCountdown <= 0) return;
+    const timer = setTimeout(() => setClearCountdown(prev => prev - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [showClearModal, clearCountdown]);
+
+  const handleCreateBackup = (silent = false) => {
+    setBackupLoading(true);
+    fetch('http://localhost:5000/api/backup')
+      .then(res => res.blob())
+      .then(blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `CDMS_Backup_${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        const now = new Date().toISOString();
+        localStorage.setItem('cdms_last_backup', now);
+        setLastBackupDate(now);
+        setBackupLoading(false);
+        if (!silent) alert('Backup downloaded successfully! Save this file to Google Drive, USB, or any secure location.');
+      })
+      .catch(() => {
+        setBackupLoading(false);
+        if (!silent) alert('Backup failed. Please try again.');
+      });
+  };
+
+  const handleClearMyData = async () => {
+    if (!userId) return;
+    setClearLoading(true);
+    try {
+      await axios.delete(`http://localhost:5000/api/users/${userId}/my-data`);
+      setClearSuccess('Your personal data has been cleared successfully. System data and other users are not affected.');
+      setTimeout(() => {
+        setShowClearModal(false);
+        setClearSuccess('');
+        setClearLoading(false);
+      }, 2500);
+    } catch (err) {
+      alert('Clear failed: ' + (err.response?.data?.error || err.message));
+      setClearLoading(false);
+    }
+  };
 
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
@@ -349,11 +487,11 @@ export default function CHOSettings({
               Manage your account credentials, notifications, and core configuration behaviors.
             </p>
             <div className="menu-grid">
-              <NavigationCard title="Profile Settings" icon="👤" view="profile" />
-              <NavigationCard title="Account Security" icon="🔒" view="security" />
-              <NavigationCard title="Notifications" icon="🔔" view="notifications" />
-              <NavigationCard title="System Preferences" icon="⚙️" view="system" />
-              <NavigationCard title="Data Management" icon="💾" view="data" isFullWidth />
+              <NavigationCard title={t('Profile Settings')} icon="👤" view="profile" />
+              <NavigationCard title={t('Account Security')} icon="🔒" view="security" />
+              <NavigationCard title={t('Notifications')} icon="🔔" view="notifications" />
+              <NavigationCard title={t('System Preferences')} icon="⚙️" view="system" />
+              <NavigationCard title={t('Data Management')} icon="💾" view="data" isFullWidth />
             </div>
           </div>
         )}
@@ -456,11 +594,11 @@ export default function CHOSettings({
                 <div style={{ display: 'flex', gap: '16px', marginTop: '24px' }}>
                   <button onClick={() => { setCurrentView('menu'); setSaveMsg(''); }}
                     style={{ background: '#ffffff', border: '1px solid #d1d5db', color: '#1f2937', borderRadius: '12px', padding: '12px 48px', fontSize: '15px', fontWeight: '500', cursor: 'pointer' }}>
-                    Cancel
+                    {t('Cancel')}
                   </button>
                   <button onClick={handleSaveProfile} disabled={saving}
                     style={{ background: saving ? '#6ee7b7' : '#10b981', border: 'none', color: '#ffffff', borderRadius: '12px', padding: '12px', fontSize: '15px', fontWeight: '500', cursor: saving ? 'not-allowed' : 'pointer', flexGrow: 1 }}>
-                    {saving ? 'Saving...' : 'Save Changes'}
+                    {saving ? 'Saving...' : t('Save Changes')}
                   </button>
                 </div>
               </>
@@ -879,7 +1017,7 @@ export default function CHOSettings({
             ))}
 
             <div className="notifications-action-container">
-              <button className="notifications-save-btn" onClick={() => setCurrentView('menu')}>Save Preferences</button>
+              <button className="notifications-save-btn" onClick={() => setCurrentView('menu')}>{t('Save Preferences')}</button>
             </div>
           </div>
         )}
@@ -913,7 +1051,12 @@ export default function CHOSettings({
                 <div className="session-list-row">
                   <div className="session-info-meta"><h4>Font Size</h4><p>Adjust text size for better readability</p></div>
                   <div style={{ position: 'relative' }}>
-                    <select value={systemPrefs.fontSize} onChange={e => setSystemPrefs({ ...systemPrefs, fontSize: e.target.value })}
+                    <select value={systemPrefs.fontSize} onChange={e => {
+                      const label = e.target.value;
+                      const scale = label === 'Small' ? '0.9' : label === 'Large' ? '1.15' : '1';
+                      setSystemPrefs({ ...systemPrefs, fontSize: label });
+                      if (onFontSizeChange) onFontSizeChange(scale);
+                    }}
                       style={{ background: '#fff', border: '1px solid #d0d5dd', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '14px', cursor: 'pointer', appearance: 'none', color: '#1f2937', minWidth: '120px' }}>
                       <option>Small</option><option>Medium</option><option>Large</option>
                     </select>
@@ -923,7 +1066,11 @@ export default function CHOSettings({
                 <div className="session-list-row">
                   <div className="session-info-meta"><h4>Compact View</h4><p>Show more content with less spacing</p></div>
                   <label className="figma-toggle-switch">
-                    <input type="checkbox" checked={systemPrefs.compactView} onChange={e => setSystemPrefs({ ...systemPrefs, compactView: e.target.checked })} />
+                    <input type="checkbox" checked={systemPrefs.compactView} onChange={e => {
+                      const val = e.target.checked;
+                      setSystemPrefs({ ...systemPrefs, compactView: val });
+                      if (onCompactChange) onCompactChange(val);
+                    }} />
                     <span className="figma-slider" />
                   </label>
                 </div>
@@ -949,30 +1096,40 @@ export default function CHOSettings({
                 <div className="session-list-row">
                   <div className="session-info-meta"><h4>Display Language</h4></div>
                   <div style={{ position: 'relative' }}>
-                    <select value={systemPrefs.displayLanguage} onChange={e => setSystemPrefs({ ...systemPrefs, displayLanguage: e.target.value })}
-                      style={{ background: '#fff', border: '1px solid #d0d5dd', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '14px', cursor: 'pointer', appearance: 'none', color: '#1f2937', minWidth: '120px' }}>
-                      <option>English</option>
-                    </select>
+                      <select value={systemPrefs.displayLanguage} onChange={e => setSystemPrefs({ ...systemPrefs, displayLanguage: e.target.value })}
+                        style={{ background: '#fff', border: '1px solid #d0d5dd', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '14px', cursor: 'pointer', appearance: 'none', color: '#1f2937', minWidth: '120px' }}>
+                        <option>English</option>
+                        <option>Filipino</option>
+                        <option>Bahasa Indonesia</option>
+                        <option>Tiếng Việt</option>
+                        <option>ไทย</option>
+                      </select>
                     <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#1f2937', fontSize: '12px' }}>▼</span>
                   </div>
                 </div>
                 <div className="session-list-row">
                   <div className="session-info-meta"><h4>Time Zone</h4></div>
                   <div style={{ position: 'relative' }}>
-                    <select value={systemPrefs.timeZone} onChange={e => setSystemPrefs({ ...systemPrefs, timeZone: e.target.value })}
-                      style={{ background: '#fff', border: '1px solid #d0d5dd', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '14px', cursor: 'pointer', appearance: 'none', color: '#1f2937', minWidth: '120px' }}>
-                      <option>Asia/Manila (GMT+8)</option>
-                    </select>
+                      <select value={systemPrefs.timeZone} onChange={e => setSystemPrefs({ ...systemPrefs, timeZone: e.target.value })}
+                        style={{ background: '#fff', border: '1px solid #d0d5dd', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '14px', cursor: 'pointer', appearance: 'none', color: '#1f2937', minWidth: '120px' }}>
+                        <option value="Asia/Manila">Asia/Manila (GMT+8)</option>
+                        <option value="Asia/Jakarta">Asia/Jakarta (GMT+7)</option>
+                        <option value="Asia/Ho_Chi_Minh">Asia/Ho_Chi_Minh (GMT+7)</option>
+                        <option value="Asia/Bangkok">Asia/Bangkok (GMT+7)</option>
+                        <option value="Asia/Kolkata">Asia/Kolkata (GMT+5:30)</option>
+                      </select>
                     <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#1f2937', fontSize: '12px' }}>▼</span>
                   </div>
                 </div>
                 <div className="session-list-row">
                   <div className="session-info-meta"><h4>Date Format</h4></div>
                   <div style={{ position: 'relative' }}>
-                    <select value={systemPrefs.dateFormat} onChange={e => setSystemPrefs({ ...systemPrefs, dateFormat: e.target.value })}
-                      style={{ background: '#fff', border: '1px solid #d0d5dd', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '14px', cursor: 'pointer', appearance: 'none', color: '#1f2937', minWidth: '120px' }}>
-                      <option>MM/DD/YY</option>
-                    </select>
+                      <select value={systemPrefs.dateFormat} onChange={e => setSystemPrefs({ ...systemPrefs, dateFormat: e.target.value })}
+                        style={{ background: '#fff', border: '1px solid #d0d5dd', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '14px', cursor: 'pointer', appearance: 'none', color: '#1f2937', minWidth: '120px' }}>
+                        <option>MM/DD/YY</option>
+                        <option>DD/MM/YY</option>
+                        <option>YYYY-MM-DD</option>
+                      </select>
                     <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#1f2937', fontSize: '12px' }}>▼</span>
                   </div>
                 </div>
@@ -1005,7 +1162,7 @@ export default function CHOSettings({
                 <div className="session-list-row">
                   <div className="session-info-meta"><h4>Confirm Before Delete</h4><p>Show confirmation dialog before deleting items</p></div>
                   <label className="figma-toggle-switch">
-                    <input type="checkbox" checked={systemPrefs.confirmDelete} onChange={e => setSystemPrefs({ ...systemPrefs, confirmDelete: e.target.checked })} />
+                    <input type="checkbox" checked={systemPrefs.confirmDelete} onChange={e => { const val = e.target.checked; setSystemPrefs(prev => ({ ...prev, confirmDelete: val })); if (onConfirmDeleteChange) onConfirmDeleteChange(val); }} />
                     <span className="figma-slider" />
                   </label>
                 </div>
@@ -1020,7 +1177,7 @@ export default function CHOSettings({
             </div>
 
             <div className="notifications-action-container">
-              <button className="notifications-save-btn" onClick={() => setCurrentView('menu')}>Save Preferences</button>
+              <button className="notifications-save-btn" onClick={() => setCurrentView('menu')}>{t('Save Preferences')}</button>
             </div>
           </div>
         )}
@@ -1047,16 +1204,21 @@ export default function CHOSettings({
               <div style={{ padding: '0 16px 20px 16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: '#4b5563', fontWeight: '500' }}>
                   <span>Storage Used</span>
-                  <span style={{ color: '#111827', fontWeight: '600' }}>2.4 GB of 10 GB</span>
+                  <span style={{ color: '#111827', fontWeight: '600' }}>{storageLoading ? 'Loading...' : storageStats ? `${storageStats.totalMB} MB of 10 GB` : '— of 10 GB'}</span>
                 </div>
                 <div style={{ width: '100%', height: '12px', background: '#e5e7eb', borderRadius: '6px', overflow: 'hidden', marginBottom: '24px' }}>
-                  <div style={{ width: '24%', height: '100%', background: '#111827', borderRadius: '6px' }} />
+                  <div style={{ width: `${storageStats ? storageStats.usedPercent : 0}%`, height: '100%', background: '#111827', borderRadius: '6px' }} />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
-                  {[['1.2 GB', 'Case Data'], ['0.8 GB', 'Reports'], ['0.4 GB', 'Other']].map(([val, lbl]) => (
-                    <div key={lbl} style={{ background: '#f9fafb', border: '1px solid #f3f4f6', borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
-                      <div style={{ fontSize: '20px', fontWeight: '600', color: '#111827', marginBottom: '4px' }}>{val}</div>
-                      <div style={{ fontSize: '13px', color: '#6b7280' }}>{lbl}</div>
+                  {[
+                    { val: storageStats ? `${storageStats.caseDataMB} MB` : '—', lbl: 'Case Data', sub: `${storageStats ? storageStats.cases : '—'} records` },
+                    { val: storageStats ? `${storageStats.userDataMB} MB` : '—', lbl: 'Reports', sub: `${storageStats ? storageStats.users : '—'} accounts` },
+                    { val: storageStats ? `${storageStats.otherMB} MB` : '—', lbl: 'Other', sub: `${storageStats ? storageStats.notifications : '—'} notifications` },
+                  ].map(item => (
+                    <div key={item.lbl} style={{ background: '#f9fafb', border: '1px solid #f3f4f6', borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '20px', fontWeight: '600', color: '#111827', marginBottom: '4px' }}>{item.val}</div>
+                      <div style={{ fontSize: '13px', color: '#6b7280' }}>{item.lbl}</div>
+                      <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>{item.sub}</div>
                     </div>
                   ))}
                 </div>
@@ -1093,7 +1255,52 @@ export default function CHOSettings({
                         <p>{row.sub}</p>
                       </div>
                     </div>
-                    <button style={{ padding: '8px 18px', background: '#fff', border: '1px solid #d0d5dd', borderRadius: '8px', fontSize: '13px', fontWeight: '600', color: '#344054', cursor: 'pointer' }}>
+                    <button onClick={() => {
+                      if (row.label === 'Export as PDF') {
+                        axios.get('http://localhost:5000/api/export-all')
+                          .then(res => {
+                            const data = res.data;
+                            const rows = data.map(c =>
+                              `<tr><td>${c.case_id}</td><td>${c.patient_name||''}</td><td>${c.age||''}</td><td>${c.barangay_name||''}</td><td>${c.disease_name||''}</td><td>${c.severity||''}</td><td>${c.status||''}</td><td>${c.date_reported||''}</td></tr>`
+                            ).join('');
+                            const html = `<html><head><title>CDMS Export</title><style>body{font-family:Arial,sans-serif;padding:24px;}h2{color:#1e3a8a;}table{width:100%;border-collapse:collapse;margin-top:16px;}th{background:#1e3a8a;color:white;padding:8px;text-align:left;}td{padding:7px 8px;border-bottom:1px solid #e5e7eb;font-size:12px;}tr:nth-child(even) td{background:#f9fafb;}</style></head><body><h2>Cabuyao CDMS — Full Data Export</h2><p>Generated: ${new Date().toLocaleString()} | Total Records: ${data.length}</p><table><thead><tr><th>ID</th><th>Patient</th><th>Age</th><th>Barangay</th><th>Disease</th><th>Severity</th><th>Status</th><th>Date</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
+                            const blob = new Blob([html], { type: 'application/pdf' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `CDMS_Export_${new Date().toISOString().split('T')[0]}.pdf`;
+                            a.click();
+                          })
+                          .catch(() => alert('Export failed. Please try again.'));
+                      } else if (row.label === 'Export as Excel') {
+                        axios.get('http://localhost:5000/api/export-all')
+                          .then(res => {
+                            const data = res.data;
+                            const headers = 'Case ID\tPatient Name\tAge\tGender\tBarangay\tDisease\tSeverity\tStatus\tDate Reported\n';
+                            const rows = data.map(c =>
+                              `${c.case_id}\t${c.patient_name||''}\t${c.age||''}\t${c.gender||''}\t${c.barangay_name||''}\t${c.disease_name||''}\t${c.severity||''}\t${c.status||''}\t${c.date_reported||''}`
+                            ).join('\n');
+                            const blob = new Blob([headers + rows], { type: 'application/vnd.ms-excel' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `CDMS_Export_${new Date().toISOString().split('T')[0]}.xls`;
+                            a.click();
+                          })
+                          .catch(() => alert('Export failed. Please try again.'));
+                      } else if (row.label === 'Export as CSV') {
+                        fetch('http://localhost:5000/api/export-all?format=csv')
+                          .then(res => res.blob())
+                          .then(blob => {
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `CDMS_Export_${new Date().toISOString().split('T')[0]}.csv`;
+                            a.click();
+                          })
+                          .catch(() => alert('Export failed. Please try again.'));
+                      }
+                    }} style={{ padding: '8px 18px', background: '#fff', border: '1px solid #d0d5dd', borderRadius: '8px', fontSize: '13px', fontWeight: '600', color: '#344054', cursor: 'pointer' }}>
                       Export
                     </button>
                   </div>
@@ -1119,18 +1326,19 @@ export default function CHOSettings({
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderTop: '1px solid #f2f4f7' }}>
                     <div style={{ textAlign: 'left' }}>
                       <div style={{ fontSize: '14px', fontWeight: '600', color: '#1d2939' }}>Last Backup</div>
-                      <div style={{ fontSize: '13px', color: '#667085' }}>March 15, 2026 at 2:30 AM</div>
+                      <div style={{ fontSize: '13px', color: '#667085' }}>{lastBackupDate ? new Date(lastBackupDate).toLocaleString('en-PH', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'No backup yet'}</div>
                     </div>
-                    <span style={{ fontSize: '13px', fontWeight: '600', padding: '4px 12px', borderRadius: '16px', background: '#ecfdf3', color: '#027a48' }}>
-                      Successful
-                    </span>
+                    {lastBackupDate
+                      ? <span style={{ fontSize: '13px', fontWeight: '600', padding: '4px 12px', borderRadius: '16px', background: '#ecfdf3', color: '#027a48' }}>Successful</span>
+                      : <span style={{ fontSize: '13px', color: '#94a3b8' }}>Never</span>
+                    }
                   </div>
 
                   <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
-                    <button style={{ flex: 1, padding: '12px', background: '#003cb4', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
-                      Create Backup
+                    <button onClick={() => handleCreateBackup(false)} disabled={backupLoading} style={{ flex: 1, padding: '12px', background: '#003cb4', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: backupLoading ? 'not-allowed' : 'pointer', opacity: backupLoading ? 0.7 : 1 }}>
+                      {backupLoading ? 'Creating Backup...' : 'Create Backup'}
                     </button>
-                    <button style={{ flex: 1, padding: '12px', background: '#fff', color: '#344054', border: '1px solid #d0d5dd', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+                    <button onClick={() => alert('To restore: go to Settings → Data Management → select your backup .json file. Full restore coming soon.')} style={{ flex: 1, padding: '12px', background: '#fff', color: '#344054', border: '1px solid #d0d5dd', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
                       Restore
                     </button>
                   </div>
@@ -1140,7 +1348,10 @@ export default function CHOSettings({
                       <div style={{ fontSize: '14px', fontWeight: '600', color: '#1d2939' }}>Auto-Backup</div>
                       <div style={{ fontSize: '13px', color: '#667085' }}>Automatically backup data weekly</div>
                     </div>
-                    <span style={{ fontSize: '13px', fontWeight: '600', color: '#16a34a' }}>Enabled</span>
+                    <label className="figma-toggle-switch">
+                      <input type="checkbox" checked={autoBackupEnabled} onChange={e => { setAutoBackupEnabled(e.target.checked); localStorage.setItem('cdms_auto_backup', String(e.target.checked)); }} />
+                      <span className="figma-slider" />
+                    </label>
                   </div>
                 </div>
               </div>
@@ -1163,14 +1374,107 @@ export default function CHOSettings({
                     <div style={{ fontSize: '14px', fontWeight: '700', color: '#b91c1c', marginBottom: '4px' }}>Clear All Data</div>
                     <div style={{ fontSize: '13px', color: '#991b1b' }}>This will permanently delete all your data. This action cannot be undone.</div>
                   </div>
-                  <button style={{ padding: '10px 20px', background: '#fff', border: '1px solid #fca5a5', borderRadius: '8px', fontSize: '13px', fontWeight: '600', color: '#dc2626', cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                  <button onClick={() => setShowClearModal(true)} style={{ padding: '10px 20px', background: '#fff', border: '1px solid #fca5a5', borderRadius: '8px', fontSize: '13px', fontWeight: '600', color: '#dc2626', cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                     🗑️ Clear Data
                   </button>
                 </div>
               </div>
-            </div>
-          )}Ca
-      </div>
+              </div>
+            )}
+
+            {showClearModal && (
+              <div style={{
+                position:'fixed', inset:0,
+                background:'rgba(0,0,0,0.6)',
+                display:'flex', alignItems:'center',
+                justifyContent:'center', zIndex:9999
+              }}>
+                <div style={{
+                  background:'#fff', borderRadius:'16px',
+                  padding:'40px 32px', width:'440px',
+                  maxWidth:'95vw', textAlign:'center',
+                  boxShadow:'0 24px 60px rgba(0,0,0,0.3)'
+                }}>
+                  <div style={{
+                    width:'64px', height:'64px', borderRadius:'50%',
+                    background:'#fee2e2', display:'flex',
+                    alignItems:'center', justifyContent:'center',
+                    margin:'0 auto 20px auto', fontSize:'28px'
+                  }}>⚠️</div>
+
+                  <h3 style={{margin:'0 0 8px 0', fontSize:'22px',
+                    fontWeight:'700', color:'#111827'}}>
+                    Clear Your Personal Data?
+                  </h3>
+
+                  <p style={{margin:'0 0 16px 0', color:'#6b7280',
+                    fontSize:'14px', lineHeight:'1.6'}}>
+                    This will permanently clear YOUR personal data
+                    (notifications and activity history) from this account.
+                  </p>
+
+                  <div style={{
+                    background:'#fef3c7', border:'1px solid #fbbf24',
+                    borderRadius:'8px', padding:'12px 16px',
+                    marginBottom:'20px', textAlign:'left'
+                  }}>
+                    <p style={{margin:0, fontSize:'13px', color:'#92400e',
+                      fontWeight:'500'}}>
+                      ✅ Other CHO admins and BHW data will NOT be affected<br/>
+                      ✅ Case records remain in the system<br/>
+                      ❌ Your notification history will be permanently deleted
+                    </p>
+                  </div>
+
+                  {clearSuccess && (
+                    <div style={{
+                      background:'#d1fae5', color:'#065f46',
+                      padding:'10px', borderRadius:'8px',
+                      marginBottom:'16px', fontSize:'13px',
+                      fontWeight:'500'
+                    }}>
+                      ✅ {clearSuccess}
+                    </div>
+                  )}
+
+                  <div style={{
+                    display:'flex', gap:'12px',
+                    borderTop:'1px solid #e5e7eb',
+                    paddingTop:'20px', marginTop:'8px'
+                  }}>
+                    <button
+                      onClick={() => setShowClearModal(false)}
+                      disabled={clearLoading}
+                      style={{
+                        flex:1, padding:'14px', background:'transparent',
+                        border:'1px solid #d1d5db', borderRadius:'8px',
+                        cursor:'pointer', fontSize:'15px',
+                        fontWeight:'500', color:'#374151'
+                      }}>
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleClearMyData}
+                      disabled={clearCountdown > 0 || clearLoading}
+                      style={{
+                        flex:1, padding:'14px',
+                        background: clearCountdown > 0 ? '#9ca3af' : '#ef4444',
+                        border:'none', borderRadius:'8px',
+                        cursor: clearCountdown > 0 ? 'not-allowed' : 'pointer',
+                        fontSize:'15px', fontWeight:'600', color:'#fff',
+                        transition:'background 0.3s'
+                      }}>
+                      {clearLoading
+                        ? 'Clearing...'
+                        : clearCountdown > 0
+                          ? `Wait ${clearCountdown}s...`
+                          : 'Yes, Clear My Data'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
     </div>
   );
 }

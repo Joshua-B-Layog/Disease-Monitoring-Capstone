@@ -11,6 +11,22 @@ import MapView from './MapView';
 
 import './App.css';
 
+const getSavedFontScale = () => {
+  const saved = localStorage.getItem('cdms_font_size');
+  return saved || '1';
+};
+const getSavedCompact = () => {
+  return localStorage.getItem('cdms_compact_mode') === 'true';
+};
+
+const translations = {
+  en: { 'Dashboard':'Dashboard','Manage Cases':'Manage Cases','Audit Reports':'Audit Reports','Map View':'Map View','User Accounts':'User Accounts','Settings':'Settings','Logout':'Logout','CHO Profile':'CHO Profile','Specialist':'Specialist','Profile Settings':'Profile Settings','Account Security':'Account Security','Notifications':'Notifications','System Preferences':'System Preferences','Data Management':'Data Management','Save Preferences':'Save Preferences','Save Changes':'Save Changes','Cancel':'Cancel','Edit Profile':'Edit Profile' },
+  fil: { 'Dashboard':'Dashboard','Manage Cases':'Pamahalaan ang mga Kaso','Audit Reports':'Mga Ulat ng Pag-audit','Map View':'Pananaw ng Mapa','User Accounts':'Mga Account ng User','Settings':'Mga Setting','Logout':'Mag-logout','CHO Profile':'Profile ng CHO','Specialist':'Specialista','Profile Settings':'Mga Setting ng Profile','Account Security':'Seguridad ng Account','Notifications':'Mga Abiso','System Preferences':'Mga Kagustuhan ng System','Data Management':'Pamamahala ng Data','Save Preferences':'I-save ang Mga Kagustuhan','Save Changes':'I-save ang Mga Pagbabago','Cancel':'Kanselahin','Edit Profile':'I-edit ang Profile' },
+  id: { 'Dashboard':'Dasbor','Manage Cases':'Kelola Kasus','Audit Reports':'Laporan Audit','Map View':'Tampilan Peta','User Accounts':'Akun Pengguna','Settings':'Pengaturan','Logout':'Keluar','CHO Profile':'Profil CHO','Specialist':'Spesialis','Profile Settings':'Pengaturan Profil','Account Security':'Keamanan Akun','Notifications':'Notifikasi','System Preferences':'Preferensi Sistem','Data Management':'Manajemen Data','Save Preferences':'Simpan Preferensi','Save Changes':'Simpan Perubahan','Cancel':'Batal','Edit Profile':'Edit Profil' },
+  vi: { 'Dashboard':'Bảng điều khiển','Manage Cases':'Quản lý ca bệnh','Audit Reports':'Báo cáo kiểm toán','Map View':'Xem bản đồ','User Accounts':'Tài khoản người dùng','Settings':'Cài đặt','Logout':'Đăng xuất','CHO Profile':'Hồ sơ CHO','Specialist':'Chuyên viên','Profile Settings':'Cài đặt hồ sơ','Account Security':'Bảo mật tài khoản','Notifications':'Thông báo','System Preferences':'Tùy chọn hệ thống','Data Management':'Quản lý dữ liệu','Save Preferences':'Lưu tùy chọn','Save Changes':'Lưu thay đổi','Cancel':'Hủy','Edit Profile':'Chỉnh sửa hồ sơ' },
+  th: { 'Dashboard':'แดชบอร์ด','Manage Cases':'จัดการเคส','Audit Reports':'รายงานการตรวจสอบ','Map View':'มุมมองแผนที่','User Accounts':'บัญชีผู้ใช้','Settings':'การตั้งค่า','Logout':'ออกจากระบบ','CHO Profile':'โปรไฟล์ CHO','Specialist':'ผู้เชี่ยวชาญ','Profile Settings':'การตั้งค่าโปรไฟล์','Account Security':'ความปลอดภัยของบัญชี','Notifications':'การแจ้งเตือน','System Preferences':'การตั้งค่าระบบ','Data Management':'การจัดการข้อมูล','Save Preferences':'บันทึกการตั้งค่า','Save Changes':'บันทึกการเปลี่ยนแปลง','Cancel':'ยกเลิก','Edit Profile':'แก้ไขโปรไฟล์' },
+};
+
 function App() {
   const [isLoggedIn, setIsLoggedIn]       = useState(false);
   const [loginRole, setLoginRole]         = useState('CHO');
@@ -25,6 +41,18 @@ function App() {
   const [selectedDisease, setSelectedDisease] = useState('Dengue');
   const [dateRange, setDateRange]         = useState({ start: '2026-01-01', end: '2026-05-28' });
   const [caseFilter, setCaseFilter]       = useState({ disease: '', barangay: '' });
+
+  const [language, setLanguage]           = useState('en');
+  const [timeZone, setTimeZone]           = useState('Asia/Manila');
+  const [dateFormat, setDateFormat]       = useState(() => localStorage.getItem('cdms_date_format') || 'MM/DD/YY');
+  const [autoSave, setAutoSave]           = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(() => localStorage.getItem('cdms_confirm_delete') !== 'false');
+  const [keyboardShortcuts, setKeyboardShortcuts] = useState(false);
+  const [fontScale, setFontScale] = useState(getSavedFontScale);
+  const [compactMode, setCompactMode] = useState(getSavedCompact);
+
+  useEffect(() => { localStorage.setItem('cdms_date_format', dateFormat); }, [dateFormat]);
+  useEffect(() => { localStorage.setItem('cdms_confirm_delete', String(confirmDelete)); }, [confirmDelete]);
 
   const [authView, setAuthView]           = useState('login'); 
 
@@ -45,13 +73,49 @@ function App() {
   }, [theme]);
   const toggleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark');
 
+  // ── Apply font-scale globally ──
+  useEffect(() => {
+    document.documentElement.style.setProperty('--app-font-scale', fontScale);
+  }, [fontScale]);
+
+  // ── Apply compact-mode data attribute globally ──
+  useEffect(() => {
+    document.documentElement.setAttribute('data-compact', compactMode ? 'true' : 'false');
+  }, [compactMode]);
+
+  // ── One-time mount: ensure saved values are applied on load ──
+  useEffect(() => {
+    const scale = localStorage.getItem('cdms_font_size') || '1';
+    const compact = localStorage.getItem('cdms_compact_mode') === 'true';
+    document.documentElement.style.setProperty('--app-font-scale', scale);
+    document.documentElement.setAttribute('data-compact', compact ? 'true' : 'false');
+  }, []);
+
   // ── Load saved profile photo from localStorage on mount ──
   useEffect(() => {
     const saved = localStorage.getItem('cdms_profile_photo');
     if (saved) setProfilePhoto(saved);
   }, []);
 
-  // ── Notification polling every 10 seconds ──
+  // ── Load saved prefs from localStorage ──
+  useEffect(() => {
+    const lang = localStorage.getItem('cdms_language');
+    let tz = localStorage.getItem('cdms_timeZone');
+    const df = localStorage.getItem('cdms_dateFormat');
+    const as = localStorage.getItem('cdms_autoSave');
+    const cd = localStorage.getItem('cdms_confirm_delete');
+    const ks = localStorage.getItem('cdms_keyboardShortcuts');
+    if (lang) setLanguage(lang);
+    if (tz) {
+      tz = tz.split(' (')[0];
+      setTimeZone(tz);
+    }
+    if (df) setDateFormat(df);
+    if (as !== null) setAutoSave(as === 'true');
+    if (cd !== null) setConfirmDelete(cd === 'true');
+    if (ks !== null) setKeyboardShortcuts(ks === 'true');
+  }, []);
+
 useEffect(() => {
   if (!loggedUserId) return;
 
@@ -77,6 +141,13 @@ useEffect(() => {
   document.addEventListener('mousedown', handler);
   return () => document.removeEventListener('mousedown', handler);
 }, []);
+
+  // ── Live clock for top-nav ──
+  const [clock, setClock] = useState(new Date());
+  useEffect(() => {
+    const interval = setInterval(() => setClock(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleProfilePhotoChange = (dataUrl) => {
     setProfilePhoto(dataUrl);
@@ -141,16 +212,19 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             dateRange={dateRange}
             setActiveTab={setActiveTab}
             loggedUser={loggedUser}
+            dateFormat={dateFormat}
+            fontScale={fontScale}
+            compactMode={compactMode}
           />
         );
       case 'Manage Cases':
-        return <ManageCases caseFilter={caseFilter} setCaseFilter={setCaseFilter} />;
+        return <ManageCases caseFilter={caseFilter} setCaseFilter={setCaseFilter} dateFormat={dateFormat} autoSave={autoSave} confirmDelete={confirmDelete} keyboardShortcuts={keyboardShortcuts} fontScale={fontScale} compactMode={compactMode} />;
       case 'Map View':
-        return <MapView setActiveTab={setActiveTab} setCaseFilter={setCaseFilter} />;
+        return <MapView setActiveTab={setActiveTab} setCaseFilter={setCaseFilter} fontScale={fontScale} compactMode={compactMode} />;
       case 'User Accounts': 
-        return <UserManagement />;
+        return <UserManagement dateFormat={dateFormat} confirmDelete={confirmDelete} fontScale={fontScale} compactMode={compactMode} />;
       case 'Audit Reports':
-        return <BarangayReports activeUser={{ role: loginRole, context: sessionContext }} />;
+        return <BarangayReports dateFormat={dateFormat} activeUser={{ role: loginRole, context: sessionContext }} fontScale={fontScale} compactMode={compactMode} />;
       case 'Settings':
         return (
           <ChoSettings
@@ -162,6 +236,26 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             onProfilePhotoChange={handleProfilePhotoChange}
             theme={theme}
             toggleTheme={toggleTheme}
+            onLanguageChange={handleLanguageChange}
+            onTimeZoneChange={handleTimeZoneChange}
+            onDateFormatChange={handleDateFormatChange}
+            onAutoSaveChange={handleAutoSaveChange}
+            onConfirmDeleteChange={handleConfirmDeleteChange}
+            onKeyboardShortcutsChange={handleKeyboardShortcutsChange}
+            onFontSizeChange={(scale) => {
+              setFontScale(scale);
+              localStorage.setItem('cdms_font_size', scale);
+            }}
+            onCompactChange={(value) => {
+              setCompactMode(value);
+              localStorage.setItem('cdms_compact_mode', String(value));
+            }}
+            savedFontScale={fontScale}
+            savedCompactMode={compactMode}
+            savedDateFormat={dateFormat}
+            savedConfirmDelete={confirmDelete}
+            fontScale={fontScale}
+            compactMode={compactMode}
           />
         );
       default:
@@ -184,6 +278,15 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
     setLoggedUserId(null);
     window.location.reload();
   };
+
+  const handleLanguageChange = (langCode) => { setLanguage(langCode); localStorage.setItem('cdms_language', langCode); };
+  const handleTimeZoneChange = (tzVal) => { setTimeZone(tzVal); localStorage.setItem('cdms_timeZone', tzVal); };
+  const handleDateFormatChange = (df) => { setDateFormat(df); localStorage.setItem('cdms_date_format', df); };
+  const handleAutoSaveChange = (val) => { setAutoSave(val); localStorage.setItem('cdms_autoSave', String(val)); };
+  const handleConfirmDeleteChange = (val) => { setConfirmDelete(val); localStorage.setItem('cdms_confirm_delete', String(val)); };
+  const handleKeyboardShortcutsChange = (val) => { setKeyboardShortcuts(val); localStorage.setItem('cdms_keyboardShortcuts', String(val)); };
+
+  const t = (key) => translations[language]?.[key] || key;
 
   if (!isLoggedIn) {
     if (authView === 'recover') {
@@ -215,9 +318,9 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
 
   return (
     <div className="dashboard-layout">
-      <Sidebar role={loginRole} activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Sidebar role={loginRole} activeTab={activeTab} setActiveTab={setActiveTab} language={language} />
 
-      <div className="main-content">
+      <div className="main-content" style={{ fontSize: `calc(14px * ${fontScale})` }}>
         <div className="top-nav">
           <div className="nav-title" style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             <h2 style={{ margin: 0 }}>{activeTab}</h2>
@@ -380,10 +483,21 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
               )}
             </div>
 
+            {/* ── LIVE CLOCK ── */}
+            <div style={{
+              fontSize: '13px', fontWeight: '500', color: 'var(--text-muted)',
+              fontFamily: 'ui-monospace, Consolas, monospace', letterSpacing: '0.03em', whiteSpace: 'nowrap',
+            }}>
+              {clock.toLocaleTimeString('en', {
+                timeZone: timeZone.split(' (')[0],
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+              })}
+            </div>
+
             <div className="user-profile" onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
               <div className="user-info">
                 <div className="user-name">{loggedUser || 'System Officer'}</div>
-                <div className="user-role">{loginRole} Specialist</div>
+                <div className="user-role">{loginRole} {t('Specialist')}</div>
               </div>
 
               <div className="avatar" style={{
@@ -414,14 +528,14 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                     className="dropdown-item"
                     onClick={openProfileModal}
                   >
-                    CHO Profile
+                    {t('CHO Profile')}
                   </div>
                   <div
                     className="dropdown-item"
                     style={{ color: '#ef4444' }}
                     onClick={handleLogout}
                   >
-                    Logout
+                    {t('Logout')}
                   </div>
                 </div>
               )}
@@ -513,7 +627,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                     cursor: 'pointer',
                   }}
                 >
-                  ✏️ Edit Profile
+                    ✏️ {t('Edit Profile')}
                 </button>
                 <button
                   onClick={() => setShowProfileModal(false)}
