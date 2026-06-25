@@ -208,7 +208,7 @@ html, body, #root {
   display: flex; 
   flex-direction: column; 
   background-color: var(--bg-main);
-  overflow: hidden; /* Lets the inner scroller handle scrolling */
+  overflow: hidden;
 }
 
 .top-nav { 
@@ -228,6 +228,39 @@ html, body, #root {
   flex: 1;
   overflow-y: auto;
   padding-bottom: 30px;
+}
+
+/* ── COMPACT MODE ── */
+[data-compact="true"] .sidebar {
+  width: 220px;
+}
+[data-compact="true"] .sidebar-logo {
+  padding: 20px 16px;
+}
+[data-compact="true"] .sidebar-logo h3 {
+  font-size: 14px;
+}
+[data-compact="true"] .menu-item {
+  padding: 8px 16px;
+  font-size: 13px;
+}
+[data-compact="true"] .top-nav {
+  height: 56px;
+  padding: 0 20px;
+}
+[data-compact="true"] .nav-title h2 {
+  font-size: 16px;
+}
+[data-compact="true"] .user-name {
+  font-size: 12px;
+}
+[data-compact="true"] .user-role {
+  font-size: 11px;
+}
+[data-compact="true"] .avatar {
+  width: 30px;
+  height: 30px;
+  font-size: 10px;
 }
 
 /* =========================================================

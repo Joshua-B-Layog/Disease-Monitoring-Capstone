@@ -17,12 +17,7 @@
     const [rememberMe, setRememberMe] = useState(false);
 
     // Forgot Password States
-    const [recoveryMethod, setRecoveryMethod] = useState('email'); // 'email' or 'mobile'
-    const [recoverySubStep, setRecoverySubStep] = useState('request'); // 'request', 'otp_verify', 'new_password'
-    const [recoveryIdentity, setRecoveryIdentity] = useState(''); // Holds email OR mobile string
-    const [recoveryOtp, setRecoveryOtp] = useState('');
-    const [recoveryNewPassword, setRecoveryNewPassword] = useState('');
-    const [recoveryConfirmPassword, setRecoveryConfirmPassword] = useState('');
+    const [recoveryIdentity, setRecoveryIdentity] = useState('');
     const [recoverySuccess, setRecoverySuccess] = useState('');
 
     // Sign-Up Form States
@@ -278,89 +273,35 @@ const handleLoginOtpSubmit = async (e) => {
     }
   };
 
-    // --- PASSWORD RECOVERY SUBMISSION ---
-   // --- INTEGRATED ACCOUNT RECOVERY ENGINE ---
     const handleRecoverySubmit = async (e) => {
       e.preventDefault();
       setRecoverySuccess('');
-      setLoginError('');  // Reusing loginError container for UI cleanup
+      setLoginError('');
       
-      // PHASE 1: Initial Link Dispatch or OTP Request
-      if (recoverySubStep === 'request') {
-        try {
-          const response = await fetch('http://localhost:5000/api/forgot-password', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ identity: recoveryIdentity, method: recoveryMethod })
-          });
-
-          if (response.ok) {
-            if (recoveryMethod === 'email') {
-              setRecoverySuccess('Surveillance authorization link dispatched to your email coordinates.');
-            } else {
-              setRecoverySubStep('otp_verify');
-              setRecoverySuccess('Secure OTP token dispatched to your mobile device.');
-            }
-          } else {
-            setLoginError('Account coordinate lookup failed. Verify your input parameters.');
-          }
-        } catch (error) {
-          setLoginError('Registry gateway timing issue. Confirm your backend state.');
-        }
-      } 
-      // PHASE 2: Verify OTP Code (Mobile Only Flow)
-      else if (recoverySubStep === 'otp_verify') {
-          try {
-              const response = await fetch('http://localhost:5000/api/verify-otp', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ identity: recoveryIdentity, otp: recoveryOtp })
-              });
-
-              if (response.ok) {
-                  // ← CHANGED: redirect to the same ResetPasswordLanding page
-                  // Pass identity so the reset page knows which account to update
-                  window.location.href = `/reset-password?identity=${encodeURIComponent(recoveryIdentity)}&method=mobile`;
-              } else {
-                  setLoginError('Invalid or expired verification code.');
-              }
-          } catch (error) {
-              setLoginError('Validation service verification timeout.');
-          }
+      if (!recoveryIdentity.trim()) {
+        setLoginError('Please enter your email or username.');
+        return;
       }
-      // PHASE 3: Overwrite and Save Password (Mobile Only Flow)
-      else if (recoverySubStep === 'new_password') {
-        if (recoveryNewPassword !== recoveryConfirmPassword) {
-          setLoginError('Security passphrases mismatch.');
-          return;
-        }
 
-        try {
-          const response = await fetch('http://localhost:5000/api/reset-password-mobile', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ identity: recoveryIdentity, newPassword: recoveryNewPassword })
-          });
+      try {
+        const response = await fetch('http://localhost:5000/api/forgot-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identity: recoveryIdentity })
+        });
 
-          if (response.ok) {
-            setRecoverySuccess('Database updated! Credentials securely modified.');
-            setTimeout(() => {
-              // Reset state tracking variables and navigate back to sign-in panel
-              setRecoverySubStep('request');
-              setRecoveryIdentity('');
-              setStep('auth');
-            }, 2500);
-          } else {
-            setLoginError('System rejected password update rules.');
-          }
-        } catch (error) {
-          setLoginError('Database write operational execution error.');
+        if (response.ok) {
+          setRecoverySuccess('A password reset link has been sent to your registered email.');
+        } else {
+          const data = await response.json();
+          setLoginError(data.error || 'Account lookup failed.');
         }
+      } catch (error) {
+        setLoginError('Connection error. Check your backend server.');
       }
     };
 
     const handleBackNavigation = () => {
-      setRecoverySubStep('request');
       setRecoveryIdentity('');
       setLoginError('');
       setSignupError('');
@@ -625,30 +566,14 @@ const handleLoginOtpSubmit = async (e) => {
 
 
 
-            {/* FORGOT PASSWORD SECTION */}
+            {/* FORGOT PASSWORD SECTION — Email Only */}
             {step === 'forgot_password' && (
               <>
                 <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
                   <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#10B981', cursor: 'pointer', fontSize: '14px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back to Login</button>
                   <h2 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '8px' }}>Recover Account</h2>
-                  <p style={{ color: 'var(--text-muted)' }}>
-                    {recoverySubStep === 'request' && (recoveryMethod === 'email' ? "Enter your registered email to receive recovery instructions." : "Enter your mobile number to receive an OTP code.")}
-                    {recoverySubStep === 'otp_verify' && "Enter the verification code sent to your mobile device."}
-                    {recoverySubStep === 'new_password' && "Setup your new secure access credentials below."}
-                  </p>
+                  <p style={{ color: 'var(--text-muted)' }}>Enter your email or username to receive a password reset link.</p>
                 </div>
-
-                {/* METHOD TOGGLE TABS (Only visible during initial request step) */}
-                {recoverySubStep === 'request' && (
-                  <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-                    <button type="button" onClick={() => { setRecoveryMethod('email'); setLoginError(''); setRecoverySuccess(''), setRecoveryIdentity('');; }} style={{ flex: 1, padding: '10px', background: recoveryMethod === 'email' ? '#10B981' : 'var(--input-bg)', color: recoveryMethod === 'email' ? '#FFFFFF' : 'var(--text-muted)', border: recoveryMethod === 'email' ? 'none' : '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
-                      📧 Email
-                    </button>
-                    <button type="button" onClick={() => { setRecoveryMethod('mobile'); setLoginError(''); setRecoverySuccess(''), setRecoveryIdentity(''); }} style={{ flex: 1, padding: '10px', background: recoveryMethod === 'mobile' ? '#10B981' : 'var(--input-bg)', color: recoveryMethod === 'mobile' ? '#FFFFFF' : 'var(--text-muted)', border: recoveryMethod === 'mobile' ? 'none' : '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
-                      📱 Mobile OTP
-                    </button>
-                  </div>
-                )}
 
                 <form onSubmit={handleRecoverySubmit}>
                   {loginError && (
@@ -662,76 +587,22 @@ const handleLoginOtpSubmit = async (e) => {
                     </div>
                   )}
 
-                  {/* SUBSTEP A: INITIAL IDENTITY FIELD REQUEST */}
-                  {recoverySubStep === 'request' && (
-                      <div className="form-group" style={{ textAlign: 'left' }}>
-                          <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontSize: '14px', fontWeight: '500' }}>
-                              {recoveryMethod === 'email' 
-                                  ? 'Username or registered email address' 
-                                  : 'Registered Mobile Number'}
-                          </label>
-                          <input 
-                              type="text"
-                              className="form-input" 
-                              placeholder={recoveryMethod === 'email' 
-                                  ? 'e.g. cho_niugan or idkwutishappen@gmail.com' 
-                                  : '09123456789'} 
-                              value={recoveryIdentity}
-                              onChange={(e) => setRecoveryIdentity(e.target.value)}
-                              required 
-                          />
-                      </div>
-                  )}
-
-                  {/* SUBSTEP B: OTP TOKEN VERIFICATION */}
-                  {recoverySubStep === 'otp_verify' && (
-                    <div className="form-group" style={{ textAlign: 'left' }}>
-                      <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontSize: '14px', fontWeight: '500' }}>One-Time Password Token (OTP)</label>
-                      <input 
-                        type="text"
-                        className="form-input" 
-                        placeholder="######" 
-                        maxLength="6"
-                        value={recoveryOtp}
-                        onChange={(e) => setRecoveryOtp(e.target.value)}
-                        style={{ letterSpacing: '4px', textAlign: 'center', fontSize: '18px', fontWeight: 'bold' }}
-                        required 
-                      />
-                    </div>
-                  )}
-
-                  {/* SUBSTEP C: INLINE CREDENTIAL CORRECTION */}
-                  {recoverySubStep === 'new_password' && (
-                    <>
-                      <div className="form-group" style={{ textAlign: 'left' }}>
-                        <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '13px', fontWeight: '500' }}>New Security Password</label>
-                        <input 
-                          type="password" 
-                          className="form-input" 
-                          placeholder="••••••••"
-                          value={recoveryNewPassword}
-                          onChange={(e) => setRecoveryNewPassword(e.target.value)}
-                          required 
-                        />
-                      </div>
-                      <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
-                        <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '13px', fontWeight: '500' }}>Confirm Security Password</label>
-                        <input 
-                          type="password" 
-                          className="form-input" 
-                          placeholder="••••••••"
-                          value={recoveryConfirmPassword}
-                          onChange={(e) => setRecoveryConfirmPassword(e.target.value)}
-                          required 
-                        />
-                      </div>
-                    </>
-                  )}
+                  <div className="form-group" style={{ textAlign: 'left' }}>
+                    <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontSize: '14px', fontWeight: '500' }}>
+                      Username or registered email address
+                    </label>
+                    <input 
+                      type="text"
+                      className="form-input" 
+                      placeholder="e.g. cho_niugan or user@email.com" 
+                      value={recoveryIdentity}
+                      onChange={(e) => setRecoveryIdentity(e.target.value)}
+                      required 
+                    />
+                  </div>
 
                   <button type="submit" className="submit-btn" style={{ backgroundColor: '#10B981', color: '#FFFFFF', marginTop: '25px', width: '100%' }}>
-                    {recoverySubStep === 'request' && (recoveryMethod === 'email' ? 'Send Recovery Link' : 'Send Verification OTP')}
-                    {recoverySubStep === 'otp_verify' && 'Verify OTP Credentials'}
-                    {recoverySubStep === 'new_password' && 'Synchronize New Password'}
+                    Send Recovery Link
                   </button>
                 </form>
               </>

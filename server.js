@@ -44,6 +44,23 @@ db.query('CREATE TABLE IF NOT EXISTS notifications (id INT AUTO_INCREMENT PRIMAR
     else console.log('Notifications table created/verified');
 });
 
+db.query(`CREATE TABLE IF NOT EXISTS notification_preferences (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL UNIQUE,
+    push_notifications BOOLEAN DEFAULT FALSE,
+    email_notifications BOOLEAN DEFAULT FALSE,
+    sms_notifications BOOLEAN DEFAULT FALSE,
+    new_case_reported BOOLEAN DEFAULT FALSE,
+    case_status_updated BOOLEAN DEFAULT FALSE,
+    high_risk_alert BOOLEAN DEFAULT FALSE,
+    weekly_summary BOOLEAN DEFAULT FALSE,
+    system_maintenance BOOLEAN DEFAULT FALSE,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+)`, (err) => {
+    if (err) console.error('Error creating notification_preferences table:', err.message);
+    else console.log('Notification preferences table created/verified');
+});
+
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -248,7 +265,7 @@ app.post('/api/cases', (req, res) => {
                         const caseInfo = caseResults[0];
                         const title = 'New Case Reported';
                         const message = `A new case of ${caseInfo.disease_name} (${caseInfo.severity}) has been reported for ${caseInfo.patient_name} in Barangay ${caseInfo.barangay_name || 'N/A'}.`;
-                        createNotificationForUsers(title, message, 'info', 'ManageCases', caseInfo.barangay_id);
+                        createNotificationForUsers(title, message, 'info', 'ManageCases', caseInfo.barangay_id, 'new_case_reported');
                         
                         // Check for high risk
                         checkAndAlertHighRisk(caseInfo.barangay_id, caseInfo.barangay_name);
@@ -324,7 +341,7 @@ app.put('/api/cases/:id', (req, res) => {
                         const caseInfo = caseResults[0];
                         const title = 'Case Status Updated';
                         const message = `The case status for ${caseInfo.patient_name} (${caseInfo.disease_name}) in Barangay ${caseInfo.barangay_name || 'N/A'} has been changed to ${caseInfo.status}.`;
-                        createNotificationForUsers(title, message, 'info', 'ManageCases', caseInfo.barangay_id);
+                        createNotificationForUsers(title, message, 'info', 'ManageCases', caseInfo.barangay_id, 'case_status_updated');
                         
                         // Check for high risk
                         checkAndAlertHighRisk(caseInfo.barangay_id, caseInfo.barangay_name);
@@ -435,7 +452,7 @@ app.delete('/api/cases/:id', (req, res) => {
             
             const title = 'Case Deleted';
             const message = `Case for ${patient_name} (${disease_name}) in Barangay ${barangay_name || 'N/A'} has been deleted.`;
-            createNotificationForUsers(title, message, 'delete', 'ManageCases', barangay_id);
+            createNotificationForUsers(title, message, 'delete', 'ManageCases', barangay_id, 'delete');
 
             console.log(`✅ Case ${id} deleted from database.`);
             return res.status(200).json({ message: 'Case deleted successfully.' });
@@ -584,13 +601,13 @@ app.post('/api/register', (req, res) => {
 // ==========================================
 
 app.post('/api/forgot-password', (req, res) => {
-    const { identity, method } = req.body;
+    const { identity } = req.body;
 
-    if (!identity || !method) {
-        return res.status(400).json({ error: 'Identity and method are required.' });
+    if (!identity) {
+        return res.status(400).json({ error: 'Identity is required.' });
     }
 
-    console.log(`--- Recovery [${method}] for: ${identity} ---`);
+    console.log(`--- Password recovery for: ${identity} ---`);
 
     const findUserQuery = 'SELECT * FROM users WHERE email = ? OR mobile_number = ? OR username = ?';
     
@@ -607,141 +624,61 @@ app.post('/api/forgot-password', (req, res) => {
         const userFound = results[0];
         console.log(`✅ Found user: ${userFound.username} | Email: ${userFound.email}`);
 
-        if (method === 'email') {
-            if (!userFound.email) {
-                return res.status(400).json({ error: 'This account has no email address on file.' });
+        if (!userFound.email) {
+            return res.status(400).json({ error: 'This account has no email address on file.' });
+        }
+
+        const token = crypto.randomBytes(32).toString('hex');
+        const expiryTime = new Date(Date.now() + 3600000);
+
+        const updateTokenQuery = 'UPDATE users SET reset_token = ?, token_expiry = ? WHERE user_id = ?';
+        db.query(updateTokenQuery, [token, expiryTime, userFound.user_id], (updateErr) => {
+            if (updateErr) {
+                return res.status(500).json({ error: 'Failed to save reset token: ' + updateErr.message });
             }
 
-            const token = crypto.randomBytes(32).toString('hex');
-            const expiryTime = new Date(Date.now() + 3600000);
+            const resetLink = `http://localhost:3000/reset-password?token=${token}&email=${encodeURIComponent(userFound.email)}`;
 
-            const updateTokenQuery = 'UPDATE users SET reset_token = ?, token_expiry = ? WHERE user_id = ?';
-            db.query(updateTokenQuery, [token, expiryTime, userFound.user_id], (updateErr) => {
-                if (updateErr) {
-                    return res.status(500).json({ error: 'Failed to save reset token: ' + updateErr.message });
-                }
-
-                const resetLink = `http://localhost:5173/reset-password?token=${token}&email=${encodeURIComponent(userFound.email)}`;
-
-                const mailOptions = {
-                    from: `"Cabuyao Health System" <${process.env.EMAIL_USER}>`,
-                    to: userFound.email,
-                    subject: 'Cabuyao Health — Password Reset Request',
-                    html: `
-                        <div style="max-width:600px;margin:0 auto;font-family:system-ui,sans-serif;background:#16171d;border:1px solid #2e303a;border-radius:8px;overflow:hidden;">
-                            <div style="background:#0d9488;padding:24px;text-align:center;">
-                                <h1 style="color:#fff;margin:0;font-size:28px;">CABUYAO HEALTH</h1>
-                            </div>
-                            <div style="background:#1f2028;padding:40px 32px;">
-                                <p style="color:#f3f4f6;font-size:16px;">We received a request to reset the password for your account.</p>
-                                <div style="background:#16171d;border-left:4px solid #0d9488;padding:12px 16px;margin:24px 0;border-radius:4px;">
-                                    <span style="color:#9ca3af;font-size:15px;display:block;">Account:</span>
-                                    <strong style="color:#f3f4f6;font-size:18px;">${userFound.full_name || userFound.username}</strong>
-                                </div>
-                                <p style="color:#f3f4f6;font-size:16px;">Click below to set a new password. This link expires in <strong>60 minutes</strong>.</p>
-                                <div style="text-align:center;margin:32px 0;">
-                                    <a href="${resetLink}" style="background:#10b981;color:#fff;text-decoration:none;padding:14px 36px;font-size:16px;font-weight:bold;border-radius:6px;display:inline-block;">RESET PASSWORD</a>
-                                </div>
-                                <p style="color:#6b7280;font-size:14px;border-top:1px solid #2e303a;padding-top:16px;">If you did not request this, ignore this email.</p>
-                            </div>
-                            <div style="background:#16171d;padding:20px;text-align:center;font-size:12px;color:#4b5563;border-top:1px solid #2e303a;">
-                                © 2026 City Health Office (CHO) Cabuyao
-                            </div>
+            const mailOptions = {
+                from: `"Cabuyao Health System" <${process.env.EMAIL_USER}>`,
+                to: userFound.email,
+                subject: 'Cabuyao Health — Password Reset Request',
+                html: `
+                    <div style="max-width:600px;margin:0 auto;font-family:system-ui,sans-serif;background:#16171d;border:1px solid #2e303a;border-radius:8px;overflow:hidden;">
+                        <div style="background:#0d9488;padding:24px;text-align:center;">
+                            <h1 style="color:#fff;margin:0;font-size:28px;">CABUYAO HEALTH</h1>
                         </div>
-                    `
-                };
+                        <div style="background:#1f2028;padding:40px 32px;">
+                            <p style="color:#f3f4f6;font-size:16px;">We received a request to reset the password for your account.</p>
+                            <div style="background:#16171d;border-left:4px solid #0d9488;padding:12px 16px;margin:24px 0;border-radius:4px;">
+                                <span style="color:#9ca3af;font-size:15px;display:block;">Account:</span>
+                                <strong style="color:#f3f4f6;font-size:18px;">${userFound.full_name || userFound.username}</strong>
+                            </div>
+                            <p style="color:#f3f4f6;font-size:16px;">Click below to set a new password. This link expires in <strong>60 minutes</strong>.</p>
+                            <div style="text-align:center;margin:32px 0;">
+                                <a href="${resetLink}" style="background:#10b981;color:#fff;text-decoration:none;padding:14px 36px;font-size:16px;font-weight:bold;border-radius:6px;display:inline-block;">RESET PASSWORD</a>
+                            </div>
+                            <p style="color:#6b7280;font-size:14px;border-top:1px solid #2e303a;padding-top:16px;">If you did not request this, ignore this email.</p>
+                        </div>
+                        <div style="background:#16171d;padding:20px;text-align:center;font-size:12px;color:#4b5563;border-top:1px solid #2e303a;">
+                            © 2026 City Health Office (CHO) Cabuyao
+                        </div>
+                    </div>
+                `
+            };
 
-                transporter.sendMail(mailOptions, (mailErr, info) => {
-                    if (mailErr) {
-                        console.error("❌ Email send FAILED:", mailErr.message);
-                        return res.status(500).json({ error: 'Email failed: ' + mailErr.message });
-                    }
-                    console.log(`✅ Email sent to: ${userFound.email} | ID: ${info.messageId}`);
-                    return res.status(200).json({ 
-                        message: `Recovery link sent to ${userFound.email}`,
-                        routingTarget: 'email'
-                    });
+            transporter.sendMail(mailOptions, (mailErr, info) => {
+                if (mailErr) {
+                    console.error("❌ Email send FAILED:", mailErr.message);
+                    return res.status(500).json({ error: 'Email failed: ' + mailErr.message });
+                }
+                console.log(`✅ Email sent to: ${userFound.email} | ID: ${info.messageId}`);
+                return res.status(200).json({ 
+                    message: `Recovery link sent to ${userFound.email}`,
+                    routingTarget: 'email'
                 });
             });
-
-        } else if (method === 'mobile') {
-            const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-            
-            const updateOtpQuery = 'UPDATE users SET otp_code = ? WHERE user_id = ?';
-            db.query(updateOtpQuery, [generatedOtp, userFound.user_id], async (otpErr) => {
-                if (otpErr) {
-                    return res.status(500).json({ error: 'Failed to save OTP: ' + otpErr.message });
-                }
-
-                if (!userFound.mobile_number) {
-                    return res.status(400).json({ error: 'No mobile number on file for this account.' });
-                }
-
-                let mobileFormatted = userFound.mobile_number.toString().trim();
-                if (mobileFormatted.startsWith('0')) {
-                    mobileFormatted = '63' + mobileFormatted.slice(1);
-                }
-
-                try {
-                    await axios.post('https://api.semaphore.co/api/v4/messages', {
-                        apikey: process.env.SEMAPHORE_API_KEY,
-                        number: mobileFormatted,
-                        message: `Your Cabuyao Health System verification code is: ${generatedOtp}. Valid for 10 minutes. Do not share this code.`,
-                        sendername: process.env.SEMAPHORE_SENDER_NAME || 'CabuyaoCHO'
-                    });
-
-                    return res.status(200).json({ 
-                        message: 'OTP sent to your registered mobile number.',
-                        routingTarget: 'mobile',
-                        mobileMask: `*******${userFound.mobile_number.toString().slice(-4)}`
-                    });
-
-                } catch (smsErr) {
-                    console.log(`\n🔑 FALLBACK OTP for ${mobileFormatted}: [ ${generatedOtp} ]\n`);
-                    return res.status(200).json({ 
-                        message: 'OTP generated. Check server console if SMS failed.',
-                        routingTarget: 'mobile',
-                        mobileMask: `*******${userFound.mobile_number.toString().slice(-4)}`
-                    });
-                }
-            });
-        }
-    });
-});
-
-app.post('/api/verify-otp', (req, res) => {
-    const { identity, otp } = req.body;
-
-    if (!otp || otp.length !== 6) {
-        return res.status(400).json({ error: 'Please enter a valid 6-digit code.' });
-    }
-
-    const checkQuery = `
-        SELECT * FROM users 
-        WHERE (email = ? OR mobile_number = ? OR username = ?) 
-        AND otp_code = ?
-    `;
-
-    db.query(checkQuery, [identity, identity, identity, otp], (err, results) => {
-        if (err) return res.status(500).json({ error: 'Database error during OTP check.' });
-        if (results.length === 0) return res.status(400).json({ error: 'Incorrect OTP code. Please try again.' });
-        return res.status(200).json({ message: 'OTP verified. You may now set a new password.' });
-    });
-});
-
-app.post('/api/reset-password-mobile', (req, res) => {
-    const { identity, newPassword } = req.body;
-
-    const updateQuery = `
-        UPDATE users 
-        SET password = ?, otp_code = NULL 
-        WHERE email = ? OR mobile_number = ? OR username = ?
-    `;
-
-    db.query(updateQuery, [newPassword, identity, identity, identity], (err, result) => {
-        if (err) return res.status(500).json({ error: 'Failed to update password.' });
-        if (result.affectedRows === 0) return res.status(404).json({ error: 'Account not found.' });
-        return res.status(200).json({ message: 'Password updated successfully!' });
+        });
     });
 });
 
@@ -844,7 +781,7 @@ app.post('/api/send-2fa-email', (req, res) => {
             [token, expiry, userId], (updateErr) => {
             if (updateErr) return res.status(500).json({ error: 'Failed to save verification token.' });
 
-            const verifyLink = `http://localhost:5173/verify-2fa?token=${token}&userId=${userId}`;
+            const verifyLink = `http://localhost:3000/verify-2fa?token=${token}&userId=${userId}`;
 
             const mailOptions = {
                 from: `"Cabuyao Health System" <${process.env.EMAIL_USER}>`,
@@ -981,32 +918,99 @@ app.post('/api/verify-login-otp', (req, res) => {
 
 
 // ==========================================
+// TextBee SMS Gateway — free, uses Android phone as SMS gateway
+async function sendSMS(to, message) {
+    const apiKey = process.env.TEXTBEE_API_KEY;
+    const deviceId = process.env.TEXTBEE_DEVICE_ID;
+    if (!apiKey || !deviceId || apiKey === 'your_textbee_api_key_here') {
+        console.log(`\n[TextBee not configured] Would send SMS to ${to}: ${message}\n`);
+        return;
+    }
+    const response = await axios.post(
+        `https://api.textbee.dev/api/v1/gateway/devices/${deviceId}/send-sms`,
+        { recipients: [to], message },
+        { headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' } }
+    );
+    return response.data;
+}
+
+function formatPhone(phone) {
+    let p = phone.toString().trim();
+    if (p.startsWith('0')) p = '63' + p.slice(1);
+    if (!p.startsWith('+')) p = '+' + p;
+    return p;
+}
+
 // NOTIFICATIONS SYSTEM ROUTES & HELPERS
 // ==========================================
 
-// Helper function to create notification for active users
-function createNotificationForUsers(title, message, type, link_to, barangayId = null) {
-    db.query('SELECT user_id, role, assigned_barangay_id FROM users WHERE is_active = 1', (err, users) => {
+// Helper function to create notification for active users with scope + preferences
+function createNotificationForUsers(title, message, type, link_to, barangayId = null, eventType = null) {
+    db.query('SELECT user_id, role, assigned_barangay_id, email, mobile_number FROM users WHERE is_active = 1', (err, users) => {
         if (err) {
             console.error('Error fetching active users for notifications:', err.message);
             return;
         }
-        
+
         users.forEach(user => {
-            const isCho = user.role === 'CHO';
+            // Scope: CHO must match barangay (same as BHW now)
+            const isCho = user.role === 'CHO' && (barangayId === null || Number(user.assigned_barangay_id) === Number(barangayId));
             const isAssignedBhw = user.role === 'BHW' && (barangayId === null || Number(user.assigned_barangay_id) === Number(barangayId));
             
-            if (isCho || isAssignedBhw) {
-                db.query(
-                    'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
-                    [user.user_id, title, message, type, link_to],
-                    (insertErr) => {
-                        if (insertErr) {
-                            console.error(`Failed to insert notification for user ${user.user_id}:`, insertErr.message);
+            if (!isCho && !isAssignedBhw) return;
+
+            // Fetch this user's notification preferences
+            const prefQuery = 'SELECT * FROM notification_preferences WHERE user_id = ?';
+            db.query(prefQuery, [user.user_id], (prefErr, prefRows) => {
+                let prefs = {
+                    push_notifications: false, email_notifications: false, sms_notifications: false,
+                    new_case_reported: false, case_status_updated: false, high_risk_alert: false,
+                    weekly_summary: false, system_maintenance: false,
+                };
+                if (!prefErr && prefRows.length > 0) {
+                    prefs = { ...prefs, ...prefRows[0] };
+                }
+
+                // Determine if this event is allowed by user preferences
+                const eventAllowed = !eventType || eventType === 'delete' || prefs[eventType] === true;
+
+                // 1. In-app notification (Push) — only if push_notifications is ON
+                if (prefs.push_notifications && eventAllowed) {
+                    db.query(
+                        'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
+                        [user.user_id, title, message, type, link_to],
+                        (insertErr) => {
+                            if (insertErr) console.error(`Failed to insert notification for user ${user.user_id}:`, insertErr.message);
                         }
-                    }
-                );
-            }
+                    );
+                }
+
+                // 2. Email notification
+                if (prefs.email_notifications && eventAllowed && user.email) {
+                    const mailOptions = {
+                        from: `"Cabuyao Health System" <${process.env.EMAIL_USER}>`,
+                        to: user.email,
+                        subject: title,
+                        html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:12px">
+                            <h2 style="color:#1e293b;margin:0 0 8px 0">${title}</h2>
+                            <p style="color:#475569;font-size:15px;line-height:1.5">${message}</p>
+                            <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0" />
+                            <p style="color:#94a3b8;font-size:12px">Cabuyao City Disease Monitoring System</p>
+                        </div>`
+                    };
+                    transporter.sendMail(mailOptions, (mailErr) => {
+                        if (mailErr) console.error(`Email notification failed for user ${user.user_id}:`, mailErr.message);
+                    });
+                }
+
+                // 3. SMS notification
+                if (prefs.sms_notifications && eventAllowed && user.mobile_number) {
+                    const smsText = `${title}: ${message}`;
+                    sendSMS(formatPhone(user.mobile_number), smsText).catch(err => {
+                        console.error(`SMS notification failed for user ${user.user_id}:`, err.message);
+                    });
+                }
+            });
         });
     });
 }
@@ -1036,7 +1040,7 @@ function checkAndAlertHighRisk(barangay_id, barangay_name) {
             `;
             db.query(checkDuplicateQuery, [`%${barangay_name}%`], (dupErr, dupResults) => {
                 if (!dupErr && dupResults.length === 0) {
-                    createNotificationForUsers(title, message, 'high_risk', 'MapView', barangay_id);
+                    createNotificationForUsers(title, message, 'high_risk', 'MapView', barangay_id, 'high_risk_alert');
                 }
             });
         }
@@ -1114,6 +1118,57 @@ app.delete('/api/notifications', (req, res) => {
     );
 });
 
+
+// GET: Fetch notification preferences for a user
+app.get('/api/notification-preferences/:userId', (req, res) => {
+    const { userId } = req.params;
+    db.query('SELECT * FROM notification_preferences WHERE user_id = ?', [userId], (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (results.length === 0) {
+            return res.json({
+                push_notifications: false, email_notifications: false, sms_notifications: false,
+                new_case_reported: false, case_status_updated: false, high_risk_alert: false,
+                weekly_summary: false, system_maintenance: false,
+            });
+        }
+        return res.json(results[0]);
+    });
+});
+
+// PUT: Save notification preferences for a user
+app.put('/api/notification-preferences/:userId', (req, res) => {
+    const { userId } = req.params;
+    const {
+        push_notifications, email_notifications, sms_notifications,
+        new_case_reported, case_status_updated, high_risk_alert,
+        weekly_summary, system_maintenance,
+    } = req.body;
+
+    db.query(
+        `INSERT INTO notification_preferences 
+        (user_id, push_notifications, email_notifications, sms_notifications, 
+         new_case_reported, case_status_updated, high_risk_alert, 
+         weekly_summary, system_maintenance)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+        push_notifications = VALUES(push_notifications),
+        email_notifications = VALUES(email_notifications),
+        sms_notifications = VALUES(sms_notifications),
+        new_case_reported = VALUES(new_case_reported),
+        case_status_updated = VALUES(case_status_updated),
+        high_risk_alert = VALUES(high_risk_alert),
+        weekly_summary = VALUES(weekly_summary),
+        system_maintenance = VALUES(system_maintenance)`,
+        [userId,
+         push_notifications ? 1 : 0, email_notifications ? 1 : 0, sms_notifications ? 1 : 0,
+         new_case_reported ? 1 : 0, case_status_updated ? 1 : 0, high_risk_alert ? 1 : 0,
+         weekly_summary ? 1 : 0, system_maintenance ? 1 : 0],
+        (err, result) => {
+            if (err) return res.status(500).json({ error: err.message });
+            return res.json({ message: 'Preferences saved successfully' });
+        }
+    );
+});
 
 // ==========================================
 // 5. STORAGE AND EXPORT ROUTES

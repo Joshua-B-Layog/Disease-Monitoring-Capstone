@@ -32,8 +32,16 @@ export default function CHOSettings({
   savedCompactMode,
   savedDateFormat,
   savedConfirmDelete,
+  openProfileView,
+  onProfileViewOpened,
 }) {
   const [currentView, setCurrentView] = useState('menu');
+  useEffect(() => {
+    if (openProfileView) {
+      setCurrentView('profile');
+      if (onProfileViewOpened) onProfileViewOpened();
+    }
+  }, [openProfileView, onProfileViewOpened]);
   const fileInputRef = useRef(null);
   const [storageStats, setStorageStats] = useState(null);
   const [storageLoading, setStorageLoading] = useState(false);
@@ -97,6 +105,29 @@ export default function CHOSettings({
     newCaseReported: false, caseStatusUpdated: false, highRiskAlert: false,
     weeklySummary: false, systemMaintenance: false,
   });
+  const [notifLoading, setNotifLoading] = useState(false);
+  const [notifSaveMsg, setNotifSaveMsg] = useState('');
+
+  useEffect(() => {
+    if (currentView !== 'notifications' || !userId) return;
+    setNotifLoading(true);
+    fetch(`http://localhost:5000/api/notification-preferences/${userId}`)
+      .then(r => r.json())
+      .then(data => {
+        setNotifications({
+          emailNotifications: !!data.email_notifications,
+          pushNotifications: !!data.push_notifications,
+          smsNotifications: !!data.sms_notifications,
+          newCaseReported: !!data.new_case_reported,
+          caseStatusUpdated: !!data.case_status_updated,
+          highRiskAlert: !!data.high_risk_alert,
+          weeklySummary: !!data.weekly_summary,
+          systemMaintenance: !!data.system_maintenance,
+        });
+      })
+      .catch(() => {})
+      .finally(() => setNotifLoading(false));
+  }, [currentView, userId]);
 
   // ── System Prefs ──
   const scaleToLabel = (scale) => {
@@ -500,12 +531,12 @@ export default function CHOSettings({
         {currentView === 'profile' && (
           <div className="detail-view-container">
             <button className="back-to-settings-btn" onClick={() => { setCurrentView('menu'); setSaveMsg(''); }}
-              style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', fontWeight: '500', color: '#1f2937', marginBottom: '24px' }}>
+              style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', fontWeight: '500', color: 'var(--text-main)', marginBottom: '24px' }}>
               <span style={{ marginRight: '8px', fontSize: '20px' }}>←</span> Back to Settings
             </button>
 
             {profileLoading ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>Loading profile...</div>
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading profile...</div>
             ) : (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '24px', marginBottom: '24px' }}>
@@ -535,8 +566,8 @@ export default function CHOSettings({
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <h2 style={{ fontSize: '24px', fontWeight: '600', color: '#111827', margin: 0 }}>{displayName}</h2>
-                    <p style={{ fontSize: '14px', color: '#6b7280', margin: 0 }}>
+                    <h2 style={{ fontSize: '24px', fontWeight: '600', color: 'var(--text-main)', margin: 0 }}>{displayName}</h2>
+                    <p style={{ fontSize: '14px', color: 'var(--text-muted)', margin: 0 }}>
                       {activeUser?.role || 'CHO'} Specialist — {profile.assignment || activeUser?.context || ''}
                     </p>
                     <button onClick={() => fileInputRef.current.click()}
@@ -553,7 +584,7 @@ export default function CHOSettings({
                   <input type="file" ref={fileInputRef} onChange={handleImageChange} style={{ display: 'none' }} accept="image/*" />
                 </div>
 
-                <hr style={{ border: 'none', borderTop: '1px solid #e5e7eb', margin: '24px 0' }} />
+                <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '24px 0' }} />
 
                 {saveMsg && (
                   <div style={{ background: saveMsg.startsWith('✅') ? '#d1fae5' : '#fee2e2', color: saveMsg.startsWith('✅') ? '#065f46' : '#991b1b', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px', fontSize: '14px', fontWeight: '500' }}>
@@ -570,15 +601,15 @@ export default function CHOSettings({
                     { label: 'Contact Number', key: 'phone', type: 'text' },
                   ].map(field => (
                     <div key={field.key} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '12px', fontWeight: '500', color: '#4b5563' }}>{field.label}</label>
+                      <label style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text-muted)' }}>{field.label}</label>
                       <input type={field.type} value={profile[field.key]} readOnly={field.readOnly}
                         onChange={e => !field.readOnly && setProfile({ ...profile, [field.key]: e.target.value })}
-                        style={{ ...fieldStyle, background: field.readOnly ? '#f9fafb' : '#ffffff', color: field.readOnly ? '#9ca3af' : '#1f2937', cursor: field.readOnly ? 'not-allowed' : 'text' }} />
+                        style={{ ...fieldStyle, background: 'var(--input-bg)', color: field.readOnly ? 'var(--text-muted)' : 'var(--text-main)', cursor: field.readOnly ? 'not-allowed' : 'text' }} />
                     </div>
                   ))}
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: '500', color: '#4b5563' }}>Unit Office Assignment</label>
+                    <label style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text-muted)' }}>Unit Office Assignment</label>
                     <select value={profile.assignedBarangayId || ''}
                       onChange={e => {
                         const selected = barangayList.find(b => b.id === parseInt(e.target.value));
@@ -593,7 +624,7 @@ export default function CHOSettings({
 
                 <div style={{ display: 'flex', gap: '16px', marginTop: '24px' }}>
                   <button onClick={() => { setCurrentView('menu'); setSaveMsg(''); }}
-                    style={{ background: '#ffffff', border: '1px solid #d1d5db', color: '#1f2937', borderRadius: '12px', padding: '12px 48px', fontSize: '15px', fontWeight: '500', cursor: 'pointer' }}>
+                    style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '12px', padding: '12px 48px', fontSize: '15px', fontWeight: '500', cursor: 'pointer' }}>
                     {t('Cancel')}
                   </button>
                   <button onClick={handleSaveProfile} disabled={saving}
@@ -617,7 +648,7 @@ export default function CHOSettings({
             <div className="security-section-card">
               <div className="security-card-header">
                 <div className="security-icon-box">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
                   </svg>
                 </div>
@@ -651,12 +682,12 @@ export default function CHOSettings({
                         placeholder={`Enter ${label}`} />
                       <button type="button" className="security-eye-btn" onClick={() => setShow(!show)}>
                         {show ? (
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1f2937" strokeWidth="2">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
                             <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
                             <line x1="1" y1="1" x2="23" y2="23"/>
                           </svg>
                         ) : (
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1f2937" strokeWidth="2">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
                             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                             <circle cx="12" cy="12" r="3" />
                           </svg>
@@ -682,7 +713,7 @@ export default function CHOSettings({
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div className="security-card-header" style={{ marginBottom: twoFaStep === 'idle' ? 0 : '16px', flex: 1 }}>
                   <div className="security-icon-box">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
                       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                     </svg>
                   </div>
@@ -958,7 +989,7 @@ export default function CHOSettings({
 
             {[
               {
-                icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#101828" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
+                icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
                 title: 'Notification Channels', subtitle: 'Choose how you want to receive notifications',
                 rows: [
                   { key: 'pushNotifications', label: 'Push Notifications', sub: 'Receive push notifications in browser' },
@@ -967,7 +998,7 @@ export default function CHOSettings({
                 ],
               },
               {
-                icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#101828" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
+                icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
                 title: 'Case Notifications', subtitle: 'Get notified about case activities',
                 rows: [
                   { key: 'newCaseReported', label: 'New Case Reported', sub: 'When a new case is reported in your barangay' },
@@ -976,7 +1007,7 @@ export default function CHOSettings({
                 ],
               },
               {
-                icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#101828" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
+                icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
                 title: 'System Notifications', subtitle: 'Updates about the system',
                 rows: [
                   { key: 'weeklySummary', label: 'Weekly Summary', sub: 'Receive a weekly summary of cases' },
@@ -1017,7 +1048,35 @@ export default function CHOSettings({
             ))}
 
             <div className="notifications-action-container">
-              <button className="notifications-save-btn" onClick={() => setCurrentView('menu')}>{t('Save Preferences')}</button>
+              {notifLoading && <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginRight: '12px' }}>Loading...</span>}
+              {notifSaveMsg && <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginRight: '12px' }}>{notifSaveMsg}</span>}
+              <button className="notifications-save-btn" onClick={async () => {
+                setNotifSaveMsg('');
+                try {
+                  const res = await fetch(`http://localhost:5000/api/notification-preferences/${userId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      push_notifications: notifications.pushNotifications,
+                      email_notifications: notifications.emailNotifications,
+                      sms_notifications: notifications.smsNotifications,
+                      new_case_reported: notifications.newCaseReported,
+                      case_status_updated: notifications.caseStatusUpdated,
+                      high_risk_alert: notifications.highRiskAlert,
+                      weekly_summary: notifications.weeklySummary,
+                      system_maintenance: notifications.systemMaintenance,
+                    }),
+                  });
+                  if (res.ok) {
+                    setNotifSaveMsg('Preferences saved!');
+                    setTimeout(() => setCurrentView('menu'), 800);
+                  } else {
+                    setNotifSaveMsg('Failed to save.');
+                  }
+                } catch {
+                  setNotifSaveMsg('Save error. Try again.');
+                }
+              }}>{t('Save Preferences')}</button>
             </div>
           </div>
         )}
@@ -1030,7 +1089,7 @@ export default function CHOSettings({
             <div className="security-section-card">
               <div className="security-card-header">
                 <div className="security-icon-box">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#101828" strokeWidth="2">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
                     <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
                     <line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
                   </svg>
@@ -1057,10 +1116,10 @@ export default function CHOSettings({
                       setSystemPrefs({ ...systemPrefs, fontSize: label });
                       if (onFontSizeChange) onFontSizeChange(scale);
                     }}
-                      style={{ background: '#fff', border: '1px solid #d0d5dd', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '14px', cursor: 'pointer', appearance: 'none', color: '#1f2937', minWidth: '120px' }}>
+                      style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '14px', cursor: 'pointer', appearance: 'none', color: 'var(--text-main)', minWidth: '120px' }}>
                       <option>Small</option><option>Medium</option><option>Large</option>
                     </select>
-                    <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#1f2937', fontSize: '12px' }}>▼</span>
+                    <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-muted)', fontSize: '12px' }}>▼</span>
                   </div>
                 </div>
                 <div className="session-list-row">
@@ -1081,7 +1140,7 @@ export default function CHOSettings({
             <div className="security-section-card">
               <div className="security-card-header">
                 <div className="security-icon-box">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#101828" strokeWidth="2">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
                     <circle cx="12" cy="12" r="10"/>
                     <line x1="2" y1="12" x2="22" y2="12"/>
                     <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
@@ -1097,40 +1156,40 @@ export default function CHOSettings({
                   <div className="session-info-meta"><h4>Display Language</h4></div>
                   <div style={{ position: 'relative' }}>
                       <select value={systemPrefs.displayLanguage} onChange={e => setSystemPrefs({ ...systemPrefs, displayLanguage: e.target.value })}
-                        style={{ background: '#fff', border: '1px solid #d0d5dd', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '14px', cursor: 'pointer', appearance: 'none', color: '#1f2937', minWidth: '120px' }}>
+                        style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '14px', cursor: 'pointer', appearance: 'none', color: 'var(--text-main)', minWidth: '120px' }}>
                         <option>English</option>
                         <option>Filipino</option>
                         <option>Bahasa Indonesia</option>
                         <option>Tiếng Việt</option>
                         <option>ไทย</option>
                       </select>
-                    <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#1f2937', fontSize: '12px' }}>▼</span>
+                    <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-muted)', fontSize: '12px' }}>▼</span>
                   </div>
                 </div>
                 <div className="session-list-row">
                   <div className="session-info-meta"><h4>Time Zone</h4></div>
                   <div style={{ position: 'relative' }}>
                       <select value={systemPrefs.timeZone} onChange={e => setSystemPrefs({ ...systemPrefs, timeZone: e.target.value })}
-                        style={{ background: '#fff', border: '1px solid #d0d5dd', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '14px', cursor: 'pointer', appearance: 'none', color: '#1f2937', minWidth: '120px' }}>
+                        style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '14px', cursor: 'pointer', appearance: 'none', color: 'var(--text-main)', minWidth: '120px' }}>
                         <option value="Asia/Manila">Asia/Manila (GMT+8)</option>
                         <option value="Asia/Jakarta">Asia/Jakarta (GMT+7)</option>
                         <option value="Asia/Ho_Chi_Minh">Asia/Ho_Chi_Minh (GMT+7)</option>
                         <option value="Asia/Bangkok">Asia/Bangkok (GMT+7)</option>
                         <option value="Asia/Kolkata">Asia/Kolkata (GMT+5:30)</option>
                       </select>
-                    <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#1f2937', fontSize: '12px' }}>▼</span>
+                    <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-muted)', fontSize: '12px' }}>▼</span>
                   </div>
                 </div>
                 <div className="session-list-row">
                   <div className="session-info-meta"><h4>Date Format</h4></div>
                   <div style={{ position: 'relative' }}>
                       <select value={systemPrefs.dateFormat} onChange={e => setSystemPrefs({ ...systemPrefs, dateFormat: e.target.value })}
-                        style={{ background: '#fff', border: '1px solid #d0d5dd', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '14px', cursor: 'pointer', appearance: 'none', color: '#1f2937', minWidth: '120px' }}>
+                        style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '14px', cursor: 'pointer', appearance: 'none', color: 'var(--text-main)', minWidth: '120px' }}>
                         <option>MM/DD/YY</option>
                         <option>DD/MM/YY</option>
                         <option>YYYY-MM-DD</option>
                       </select>
-                    <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#1f2937', fontSize: '12px' }}>▼</span>
+                    <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-muted)', fontSize: '12px' }}>▼</span>
                   </div>
                 </div>
               </div>
@@ -1140,7 +1199,7 @@ export default function CHOSettings({
             <div className="security-section-card">
               <div className="security-card-header">
                 <div className="security-icon-box">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#101828" strokeWidth="2">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
                     <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
                     <line x1="8" y1="21" x2="16" y2="21"/>
                     <line x1="12" y1="17" x2="12" y2="21"/>
@@ -1191,7 +1250,7 @@ export default function CHOSettings({
             <div className="security-section-card">
               <div className="security-card-header">
                 <div className="security-icon-box">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
                     <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
                     <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
                   </svg>
@@ -1202,12 +1261,12 @@ export default function CHOSettings({
                 </div>
               </div>
               <div style={{ padding: '0 16px 20px 16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: '#4b5563', fontWeight: '500' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', marginBottom: '8px', color: 'var(--text-muted)', fontWeight: '500' }}>
                   <span>Storage Used</span>
-                  <span style={{ color: '#111827', fontWeight: '600' }}>{storageLoading ? 'Loading...' : storageStats ? `${storageStats.totalMB} MB of 10 GB` : '— of 10 GB'}</span>
+                  <span style={{ color: 'var(--text-main)', fontWeight: '600' }}>{storageLoading ? 'Loading...' : storageStats ? `${storageStats.totalMB} MB of 10 GB` : '— of 10 GB'}</span>
                 </div>
-                <div style={{ width: '100%', height: '12px', background: '#e5e7eb', borderRadius: '6px', overflow: 'hidden', marginBottom: '24px' }}>
-                  <div style={{ width: `${storageStats ? storageStats.usedPercent : 0}%`, height: '100%', background: '#111827', borderRadius: '6px' }} />
+                <div style={{ width: '100%', height: '12px', background: 'var(--border-color)', borderRadius: '6px', overflow: 'hidden', marginBottom: '24px' }}>
+                  <div style={{ width: `${storageStats ? storageStats.usedPercent : 0}%`, height: '100%', background: 'var(--text-main)', borderRadius: '6px' }} />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
                   {[
@@ -1215,10 +1274,10 @@ export default function CHOSettings({
                     { val: storageStats ? `${storageStats.userDataMB} MB` : '—', lbl: 'Reports', sub: `${storageStats ? storageStats.users : '—'} accounts` },
                     { val: storageStats ? `${storageStats.otherMB} MB` : '—', lbl: 'Other', sub: `${storageStats ? storageStats.notifications : '—'} notifications` },
                   ].map(item => (
-                    <div key={item.lbl} style={{ background: '#f9fafb', border: '1px solid #f3f4f6', borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
-                      <div style={{ fontSize: '20px', fontWeight: '600', color: '#111827', marginBottom: '4px' }}>{item.val}</div>
-                      <div style={{ fontSize: '13px', color: '#6b7280' }}>{item.lbl}</div>
-                      <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>{item.sub}</div>
+                    <div key={item.lbl} style={{ background: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '20px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '4px' }}>{item.val}</div>
+                      <div style={{ fontSize: '14px', color: 'var(--text-muted)' }}>{item.lbl}</div>
+                      <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px' }}>{item.sub}</div>
                     </div>
                   ))}
                 </div>
@@ -1229,7 +1288,7 @@ export default function CHOSettings({
             <div className="security-section-card">
               <div className="security-card-header">
                 <div className="security-icon-box">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                     <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
                   </svg>
@@ -1300,7 +1359,7 @@ export default function CHOSettings({
                           })
                           .catch(() => alert('Export failed. Please try again.'));
                       }
-                    }} style={{ padding: '8px 18px', background: '#fff', border: '1px solid #d0d5dd', borderRadius: '8px', fontSize: '13px', fontWeight: '600', color: '#344054', cursor: 'pointer' }}>
+                    }} style={{ padding: '8px 18px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '13px', fontWeight: '600', color: 'var(--text-main)', cursor: 'pointer' }}>
                       Export
                     </button>
                   </div>
@@ -1312,7 +1371,7 @@ export default function CHOSettings({
               <div className="security-section-card">
                 <div className="security-card-header">
                   <div className="security-icon-box">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
                       <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
                     </svg>
                   </div>
@@ -1325,8 +1384,8 @@ export default function CHOSettings({
                 <div style={{ padding: '0 0 16px 0' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderTop: '1px solid #f2f4f7' }}>
                     <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontSize: '14px', fontWeight: '600', color: '#1d2939' }}>Last Backup</div>
-                      <div style={{ fontSize: '13px', color: '#667085' }}>{lastBackupDate ? new Date(lastBackupDate).toLocaleString('en-PH', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'No backup yet'}</div>
+                      <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)' }}>Last Backup</div>
+                      <div style={{ fontSize: '14px', color: 'var(--text-muted)' }}>{lastBackupDate ? new Date(lastBackupDate).toLocaleString('en-PH', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'No backup yet'}</div>
                     </div>
                     {lastBackupDate
                       ? <span style={{ fontSize: '13px', fontWeight: '600', padding: '4px 12px', borderRadius: '16px', background: '#ecfdf3', color: '#027a48' }}>Successful</span>
@@ -1338,15 +1397,15 @@ export default function CHOSettings({
                     <button onClick={() => handleCreateBackup(false)} disabled={backupLoading} style={{ flex: 1, padding: '12px', background: '#003cb4', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: backupLoading ? 'not-allowed' : 'pointer', opacity: backupLoading ? 0.7 : 1 }}>
                       {backupLoading ? 'Creating Backup...' : 'Create Backup'}
                     </button>
-                    <button onClick={() => alert('To restore: go to Settings → Data Management → select your backup .json file. Full restore coming soon.')} style={{ flex: 1, padding: '12px', background: '#fff', color: '#344054', border: '1px solid #d0d5dd', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+                    <button onClick={() => alert('To restore: go to Settings → Data Management → select your backup .json file. Full restore coming soon.')} style={{ flex: 1, padding: '12px', background: 'var(--bg-surface)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
                       Restore
                     </button>
                   </div>
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0 0 0', marginTop: '12px', borderTop: '1px solid #f2f4f7' }}>
                     <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontSize: '14px', fontWeight: '600', color: '#1d2939' }}>Auto-Backup</div>
-                      <div style={{ fontSize: '13px', color: '#667085' }}>Automatically backup data weekly</div>
+                      <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)' }}>Auto-Backup</div>
+                      <div style={{ fontSize: '14px', color: 'var(--text-muted)' }}>Automatically backup data weekly</div>
                     </div>
                     <label className="figma-toggle-switch">
                       <input type="checkbox" checked={autoBackupEnabled} onChange={e => { setAutoBackupEnabled(e.target.checked); localStorage.setItem('cdms_auto_backup', String(e.target.checked)); }} />
@@ -1480,8 +1539,8 @@ export default function CHOSettings({
 }
 
 const fieldStyle = {
-  background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '12px',
-  padding: '12px 16px', fontSize: '15px', color: '#1f2937',
+  background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '12px',
+  padding: '12px 16px', fontSize: '15px', color: 'var(--text-main)',
   boxShadow: '0 2px 4px rgba(0,0,0,0.02)', outline: 'none', width: '100%',
   boxSizing: 'border-box',
 };

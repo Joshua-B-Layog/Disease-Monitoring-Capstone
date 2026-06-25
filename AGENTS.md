@@ -8,7 +8,7 @@ This is a Web-Based Disease Monitoring and Mapping System for the City of Cabuya
 - Frontend: React + Vite
 - Maps: React Leaflet + OpenStreetMap
 - Email: Nodemailer (Gmail)
-- SMS: Semaphore API
+- SMS: TextBee Android SMS Gateway
 
 ## Project Structure
 - `server.js` — main backend, all API routes
@@ -51,3 +51,4 @@ Poliomyelitis, SARS, Sore Eyes
 - Always preserve existing working features when adding new ones
 - MySQL passwords are stored as plain text (no hashing yet)
 - The .env file holds DB credentials and email/SMS keys
+- TextBee setup: 1) Create free account at https://textbee.dev, 2) Install Android app on a dedicated phone, 3) Register device from dashboard, 4) Set TEXTBEE_API_KEY and TEXTBEE_DEVICE_ID in .env.local

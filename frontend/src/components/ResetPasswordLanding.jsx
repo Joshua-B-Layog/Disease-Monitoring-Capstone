@@ -3,8 +3,6 @@ import React, { useEffect, useState } from 'react';
 export default function ResetPasswordLanding() {
   const [email, setEmail] = useState('');
   const [token, setToken] = useState('');
-  const [identity, setIdentity] = useState('');
-  const [method, setMethod] = useState('email'); // 'email' or 'mobile'
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNew, setShowNew] = useState(false);
@@ -15,17 +13,8 @@ export default function ResetPasswordLanding() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const urlMethod = params.get('method') || 'email';
-    setMethod(urlMethod);
-
-    if (urlMethod === 'mobile') {
-      // Mobile OTP flow — uses identity (username/mobile/email)
-      setIdentity(params.get('identity') || '');
-    } else {
-      // Email link flow — uses token + email
-      setEmail(params.get('email') || '');
-      setToken(params.get('token') || '');
-    }
+    setEmail(params.get('email') || '');
+    setToken(params.get('token') || '');
   }, []);
 
   const handleSubmit = async (e) => {
@@ -42,23 +31,11 @@ export default function ResetPasswordLanding() {
     setStatus({ type: '', msg: '' });
 
     try {
-      let response;
-
-      if (method === 'mobile') {
-        // Mobile OTP flow — call reset-password-mobile
-        response = await fetch('http://localhost:5000/api/reset-password-mobile', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ identity, newPassword })
-        });
-      } else {
-        // Email link flow — call reset-password with token
-        response = await fetch('http://localhost:5000/api/reset-password', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, token, newPassword })
-        });
-      }
+      const response = await fetch('http://localhost:5000/api/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, token, newPassword })
+      });
 
       const data = await response.json();
 
@@ -69,7 +46,6 @@ export default function ResetPasswordLanding() {
       setStatus({ type: 'success', msg: 'Password updated successfully!' });
       setDone(true);
 
-      // Redirect to login after 2.5 seconds
       setTimeout(() => {
         window.location.href = '/';
       }, 2500);
@@ -80,9 +56,6 @@ export default function ResetPasswordLanding() {
       setLoading(false);
     }
   };
-
-  // What to show as the account identifier under the heading
-  const accountDisplay = method === 'mobile' ? identity : email;
 
   return (
     <div style={{
@@ -105,12 +78,9 @@ export default function ResetPasswordLanding() {
           Set New Password
         </h2>
         <p style={{ color: '#9CA3AF', fontSize: '14px', margin: '0 0 28px 0' }}>
-          {method === 'mobile' 
-            ? 'OTP verified successfully. Set your new password below.'
-            : 'Enter your new password below for:'
-          }
+          Enter your new password below for:
           <br />
-          <span style={{ color: '#10B981', fontWeight: '500' }}>{accountDisplay}</span>
+          <span style={{ color: '#10B981', fontWeight: '500' }}>{email}</span>
         </p>
 
         {/* Status Messages */}

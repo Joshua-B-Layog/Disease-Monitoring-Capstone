@@ -2,7 +2,7 @@
 .settings-wrapper {
   width: 100%;
   min-height: 100vh;
-  background-color: #f8fafc;
+  background-color: var(--bg-main);
   padding: 40px 20px;
   box-sizing: border-box;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -16,14 +16,14 @@
 .settings-title {
   font-size: 32px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--text-main);
   margin: 0 0 8px 0;
   text-align: left;
 }
 
 .settings-subtitle {
   font-size: 16px;
-  color: #64748b;
+  color: var(--text-muted);
   margin: 0 0 32px 0;
   text-align: left;
 }
@@ -36,8 +36,8 @@
 }
 
 .nav-box {
-  background-color: #ffffff;
-  border: 1px solid #e2e8f0;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 24px;
   display: flex;
@@ -51,7 +51,7 @@
 .nav-box:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  border-color: #cbd5e1;
+  border-color: var(--text-muted);
 }
 
 .nav-box.full-width {
@@ -71,12 +71,12 @@
 .box-title-text {
   font-size: 18px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--text-main);
   margin: 0;
 }
 
 .box-arrow-right {
-  color: #94a3b8;
+  color: var(--text-muted);
   font-size: 18px;
 }
 
@@ -91,7 +91,7 @@
 .back-to-settings-btn {
   background: none;
   border: none;
-  color: #475569;
+  color: var(--text-muted);
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
@@ -103,28 +103,28 @@
 }
 
 .back-to-settings-btn:hover {
-  color: #0f172a;
+  color: var(--text-main);
 }
 
 .sub-view-title {
   font-size: 22px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--text-main);
   margin: 8px 0 0 0;
   text-align: left;
 }
 
 .sub-view-subtitle {
   font-size: 14px;
-  color: #64748b;
+  color: var(--text-muted);
   margin: -16px 0 8px 0;
   text-align: left;
 }
 
 /* --- Profile Header Style --- */
 .profile-header-container {
-  background-color: #ffffff;
-  border: 1px solid #e2e8f0;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 24px;
   display: flex;
@@ -140,7 +140,7 @@
   width: 80px;
   height: 80px;
   border-radius: 50%;
-  background-color: #e2e8f0;
+  background-color: var(--input-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -156,7 +156,7 @@
 .avatar-initials {
   font-size: 28px;
   font-weight: 600;
-  color: #475569;
+  color: var(--text-muted);
   text-transform: uppercase;
 }
 
@@ -164,14 +164,14 @@
   position: absolute;
   bottom: 0;
   right: 0;
-  background-color: #0f172a;
+  background-color: var(--text-main);
   width: 28px;
   height: 28px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid #ffffff;
+  border: 2px solid var(--bg-surface);
   cursor: pointer;
 }
 
@@ -184,29 +184,29 @@
 .profile-display-name {
   font-size: 20px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--text-main);
   margin: 0 0 4px 0;
 }
 
 .profile-display-role {
   font-size: 14px;
-  color: #64748b;
+  color: var(--text-muted);
   margin: 0 0 12px 0;
 }
 
 .change-photo-btn {
-  background-color: #ffffff;
-  border: 1px solid #cbd5e1;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--input-border);
   padding: 6px 12px;
   font-size: 13px;
   font-weight: 600;
-  color: #334155;
+  color: var(--text-main);
   border-radius: 6px;
   cursor: pointer;
 }
 
 .change-photo-btn:hover {
-  background-color: #f8fafc;
+  background-color: var(--bg-main);
 }
 
 /* --- Split Input Configuration Layouts --- */
@@ -214,10 +214,10 @@
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 20px;
-  background-color: #ffffff;
+  background-color: var(--bg-surface);
   padding: 24px;
   border-radius: 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-color);
 }
 
 .input-field-group {
@@ -230,23 +230,23 @@
 .input-field-group label {
   font-size: 13px;
   font-weight: 600;
-  color: #475569;
+  color: var(--text-muted);
 }
 
 .input-field-group input, 
 .input-field-group select {
   padding: 10px 14px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--input-border);
   border-radius: 8px;
   font-size: 14px;
-  color: #0f172a;
+  color: var(--text-main);
   outline: none;
-  background-color: #ffffff;
+  background-color: var(--input-bg);
 }
 
 .input-field-group input[readonly] {
-  background-color: #f1f5f9;
-  color: #64748b;
+  background-color: var(--input-bg);
+  color: var(--text-muted);
   cursor: not-allowed;
 }
 
@@ -258,11 +258,11 @@
 }
 
 .security-section-card {
-  background-color: #ffffff;
+  background-color: var(--bg-surface);
   border-radius: 12px;
   padding: 24px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
-  border: 1px solid #eef0f3;
+  border: 1px solid var(--border-color);
   text-align: left;
 }
 
@@ -298,7 +298,7 @@
 }
 
 .security-icon-box {
-  background-color: #f3f4f6;
+  background-color: var(--input-bg);
   width: 44px;
   height: 44px;
   border-radius: 8px;
@@ -314,13 +314,13 @@
 .security-header-text h3 {
   font-size: 16px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--text-main);
   margin: 0 0 2px 0;
 }
 
 .security-timestamp {
   font-size: 13px;
-  color: #64748b;
+  color: var(--text-muted);
 }
 
 .security-card-body {
@@ -340,7 +340,7 @@
 .security-input-row label {
   font-size: 14px;
   font-weight: 500;
-  color: #344054;
+  color: var(--text-main);
 }
 
 .security-password-wrapper {
@@ -352,11 +352,11 @@
   width: 100%;
   padding: 12px 16px;
   padding-right: 48px;
-  border: 1px solid #d0d5dd;
+  border: 1px solid var(--input-border);
   border-radius: 8px;
-  background-color: #ffffff;
+  background-color: var(--input-bg);
   font-size: 14px;
-  color: #1d2939;
+  color: var(--text-main);
   outline: none;
   box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
   box-sizing: border-box;
@@ -388,21 +388,21 @@
 }
 
 .security-manage-btn {
-  background-color: #ffffff;
-  border: 1px solid #d0d5dd;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--input-border);
   border-radius: 8px;
   padding: 8px 16px;
   font-size: 14px;
   font-weight: 600;
-  color: #344054;
+  color: var(--text-main);
   cursor: pointer;
   box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
   transition: all 0.2s ease;
 }
 
 .security-manage-btn:hover {
-  background-color: #f9fafb;
-  border-color: #b2bbc8;
+  background-color: var(--bg-main);
+  border-color: var(--text-muted);
 }
 
 /* --- Custom Figma Toggle Switch Slider --- */
@@ -425,7 +425,7 @@
   position: absolute;
   cursor: pointer;
   top: 0; left: 0; right: 0; bottom: 0;
-  background-color: #d1d5db;
+  background-color: var(--text-muted);
   border: none;
   border-radius: 34px;
   transition: background-color 0.2s;
@@ -438,7 +438,7 @@
   width: 18px;
   left: 3px;
   bottom: 3px;
-  background-color: white;
+  background-color: #fff;
   border-radius: 50%;
   transition: transform 0.2s;
 }
@@ -464,7 +464,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 16px 0;
-  border-top: 1px solid #f2f4f7;
+  border-top: 1px solid var(--border-color);
   gap: 32px;
 }
 
@@ -476,13 +476,13 @@
 .session-info-meta h4 {
   font-size: 14px;
   font-weight: 600;
-  color: #1d2939;
+  color: var(--text-main);
   margin: 0 0 4px 0;
 }
 
 .session-info-meta p {
   font-size: 13px;
-  color: #667085;
+  color: var(--text-muted);
   margin: 0;
 }
 
@@ -539,31 +539,31 @@
 }
 
 .btn-secondary-cancel {
-  background-color: #ffffff;
-  border: 1px solid #cbd5e1;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--input-border);
   padding: 10px 20px;
   border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
-  color: #475569;
+  color: var(--text-muted);
   cursor: pointer;
 }
 
 .btn-primary-action {
-  background-color: #0f172a;
+  background-color: var(--text-main);
   border: none;
   padding: 10px 20px;
   border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--bg-surface);
   cursor: pointer;
 }
 
 /* --- Utility Data Manager Cards --- */
 .utility-row-action-card {
-  background-color: #ffffff;
-  border: 1px solid #e2e8f0;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 16px 20px;
   margin-bottom: 12px;
@@ -575,16 +575,16 @@
 }
 
 .utility-row-action-card:hover {
-  background-color: #f8fafc;
-  border-color: #cbd5e1;
+  background-color: var(--bg-main);
+  border-color: var(--text-muted);
 }
 
 .utility-row-action-card span:first-child {
   font-size: 14px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--text-main);
 }
 
 .utility-row-action-card span:last-child {
-  color: #94a3b8;
+  color: var(--text-muted);
 }

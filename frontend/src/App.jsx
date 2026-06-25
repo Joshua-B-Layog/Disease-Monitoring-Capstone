@@ -50,6 +50,7 @@ function App() {
   const [keyboardShortcuts, setKeyboardShortcuts] = useState(false);
   const [fontScale, setFontScale] = useState(getSavedFontScale);
   const [compactMode, setCompactMode] = useState(getSavedCompact);
+  const [openProfileView, setOpenProfileView] = useState(false);
 
   useEffect(() => { localStorage.setItem('cdms_date_format', dateFormat); }, [dateFormat]);
   useEffect(() => { localStorage.setItem('cdms_confirm_delete', String(confirmDelete)); }, [confirmDelete]);
@@ -256,6 +257,8 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             savedConfirmDelete={confirmDelete}
             fontScale={fontScale}
             compactMode={compactMode}
+            openProfileView={openProfileView}
+            onProfileViewOpened={() => setOpenProfileView(false)}
           />
         );
       default:
@@ -320,7 +323,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
     <div className="dashboard-layout">
       <Sidebar role={loginRole} activeTab={activeTab} setActiveTab={setActiveTab} language={language} />
 
-      <div className="main-content" style={{ fontSize: `calc(14px * ${fontScale})` }}>
+      <div className="main-content">
         <div className="top-nav">
           <div className="nav-title" style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             <h2 style={{ margin: 0 }}>{activeTab}</h2>
@@ -543,7 +546,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
           </div>
         </div>
 
-        <div className="content-scroller">
+        <div className="content-scroller" style={{ zoom: parseFloat(fontScale) }}>
           {renderContent()}
         </div>
       </div>
@@ -620,7 +623,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
               {/* ── Action buttons ── */}
               <div style={{ display: 'flex', gap: '12px', marginTop: '24px', paddingTop: '20px', borderTop: '1px solid #e2e8f0' }}>
                 <button
-                  onClick={() => { setShowProfileModal(false); setActiveTab('Settings'); }}
+                  onClick={() => { setShowProfileModal(false); setActiveTab('Settings'); setOpenProfileView(true); }}
                   style={{
                     flex: 1, padding: '12px', background: '#10b981', color: '#fff',
                     border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600',
