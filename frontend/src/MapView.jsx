@@ -144,6 +144,19 @@ export default function MapView({ setActiveTab, setCaseFilter }) {
   const [tooltip, setTooltip] = useState(null);
   const [popup,   setPopup]   = useState(null);
 
+  const [barangayOpen, setBarangayOpen] = useState(false);
+  const barangayRef = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (barangayRef.current && !barangayRef.current.contains(e.target)) {
+        setBarangayOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
   useEffect(() => {
     axios.get('http://localhost:5000/api/disease_cases')
       .then(res => setAllCases(res.data))
@@ -214,10 +227,75 @@ export default function MapView({ setActiveTab, setCaseFilter }) {
         {/* Barangay — all 18 hardcoded */}
         <div>
           <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', marginBottom: '5px', fontWeight: '600' }}>Barangay</label>
-          <select value={filterBarangay} onChange={e => setFilterBarangay(e.target.value)} style={SEL}>
-            <option value="All Barangays">All Barangays</option>
-            {ALL_BARANGAYS.map(b => <option key={b} value={b}>{b}</option>)}
-          </select>
+          <div style={{ position: 'relative' }} ref={barangayRef}>
+            <button
+              onClick={() => setBarangayOpen(!barangayOpen)}
+              style={{
+                width: '100%', padding: '9px 12px',
+                background: '#0f172a', border: `1px solid ${barangayOpen ? '#60a5fa' : '#334155'}`,
+                borderRadius: '7px', color: '#e2e8f0',
+                fontSize: '13px', cursor: 'pointer', textAlign: 'left',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                boxSizing: 'border-box',
+              }}
+            >
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{filterBarangay}</span>
+              <span style={{
+                fontSize: '10px', opacity: 0.6, flexShrink: 0, marginLeft: '8px',
+                transition: 'transform 0.2s', display: 'inline-block',
+                transform: barangayOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+              }}>▾</span>
+            </button>
+            {barangayOpen && (
+              <div style={{
+                position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
+                maxHeight: '250px', overflowY: 'auto', marginTop: '4px',
+                background: '#1e293b', border: '1px solid #475569',
+                borderRadius: '8px', boxShadow: '0 12px 32px rgba(0,0,0,0.5)',
+                padding: '4px', textAlign: 'left',
+              }}>
+                <div
+                  onClick={() => { setFilterBarangay('All Barangays'); setBarangayOpen(false); }}
+                  style={{
+                    padding: '8px 14px', cursor: 'pointer', fontSize: '13px',
+                    display: 'flex', alignItems: 'center', gap: '8px',
+                    borderRadius: '6px',
+                    justifyContent: 'flex-start',
+                    background: filterBarangay === 'All Barangays' ? 'rgba(96,165,250,0.18)' : 'transparent',
+                    color: filterBarangay === 'All Barangays' ? '#93bbfc' : '#cbd5e1',
+                    fontWeight: filterBarangay === 'All Barangays' ? '600' : '400',
+                    borderLeft: filterBarangay === 'All Barangays' ? '3px solid #60a5fa' : '3px solid transparent',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(96,165,250,0.25)'; e.currentTarget.style.color = '#f1f5f9'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = filterBarangay === 'All Barangays' ? 'rgba(96,165,250,0.18)' : 'transparent'; e.currentTarget.style.color = filterBarangay === 'All Barangays' ? '#93bbfc' : '#cbd5e1'; }}
+                >
+                  <span style={{ flex: 1 }}>All Barangays</span>
+                  {filterBarangay === 'All Barangays' && <span style={{ color: '#60a5fa', fontSize: '12px' }}>✓</span>}
+                </div>
+                {ALL_BARANGAYS.map(b => (
+                  <div
+                    key={b}
+                    onClick={() => { setFilterBarangay(b); setBarangayOpen(false); }}
+                    style={{
+                      padding: '8px 14px', cursor: 'pointer', fontSize: '13px',
+                      display: 'flex', alignItems: 'center', gap: '8px',
+                      borderRadius: '6px',
+                      justifyContent: 'flex-start',
+                      background: filterBarangay === b ? 'rgba(96,165,250,0.18)' : 'transparent',
+                      color: filterBarangay === b ? '#93bbfc' : '#cbd5e1',
+                      fontWeight: filterBarangay === b ? '600' : '400',
+                      borderLeft: filterBarangay === b ? '3px solid #60a5fa' : '3px solid transparent',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(96,165,250,0.25)'; e.currentTarget.style.color = '#f1f5f9'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = filterBarangay === b ? 'rgba(96,165,250,0.18)' : 'transparent'; e.currentTarget.style.color = filterBarangay === b ? '#93bbfc' : '#cbd5e1'; }}
+                  >
+                    <span style={{ flex: 1 }}>{b}</span>
+                    {filterBarangay === b && <span style={{ color: '#60a5fa', fontSize: '12px' }}>✓</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Status */}

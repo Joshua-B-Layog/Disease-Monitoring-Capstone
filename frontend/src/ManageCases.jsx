@@ -90,6 +90,10 @@ export default function ManageCases({ caseFilter, setCaseFilter }) {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const exportRef = useRef(null);
 
+  // Barangay filter dropdown
+  const [barangayOpen, setBarangayOpen] = useState(false);
+  const barangayRef = useRef(null);
+
   // Delete modal
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -150,6 +154,9 @@ export default function ManageCases({ caseFilter, setCaseFilter }) {
     const handler = (e) => {
       if (exportRef.current && !exportRef.current.contains(e.target)) {
         setShowExportMenu(false);
+      }
+      if (barangayRef.current && !barangayRef.current.contains(e.target)) {
+        setBarangayOpen(false);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -554,11 +561,31 @@ export default function ManageCases({ caseFilter, setCaseFilter }) {
               style={{ padding: '8px 12px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)', fontSize: '13px', width: '180px' }} />
 
             {/* Barangay filter */}
-            <select value={filterBarangay} onChange={e => { setFilterBarangay(e.target.value); setTablePage(1); }}
-              style={{ padding: '8px 12px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)', fontSize: '13px' }}>
-              <option>All Barangays</option>
-              {CABUYAO_BARANGAYS.map(b => <option key={b}>{b}</option>)}
-            </select>
+            <div style={{ position: 'relative' }} ref={barangayRef}>
+              <button className="mc-custom-dropdown-btn" onClick={() => setBarangayOpen(!barangayOpen)}>
+                <span>{filterBarangay}</span>
+                <span style={{ marginLeft: '6px', opacity: 0.6 }}>▾</span>
+              </button>
+              {barangayOpen && (
+                <div className="mc-custom-dropdown-panel">
+                  <div
+                    className={`mc-custom-dropdown-item ${filterBarangay === 'All Barangays' ? 'mc-custom-dropdown-item--active' : ''}`}
+                    onClick={() => { setFilterBarangay('All Barangays'); setTablePage(1); setBarangayOpen(false); }}
+                  >
+                    All Barangays
+                  </div>
+                  {CABUYAO_BARANGAYS.map(b => (
+                    <div
+                      key={b}
+                      className={`mc-custom-dropdown-item ${filterBarangay === b ? 'mc-custom-dropdown-item--active' : ''}`}
+                      onClick={() => { setFilterBarangay(b); setTablePage(1); setBarangayOpen(false); }}
+                    >
+                      {b}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* Status filter */}
             <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setTablePage(1); }}

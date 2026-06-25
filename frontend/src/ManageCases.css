@@ -57,3 +57,27 @@
 .back-link { color: white; background: none; border: none; cursor: pointer; margin-bottom: 20px; display: block; }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* ── Custom dropdown for Barangay filter ── */
+.mc-custom-dropdown-btn {
+  padding: 8px 12px; background: var(--input-bg);
+  border: 1px solid var(--border-color); border-radius: 6px;
+  color: var(--text-main); font-size: 13px; cursor: pointer;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 6px; white-space: nowrap; box-sizing: border-box;
+}
+.mc-custom-dropdown-btn:hover { border-color: var(--text-muted); }
+.mc-custom-dropdown-panel {
+  position: absolute; top: 100%; left: 0; z-index: 100;
+  max-height: 250px; overflow-y: auto; margin-top: 4px; min-width: 100%;
+  background: var(--bg-surface); border: 1px solid var(--border-color);
+  border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+.mc-custom-dropdown-item {
+  padding: 8px 12px; cursor: pointer; font-size: 13px;
+  color: var(--text-main);
+}
+.mc-custom-dropdown-item:hover { background: var(--input-bg); }
+.mc-custom-dropdown-item--active {
+  background: rgba(59,130,246,0.12); color: #60a5fa; font-weight: 600;
+}

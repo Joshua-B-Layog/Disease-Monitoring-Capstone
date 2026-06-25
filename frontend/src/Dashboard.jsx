@@ -20,6 +20,9 @@ const Dashboard = ({ setActiveTab, loggedUser }) => {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const exportRef = useRef(null);
 
+  const [diseaseOpen, setDiseaseOpen] = useState(false);
+  const diseaseRef = useRef(null);
+
   useEffect(() => {
     axios.get('http://localhost:5000/api/disease_cases')
       .then((res) => { setCases(res.data); setLoading(false); })
@@ -30,6 +33,9 @@ const Dashboard = ({ setActiveTab, loggedUser }) => {
     const handler = (e) => {
       if (exportRef.current && !exportRef.current.contains(e.target)) {
         setShowExportMenu(false);
+      }
+      if (diseaseRef.current && !diseaseRef.current.contains(e.target)) {
+        setDiseaseOpen(false);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -337,13 +343,40 @@ const Dashboard = ({ setActiveTab, loggedUser }) => {
           {/* Disease dropdown */}
           <div>
             <label style={{ color: 'var(--text-muted)', fontSize: '11px', display: 'block', marginBottom: '4px' }}>Disease</label>
-            <select
-              value={selectedDisease}
-              onChange={(e) => setSelectedDisease(e.target.value)}
-              style={{ width: '100%', padding: '7px 10px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box' }}
-            >
-              {ALL_DISEASES.map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
+            <div style={{ position: 'relative' }} ref={diseaseRef}>
+              <button
+                onClick={() => setDiseaseOpen(!diseaseOpen)}
+                style={{ width: '100%', padding: '7px 10px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              >
+                <span>{selectedDisease}</span>
+                <span style={{ marginLeft: '6px', opacity: 0.6 }}>▾</span>
+              </button>
+              {diseaseOpen && (
+                <div style={{
+                  position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
+                  maxHeight: '250px', overflowY: 'auto', marginTop: '4px',
+                  background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
+                  borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                }}>
+                  {ALL_DISEASES.map(d => (
+                    <div
+                      key={d}
+                      onClick={() => { setSelectedDisease(d); setDiseaseOpen(false); }}
+                      style={{
+                        padding: '7px 10px', cursor: 'pointer', fontSize: '13px',
+                        background: selectedDisease === d ? 'var(--input-bg)' : 'transparent',
+                        color: 'var(--text-main)',
+                        fontWeight: selectedDisease === d ? '600' : '400',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--input-bg)'}
+                      onMouseLeave={e => { e.currentTarget.style.background = selectedDisease === d ? 'var(--input-bg)' : 'transparent'; }}
+                    >
+                      {d}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* ── FIX: Date range — stacked so neither overflows ── */}

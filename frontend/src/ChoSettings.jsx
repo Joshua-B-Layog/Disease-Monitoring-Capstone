@@ -9,6 +9,8 @@ export default function CHOSettings({
   setLoggedUser,
   profilePhoto,
   onProfilePhotoChange,
+  theme,
+  toggleTheme,
 }) {
   const [currentView, setCurrentView] = useState('menu');
   const fileInputRef = useRef(null);
@@ -902,11 +904,11 @@ export default function CHOSettings({
               </div>
               <div className="security-sessions-container">
                 <div className="session-list-row">
-                  <div className="session-info-meta"><h4>Dark Mode</h4><p>Switch between light and dark theme</p></div>
-                  <label className="figma-toggle-switch">
-                    <input type="checkbox" checked={systemPrefs.darkMode} onChange={e => setSystemPrefs({ ...systemPrefs, darkMode: e.target.checked })} />
-                    <span className="figma-slider" />
-                  </label>
+                    <div className="session-info-meta"><h4>Dark Mode</h4><p>Switch between light and dark theme</p></div>
+                    <label className="figma-toggle-switch">
+                      <input type="checkbox" checked={theme === 'dark'} onChange={() => toggleTheme()} />
+                      <span className="figma-slider" />
+                    </label>
                 </div>
                 <div className="session-list-row">
                   <div className="session-info-meta"><h4>Font Size</h4><p>Adjust text size for better readability</p></div>
@@ -928,6 +930,95 @@ export default function CHOSettings({
               </div>
             </div>
 
+            {/* ── Language & Region ── */}
+            <div className="security-section-card">
+              <div className="security-card-header">
+                <div className="security-icon-box">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#101828" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="2" y1="12" x2="22" y2="12"/>
+                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                  </svg>
+                </div>
+                <div className="security-header-text">
+                  <h3>Language & Region</h3>
+                  <span className="security-timestamp">Set your preferred language</span>
+                </div>
+              </div>
+              <div className="security-sessions-container">
+                <div className="session-list-row">
+                  <div className="session-info-meta"><h4>Display Language</h4></div>
+                  <div style={{ position: 'relative' }}>
+                    <select value={systemPrefs.displayLanguage} onChange={e => setSystemPrefs({ ...systemPrefs, displayLanguage: e.target.value })}
+                      style={{ background: '#fff', border: '1px solid #d0d5dd', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '14px', cursor: 'pointer', appearance: 'none', color: '#1f2937', minWidth: '120px' }}>
+                      <option>English</option>
+                    </select>
+                    <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#1f2937', fontSize: '12px' }}>▼</span>
+                  </div>
+                </div>
+                <div className="session-list-row">
+                  <div className="session-info-meta"><h4>Time Zone</h4></div>
+                  <div style={{ position: 'relative' }}>
+                    <select value={systemPrefs.timeZone} onChange={e => setSystemPrefs({ ...systemPrefs, timeZone: e.target.value })}
+                      style={{ background: '#fff', border: '1px solid #d0d5dd', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '14px', cursor: 'pointer', appearance: 'none', color: '#1f2937', minWidth: '120px' }}>
+                      <option>Asia/Manila (GMT+8)</option>
+                    </select>
+                    <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#1f2937', fontSize: '12px' }}>▼</span>
+                  </div>
+                </div>
+                <div className="session-list-row">
+                  <div className="session-info-meta"><h4>Date Format</h4></div>
+                  <div style={{ position: 'relative' }}>
+                    <select value={systemPrefs.dateFormat} onChange={e => setSystemPrefs({ ...systemPrefs, dateFormat: e.target.value })}
+                      style={{ background: '#fff', border: '1px solid #d0d5dd', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '14px', cursor: 'pointer', appearance: 'none', color: '#1f2937', minWidth: '120px' }}>
+                      <option>MM/DD/YY</option>
+                    </select>
+                    <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#1f2937', fontSize: '12px' }}>▼</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ── System Behavior ── */}
+            <div className="security-section-card">
+              <div className="security-card-header">
+                <div className="security-icon-box">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#101828" strokeWidth="2">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                    <line x1="8" y1="21" x2="16" y2="21"/>
+                    <line x1="12" y1="17" x2="12" y2="21"/>
+                  </svg>
+                </div>
+                <div className="security-header-text">
+                  <h3>System Behavior</h3>
+                  <span className="security-timestamp">Configure how the system behaves</span>
+                </div>
+              </div>
+              <div className="security-sessions-container">
+                <div className="session-list-row">
+                  <div className="session-info-meta"><h4>Auto-Save</h4><p>Automatically save changes while editing</p></div>
+                  <label className="figma-toggle-switch">
+                    <input type="checkbox" checked={systemPrefs.autoSave} onChange={e => setSystemPrefs({ ...systemPrefs, autoSave: e.target.checked })} />
+                    <span className="figma-slider" />
+                  </label>
+                </div>
+                <div className="session-list-row">
+                  <div className="session-info-meta"><h4>Confirm Before Delete</h4><p>Show confirmation dialog before deleting items</p></div>
+                  <label className="figma-toggle-switch">
+                    <input type="checkbox" checked={systemPrefs.confirmDelete} onChange={e => setSystemPrefs({ ...systemPrefs, confirmDelete: e.target.checked })} />
+                    <span className="figma-slider" />
+                  </label>
+                </div>
+                <div className="session-list-row">
+                  <div className="session-info-meta"><h4>Keyboard Shortcuts</h4><p>Enable keyboard shortcuts for quick actions</p></div>
+                  <label className="figma-toggle-switch">
+                    <input type="checkbox" checked={systemPrefs.keyboardShortcuts} onChange={e => setSystemPrefs({ ...systemPrefs, keyboardShortcuts: e.target.checked })} />
+                    <span className="figma-slider" />
+                  </label>
+                </div>
+              </div>
+            </div>
+
             <div className="notifications-action-container">
               <button className="notifications-save-btn" onClick={() => setCurrentView('menu')}>Save Preferences</button>
             </div>
@@ -939,6 +1030,7 @@ export default function CHOSettings({
           <div className="detail-view-container security-view-view">
             <button className="back-to-settings-btn" onClick={() => setCurrentView('menu')}>← Back to Settings</button>
 
+            {/* Storage Overview */}
             <div className="security-section-card">
               <div className="security-card-header">
                 <div className="security-icon-box">
@@ -970,9 +1062,114 @@ export default function CHOSettings({
                 </div>
               </div>
             </div>
-          </div>
-        )}
 
+            {/* Export Data */}
+            <div className="security-section-card">
+              <div className="security-card-header">
+                <div className="security-icon-box">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                </div>
+                <div className="security-header-text">
+                  <h3>Export Data</h3>
+                  <span className="security-timestamp">Download your data in various formats</span>
+                </div>
+              </div>
+              <div className="security-sessions-container">
+                {[
+                  { label: 'Export as PDF', sub: 'Download all data as PDF documents', color: '#dc2626', icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6' },
+                  { label: 'Export as Excel', sub: 'Download data as Excel spreadsheet', color: '#16a34a', icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6' },
+                  { label: 'Export as CSV', sub: 'Download data as CSV file', color: '#2563eb', icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6' },
+                ].map(row => (
+                  <div key={row.label} className="session-list-row">
+                    <div className="session-info-meta" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={row.color} strokeWidth="2">
+                        <path d={row.icon} />
+                      </svg>
+                      <div>
+                        <h4>{row.label}</h4>
+                        <p>{row.sub}</p>
+                      </div>
+                    </div>
+                    <button style={{ padding: '8px 18px', background: '#fff', border: '1px solid #d0d5dd', borderRadius: '8px', fontSize: '13px', fontWeight: '600', color: '#344054', cursor: 'pointer' }}>
+                      Export
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+              {/* Backup & Restore */}
+              <div className="security-section-card">
+                <div className="security-card-header">
+                  <div className="security-icon-box">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2">
+                      <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                    </svg>
+                  </div>
+                  <div className="security-header-text">
+                    <h3>Backup & Restore</h3>
+                    <span className="security-timestamp">Manage data backups</span>
+                  </div>
+                </div>
+
+                <div style={{ padding: '0 0 16px 0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderTop: '1px solid #f2f4f7' }}>
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ fontSize: '14px', fontWeight: '600', color: '#1d2939' }}>Last Backup</div>
+                      <div style={{ fontSize: '13px', color: '#667085' }}>March 15, 2026 at 2:30 AM</div>
+                    </div>
+                    <span style={{ fontSize: '13px', fontWeight: '600', padding: '4px 12px', borderRadius: '16px', background: '#ecfdf3', color: '#027a48' }}>
+                      Successful
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
+                    <button style={{ flex: 1, padding: '12px', background: '#003cb4', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+                      Create Backup
+                    </button>
+                    <button style={{ flex: 1, padding: '12px', background: '#fff', color: '#344054', border: '1px solid #d0d5dd', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+                      Restore
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0 0 0', marginTop: '12px', borderTop: '1px solid #f2f4f7' }}>
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ fontSize: '14px', fontWeight: '600', color: '#1d2939' }}>Auto-Backup</div>
+                      <div style={{ fontSize: '13px', color: '#667085' }}>Automatically backup data weekly</div>
+                    </div>
+                    <span style={{ fontSize: '13px', fontWeight: '600', color: '#16a34a' }}>Enabled</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Danger Zone */}
+              <div className="security-section-card" style={{ borderColor: '#fecaca' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                  </svg>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#dc2626' }}>Danger Zone</h3>
+                    <span style={{ fontSize: '13px', color: '#94a3b8' }}>Irreversible actions</span>
+                  </div>
+                </div>
+
+                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '16px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
+                  <div style={{ textAlign: 'left' }}>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: '#b91c1c', marginBottom: '4px' }}>Clear All Data</div>
+                    <div style={{ fontSize: '13px', color: '#991b1b' }}>This will permanently delete all your data. This action cannot be undone.</div>
+                  </div>
+                  <button style={{ padding: '10px 20px', background: '#fff', border: '1px solid #fca5a5', borderRadius: '8px', fontSize: '13px', fontWeight: '600', color: '#dc2626', cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                    🗑️ Clear Data
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}Ca
       </div>
     </div>
   );

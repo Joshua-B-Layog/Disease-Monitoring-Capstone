@@ -39,6 +39,11 @@ db.query('SELECT 1', (err) => {
     }
 });
 
+db.query('CREATE TABLE IF NOT EXISTS notifications (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT, title VARCHAR(255), message TEXT, type VARCHAR(50), is_read TINYINT DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, link_to VARCHAR(100), FOREIGN KEY (user_id) REFERENCES users(user_id))', (err) => {
+    if (err) console.error('Error creating notifications table:', err.message);
+    else console.log('Notifications table created/verified');
+});
+
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -399,18 +404,42 @@ app.delete('/api/cases/:id', (req, res) => {
     const { id } = req.params;
     console.log("--- Delete Case ---", { id });
 
-    const deleteQuery = 'DELETE FROM disease_cases WHERE case_id = ?';
+    const fetchCaseQuery = `
+        SELECT dc.patient_name, d.name AS disease_name, b.name AS barangay_name, dc.barangay_id
+        FROM disease_cases dc
+        LEFT JOIN diseases d ON dc.disease_id = d.id
+        LEFT JOIN barangays b ON dc.barangay_id = b.id
+        WHERE dc.case_id = ?
+    `;
     
-    db.query(deleteQuery, [id], (err, result) => {
+    db.query(fetchCaseQuery, [id], (err, caseResults) => {
         if (err) {
-            console.error("Delete case error:", err.message);
+            console.error("Fetch case error before delete:", err.message);
             return res.status(500).json({ error: err.message });
         }
-        if (result.affectedRows === 0) {
+        
+        if (!caseResults || caseResults.length === 0) {
             return res.status(404).json({ error: 'Case not found.' });
         }
-        console.log(`✅ Case ${id} deleted from database.`);
-        return res.status(200).json({ message: 'Case deleted successfully.' });
+        
+        const caseInfo = caseResults[0];
+        const { patient_name, disease_name, barangay_name, barangay_id } = caseInfo;
+
+        const deleteQuery = 'DELETE FROM disease_cases WHERE case_id = ?';
+        
+        db.query(deleteQuery, [id], (delErr, delResult) => {
+            if (delErr) {
+                console.error("Delete case error:", delErr.message);
+                return res.status(500).json({ error: delErr.message });
+            }
+            
+            const title = 'Case Deleted';
+            const message = `Case for ${patient_name} (${disease_name}) in Barangay ${barangay_name || 'N/A'} has been deleted.`;
+            createNotificationForUsers(title, message, 'delete', 'ManageCases', barangay_id);
+
+            console.log(`✅ Case ${id} deleted from database.`);
+            return res.status(200).json({ message: 'Case deleted successfully.' });
+        });
     });
 });
 
@@ -1002,7 +1031,7 @@ function checkAndAlertHighRisk(barangay_id, barangay_name) {
             
             const checkDuplicateQuery = `
                 SELECT id FROM notifications 
-                WHERE type = 'high_risk' AND title LIKE ? AND created_at > NOW() - INTERVAL 1 HOUR
+                WHERE type = 'high_risk' AND message LIKE ? AND created_at > NOW() - INTERVAL 1 HOUR
                 LIMIT 1
             `;
             db.query(checkDuplicateQuery, [`%${barangay_name}%`], (dupErr, dupResults) => {

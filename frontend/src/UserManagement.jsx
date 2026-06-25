@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
 const CHO_BARANGAYS = {
@@ -44,6 +44,9 @@ export default function UserManagement() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
+  const [barangayOpen, setBarangayOpen] = useState(false);
+  const barangayRef = useRef(null);
+
   const fetchUsers = () => {
     setLoading(true);
     axios.get('http://localhost:5000/api/users')
@@ -57,6 +60,16 @@ export default function UserManagement() {
     axios.get('http://localhost:5000/api/barangays')
       .then(res => setBarangayList(res.data))
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (barangayRef.current && !barangayRef.current.contains(e.target)) {
+        setBarangayOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, []);
 
   const filteredUsers = users.filter(u => {
@@ -209,20 +222,53 @@ export default function UserManagement() {
           <input type="text" placeholder="Search Accounts..."
             value={searchQuery} onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
             style={{ ...inputStyle, width: '220px' }} />
-          <select value={filterBarangay} onChange={e => { setFilterBarangay(e.target.value); setCurrentPage(1); }}
-            style={{ ...inputStyle, width: '180px' }}>
-            <option value="All Barangays">All Barangays</option>
-            <optgroup label="CHO Unit I">
-              {barangayList.filter(b => getChoUnit(b.name) === 'CHO Unit I').map(b => (
-                <option key={b.id} value={b.name}>{b.name}</option>
-              ))}
-            </optgroup>
-            <optgroup label="CHO Unit II">
-              {barangayList.filter(b => getChoUnit(b.name) === 'CHO Unit II').map(b => (
-                <option key={b.id} value={b.name}>{b.name}</option>
-              ))}
-            </optgroup>
-          </select>
+          <div style={{ position: 'relative', width: '180px' }} ref={barangayRef}>
+            <button
+              onClick={() => setBarangayOpen(!barangayOpen)}
+              style={{ ...inputStyle, width: '100%', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}
+            >
+              <span>{filterBarangay}</span>
+              <span style={{ marginLeft: '6px', opacity: 0.6 }}>▾</span>
+            </button>
+            {barangayOpen && (
+              <div style={{
+                position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
+                maxHeight: '250px', overflowY: 'auto', marginTop: '4px',
+                background: '#fff', border: '1px solid #e2e8f0',
+                borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+              }}>
+                <div
+                  onClick={() => { setFilterBarangay('All Barangays'); setCurrentPage(1); setBarangayOpen(false); }}
+                  style={{
+                    padding: '8px 12px', cursor: 'pointer', fontSize: '13px',
+                    background: filterBarangay === 'All Barangays' ? '#eff6ff' : 'transparent',
+                    color: filterBarangay === 'All Barangays' ? '#2563eb' : '#334155',
+                    fontWeight: filterBarangay === 'All Barangays' ? '600' : '400',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                  onMouseLeave={e => { e.currentTarget.style.background = filterBarangay === 'All Barangays' ? '#eff6ff' : 'transparent'; }}
+                >
+                  All Barangays
+                </div>
+                {barangayList.map(b => (
+                  <div
+                    key={b.id}
+                    onClick={() => { setFilterBarangay(b.name); setCurrentPage(1); setBarangayOpen(false); }}
+                    style={{
+                      padding: '8px 12px', cursor: 'pointer', fontSize: '13px',
+                      background: filterBarangay === b.name ? '#eff6ff' : 'transparent',
+                      color: filterBarangay === b.name ? '#2563eb' : '#334155',
+                      fontWeight: filterBarangay === b.name ? '600' : '400',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                    onMouseLeave={e => { e.currentTarget.style.background = filterBarangay === b.name ? '#eff6ff' : 'transparent'; }}
+                  >
+                    {b.name}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1); }}
             style={{ ...inputStyle, width: '140px' }}>
             <option>All Status</option>

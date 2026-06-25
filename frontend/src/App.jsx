@@ -51,7 +51,7 @@ function App() {
     if (saved) setProfilePhoto(saved);
   }, []);
 
-  // ── Notification polling every 30 seconds ──
+  // ── Notification polling every 10 seconds ──
 useEffect(() => {
   if (!loggedUserId) return;
 
@@ -63,7 +63,7 @@ useEffect(() => {
   };
 
   fetchNotifications();
-  const interval = setInterval(fetchNotifications, 30000);
+  const interval = setInterval(fetchNotifications, 10000);
   return () => clearInterval(interval);
 }, [loggedUserId]);
 
@@ -160,6 +160,8 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             setLoggedUser={setLoggedUser}
             profilePhoto={profilePhoto}
             onProfilePhotoChange={handleProfilePhotoChange}
+            theme={theme}
+            toggleTheme={toggleTheme}
           />
         );
       default:
@@ -225,11 +227,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
           </div>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-            <button onClick={toggleTheme} className="theme-toggle-btn" style={{ position: 'static' }}>
-              {theme === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode'}
-            </button>
-
-                        {/* ── BELL ICON + NOTIFICATION DROPDOWN ── */}
+            {/* ── BELL ICON + NOTIFICATION DROPDOWN ── */}
             <div style={{ position: 'relative' }} ref={notifRef}>
               <button
                 onClick={() => {
