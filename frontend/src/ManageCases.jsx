@@ -43,6 +43,13 @@ const CABUYAO_BARANGAYS = [
   'Marinig','Niugan','Pitland','Pulo','Sala','San Isidro'
 ];
 
+const PUROK_OPTIONS = [
+  'Purok 1', 'Purok 2', 'Purok 3', 'Purok 4', 'Purok 5', 'Purok 6',
+  'Blk 1', 'Blk 2', 'Blk 3', 'Blk 4', 'Blk 5',
+  'Phase 1', 'Phase 2', 'Phase 3',
+  'Lot 1', 'Lot 2', 'Lot 3', 'Lot 4', 'Lot 5'
+];
+
 const CASES_PER_PAGE = 10;
 
 const EMPTY_FORM = {
@@ -81,7 +88,7 @@ const formatDateStr = (dateStr, fmt) => {
   return `${m}/${day}/${shortY}`;
 };
 
-export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, autoSave, confirmDelete, keyboardShortcuts, fontScale, compactMode, loggedUserId }) {
+export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, autoSave, confirmDelete, keyboardShortcuts, fontScale, compactMode, loggedUserId, loginRole, loginBarangay }) {
   const [view, setView] = useState('categories'); // 'categories' | 'list' | 'add' | 'edit'
   const [cardPage, setCardPage] = useState(0);
   const [selectedDisease, setSelectedDisease] = useState(null);
@@ -91,11 +98,15 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const [loadingCases, setLoadingCases] = useState(false);
   const [barangayList, setBarangayList] = useState([]);
   const [allDiseases, setAllDiseases] = useState([]);
+  const baseCases = (loginRole === 'BHW' && loginBarangay)
+    ? allCases.filter(c => c.barangay_name === loginBarangay)
+    : allCases;
 
   // Table filters
   const [searchQuery, setSearchQuery] = useState('');
   const [filterBarangay, setFilterBarangay] = useState('All Barangays');
   const [filterStatus, setFilterStatus] = useState('All Status');
+  const [filterPurok, setFilterPurok] = useState('All Puroks');
   // ── NEW: sub-disease filter for the "Other" card ──
   const [filterSubDisease, setFilterSubDisease] = useState('All Remaining Diseases');
   const [tablePage, setTablePage] = useState(1);
@@ -118,6 +129,16 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   // Barangay filter dropdown
   const [barangayOpen, setBarangayOpen] = useState(false);
   const barangayRef = useRef(null);
+
+  // Purok/Blk/Phase filter dropdown
+  const [purokOpen, setPurokOpen] = useState(false);
+  const purokRef = useRef(null);
+
+  // Form dropdowns
+  const [barangayFormOpen, setBarangayFormOpen] = useState(false);
+  const [diseaseOpen, setDiseaseOpen] = useState(false);
+  const barangayFormRef = useRef(null);
+  const diseaseFormRef = useRef(null);
 
   // Sub-disease filter dropdown
   const [subDiseaseOpen, setSubDiseaseOpen] = useState(false);
@@ -204,6 +225,11 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       if (shortcutsRef.current && !shortcutsRef.current.contains(e.target)) {
         setShowShortcutsGuide(false);
       }
+      if (purokRef.current && !purokRef.current.contains(e.target)) {
+        setPurokOpen(false);
+      }
+      if (barangayFormRef.current && !barangayFormRef.current.contains(e.target)) setBarangayFormOpen(false);
+      if (diseaseFormRef.current && !diseaseFormRef.current.contains(e.target)) setDiseaseOpen(false);
       setSubDiseaseOpen(false);
     };
     document.addEventListener('mousedown', handler);
@@ -272,7 +298,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     return dn === card.dbName.toLowerCase();
   };
 
-  const getCaseCount = (card) => allCases.filter(c => matchesCard(c, card)).length;
+  const getCaseCount = (card) => baseCases.filter(c => matchesCard(c, card)).length;
 
   // ── Get unique "Other" disease names from allCases for the sub-filter dropdown ──
   const getOtherDiseaseNames = () => {
@@ -294,8 +320,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   // ── Filter cases for list ──
   const getFilteredCases = () => {
     let result = selectedDisease
-      ? allCases.filter(c => matchesCard(c, selectedDisease))
-      : allCases;
+      ? baseCases.filter(c => matchesCard(c, selectedDisease))
+      : baseCases;
 
     // ── Sub-disease filter (only active for "Other" card) ──
     if (
@@ -311,7 +337,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       const q = searchQuery.toLowerCase();
       result = result.filter(c =>
         (c.patient_name || '').toLowerCase().includes(q) ||
-        String(c.case_id).includes(q)
+        String(c.case_id).includes(q) ||
+        (c.address || '').toLowerCase().includes(q)
       );
     }
     if (filterBarangay !== 'All Barangays') {
@@ -319,6 +346,10 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     }
     if (filterStatus !== 'All Status') {
       result = result.filter(c => c.status === filterStatus);
+    }
+    if (filterPurok !== 'All Puroks') {
+      const q = filterPurok.toLowerCase();
+      result = result.filter(c => (c.address || '').toLowerCase().includes(q));
     }
     return result;
   };
@@ -477,9 +508,15 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   };
 
   const inputStyle = {
-    width: '100%', padding: '10px 12px', borderRadius: '6px',
-    border: '1px solid #d1d5db', background: '#f9fafb', color: '#1f2937',
-    fontSize: '14px', boxSizing: 'border-box', outline: 'none'
+    width: '100%',
+    padding: '10px 12px',
+    borderRadius: '6px',
+    border: '1px solid #d1d5db',
+    background: '#f9fafb',
+    color: '#1f2937',
+    fontSize: '14px',
+    boxSizing: 'border-box',
+    outline: 'none',
   };
 
   // ═══════════════════════════════════
@@ -704,32 +741,57 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               value={searchQuery} onChange={e => { setSearchQuery(e.target.value); setTablePage(1); }}
               style={{ padding: '8px 12px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)', fontSize: '13px', width: '180px' }} />
 
-            {/* Barangay filter */}
-            <div style={{ position: 'relative' }} ref={barangayRef}>
-              <button className="mc-custom-dropdown-btn" onClick={() => setBarangayOpen(!barangayOpen)}>
-                <span>{filterBarangay}</span>
-                <span style={{ marginLeft: '6px', opacity: 0.6 }}>▾</span>
-              </button>
-              {barangayOpen && (
-                <div className="mc-custom-dropdown-panel">
-                  <div
-                    className={`mc-custom-dropdown-item ${filterBarangay === 'All Barangays' ? 'mc-custom-dropdown-item--active' : ''}`}
-                    onClick={() => { setFilterBarangay('All Barangays'); setTablePage(1); setBarangayOpen(false); }}
-                  >
-                    All Barangays
-                  </div>
-                  {CABUYAO_BARANGAYS.map(b => (
+            {/* Barangay filter — hidden for BHW */}
+            {loginRole !== 'BHW' && (
+              <div style={{ position: 'relative' }} ref={barangayRef}>
+                <button className="mc-custom-dropdown-btn" onClick={() => setBarangayOpen(!barangayOpen)}>
+                  <span>{filterBarangay}</span>
+                  <span style={{ marginLeft: '6px', opacity: 0.6 }}>▾</span>
+                </button>
+                {barangayOpen && (
+                  <div className="mc-custom-dropdown-panel">
                     <div
-                      key={b}
-                      className={`mc-custom-dropdown-item ${filterBarangay === b ? 'mc-custom-dropdown-item--active' : ''}`}
-                      onClick={() => { setFilterBarangay(b); setTablePage(1); setBarangayOpen(false); }}
+                      className={`mc-custom-dropdown-item ${filterBarangay === 'All Barangays' ? 'mc-custom-dropdown-item--active' : ''}`}
+                      onClick={() => { setFilterBarangay('All Barangays'); setTablePage(1); setBarangayOpen(false); }}
                     >
-                      {b}
+                      All Barangays
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                    {CABUYAO_BARANGAYS.map(b => (
+                      <div
+                        key={b}
+                        className={`mc-custom-dropdown-item ${filterBarangay === b ? 'mc-custom-dropdown-item--active' : ''}`}
+                        onClick={() => { setFilterBarangay(b); setTablePage(1); setBarangayOpen(false); }}
+                      >
+                        {b}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Purok/Blk/Phase filter — only for BHW */}
+            {loginRole === 'BHW' && (
+              <div style={{ position: 'relative' }} ref={purokRef}>
+                <button className="mc-custom-dropdown-btn" onClick={() => setPurokOpen(!purokOpen)}>
+                  <span>{filterPurok}</span>
+                  <span style={{ marginLeft: '6px', opacity: 0.6 }}>▾</span>
+                </button>
+                {purokOpen && (
+                  <div className="mc-custom-dropdown-panel">
+                    {['All Puroks', 'Purok 1', 'Purok 2', 'Purok 3', 'Purok 4', 'Purok 5', 'Purok 6', 'Blk 1', 'Blk 2', 'Blk 3', 'Blk 4', 'Blk 5', 'Phase 1', 'Phase 2', 'Phase 3', 'Lot 1', 'Lot 2', 'Lot 3', 'Lot 4', 'Lot 5'].map(p => (
+                      <div
+                        key={p}
+                        className={`mc-custom-dropdown-item ${filterPurok === p ? 'mc-custom-dropdown-item--active' : ''}`}
+                        onClick={() => { setFilterPurok(p); setTablePage(1); setPurokOpen(false); }}
+                      >
+                        {p}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Status filter */}
             <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setTablePage(1); }}
@@ -993,14 +1055,126 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   <input type="text" placeholder="123 Rizal St, San Isidro Cabuyao" style={inputStyle}
                     value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} />
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Assigned Barangay</label>
-                  <select style={inputStyle} value={formData.barangayId}
-                    onChange={e => setFormData({ ...formData, barangayId: e.target.value })}>
-                    <option value="">— Select Barangay —</option>
-                    {barangayList.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                  </select>
-                </div>
+                {loginRole === 'BHW' ? (
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Assigned Purok / Blk / Phase / Lot</label>
+                    <div style={{ position: 'relative' }} ref={purokRef}>
+                      <button
+                        type="button"
+                        onClick={() => setPurokOpen(!purokOpen)}
+                        style={{
+                          ...inputStyle,
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          cursor: 'pointer', textAlign: 'left',
+                          border: `1px solid ${purokOpen ? '#3b82f6' : '#d1d5db'}`,
+                        }}
+                      >
+                        <span>{formData.address || '— Select Location —'}</span>
+                        <span style={{
+                          fontSize: '10px', opacity: 0.6, marginLeft: '8px',
+                          transition: 'transform 0.2s', display: 'inline-block',
+                          transform: purokOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                        }}>▾</span>
+                      </button>
+                      {purokOpen && (
+                        <div style={{
+                          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200,
+                          maxHeight: '200px', overflowY: 'auto', marginTop: '4px',
+                          background: '#ffffff', border: '1px solid #d1d5db',
+                          borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                          padding: '4px',
+                        }}>
+                          <div
+                            onClick={() => { setFormData({ ...formData, address: '' }); setPurokOpen(false); }}
+                            style={{
+                              padding: '8px 12px', cursor: 'pointer', fontSize: '13px',
+                              borderRadius: '6px', color: '#64748b',
+                              background: !formData.address ? '#eff6ff' : 'transparent',
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                            onMouseLeave={e => { e.currentTarget.style.background = !formData.address ? '#eff6ff' : 'transparent'; }}
+                          >
+                            — Select Location —
+                          </div>
+                          {PUROK_OPTIONS.map(p => (
+                            <div
+                              key={p}
+                              onClick={() => { setFormData({ ...formData, address: p }); setPurokOpen(false); }}
+                              style={{
+                                padding: '8px 12px', cursor: 'pointer', fontSize: '13px',
+                                borderRadius: '6px',
+                                background: formData.address === p ? '#eff6ff' : 'transparent',
+                                color: formData.address === p ? '#2563eb' : '#1f2937',
+                                fontWeight: formData.address === p ? '600' : '400',
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                              onMouseLeave={e => { e.currentTarget.style.background = formData.address === p ? '#eff6ff' : 'transparent'; }}
+                            >
+                              {p}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Assigned Barangay</label>
+                    <div style={{ position: 'relative' }} ref={barangayFormRef}>
+                      <button
+                        type="button"
+                        onClick={() => setBarangayFormOpen(!barangayFormOpen)}
+                        style={{
+                          ...inputStyle,
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          cursor: 'pointer', textAlign: 'left',
+                          border: `1px solid ${barangayFormOpen ? '#3b82f6' : '#d1d5db'}`,
+                        }}
+                      >
+                        <span>{barangayList.find(b => String(b.id) === String(formData.barangayId))?.name || '— Select Barangay —'}</span>
+                        <span style={{
+                          fontSize: '10px', opacity: 0.6, marginLeft: '8px',
+                          transition: 'transform 0.2s', display: 'inline-block',
+                          transform: barangayFormOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                        }}>▾</span>
+                      </button>
+                      {barangayFormOpen && (
+                        <div style={{
+                          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200,
+                          maxHeight: '200px', overflowY: 'auto', marginTop: '4px',
+                          background: '#ffffff', border: '1px solid #d1d5db',
+                          borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                          padding: '4px',
+                        }}>
+                          <div
+                            onClick={() => { setFormData({ ...formData, barangayId: '' }); setBarangayFormOpen(false); }}
+                            style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '13px', borderRadius: '6px', color: '#64748b' }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                          >
+                            — Select Barangay —
+                          </div>
+                          {barangayList.map(b => (
+                            <div
+                              key={b.id}
+                              onClick={() => { setFormData({ ...formData, barangayId: b.id }); setBarangayFormOpen(false); }}
+                              style={{
+                                padding: '8px 12px', cursor: 'pointer', fontSize: '13px', borderRadius: '6px',
+                                background: String(formData.barangayId) === String(b.id) ? '#eff6ff' : 'transparent',
+                                color: String(formData.barangayId) === String(b.id) ? '#2563eb' : '#1f2937',
+                                fontWeight: String(formData.barangayId) === String(b.id) ? '600' : '400',
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                              onMouseLeave={e => { e.currentTarget.style.background = String(formData.barangayId) === String(b.id) ? '#eff6ff' : 'transparent'; }}
+                            >
+                              {b.name}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* RIGHT: Clinical Info */}
@@ -1010,12 +1184,59 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 </h4>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Disease Type</label>
-                  <select style={inputStyle} value={currentDisease}
-                    onChange={e => setFormData({ ...formData, diseaseType: e.target.value })}>
-                    <option value="">— Select Disease —</option>
-                    {ALL_DISEASE_OPTIONS.map(d => <option key={d} value={d}>{d}</option>)}
-                    <option value="Other Communicable Diseases">Other Communicable Diseases</option>
-                  </select>
+                  <div style={{ position: 'relative' }} ref={diseaseFormRef}>
+                    <button
+                      type="button"
+                      onClick={() => setDiseaseOpen(!diseaseOpen)}
+                      style={{
+                        ...inputStyle,
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        cursor: 'pointer', textAlign: 'left',
+                        border: `1px solid ${diseaseOpen ? '#3b82f6' : '#d1d5db'}`,
+                      }}
+                    >
+                      <span>{formData.diseaseType || '— Select Disease —'}</span>
+                      <span style={{
+                        fontSize: '10px', opacity: 0.6, marginLeft: '8px',
+                        transition: 'transform 0.2s', display: 'inline-block',
+                        transform: diseaseOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                      }}>▾</span>
+                    </button>
+                    {diseaseOpen && (
+                      <div style={{
+                        position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200,
+                        maxHeight: '200px', overflowY: 'auto', marginTop: '4px',
+                        background: '#ffffff', border: '1px solid #d1d5db',
+                        borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                        padding: '4px',
+                      }}>
+                        <div
+                          onClick={() => { setFormData({ ...formData, diseaseType: '' }); setDiseaseOpen(false); }}
+                          style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '13px', borderRadius: '6px', color: '#64748b' }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                        >
+                          — Select Disease —
+                        </div>
+                        {ALL_DISEASE_OPTIONS.concat(['Other Communicable Diseases']).map(d => (
+                          <div
+                            key={d}
+                            onClick={() => { setFormData({ ...formData, diseaseType: d }); setDiseaseOpen(false); }}
+                            style={{
+                              padding: '8px 12px', cursor: 'pointer', fontSize: '13px', borderRadius: '6px',
+                              background: formData.diseaseType === d ? '#eff6ff' : 'transparent',
+                              color: formData.diseaseType === d ? '#2563eb' : '#1f2937',
+                              fontWeight: formData.diseaseType === d ? '600' : '400',
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                            onMouseLeave={e => { e.currentTarget.style.background = formData.diseaseType === d ? '#eff6ff' : 'transparent'; }}
+                          >
+                            {d}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 {isOther && (
                   <div>

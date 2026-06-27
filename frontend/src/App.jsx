@@ -33,6 +33,7 @@ function App() {
   const [sessionContext, setSessionContext] = useState(''); 
   const [loggedUser, setLoggedUser]       = useState('');
   const [loggedUserId, setLoggedUserId]   = useState(null);
+  const [loggedUserBarangay, setLoggedUserBarangay] = useState(null);
 
   const [profilePhoto, setProfilePhoto]   = useState(null);
 
@@ -216,12 +217,14 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             dateFormat={dateFormat}
             fontScale={fontScale}
             compactMode={compactMode}
+            loginRole={loginRole}
+            loginBarangay={loggedUserBarangay}
           />
         );
       case 'Manage Cases':
-        return <ManageCases caseFilter={caseFilter} setCaseFilter={setCaseFilter} dateFormat={dateFormat} autoSave={autoSave} confirmDelete={confirmDelete} keyboardShortcuts={keyboardShortcuts} fontScale={fontScale} compactMode={compactMode} loggedUserId={loggedUserId} />;
+        return <ManageCases caseFilter={caseFilter} setCaseFilter={setCaseFilter} dateFormat={dateFormat} autoSave={autoSave} confirmDelete={confirmDelete} keyboardShortcuts={keyboardShortcuts} fontScale={fontScale} compactMode={compactMode} loggedUserId={loggedUserId} loginRole={loginRole} loginBarangay={loggedUserBarangay} />;
       case 'Map View':
-        return <MapView setActiveTab={setActiveTab} setCaseFilter={setCaseFilter} fontScale={fontScale} compactMode={compactMode} />;
+        return <MapView setActiveTab={setActiveTab} setCaseFilter={setCaseFilter} fontScale={fontScale} compactMode={compactMode} loginRole={loginRole} loginBarangay={loggedUserBarangay} />;
       case 'User Accounts': 
         return <UserManagement dateFormat={dateFormat} confirmDelete={confirmDelete} fontScale={fontScale} compactMode={compactMode} loggedUserId={loggedUserId} />;
       case 'Audit Reports':
@@ -272,6 +275,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
     setSessionContext(sessionData.context);
     setLoggedUser(sessionData.name || sessionData.username);
     setLoggedUserId(sessionData.id || null);
+    setLoggedUserBarangay(sessionData.barangay || null);
   };
 
   const handleLogout = () => { 

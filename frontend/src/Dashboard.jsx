@@ -24,7 +24,7 @@ const formatDateStr = (dateStr, fmt) => {
   return `${m}/${day}/${shortY}`;
 };
 
-const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMode }) => {
+const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMode, loginRole, loginBarangay }) => {
   const [cases, setCases] = useState([]);
   const [selectedDisease, setSelectedDisease] = useState('Dengue');
   const [loading, setLoading] = useState(true);
@@ -69,18 +69,22 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  const displayCases = (loginRole === 'BHW' && loginBarangay)
+    ? cases.filter(c => c.barangay_name === loginBarangay)
+    : cases;
+
   if (loading) {
     return <div style={{ color: 'var(--text-main)', padding: '40px', textAlign: 'center' }}>Loading dashboard data...</div>;
   }
 
   // --- STAT CARDS ---
-  const totalCases = cases.length;
-  const activeCases = cases.filter(c => ['Active', 'Pending', 'Under Treatment'].includes(c.status)).length;
-  const recoveredCases = cases.filter(c => c.status === 'Recovered').length;
-  const deathCases = cases.filter(c => c.status === 'Deceased').length;
+  const totalCases = displayCases.length;
+  const activeCases = displayCases.filter(c => ['Active', 'Pending', 'Under Treatment'].includes(c.status)).length;
+  const recoveredCases = displayCases.filter(c => c.status === 'Recovered').length;
+  const deathCases = displayCases.filter(c => c.status === 'Deceased').length;
 
   // --- BAR CHART DATA ---
-  const diseaseFilteredCases = cases.filter(
+  const diseaseFilteredCases = displayCases.filter(
     c => c.disease_name && c.disease_name.toLowerCase() === selectedDisease.toLowerCase()
   );
   const barangayCounts = {};
@@ -94,8 +98,8 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   const highestCount = sortedBars.length > 0 ? sortedBars[0].count : 1;
 
   // --- PAGINATION ---
-  const totalPages = Math.ceil(cases.length / CASES_PER_PAGE);
-  const paginatedCases = cases.slice(
+  const totalPages = Math.ceil(displayCases.length / CASES_PER_PAGE);
+  const paginatedCases = displayCases.slice(
     (currentPage - 1) * CASES_PER_PAGE,
     currentPage * CASES_PER_PAGE
   );
@@ -475,7 +479,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           <h4 style={{ color: 'var(--text-main)', margin: 0, fontSize: '15px', fontWeight: '600' }}>
             Recent Case Reports
             <span style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: '400', marginLeft: '8px' }}>
-              ({cases.length} total)
+              ({displayCases.length} total)
             </span>
           </h4>
           <button
@@ -524,7 +528,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         {/* Pagination */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}>
           <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
-            Showing {(currentPage - 1) * CASES_PER_PAGE + 1}–{Math.min(currentPage * CASES_PER_PAGE, cases.length)} of {cases.length} cases
+            Showing {(currentPage - 1) * CASES_PER_PAGE + 1}–{Math.min(currentPage * CASES_PER_PAGE, displayCases.length)} of {displayCases.length} cases
           </span>
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
             <button

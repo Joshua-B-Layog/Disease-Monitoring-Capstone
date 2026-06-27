@@ -21,11 +21,11 @@ const Sidebar = ({ role, activeTab, setActiveTab, language }) => {
       { name: 'Settings', icon: '⚙️' }
     ],
     BHW: [
-      { name: 'Dashboard', icon: '🏠' },
-      { name: 'New Case Report', icon: '➕' },
-      { name: 'My Barangay', icon: '📍' },
-      { name: 'My Reports', icon: '📄' },
-      { name: 'Profile', icon: '👤' }
+      { name: 'Dashboard', icon: '📊' },
+      { name: 'Manage Cases', icon: '📋' },
+      { name: 'Audit Reports', icon: '📁' },
+      { name: 'Map View', icon: '🗺️' },
+      { name: 'Settings', icon: '⚙️' },
     ]
   };
 
