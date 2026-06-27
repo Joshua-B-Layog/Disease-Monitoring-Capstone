@@ -36,10 +36,24 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   const [diseaseOpen, setDiseaseOpen] = useState(false);
   const diseaseRef = useRef(null);
 
-  useEffect(() => {
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [now, setNow] = useState(Date.now());
+
+  const fetchCasesData = () => {
     axios.get('http://localhost:5000/api/disease_cases')
-      .then((res) => { setCases(res.data); setLoading(false); })
+      .then((res) => { setCases(res.data); setLoading(false); setLastUpdated(Date.now()); })
       .catch(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchCasesData();
+    const interval = setInterval(fetchCasesData, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -448,6 +462,10 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           >
             🖨️ Print Report
           </button>
+
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', paddingTop: '4px' }}>
+            {lastUpdated ? `Updated ${Math.round((now - lastUpdated) / 1000)}s ago` : 'Refreshing...'}
+          </div>
         </div>
       </div>
 

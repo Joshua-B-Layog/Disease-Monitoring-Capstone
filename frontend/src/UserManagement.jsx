@@ -24,7 +24,7 @@ const EMPTY_FORM = {
   role: 'BHW',
 };
 
-export default function UserManagement({ confirmDelete, fontScale, compactMode, dateFormat }) {
+export default function UserManagement({ confirmDelete, fontScale, compactMode, dateFormat, loggedUserId }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [barangayList, setBarangayList] = useState([]);
@@ -34,6 +34,8 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
   const [filterStatus, setFilterStatus] = useState('All Status');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState([]);
+  const [editQueueIndex, setEditQueueIndex] = useState(0);
+  const [bulkDeleteMode, setBulkDeleteMode] = useState(false);
 
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
@@ -143,6 +145,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
       isActive: user.is_active === 1,
       password: '',
       generateTempPassword: false,
+      role: user.role || 'BHW',
     });
     setEditingUser(user);
     setSubmitMsg('');
@@ -163,6 +166,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
       barangayId: formData.barangayId,
       isActive: formData.isActive,
       role: formData.role,
+      loggedUserId: loggedUserId || null,
     };
     if (!editingUser) {
       payload.password = formData.password;
@@ -178,7 +182,19 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
         setSubmitMsg('User account created successfully!');
       }
       fetchUsers();
-      setTimeout(() => { setShowModal(false); setSubmitMsg(''); setSubmitLoading(false); }, 1200);
+      const nextIdx = editQueueIndex + 1;
+      if (selectedIds.length > 1 && nextIdx < selectedIds.length && editingUser && selectedIds.includes(editingUser.user_id)) {
+        setEditQueueIndex(nextIdx);
+        const nextUser = users.find(u => u.user_id === selectedIds[nextIdx]);
+        if (nextUser) {
+          setSubmitMsg('');
+          setSubmitLoading(false);
+          setShowModal(false);
+          setTimeout(() => openEdit(nextUser), 100);
+          return;
+        }
+      }
+      setTimeout(() => { setShowModal(false); setSubmitMsg(''); setSubmitLoading(false); setEditQueueIndex(0); setSelectedIds([]); }, 1200);
     } catch (err) {
       setSubmitMsg('Error: ' + (err.response?.data?.error || err.message));
       setSubmitLoading(false);
@@ -189,9 +205,19 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
     if (!deleteTarget) return;
     setDeleteLoading(true);
     try {
-      await axios.delete(`http://localhost:5000/api/users/${deleteTarget.user_id}`);
-      fetchUsers();
-      setDeleteTarget(null);
+      if (bulkDeleteMode) {
+        for (const id of selectedIds) {
+          await axios.delete(`http://localhost:5000/api/users/${id}`);
+        }
+        fetchUsers();
+        setBulkDeleteMode(false);
+        setSelectedIds([]);
+        setDeleteTarget(null);
+      } else {
+        await axios.delete(`http://localhost:5000/api/users/${deleteTarget.user_id}`);
+        fetchUsers();
+        setDeleteTarget(null);
+      }
     } catch (err) {
       alert('Delete failed: ' + (err.response?.data?.error || err.message));
     } finally {
@@ -292,8 +318,26 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
             <option>Active</option>
             <option>Inactive</option>
           </select>
+          {selectedIds.length > 0 && (
+            <>
+              <button onClick={() => {
+                setEditQueueIndex(0);
+                openEdit(users.find(u => u.user_id === selectedIds[0]));
+              }}
+                style={{ padding: '8px 16px', background: 'transparent', border: '1px solid #3b82f6', color: '#3b82f6', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', fontSize: '13px' }}>
+                Edit Selected ({selectedIds.length})
+              </button>
+              <button onClick={() => {
+                setBulkDeleteMode(true);
+                setDeleteTarget({ user_id: null, full_name: `${selectedIds.length} accounts`, barangay_name: '' });
+              }}
+                style={{ padding: '8px 16px', background: 'transparent', border: '1px solid #ef4444', color: '#ef4444', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', fontSize: '13px' }}>
+                Delete Selected ({selectedIds.length})
+              </button>
+            </>
+          )}
           <button onClick={openAdd}
-            style={{ marginLeft: 'auto', padding: '10px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
+            style={{ marginLeft: selectedIds.length > 0 ? '0' : 'auto', padding: '10px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
             + Add User
           </button>
         </div>
@@ -477,7 +521,21 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', paddingTop: '16px', borderTop: '1px solid #f1f5f9' }}>
-                <button type="button" onClick={() => setShowModal(false)}
+                <button type="button" onClick={() => {
+                  const nextIdx = editQueueIndex + 1;
+                  if (selectedIds.length > 1 && nextIdx < selectedIds.length && editingUser && selectedIds.includes(editingUser.user_id)) {
+                    setEditQueueIndex(nextIdx);
+                    const nextUser = users.find(u => u.user_id === selectedIds[nextIdx]);
+                    if (nextUser) {
+                      setShowModal(false);
+                      setTimeout(() => openEdit(nextUser), 100);
+                      return;
+                    }
+                  }
+                  setEditQueueIndex(0);
+                  setSelectedIds([]);
+                  setShowModal(false);
+                }}
                   style={{ padding: '10px 24px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', color: '#475569', cursor: 'pointer' }}>
                   Cancel
                 </button>
@@ -502,8 +560,11 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
             </div>
             <h3 style={{ margin: '0 0 8px 0', fontSize: '22px', fontWeight: '700', color: '#111827' }}>Are you sure?</h3>
             <p style={{ margin: '0 0 20px 0', color: '#6b7280', fontSize: '14px', lineHeight: '1.6' }}>
-              This action cannot be undone.<br />This will permanently delete the account of:
+              This action cannot be undone.<br />{bulkDeleteMode
+                ? `This will permanently delete ${selectedIds.length} accounts. Are you sure?`
+                : 'This will permanently delete the account of:'}
             </p>
+            {!bulkDeleteMode && (
             <div style={{ background: '#f9fafb', borderLeft: '4px solid #ef4444', borderRadius: '6px', padding: '14px 18px', marginBottom: '20px', textAlign: 'left' }}>
               <div style={{ fontWeight: '700', color: '#111827', fontSize: '15px', marginBottom: '4px' }}>
                 {deleteTarget.full_name} (U-{String(deleteTarget.user_id).padStart(3, '0')})
@@ -512,11 +573,12 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                 {deleteTarget.role === 'BHW' ? 'Barangay Health Worker' : 'City Health Office Admin'} — {deleteTarget.barangay_name || 'No barangay assigned'}
               </div>
             </div>
+            )}
             <p style={{ color: '#6b7280', fontSize: '13px', margin: '0 0 28px 0' }}>
               All associated case records will remain but show as "System" for audit purposes.
             </p>
             <div style={{ display: 'flex', borderTop: '1px solid #e5e7eb', paddingTop: '20px' }}>
-              <button onClick={() => setDeleteTarget(null)} disabled={deleteLoading}
+              <button onClick={() => { setDeleteTarget(null); setBulkDeleteMode(false); }} disabled={deleteLoading}
                 style={{ flex: 1, padding: '14px', background: 'transparent', border: 'none', borderRight: '1px solid #e5e7eb', cursor: 'pointer', fontSize: '16px', fontWeight: '500', color: '#374151' }}>
                 Cancel
               </button>

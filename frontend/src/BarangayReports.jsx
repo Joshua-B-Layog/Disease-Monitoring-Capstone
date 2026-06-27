@@ -27,75 +27,55 @@ const REPORT_TYPE_SORT_OPTIONS = [
   { value: 'oldest', label: 'Oldest First' },
 ];
 
-// ── Static audit log data ──
-const AUDIT_LOGS_DATA = [
-  { id: 1,  timestamp: 'Jun 07, 2026 02:15 PM', createdAt: new Date('2026-06-07T14:15:00'), userId: 'CHO-Admin', userName: 'Pedro Santos', userRole: 'CHO', choUnit: 'CHO Unit I', barangay: null,           action: 'Created',  entity: 'Case Record',  details: 'Added Dengue entry for Patient DG-901 (Niugan)' },
-  { id: 2,  timestamp: 'Jun 07, 2026 01:40 PM', createdAt: new Date('2026-06-07T13:40:00'), userId: 'MK02',      userName: 'Maria Koars',  userRole: 'BHW', choUnit: null,       barangay: 'Marinig',      action: 'Updated',  entity: 'Case Record',  details: 'Changed COVID-19 status to Recovered for CV-1102' },
-  { id: 3,  timestamp: 'Jun 07, 2026 11:15 AM', createdAt: new Date('2026-06-07T11:15:00'), userId: 'CHO-Admin', userName: 'Pedro Santos', userRole: 'CHO', choUnit: 'CHO Unit I', barangay: null,           action: 'Deleted',  entity: 'Case Record',  details: 'Removed duplicate Influenza A log item #FL-043' },
-  { id: 4,  timestamp: 'Jun 06, 2026 04:10 PM', createdAt: new Date('2026-06-06T16:10:00'), userId: 'JD01',      userName: 'Juan Danika', userRole: 'CHO', choUnit: 'CHO Unit II', barangay: null,          action: 'Created',  entity: 'User Account', details: 'Provisioned BHW account credentials for Sector Pulo' },
-  { id: 5,  timestamp: 'Jun 06, 2026 09:30 AM', createdAt: new Date('2026-06-06T09:30:00'), userId: 'JD01',      userName: 'Juan Danika', userRole: 'CHO', choUnit: 'CHO Unit II', barangay: null,          action: 'Logged In', entity: 'System',      details: 'Login from Chrome on Windows' },
-  { id: 6,  timestamp: 'Jun 05, 2026 03:20 PM', createdAt: new Date('2026-06-05T15:20:00'), userId: 'MK02',      userName: 'Maria Koars',  userRole: 'BHW', choUnit: null,       barangay: 'Marinig',      action: 'Updated',  entity: 'Case Record',  details: 'Updated severity for Dengue case DG-899 to Severe' },
-  { id: 7,  timestamp: 'Jun 05, 2026 10:00 AM', createdAt: new Date('2026-06-05T10:00:00'), userId: 'CHO-Admin', userName: 'Pedro Santos', userRole: 'CHO', choUnit: 'CHO Unit I', barangay: null,           action: 'Created',  entity: 'Case Record',  details: 'Added Tuberculosis case TB-024 (Sala)' },
-  { id: 8,  timestamp: 'Jun 04, 2026 02:45 PM', createdAt: new Date('2026-06-04T14:45:00'), userId: 'JD01',      userName: 'Juan Danika', userRole: 'CHO', choUnit: 'CHO Unit II', barangay: null,          action: 'Deleted',  entity: 'User Account', details: 'Deactivated BHW account ID PC03' },
-  { id: 9,  timestamp: 'Jun 04, 2026 11:30 AM', createdAt: new Date('2026-06-04T11:30:00'), userId: 'MK02',      userName: 'Maria Koars',  userRole: 'BHW', choUnit: null,       barangay: 'Marinig',      action: 'Logged In', entity: 'System',     details: 'Login from Firefox on Android' },
-  { id: 10, timestamp: 'Jun 03, 2026 04:00 PM', createdAt: new Date('2026-06-03T16:00:00'), userId: 'CHO-Admin', userName: 'Pedro Santos', userRole: 'CHO', choUnit: 'CHO Unit I', barangay: null,           action: 'Updated',  entity: 'Case Record',  details: 'Changed status of CV-1089 to Recovered' },
-  { id: 11, timestamp: 'Jun 03, 2026 01:15 PM', createdAt: new Date('2026-06-03T13:15:00'), userId: 'BHW-Pulo',  userName: 'Rosa Mendoza', userRole: 'BHW', choUnit: null,       barangay: 'Pulo',         action: 'Created',  entity: 'Case Record',  details: 'New Cholera case CH-011 (Pulo)' },
-  { id: 12, timestamp: 'Jun 02, 2026 10:00 AM', createdAt: new Date('2026-06-02T10:00:00'), userId: 'MK02',      userName: 'Maria Koars',  userRole: 'BHW', choUnit: null,       barangay: 'Marinig',      action: 'Deleted',  entity: 'Case Record',  details: 'Removed test entry DG-000' },
-];
+
 
 export default function BarangayReports({ activeUser, fontScale, compactMode, dateFormat }) {
   const choUnit    = activeUser?.context || 'CHO Unit I (Sala)';
   const myBarangays = CHO_BARANGAYS[choUnit] || Object.values(CHO_BARANGAYS).flat();
 
-  // ── Live case data ──
-  const [allCases, setAllCases]         = useState([]);
-  const [statsLoading, setStatsLoading] = useState(true);
+  // ── Live data ──
+  const [allCases, setAllCases]           = useState([]);
+  const [statsLoading, setStatsLoading]   = useState(true);
+  const [auditLogs, setAuditLogs]         = useState([]);
+  const [auditLoading, setAuditLoading]   = useState(true);
+  const [lastUpdated, setLastUpdated]     = useState(null);
+  const [now, setNow]                     = useState(Date.now());
+
+  const fetchLiveData = () => {
+    axios.get('http://localhost:5000/api/disease_cases')
+      .then(res => setAllCases(res.data))
+      .catch(() => {});
+    axios.get('http://localhost:5000/api/audit-logs')
+      .then(res => { setAuditLogs(res.data); setLastUpdated(Date.now()); })
+      .catch(() => {});
+  };
 
   useEffect(() => {
+    setStatsLoading(true);
+    setAuditLoading(true);
     axios.get('http://localhost:5000/api/disease_cases')
-      .then(res  => { setAllCases(res.data); setStatsLoading(false); })
-      .catch(()  => setStatsLoading(false));
+      .then(res => { setAllCases(res.data); setStatsLoading(false); })
+      .catch(() => setStatsLoading(false));
+    axios.get('http://localhost:5000/api/audit-logs')
+      .then(res => { setAuditLogs(res.data); setAuditLoading(false); setLastUpdated(Date.now()); })
+      .catch(() => setAuditLoading(false));
+    const interval = setInterval(fetchLiveData, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const myCases         = allCases.filter(c => myBarangays.includes(c.barangay_name));
   const casesAdded      = myCases.length;
   const casesUpdated    = myCases.filter(c => c.status === 'Recovered' || c.status === 'Under Treatment').length;
-  const casesDeleted    = AUDIT_LOGS_DATA.filter(l => l.action === 'Deleted' && l.entity === 'Case Record').length;
-  const accountsCreated = AUDIT_LOGS_DATA.filter(l => l.action === 'Created' && l.entity === 'User Account').length;
+  const casesDeleted    = auditLogs.filter(l => l.action === 'Deleted' && l.entity === 'Case Record').length;
+  const accountsCreated = auditLogs.filter(l => l.action === 'Created' && l.entity === 'User Account').length;
 
   // ── Generated Report Logs ──
-  const [reportLogs, setReportLogs] = useState([
-    {
-      id: 1,
-      title: 'Daily Summary Report - Jun 07',
-      timestamp: 'Generated Today, 02:15 PM',
-      period: 'Today',
-      entity: 'Case Records',
-      details: 'Daily dengue summary across all monitored barangays.',
-      createdAt: new Date('2026-06-07T14:15:00'),
-      snapshotLogs: AUDIT_LOGS_DATA.filter(l => l.createdAt >= new Date('2026-06-07T00:00:00')),
-    },
-    {
-      id: 2,
-      title: 'Weekly Barangay Health Review - Wk 23',
-      timestamp: 'Generated Yesterday, 05:00 PM',
-      period: 'Weekly',
-      entity: 'Epidemiological Summary',
-      details: 'Weekly review of all communicable disease cases.',
-      createdAt: new Date('2026-06-06T17:00:00'),
-      snapshotLogs: AUDIT_LOGS_DATA.filter(l => l.createdAt >= new Date('2026-06-01T00:00:00')),
-    },
-    {
-      id: 3,
-      title: 'Consolidated System Audit Logs - May',
-      timestamp: 'Generated Jun 01, 2026',
-      period: 'Monthly',
-      entity: 'Case Records',
-      details: 'Full monthly audit log consolidation.',
-      createdAt: new Date('2026-06-01T10:00:00'),
-      snapshotLogs: AUDIT_LOGS_DATA,
-    },
-  ]);
+  const [reportLogs, setReportLogs] = useState([]);
 
   // ── Generate Report Modal ──
   const [showGenModal, setShowGenModal] = useState(false);
@@ -128,7 +108,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
   const handleDownloadCSV = (report) => {
     const headers = 'Timestamp,User ID,Name,Action,Entity,Details\n';
     const logRows = (report.snapshotLogs || []).map(l =>
-      `"${l.timestamp}","${l.userId}","${l.userName}","${l.action}","${l.entity}","${l.details}"`
+      `"${l.created_at ? new Date(l.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}","${l.user_id || ''}","${l.user_name || ''}","${l.action}","${l.entity}","${l.details}"`
     ).join('\n');
     const blob = new Blob([headers + logRows], { type: 'text/csv;charset=utf-8;' });
     const url  = URL.createObjectURL(blob);
@@ -139,7 +119,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
 
   const handleDownloadWord = (report) => {
     const rows = (report.snapshotLogs || []).map(l =>
-      `<tr><td>${l.timestamp}</td><td>${l.userId}</td><td>${l.userName}</td><td>${l.action}</td><td>${l.entity}</td><td>${l.details}</td></tr>`
+      `<tr><td>${l.created_at ? new Date(l.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</td><td>${l.user_id || ''}</td><td>${l.user_name || ''}</td><td>${l.action}</td><td>${l.entity}</td><td>${l.details}</td></tr>`
     ).join('');
     const html = `<html><head><meta charset="utf-8"><title>${report.title}</title>
     <style>
@@ -238,23 +218,23 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
       ? ['All', ...COVERED_BARANGAYS_UNIT_I]
       : [];
 
-  const filteredAuditLogs = AUDIT_LOGS_DATA.filter(log => {
+  const filteredAuditLogs = auditLogs.filter(log => {
     const q = searchLog.toLowerCase();
     const matchSearch = !q ||
-      log.userName.toLowerCase().includes(q) ||
-      log.details.toLowerCase().includes(q) ||
-      log.entity.toLowerCase().includes(q);
+      (log.user_name || '').toLowerCase().includes(q) ||
+      (log.details || '').toLowerCase().includes(q) ||
+      (log.entity || '').toLowerCase().includes(q);
 
     const matchAction = filterAction === 'All Actions' || log.action === filterAction;
 
     let matchUser = true;
     if (filterUserRole === 'CHO Users') {
-      matchUser = log.userRole === 'CHO';
+      matchUser = log.user_role === 'CHO';
       if (filterUserSub !== 'All') {
-        matchUser = matchUser && log.choUnit === filterUserSub;
+        matchUser = matchUser && log.cho_unit === filterUserSub;
       }
     } else if (filterUserRole === 'BHW Users') {
-      matchUser = log.userRole === 'BHW';
+      matchUser = log.user_role === 'BHW';
       if (filterUserSub !== 'All') {
         matchUser = matchUser && log.barangay === filterUserSub;
       }
@@ -262,7 +242,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
 
     let matchDate = true;
     if (dateRange.start && dateRange.end) {
-      const logDate = new Date(log.timestamp);
+      const logDate = new Date(log.created_at);
       matchDate = logDate >= new Date(dateRange.start) && logDate <= new Date(dateRange.end);
     }
 
@@ -378,7 +358,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid #f1f5f9' }}>
-                    {['Timestamp', 'User', 'Action', 'Entity', 'Details'].map(h => (
+                {['Timestamp', 'User', 'Action', 'Entity', 'Details', 'Updated By'].map(h => (
                       <th key={h} style={{ padding: '8px 12px', textAlign: 'center', color: '#94a3b8', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
                     ))}
                   </tr>
@@ -386,10 +366,10 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                 <tbody>
                   {(viewReport.snapshotLogs || []).slice(0, 10).map(l => (
                     <tr key={l.id} style={{ borderBottom: '1px solid #f8fafc' }}>
-                      <td style={{ padding: '8px 12px', textAlign: 'center', color: '#64748b', whiteSpace: 'nowrap' }}>{l.timestamp}</td>
+                      <td style={{ padding: '8px 12px', textAlign: 'center', color: '#64748b', whiteSpace: 'nowrap' }}>{l.created_at ? new Date(l.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</td>
                       <td style={{ padding: '8px 12px', textAlign: 'center' }}>
-                        <div style={{ fontWeight: '600', color: '#1e293b', fontSize: '12px' }}>{l.userId}</div>
-                        <div style={{ color: '#94a3b8', fontSize: '11px' }}>{l.userName}</div>
+                        <div style={{ fontWeight: '600', color: '#1e293b', fontSize: '12px' }}>{l.user_id}</div>
+                        <div style={{ color: '#94a3b8', fontSize: '11px' }}>{l.user_name}</div>
                       </td>
                       <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                         <span style={{ padding: '3px 10px', borderRadius: '10px', fontSize: '11px', fontWeight: '600', ...actionBadgeStyle(l.action) }}>{l.action}</span>
@@ -812,12 +792,16 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
           </span>
         </div>
 
+        <div style={{ fontSize: '11px', color: '#94a3b8', textAlign: 'right', marginBottom: '6px' }}>
+          {lastUpdated ? `Updated ${Math.round((now - lastUpdated) / 1000)}s ago` : 'Refreshing...'}
+        </div>
+
         {/* Table */}
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #f1f5f9' }}>
-                {['Timestamp', 'User', 'Action', 'Entity', 'Details'].map(h => (
+                {['Timestamp', 'User', 'Action', 'Entity', 'Details', 'Updated By'].map(h => (
                   <th key={h} style={{ padding: compactMode ? '6px 8px' : '10px 14px', textAlign: 'center', fontSize: '11px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>
                     {h}
                   </th>
@@ -825,26 +809,27 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
               </tr>
             </thead>
             <tbody>
-              {paginatedLogs.length === 0 ? (
-                <tr><td colSpan={5} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '14px' }}>No logs found matching your filters.</td></tr>
+              {auditLoading ? (
+                <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '14px' }}>Loading audit logs...</td></tr>
+              ) : paginatedLogs.length === 0 ? (
+                <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '14px' }}>No logs found matching your filters.</td></tr>
               ) : (
                 paginatedLogs.map(log => (
                   <tr key={log.id} style={{ borderBottom: '1px solid #f8fafc' }}
                     onMouseEnter={e => e.currentTarget.style.background = '#fafafa'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                    <td style={{ padding: compactMode ? '7px 8px' : '13px 14px', fontSize: '13px', color: '#64748b', whiteSpace: 'nowrap', textAlign: 'center' }}>{log.timestamp}</td>
+                    <td style={{ padding: compactMode ? '7px 8px' : '13px 14px', fontSize: '13px', color: '#64748b', whiteSpace: 'nowrap', textAlign: 'center' }}>{log.created_at ? new Date(log.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</td>
                     <td style={{ padding: compactMode ? '7px 8px' : '13px 14px', textAlign: 'center' }}>
-                      <div style={{ fontSize: '13px', fontWeight: '600', color: '#1e293b' }}>{log.userId}</div>
-                      <div style={{ fontSize: '12px', color: '#94a3b8' }}>{log.userName}</div>
-                      {/* Role tag */}
+                      <div style={{ fontSize: '13px', fontWeight: '600', color: '#1e293b' }}>U-{String(log.user_id).padStart(3, '0')}</div>
+                      <div style={{ fontSize: '12px', color: '#94a3b8' }}>{log.user_name}</div>
                       <div style={{ marginTop: '3px' }}>
                         <span style={{
                           fontSize: '10px', fontWeight: '700', padding: '1px 7px', borderRadius: '10px',
-                          background: log.userRole === 'CHO' ? '#eff6ff' : '#f0fdf4',
-                          color: log.userRole === 'CHO' ? '#2563eb' : '#16a34a',
+                          background: log.user_role === 'CHO' ? '#eff6ff' : '#f0fdf4',
+                          color: log.user_role === 'CHO' ? '#2563eb' : '#16a34a',
                         }}>
-                          {log.userRole === 'CHO'
-                            ? (log.choUnit || 'CHO')
+                          {log.user_role === 'CHO'
+                            ? (log.cho_unit || 'CHO')
                             : (log.barangay ? `BHW · ${log.barangay}` : 'BHW')}
                         </span>
                       </div>
@@ -855,7 +840,10 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                       </span>
                     </td>
                     <td style={{ padding: compactMode ? '7px 8px' : '13px 14px', fontSize: '13px', color: '#475569', textAlign: 'center' }}>{log.entity}</td>
-                    <td style={{ padding: compactMode ? '7px 8px' : '13px 14px', fontSize: '13px', color: '#64748b', maxWidth: '320px', textAlign: 'left' }}>{log.details}</td>
+                    <td style={{ padding: compactMode ? '7px 8px' : '13px 14px', fontSize: '13px', color: '#64748b', maxWidth: '320px', textAlign: 'center' }}>{(log.details || '').replace(/\s*\(User ID:\s*\d+\)/gi, '').replace(/\s*\(Case ID:\s*\d+\)/gi, '')}</td>
+                    <td style={{ padding: compactMode ? '7px 8px' : '13px 14px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: log.user_role === 'CHO' ? '#2563eb' : '#16a34a' }}>
+                      {log.user_role === 'CHO' ? 'CHO Admin' : 'BHW'}
+                    </td>
                   </tr>
                 ))
               )}

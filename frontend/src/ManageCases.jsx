@@ -81,7 +81,7 @@ const formatDateStr = (dateStr, fmt) => {
   return `${m}/${day}/${shortY}`;
 };
 
-export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, autoSave, confirmDelete, keyboardShortcuts, fontScale, compactMode }) {
+export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, autoSave, confirmDelete, keyboardShortcuts, fontScale, compactMode, loggedUserId }) {
   const [view, setView] = useState('categories'); // 'categories' | 'list' | 'add' | 'edit'
   const [cardPage, setCardPage] = useState(0);
   const [selectedDisease, setSelectedDisease] = useState(null);
@@ -90,6 +90,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const [allCases, setAllCases] = useState([]);
   const [loadingCases, setLoadingCases] = useState(false);
   const [barangayList, setBarangayList] = useState([]);
+  const [allDiseases, setAllDiseases] = useState([]);
 
   // Table filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -101,15 +102,25 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
   // Auto-save toast state
   const [autoSaveToast, setAutoSaveToast] = useState('');
+
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [now, setNow] = useState(Date.now());
   const fs = fontScale || '1';
 
   // Export dropdown
   const [showExportMenu, setShowExportMenu] = useState(false);
   const exportRef = useRef(null);
 
+  // Keyboard shortcuts guide
+  const [showShortcutsGuide, setShowShortcutsGuide] = useState(false);
+  const shortcutsRef = useRef(null);
+
   // Barangay filter dropdown
   const [barangayOpen, setBarangayOpen] = useState(false);
   const barangayRef = useRef(null);
+
+  // Sub-disease filter dropdown
+  const [subDiseaseOpen, setSubDiseaseOpen] = useState(false);
 
   // Delete modal
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -155,15 +166,30 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const fetchCases = () => {
     setLoadingCases(true);
     axios.get('http://localhost:5000/api/disease_cases')
-      .then(res => { setAllCases(res.data); setLoadingCases(false); })
+      .then(res => { setAllCases(res.data); setLoadingCases(false); setLastUpdated(Date.now()); })
       .catch(() => setLoadingCases(false));
   };
 
-  useEffect(() => { fetchCases(); }, []);
+  useEffect(() => {
+    fetchCases();
+    const interval = setInterval(() => {
+      if (view !== 'add' && view !== 'edit') fetchCases();
+    }, 30000);
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     axios.get('http://localhost:5000/api/barangays')
       .then(res => setBarangayList(res.data))
+      .catch(() => {});
+    axios.get('http://localhost:5000/api/diseases')
+      .then(res => setAllDiseases(res.data))
       .catch(() => {});
   }, []);
 
@@ -175,6 +201,10 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       if (barangayRef.current && !barangayRef.current.contains(e.target)) {
         setBarangayOpen(false);
       }
+      if (shortcutsRef.current && !shortcutsRef.current.contains(e.target)) {
+        setShowShortcutsGuide(false);
+      }
+      setSubDiseaseOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -247,11 +277,15 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   // ── Get unique "Other" disease names from allCases for the sub-filter dropdown ──
   const getOtherDiseaseNames = () => {
     const names = new Set();
+    allDiseases.forEach(d => {
+      if (!KNOWN_DB_NAMES.includes(d.name.toLowerCase())) {
+        names.add(d.name);
+      }
+    });
     allCases.forEach(c => {
       if (!c.disease_name) return;
-      const dn = c.disease_name.toLowerCase();
-      if (!KNOWN_DB_NAMES.includes(dn)) {
-        names.add(c.disease_name); // preserve original casing
+      if (!KNOWN_DB_NAMES.includes(c.disease_name.toLowerCase())) {
+        names.add(c.disease_name);
       }
     });
     return Array.from(names).sort();
@@ -423,6 +457,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       physician: formData.physician,
       latitude: formData.lat || null,
       longitude: formData.lng || null,
+      user_id: loggedUserId || null,
     };
 
     try {
@@ -465,6 +500,24 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             </p>
           </div>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            {keyboardShortcuts && (
+              <div style={{ position: 'relative' }} ref={shortcutsRef}>
+                <button onClick={() => setShowShortcutsGuide(!showShortcutsGuide)}
+                  style={{ width: '30px', height: '30px', borderRadius: '50%', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '14px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  ?
+                </button>
+                {showShortcutsGuide && (
+                  <div style={{ position: 'absolute', top: '110%', right: 0, width: '240px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', padding: '14px', fontSize: '13px' }}>
+                    <div style={{ fontWeight: '700', marginBottom: '10px', color: 'var(--text-main)' }}>Keyboard Shortcuts</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>New Case</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', border: '1px solid var(--border-color)' }}>N</kbd></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>Save Form</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', border: '1px solid var(--border-color)' }}>Ctrl+S</kbd></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>Close / Back</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', border: '1px solid var(--border-color)' }}>Esc</kbd></div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Page {cardPage + 1} / {DISEASE_PAGES.length}</span>
             <button onClick={() => setCardPage(0)} disabled={cardPage === 0}
               style={{ padding: '7px 16px', background: cardPage === 0 ? 'var(--input-bg)' : '#1E3A8A', color: cardPage === 0 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: cardPage === 0 ? 'not-allowed' : 'pointer', fontSize: '13px' }}>
@@ -582,6 +635,24 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             </h2>
           </div>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            {keyboardShortcuts && (
+              <div style={{ position: 'relative' }} ref={shortcutsRef}>
+                <button onClick={() => setShowShortcutsGuide(!showShortcutsGuide)}
+                  style={{ width: '30px', height: '30px', borderRadius: '50%', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '14px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  ?
+                </button>
+                {showShortcutsGuide && (
+                  <div style={{ position: 'absolute', top: '110%', right: 0, width: '240px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', padding: '14px', fontSize: '13px' }}>
+                    <div style={{ fontWeight: '700', marginBottom: '10px', color: 'var(--text-main)' }}>Keyboard Shortcuts</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>New Case</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', border: '1px solid var(--border-color)' }}>N</kbd></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>Save Form</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', border: '1px solid var(--border-color)' }}>Ctrl+S</kbd></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>Close / Back</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', border: '1px solid var(--border-color)' }}>Esc</kbd></div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             {/* EXPORT DROPDOWN */}
             <div style={{ position: 'relative' }} ref={exportRef}>
               <button onClick={() => setShowExportMenu(!showExportMenu)}
@@ -619,6 +690,10 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               + Add Case
             </button>
           </div>
+        </div>
+
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right', marginBottom: '6px' }}>
+          {lastUpdated ? `Updated ${Math.round((now - lastUpdated) / 1000)}s ago` : 'Refreshing...'}
         </div>
 
         {/* Table card */}
@@ -670,26 +745,60 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
             {/* ── NEW: Remaining Diseases sub-filter (only for "Other" card) ── */}
             {isOtherCard && (
-              <select
-                value={filterSubDisease}
-                onChange={e => { setFilterSubDisease(e.target.value); setTablePage(1); }}
-                style={{
-                  padding: '8px 12px',
-                  background: 'var(--input-bg)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '6px',
-                  color: filterSubDisease === 'All Remaining Diseases' ? 'var(--text-muted)' : 'var(--text-main)',
-                  fontSize: '13px',
-                  minWidth: '180px',
-                }}
-              >
-                <option value="All Remaining Diseases" style={{ color: 'var(--text-muted)' }}>
-                  Remaining Diseases
-                </option>
-                {otherDiseaseNames.map(name => (
-                  <option key={name} value={name} style={{ color: 'var(--text-main)' }}>{name}</option>
-                ))}
-              </select>
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setSubDiseaseOpen(!subDiseaseOpen)}
+                  style={{
+                    padding: '8px 12px',
+                    background: 'var(--input-bg)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '6px',
+                    color: filterSubDisease === 'All Remaining Diseases' ? 'var(--text-muted)' : 'var(--text-main)',
+                    fontSize: '13px',
+                    minWidth: '180px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '6px',
+                  }}
+                >
+                  <span>{filterSubDisease === 'All Remaining Diseases' ? 'Remaining Diseases' : filterSubDisease}</span>
+                  <span style={{ opacity: 0.6 }}>▾</span>
+                </button>
+                {subDiseaseOpen && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    zIndex: 100,
+                    maxHeight: '180px',
+                    overflowY: 'auto',
+                    marginTop: '4px',
+                    minWidth: '100%',
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '6px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                  }}>
+                    <div
+                      className={`mc-custom-dropdown-item ${filterSubDisease === 'All Remaining Diseases' ? 'mc-custom-dropdown-item--active' : ''}`}
+                      onClick={() => { setFilterSubDisease('All Remaining Diseases'); setTablePage(1); setSubDiseaseOpen(false); }}
+                    >
+                      Remaining Diseases
+                    </div>
+                    {otherDiseaseNames.map(name => (
+                      <div
+                        key={name}
+                        className={`mc-custom-dropdown-item ${filterSubDisease === name ? 'mc-custom-dropdown-item--active' : ''}`}
+                        onClick={() => { setFilterSubDisease(name); setTablePage(1); setSubDiseaseOpen(false); }}
+                      >
+                        {name}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
 
             <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontSize: '13px' }}>

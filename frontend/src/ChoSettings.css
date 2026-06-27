@@ -33,6 +33,7 @@
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 20px;
+  height: calc(100vh - 450px);
 }
 
 .nav-box {
@@ -40,6 +41,7 @@
   border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 24px;
+  min-height: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;

@@ -202,6 +202,20 @@ CREATE TABLE notifications (
 );
 
 
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT,
+  user_name VARCHAR(255),
+  user_role VARCHAR(50),
+  cho_unit VARCHAR(100),
+  barangay VARCHAR(100),
+  action VARCHAR(50),
+  entity VARCHAR(100),
+  details TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 --
 -- Indexes for dumped tables
 --

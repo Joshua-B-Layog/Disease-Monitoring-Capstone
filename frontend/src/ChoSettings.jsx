@@ -139,12 +139,16 @@ export default function CHOSettings({
     darkMode: false,
     fontSize: scaleToLabel(savedFontScale || '1'),
     compactView: savedCompactMode === true || savedCompactMode === 'true' ? true : false,
-    displayLanguage: 'English',
-    timeZone: 'Asia/Manila',
+    displayLanguage: localStorage.getItem('cdms_language') === 'fil' ? 'Filipino'
+      : localStorage.getItem('cdms_language') === 'id' ? 'Bahasa Indonesia'
+      : localStorage.getItem('cdms_language') === 'vi' ? 'Tiếng Việt'
+      : localStorage.getItem('cdms_language') === 'th' ? 'ไทย'
+      : 'English',
+    timeZone: localStorage.getItem('cdms_timeZone')?.split(' (')[0] || 'Asia/Manila',
     dateFormat: savedDateFormat || 'MM/DD/YY',
-    autoSave: false,
-    confirmDelete: savedConfirmDelete !== undefined ? savedConfirmDelete : true,
-    keyboardShortcuts: false,
+    autoSave: localStorage.getItem('cdms_autoSave') === 'true',
+    confirmDelete: localStorage.getItem('cdms_confirm_delete') !== 'false',
+    keyboardShortcuts: localStorage.getItem('cdms_keyboardShortcuts') === 'true',
   });
 
   const t = (key) => {
@@ -1314,50 +1318,103 @@ export default function CHOSettings({
                         <p>{row.sub}</p>
                       </div>
                     </div>
-                    <button onClick={() => {
-                      if (row.label === 'Export as PDF') {
-                        axios.get('http://localhost:5000/api/export-all')
-                          .then(res => {
-                            const data = res.data;
-                            const rows = data.map(c =>
-                              `<tr><td>${c.case_id}</td><td>${c.patient_name||''}</td><td>${c.age||''}</td><td>${c.barangay_name||''}</td><td>${c.disease_name||''}</td><td>${c.severity||''}</td><td>${c.status||''}</td><td>${c.date_reported||''}</td></tr>`
-                            ).join('');
-                            const html = `<html><head><title>CDMS Export</title><style>body{font-family:Arial,sans-serif;padding:24px;}h2{color:#1e3a8a;}table{width:100%;border-collapse:collapse;margin-top:16px;}th{background:#1e3a8a;color:white;padding:8px;text-align:left;}td{padding:7px 8px;border-bottom:1px solid #e5e7eb;font-size:12px;}tr:nth-child(even) td{background:#f9fafb;}</style></head><body><h2>Cabuyao CDMS — Full Data Export</h2><p>Generated: ${new Date().toLocaleString()} | Total Records: ${data.length}</p><table><thead><tr><th>ID</th><th>Patient</th><th>Age</th><th>Barangay</th><th>Disease</th><th>Severity</th><th>Status</th><th>Date</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
-                            const blob = new Blob([html], { type: 'application/pdf' });
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = url;
-                            a.download = `CDMS_Export_${new Date().toISOString().split('T')[0]}.pdf`;
-                            a.click();
-                          })
-                          .catch(() => alert('Export failed. Please try again.'));
-                      } else if (row.label === 'Export as Excel') {
-                        axios.get('http://localhost:5000/api/export-all')
-                          .then(res => {
-                            const data = res.data;
-                            const headers = 'Case ID\tPatient Name\tAge\tGender\tBarangay\tDisease\tSeverity\tStatus\tDate Reported\n';
-                            const rows = data.map(c =>
-                              `${c.case_id}\t${c.patient_name||''}\t${c.age||''}\t${c.gender||''}\t${c.barangay_name||''}\t${c.disease_name||''}\t${c.severity||''}\t${c.status||''}\t${c.date_reported||''}`
-                            ).join('\n');
-                            const blob = new Blob([headers + rows], { type: 'application/vnd.ms-excel' });
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = url;
-                            a.download = `CDMS_Export_${new Date().toISOString().split('T')[0]}.xls`;
-                            a.click();
-                          })
-                          .catch(() => alert('Export failed. Please try again.'));
-                      } else if (row.label === 'Export as CSV') {
-                        fetch('http://localhost:5000/api/export-all?format=csv')
-                          .then(res => res.blob())
-                          .then(blob => {
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = url;
-                            a.download = `CDMS_Export_${new Date().toISOString().split('T')[0]}.csv`;
-                            a.click();
-                          })
-                          .catch(() => alert('Export failed. Please try again.'));
+                    <button onClick={async () => {
+                      const AUDIT_LOGS_DATA = [
+                        { id: 1,  timestamp: 'Jun 07, 2026 02:15 PM', userName: 'Pedro Santos', userRole: 'CHO', action: 'Created',  entity: 'Case Record',  details: 'Added Dengue entry for Patient DG-901 (Niugan)' },
+                        { id: 2,  timestamp: 'Jun 07, 2026 01:40 PM', userName: 'Maria Koars',  userRole: 'BHW', action: 'Updated',  entity: 'Case Record',  details: 'Changed COVID-19 status to Recovered for CV-1102' },
+                        { id: 3,  timestamp: 'Jun 07, 2026 11:15 AM', userName: 'Pedro Santos', userRole: 'CHO', action: 'Deleted',  entity: 'Case Record',  details: 'Removed duplicate Influenza A log item #FL-043' },
+                        { id: 4,  timestamp: 'Jun 06, 2026 04:10 PM', userName: 'Juan Danika',  userRole: 'CHO', action: 'Created',  entity: 'User Account', details: 'Provisioned BHW account credentials for Sector Pulo' },
+                        { id: 5,  timestamp: 'Jun 06, 2026 09:30 AM', userName: 'Juan Danika',  userRole: 'CHO', action: 'Logged In', entity: 'System',      details: 'Login from Chrome on Windows' },
+                        { id: 6,  timestamp: 'Jun 05, 2026 03:20 PM', userName: 'Maria Koars',  userRole: 'BHW', action: 'Updated',  entity: 'Case Record',  details: 'Updated severity for Dengue case DG-899 to Severe' },
+                        { id: 7,  timestamp: 'Jun 05, 2026 10:00 AM', userName: 'Pedro Santos', userRole: 'CHO', action: 'Created',  entity: 'Case Record',  details: 'Added Tuberculosis case TB-024 (Sala)' },
+                        { id: 8,  timestamp: 'Jun 04, 2026 02:45 PM', userName: 'Juan Danika',  userRole: 'CHO', action: 'Deleted',  entity: 'User Account', details: 'Deactivated BHW account ID PC03' },
+                        { id: 9,  timestamp: 'Jun 04, 2026 11:30 AM', userName: 'Maria Koars',  userRole: 'BHW', action: 'Logged In', entity: 'System',     details: 'Login from Firefox on Android' },
+                        { id: 10, timestamp: 'Jun 03, 2026 04:00 PM', userName: 'Pedro Santos', userRole: 'CHO', action: 'Updated',  entity: 'Case Record',  details: 'Changed status of CV-1089 to Recovered' },
+                      ];
+                      try {
+                        const [caseRes, userRes] = await Promise.all([
+                          axios.get('http://localhost:5000/api/export-all'),
+                          axios.get('http://localhost:5000/api/users'),
+                        ]);
+                        const cases = caseRes.data;
+                        const users = userRes.data;
+                        const logs = AUDIT_LOGS_DATA;
+
+                        if (row.label === 'Export as PDF') {
+                          const caseRows = cases.map(c =>
+                            `<tr><td>${c.case_id}</td><td>${c.patient_name||''}</td><td>${c.age||''}</td><td>${c.gender||''}</td><td>${c.barangay_name||''}</td><td>${c.disease_name||''}</td><td>${c.severity||''}</td><td>${c.status||''}</td><td>${c.date_reported||''}</td></tr>`
+                          ).join('');
+                          const userRows = users.map(u =>
+                            `<tr><td>U-${String(u.user_id).padStart(3,'0')}</td><td>${u.full_name||''}</td><td>${u.username||''}</td><td>${u.role||''}</td><td>${u.barangay_name||''}</td><td>${u.is_active?'Active':'Inactive'}</td><td>${u.email||''}</td></tr>`
+                          ).join('');
+                          const html = `<html><head><title>CDMS Export</title><style>
+                            body{font-family:Arial,sans-serif;padding:28px;font-size:13px;color:#111;background:#fff;}
+                            h2{color:#1e3a8a;margin-bottom:2px;}
+                            .meta{color:#555;margin:0 0 20px 0;font-size:12px;}
+                            h3{color:#1e3a8a;margin:24px 0 8px 0;font-size:14px;}
+                            table{width:100%;border-collapse:collapse;margin-bottom:16px;}
+                            table th{background:#1e3a8a;color:white;padding:8px 10px;text-align:center;font-size:12px;border:1px solid #1e3a8a;}
+                            table td{padding:6px 10px;border:1px solid #d1d5db;text-align:center;font-size:12px;}
+                            table tr:nth-child(even) td{background:#f9fafb;}
+                            .print-btn{display:block;margin:0 auto 24px auto;padding:12px 32px;background:#1e3a8a;color:white;border:none;border-radius:8px;cursor:pointer;font-size:15px;font-weight:600;}
+                            .print-btn:hover{background:#1e40af;}
+                            .note{background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;padding:12px 16px;color:#92400e;font-size:13px;margin:16px 0;}
+                            @media print{.print-btn{display:none;}}
+                          </style></head><body>
+                          <button class="print-btn" onclick="window.print();">🖨️ Print / Save as PDF</button>
+                          <h2>Cabuyao CDMS — Full Data Export</h2>
+                          <p class="meta">Generated: ${new Date().toLocaleString()} &nbsp;|&nbsp; ${cases.length} Cases, ${users.length} Users</p>
+                          <h3>Case Records (${cases.length})</h3>
+                          <table><thead><tr><th>ID</th><th>Patient Name</th><th>Age</th><th>Gender</th><th>Barangay</th><th>Disease</th><th>Severity</th><th>Status</th><th>Date Reported</th></tr></thead><tbody>${caseRows}</tbody></table>
+                          <h3>User Accounts (${users.length})</h3>
+                          <table><thead><tr><th>User ID</th><th>Full Name</th><th>Username</th><th>Role</th><th>Barangay</th><th>Status</th><th>Email</th></tr></thead><tbody>${userRows}</tbody></table>
+                          <h3>System Activity Log</h3>
+                          <div class="note">For detailed audit logs, please export from the Audit Reports section.</div>
+                          </body></html>`;
+                          const printWindow = window.open('', '_blank');
+                          printWindow.document.write(html);
+                          printWindow.document.close();
+                        } else if (row.label === 'Export as Excel') {
+                          const sep = '\t';
+                          const nl = '\n';
+                          let content = '';
+                          content += '=== CASE RECORDS ===' + nl;
+                          content += 'Case ID' + sep + 'Patient Name' + sep + 'Age' + sep + 'Barangay' + sep + 'Disease' + sep + 'Severity' + sep + 'Status' + sep + 'Date Reported' + nl;
+                          cases.forEach(c => { content += `${c.case_id}${sep}${c.patient_name||''}${sep}${c.age||''}${sep}${c.barangay_name||''}${sep}${c.disease_name||''}${sep}${c.severity||''}${sep}${c.status||''}${sep}${c.date_reported||''}${nl}`; });
+                          content += nl + '=== USER ACCOUNTS ===' + nl;
+                          content += 'ID' + sep + 'Name' + sep + 'Username' + sep + 'Barangay' + sep + 'Role' + sep + 'Status' + nl;
+                          users.forEach(u => { content += `U-${String(u.user_id).padStart(3,'0')}${sep}${u.full_name||''}${sep}${u.username||''}${sep}${u.barangay_name||''}${sep}${u.role||''}${sep}${u.is_active?'Active':'Inactive'}${nl}`; });
+                          content += nl + '=== SYSTEM LOGS ===' + nl;
+                          content += '#' + sep + 'Timestamp' + sep + 'User' + sep + 'Role' + sep + 'Action' + sep + 'Entity' + sep + 'Details' + nl;
+                          logs.forEach(l => { content += `${l.id}${sep}${l.timestamp}${sep}${l.userName}${sep}${l.userRole}${sep}${l.action}${sep}${l.entity}${sep}${l.details}${nl}`; });
+                          const blob = new Blob([content], { type: 'application/vnd.ms-excel' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `CDMS_Export_${new Date().toISOString().split('T')[0]}.xls`;
+                          a.click();
+                        } else if (row.label === 'Export as CSV') {
+                          const sep = ',';
+                          const nl = '\n';
+                          let content = '';
+                          content += '=== CASE RECORDS ===' + nl;
+                          content += 'Case ID' + sep + 'Patient Name' + sep + 'Age' + sep + 'Barangay' + sep + 'Disease' + sep + 'Severity' + sep + 'Status' + sep + 'Date Reported' + nl;
+                          cases.forEach(c => { content += `${c.case_id}${sep}${c.patient_name||''}${sep}${c.age||''}${sep}${c.barangay_name||''}${sep}${c.disease_name||''}${sep}${c.severity||''}${sep}${c.status||''}${sep}${c.date_reported||''}${nl}`; });
+                          content += nl + '=== USER ACCOUNTS ===' + nl;
+                          content += 'ID' + sep + 'Name' + sep + 'Username' + sep + 'Barangay' + sep + 'Role' + sep + 'Status' + nl;
+                          users.forEach(u => { content += `U-${String(u.user_id).padStart(3,'0')}${sep}${u.full_name||''}${sep}${u.username||''}${sep}${u.barangay_name||''}${sep}${u.role||''}${sep}${u.is_active?'Active':'Inactive'}${nl}`; });
+                          content += nl + '=== SYSTEM LOGS ===' + nl;
+                          content += '#' + sep + 'Timestamp' + sep + 'User' + sep + 'Role' + sep + 'Action' + sep + 'Entity' + sep + 'Details' + nl;
+                          logs.forEach(l => { content += `${l.id}${sep}${l.timestamp}${sep}${l.userName}${sep}${l.userRole}${sep}${l.action}${sep}${l.entity}${sep}${l.details}${nl}`; });
+                          const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `CDMS_Export_${new Date().toISOString().split('T')[0]}.csv`;
+                          a.click();
+                        }
+                      } catch (err) {
+                        alert('Export failed. Please try again.');
                       }
                     }} style={{ padding: '8px 18px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '13px', fontWeight: '600', color: 'var(--text-main)', cursor: 'pointer' }}>
                       Export

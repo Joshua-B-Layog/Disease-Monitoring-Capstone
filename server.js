@@ -61,6 +61,30 @@ db.query(`CREATE TABLE IF NOT EXISTS notification_preferences (
     else console.log('Notification preferences table created/verified');
 });
 
+db.query(`CREATE TABLE IF NOT EXISTS audit_logs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT,
+  user_name VARCHAR(255),
+  user_role VARCHAR(50),
+  cho_unit VARCHAR(100),
+  barangay VARCHAR(100),
+  action VARCHAR(50),
+  entity VARCHAR(100),
+  details TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)`, (err) => {
+  if (err) console.error('Error creating audit_logs table:', err.message);
+  else console.log('Audit logs table created/verified');
+});
+
+function createAuditLog(userId, userName, userRole, choUnit, barangay, action, entity, details) {
+  db.query(
+    'INSERT INTO audit_logs (user_id, user_name, user_role, cho_unit, barangay, action, entity, details) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [userId || null, userName || 'System', userRole || 'System', choUnit || null, barangay || null, action, entity, details],
+    (err) => { if (err) console.error('Audit log insert error:', err.message); }
+  );
+}
+
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -106,7 +130,7 @@ app.get('/api/disease_cases', (req, res) => {
         FROM disease_cases dc
         LEFT JOIN diseases d ON dc.disease_id = d.id
         LEFT JOIN barangays b ON dc.barangay_id = b.id
-        ORDER BY dc.date_reported DESC
+ORDER BY dc.case_id DESC
     `;
     db.query(sql, (err, results) => {
         if (err) {
@@ -252,7 +276,28 @@ app.post('/api/cases', (req, res) => {
                     return res.status(500).json({ error: insertErr.message });
                 }
                 console.log("✅ Case inserted, ID:", result.insertId);
-                
+
+                // Write audit log entry
+                const auditUserId = req.body.user_id || null;
+                const auditDisease = disease_name || 'Unknown Disease';
+                const auditPatient = patient_name || 'Unknown Patient';
+                if (auditUserId) {
+                  db.query('SELECT full_name, role, assigned_barangay_id FROM users WHERE user_id = ?', [auditUserId], (uErr, uRes) => {
+                    if (!uErr && uRes.length > 0) {
+                      const u = uRes[0];
+                      db.query('SELECT name FROM barangays WHERE id = ?', [u.assigned_barangay_id], (bErr, bRes) => {
+                        const brgy = (!bErr && bRes.length > 0) ? bRes[0].name : null;
+                        db.query(
+                          'INSERT INTO audit_logs (user_id, user_name, user_role, barangay, action, entity, details) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                          [auditUserId, u.full_name, u.role, brgy, 'Created', 'Case Record',
+                           `Added new ${auditDisease} case for ${auditPatient} (Case ID: ${result.insertId})`],
+                          (aErr) => { if (aErr) console.error('Audit log error:', aErr.message); }
+                        );
+                      });
+                    }
+                  });
+                }
+
                 // Trigger auto-notifications
                 db.query(`
                     SELECT dc.patient_name, d.name AS disease_name, b.name AS barangay_name, dc.barangay_id, dc.severity
@@ -329,6 +374,27 @@ app.put('/api/cases/:id', (req, res) => {
                 }
                 console.log("✅ Case updated:", id);
 
+                // Write audit log entry
+                const auditUserId = req.body.user_id || null;
+                const auditDisease = disease_name || 'Unknown Disease';
+                const auditPatient = patient_name || 'Unknown Patient';
+                if (auditUserId) {
+                  db.query('SELECT full_name, role, assigned_barangay_id FROM users WHERE user_id = ?', [auditUserId], (uErr, uRes) => {
+                    if (!uErr && uRes.length > 0) {
+                      const u = uRes[0];
+                      db.query('SELECT name FROM barangays WHERE id = ?', [u.assigned_barangay_id], (bErr, bRes) => {
+                        const brgy = (!bErr && bRes.length > 0) ? bRes[0].name : null;
+                        db.query(
+                          'INSERT INTO audit_logs (user_id, user_name, user_role, barangay, action, entity, details) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                          [auditUserId, u.full_name, u.role, brgy, 'Updated', 'Case Record',
+                           `Updated ${auditDisease} case for ${auditPatient} (Case ID: ${id})`],
+                          (aErr) => { if (aErr) console.error('Audit log error:', aErr.message); }
+                        );
+                      });
+                    }
+                  });
+                }
+
                 // Trigger status updated notification
                 db.query(`
                     SELECT dc.patient_name, d.name AS disease_name, b.name AS barangay_name, dc.barangay_id, dc.status
@@ -366,7 +432,7 @@ app.put('/api/cases/:id', (req, res) => {
 // ROUTE: Admin-edit a user account
 app.put('/api/users/:id', (req, res) => {
     const { id } = req.params;
-    const { firstName, lastName, username, email, mobile, barangayId, isActive, role } = req.body;
+    const { firstName, lastName, username, email, mobile, barangayId, isActive, role, loggedUserId } = req.body;
     const fullName = `${firstName.trim()} ${lastName.trim()}`;
 
     const updateQuery = `
@@ -388,6 +454,24 @@ app.put('/api/users/:id', (req, res) => {
             return res.status(404).json({ error: 'User not found.' });
         }
         console.log("✅ User updated:", id);
+        if (loggedUserId) {
+          db.query('SELECT full_name, role, assigned_barangay_id FROM users WHERE user_id = ?', [loggedUserId], (aErr, aRes) => {
+            if (!aErr && aRes.length > 0) {
+              const admin = aRes[0];
+              const adminName = admin.full_name;
+              const adminRole = admin.role;
+              const choUnit = (adminRole === 'CHO') ? 'CHO Unit I' : null;
+              db.query('SELECT name FROM barangays WHERE id = ?', [admin.assigned_barangay_id], (bErr, bRes) => {
+                const brgy = (!bErr && bRes.length > 0) ? bRes[0].name : null;
+                createAuditLog(loggedUserId, adminName, adminRole, choUnit, brgy, 'Updated', 'User Account', `Updated account details for ${fullName} (User ID: ${id})`);
+              });
+            } else {
+              createAuditLog(null, 'CHO Admin', 'CHO', null, null, 'Updated', 'User Account', `Updated account details for ${fullName} (User ID: ${id})`);
+            }
+          });
+        } else {
+          createAuditLog(null, 'CHO Admin', 'CHO', null, null, 'Updated', 'User Account', `Updated account details for ${fullName} (User ID: ${id})`);
+        }
         res.status(200).json({ message: 'User updated successfully.' });
     });
 });
@@ -450,6 +534,27 @@ app.delete('/api/cases/:id', (req, res) => {
                 return res.status(500).json({ error: delErr.message });
             }
             
+            // Write audit log entry
+            const auditUserId = req.body.user_id || null;
+            const auditDisease = disease_name || 'Unknown Disease';
+            const auditPatient = patient_name || 'Unknown Patient';
+            if (auditUserId) {
+              db.query('SELECT full_name, role, assigned_barangay_id FROM users WHERE user_id = ?', [auditUserId], (uErr, uRes) => {
+                if (!uErr && uRes.length > 0) {
+                  const u = uRes[0];
+                  db.query('SELECT name FROM barangays WHERE id = ?', [u.assigned_barangay_id], (bErr, bRes) => {
+                    const brgy = (!bErr && bRes.length > 0) ? bRes[0].name : null;
+                    db.query(
+                      'INSERT INTO audit_logs (user_id, user_name, user_role, barangay, action, entity, details) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                      [auditUserId, u.full_name, u.role, brgy, 'Deleted', 'Case Record',
+                       `Deleted case for ${auditPatient} (${auditDisease}) in Barangay ${barangay_name || 'N/A'} (Case ID: ${id})`],
+                      (aErr) => { if (aErr) console.error('Audit log error:', aErr.message); }
+                    );
+                  });
+                }
+              });
+            }
+
             const title = 'Case Deleted';
             const message = `Case for ${patient_name} (${disease_name}) in Barangay ${barangay_name || 'N/A'} has been deleted.`;
             createNotificationForUsers(title, message, 'delete', 'ManageCases', barangay_id, 'delete');
@@ -472,10 +577,36 @@ app.delete('/api/users/:id', (req, res) => {
             return res.status(404).json({ error: 'User not found.' });
         }
         console.log(`✅ User ${id} deleted.`);
+        createAuditLog(id, 'CHO Admin', 'CHO', null, null, 'Deleted', 'User Account', `Deleted user account ID ${id}`);
         res.status(200).json({ message: 'User deleted successfully.' });
     });
 });
 
+
+// ==========================================
+// AUDIT LOG ROUTES
+// ==========================================
+
+// GET all audit logs (newest first)
+app.get('/api/audit-logs', (req, res) => {
+  db.query('SELECT * FROM audit_logs ORDER BY created_at DESC', (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(results);
+  });
+});
+
+// POST a manual audit log entry (for frontend-triggered events)
+app.post('/api/audit-logs', (req, res) => {
+  const { user_id, user_name, user_role, cho_unit, barangay, action, entity, details } = req.body;
+  db.query(
+    'INSERT INTO audit_logs (user_id, user_name, user_role, cho_unit, barangay, action, entity, details) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [user_id || null, user_name || 'System', user_role || 'System', cho_unit || null, barangay || null, action, entity, details],
+    (err, result) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.status(201).json({ message: 'Audit log created', id: result.insertId });
+    }
+  );
+});
 
 // ==========================================
 // AUTHENTICATION ROUTES
@@ -543,6 +674,8 @@ app.post('/api/login', (req, res) => {
             device || 'Unknown Device',
             user.user_id
         ]);
+
+        createAuditLog(user.user_id, user.full_name, user.role, null, user.assigned_barangay_name, 'Logged In', 'System', `Login from ${device || 'Unknown Device'} at ${location || 'Unknown Location'}`);
 
         return res.status(200).json({
             message: 'Success',
@@ -763,6 +896,7 @@ app.post('/api/users', (req, res) => {
         }
 
         console.log("✅ User added:", { username, fullName, barangayId });
+        createAuditLog(null, 'CHO Admin', 'CHO', null, null, 'Created', 'User Account', `Created account for ${fullName} (${role}) assigned to barangay ID ${barangayId}`);
         res.status(200).json({ message: 'User account created successfully.', user_id: result.insertId, tempPassword: tempPasswordGenerated });
     });
 });

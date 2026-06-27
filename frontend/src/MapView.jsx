@@ -135,7 +135,7 @@ function PulseMarkers({ barangayData, onHover, onLeave, onClick }) {
 }
 
 export default function MapView({ setActiveTab, setCaseFilter }) {
-  const [allCases, setAllCases]       = useState([]);
+  const [allCases, setAllCases]         = useState([]);
   const [barangayData, setBarangayData] = useState([]);
   const [filterBarangay, setFilterBarangay] = useState('All Barangays');
   const [filterStatus,   setFilterStatus]   = useState('All Status');
@@ -143,6 +143,8 @@ export default function MapView({ setActiveTab, setCaseFilter }) {
   const [filterSeverity, setFilterSeverity] = useState('All Severities');
   const [tooltip, setTooltip] = useState(null);
   const [popup,   setPopup]   = useState(null);
+  const [lastUpdated, setLastUpdated]   = useState(null);
+  const [now, setNow]                   = useState(Date.now());
 
   const [barangayOpen, setBarangayOpen] = useState(false);
   const barangayRef = useRef(null);
@@ -157,10 +159,21 @@ export default function MapView({ setActiveTab, setCaseFilter }) {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  useEffect(() => {
+  const fetchMapData = () => {
     axios.get('http://localhost:5000/api/disease_cases')
-      .then(res => setAllCases(res.data))
+      .then(res => { setAllCases(res.data); setLastUpdated(Date.now()); })
       .catch(err => console.error('MapView fetch error:', err));
+  };
+
+  useEffect(() => {
+    fetchMapData();
+    const interval = setInterval(fetchMapData, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -369,6 +382,10 @@ export default function MapView({ setActiveTab, setCaseFilter }) {
           style={{ padding: '11px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '7px', cursor: 'pointer', fontWeight: '600', fontSize: '13px', marginTop: 'auto' }}>
           Reset Filters
         </button>
+
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', paddingTop: '6px' }}>
+          {lastUpdated ? `Updated ${Math.round((now - lastUpdated) / 1000)}s ago` : 'Refreshing...'}
+        </div>
       </div>
 
       {/* ── MAP AREA ── */}
