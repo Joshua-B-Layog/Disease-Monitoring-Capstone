@@ -89,7 +89,7 @@ function createAuditLog(userId, userName, userRole, choUnit, barangay, action, e
 
 const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
-    port: 465,
+    port: 587,
     secure: true,
     family: 4,
     auth: {
