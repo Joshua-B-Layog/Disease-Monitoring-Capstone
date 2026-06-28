@@ -8,29 +8,26 @@ const mysql = require('mysql2');
 const cors = require('cors');
 const crypto = require('crypto');
 const axios = require('axios');
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-async function sendEmail({ to, subject, html }) {
-  try {
-    const { error } = await resend.emails.send({
-      from: 'Cabuyao Health System <onboarding@resend.dev>',
-      to,
-      subject,
-      html,
-    });
-    if (error) {
-      console.error('Resend error:', error);
-      return false;
-    }
-    console.log(`✅ Email sent to ${to}`);
-    return true;
-  } catch (err) {
-    console.error('Resend exception:', err.message);
-    return false;
+const transporter = nodemailer.createTransport({
+  host: 'smtp-relay.brevo.com',
+  port: 587,
+  secure: false,
+  auth: {
+    user: process.env.BREVO_EMAIL,
+    pass: process.env.BREVO_SMTP_KEY
   }
-}
+});
+
+console.log('Brevo creds:', process.env.BREVO_EMAIL, process.env.BREVO_SMTP_KEY ? 'KEY_LOADED' : 'KEY_MISSING');
+transporter.verify((error, success) => {
+    if (error) {
+        console.error("❌ Email transporter FAILED:", error.message);
+    } else {
+        console.log("✅ Email transporter ready. Emails will send successfully.");
+    }
+});
 
 const app = express();
 
@@ -779,7 +776,11 @@ app.post('/api/forgot-password', (req, res) => {
 
             const resetLink = `http://localhost:3000/reset-password?token=${token}&email=${encodeURIComponent(userFound.email)}`;
 
-            const sent = await sendEmail({ to: userFound.email, subject: 'Cabuyao Health — Password Reset Request', html: `
+            const mailOptions = {
+                from: `"Cabuyao Health System" <${process.env.BREVO_FROM}>`,
+                to: userFound.email,
+                subject: 'Cabuyao Health — Password Reset Request',
+                html: `
                 <div style="max-width:600px;margin:0 auto;font-family:system-ui,sans-serif;background:#16171d;border:1px solid #2e303a;border-radius:8px;overflow:hidden;">
                     <div style="background:#0d9488;padding:24px;text-align:center;">
                         <h1 style="color:#fff;margin:0;font-size:28px;">CABUYAO HEALTH</h1>
@@ -800,13 +801,18 @@ app.post('/api/forgot-password', (req, res) => {
                         © 2026 City Health Office (CHO) Cabuyao
                     </div>
                 </div>
-            ` });
-            if (!sent) {
-              return res.status(500).json({ error: 'Failed to send recovery email. Please try again.' });
-            }
-            return res.status(200).json({
-              message: `Recovery link sent to ${userFound.email}`,
-              routingTarget: 'email'
+                `
+            };
+            transporter.sendMail(mailOptions, (mailErr, info) => {
+                if (mailErr) {
+                    console.error(" Email send FAILED:", mailErr.message);
+                    return res.status(500).json({ error: 'Email failed: ' + mailErr.message });
+                }
+                console.log(` Email sent to: ${userFound.email} | ID: ${info.messageId}`);
+                return res.status(200).json({ 
+                    message: `Recovery link sent to ${userFound.email}`,
+                    routingTarget: 'email'
+                });
             });
         });
     });
@@ -1097,7 +1103,7 @@ function createNotificationForUsers(title, message, type, link_to, barangayId = 
                 // 2. Email notification
                 if (prefs.email_notifications && eventAllowed && user.email) {
                     const mailOptions = {
-                        from: `"Cabuyao Health System" <${process.env.EMAIL_USER}>`,
+                        from: `"Cabuyao Health System" <${process.env.BREVO_FROM}>`,
                         to: user.email,
                         subject: title,
                         html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:12px">
