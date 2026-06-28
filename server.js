@@ -7,8 +7,30 @@ const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
 const axios = require('axios');
+const { Resend } = require('resend');
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+async function sendEmail({ to, subject, html }) {
+  try {
+    const { error } = await resend.emails.send({
+      from: 'Cabuyao Health System <onboarding@resend.dev>',
+      to,
+      subject,
+      html,
+    });
+    if (error) {
+      console.error('Resend error:', error);
+      return false;
+    }
+    console.log(`✅ Email sent to ${to}`);
+    return true;
+  } catch (err) {
+    console.error('Resend exception:', err.message);
+    return false;
+  }
+}
 
 const app = express();
 
@@ -86,26 +108,6 @@ function createAuditLog(userId, userName, userRole, choUnit, barangay, action, e
     (err) => { if (err) console.error('Audit log insert error:', err.message); }
   );
 }
-
-const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: true,
-    family: 4,
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    }
-});
-
-transporter.verify((error, success) => {
-    if (error) {
-        console.error("❌ Email transporter FAILED:", error.message);
-        console.error("   Check your EMAIL_USER and EMAIL_PASS in .env");
-    } else {
-        console.log("✅ Email transporter ready. Emails will send successfully.");
-    }
-});
 
 // ==========================================
 // 4. API ROUTES
@@ -770,51 +772,41 @@ app.post('/api/forgot-password', (req, res) => {
         const expiryTime = new Date(Date.now() + 3600000);
 
         const updateTokenQuery = 'UPDATE users SET reset_token = ?, token_expiry = ? WHERE user_id = ?';
-        db.query(updateTokenQuery, [token, expiryTime, userFound.user_id], (updateErr) => {
+        db.query(updateTokenQuery, [token, expiryTime, userFound.user_id], async (updateErr) => {
             if (updateErr) {
                 return res.status(500).json({ error: 'Failed to save reset token: ' + updateErr.message });
             }
 
             const resetLink = `http://localhost:3000/reset-password?token=${token}&email=${encodeURIComponent(userFound.email)}`;
 
-            const mailOptions = {
-                from: `"Cabuyao Health System" <${process.env.EMAIL_USER}>`,
-                to: userFound.email,
-                subject: 'Cabuyao Health — Password Reset Request',
-                html: `
-                    <div style="max-width:600px;margin:0 auto;font-family:system-ui,sans-serif;background:#16171d;border:1px solid #2e303a;border-radius:8px;overflow:hidden;">
-                        <div style="background:#0d9488;padding:24px;text-align:center;">
-                            <h1 style="color:#fff;margin:0;font-size:28px;">CABUYAO HEALTH</h1>
-                        </div>
-                        <div style="background:#1f2028;padding:40px 32px;">
-                            <p style="color:#f3f4f6;font-size:16px;">We received a request to reset the password for your account.</p>
-                            <div style="background:#16171d;border-left:4px solid #0d9488;padding:12px 16px;margin:24px 0;border-radius:4px;">
-                                <span style="color:#9ca3af;font-size:15px;display:block;">Account:</span>
-                                <strong style="color:#f3f4f6;font-size:18px;">${userFound.full_name || userFound.username}</strong>
-                            </div>
-                            <p style="color:#f3f4f6;font-size:16px;">Click below to set a new password. This link expires in <strong>60 minutes</strong>.</p>
-                            <div style="text-align:center;margin:32px 0;">
-                                <a href="${resetLink}" style="background:#10b981;color:#fff;text-decoration:none;padding:14px 36px;font-size:16px;font-weight:bold;border-radius:6px;display:inline-block;">RESET PASSWORD</a>
-                            </div>
-                            <p style="color:#6b7280;font-size:14px;border-top:1px solid #2e303a;padding-top:16px;">If you did not request this, ignore this email.</p>
-                        </div>
-                        <div style="background:#16171d;padding:20px;text-align:center;font-size:12px;color:#4b5563;border-top:1px solid #2e303a;">
-                            © 2026 City Health Office (CHO) Cabuyao
-                        </div>
+            const sent = await sendEmail({ to: userFound.email, subject: 'Cabuyao Health — Password Reset Request', html: `
+                <div style="max-width:600px;margin:0 auto;font-family:system-ui,sans-serif;background:#16171d;border:1px solid #2e303a;border-radius:8px;overflow:hidden;">
+                    <div style="background:#0d9488;padding:24px;text-align:center;">
+                        <h1 style="color:#fff;margin:0;font-size:28px;">CABUYAO HEALTH</h1>
                     </div>
-                `
-            };
-
-            transporter.sendMail(mailOptions, (mailErr, info) => {
-                if (mailErr) {
-                    console.error("❌ Email send FAILED:", mailErr.message);
-                    return res.status(500).json({ error: 'Email failed: ' + mailErr.message });
-                }
-                console.log(`✅ Email sent to: ${userFound.email} | ID: ${info.messageId}`);
-                return res.status(200).json({ 
-                    message: `Recovery link sent to ${userFound.email}`,
-                    routingTarget: 'email'
-                });
+                    <div style="background:#1f2028;padding:40px 32px;">
+                        <p style="color:#f3f4f6;font-size:16px;">We received a request to reset the password for your account.</p>
+                        <div style="background:#16171d;border-left:4px solid #0d9488;padding:12px 16px;margin:24px 0;border-radius:4px;">
+                            <span style="color:#9ca3af;font-size:15px;display:block;">Account:</span>
+                            <strong style="color:#f3f4f6;font-size:18px;">${userFound.full_name || userFound.username}</strong>
+                        </div>
+                        <p style="color:#f3f4f6;font-size:16px;">Click below to set a new password. This link expires in <strong>60 minutes</strong>.</p>
+                        <div style="text-align:center;margin:32px 0;">
+                            <a href="${resetLink}" style="background:#10b981;color:#fff;text-decoration:none;padding:14px 36px;font-size:16px;font-weight:bold;border-radius:6px;display:inline-block;">RESET PASSWORD</a>
+                        </div>
+                        <p style="color:#6b7280;font-size:14px;border-top:1px solid #2e303a;padding-top:16px;">If you did not request this, ignore this email.</p>
+                    </div>
+                    <div style="background:#16171d;padding:20px;text-align:center;font-size:12px;color:#4b5563;border-top:1px solid #2e303a;">
+                        © 2026 City Health Office (CHO) Cabuyao
+                    </div>
+                </div>
+            ` });
+            if (!sent) {
+              return res.status(500).json({ error: 'Failed to send recovery email. Please try again.' });
+            }
+            return res.status(200).json({
+              message: `Recovery link sent to ${userFound.email}`,
+              routingTarget: 'email'
             });
         });
     });
@@ -881,23 +873,15 @@ app.post('/api/users', (req, res) => {
         }
 
         if (tempPasswordGenerated) {
-            const mailOptions = {
-                from: `"Cabuyao Health System" <${process.env.EMAIL_USER}>`,
-                to: email,
-                subject: 'Your Cabuyao Health System Account',
-                html: `
-                    <div style="font-family:system-ui,sans-serif;padding:24px;">
-                        <h2 style="color:#1e3a8a;">Welcome to Cabuyao Health System</h2>
-                        <p>An account has been created for you as a Barangay Health Worker.</p>
-                        <p><strong>Username:</strong> ${username}<br/>
-                        <strong>Temporary Password:</strong> ${tempPasswordGenerated}</p>
-                        <p>Please log in and change your password as soon as possible.</p>
-                    </div>
-                `
-            };
-            transporter.sendMail(mailOptions, (mailErr) => {
-                if (mailErr) console.error("Temp password email failed:", mailErr.message);
-            });
+            sendEmail({ to: email, subject: 'Your Cabuyao Health System Account', html: `
+                <div style="font-family:system-ui,sans-serif;padding:24px;">
+                    <h2 style="color:#1e3a8a;">Welcome to Cabuyao Health System</h2>
+                    <p>An account has been created for you as a Barangay Health Worker.</p>
+                    <p><strong>Username:</strong> ${username}<br/>
+                    <strong>Temporary Password:</strong> ${tempPasswordGenerated}</p>
+                    <p>Please log in and change your password as soon as possible.</p>
+                </div>
+            ` }).catch(err => console.error('Temp password email failed:', err.message));
         }
 
         console.log("✅ User added:", { username, fullName, barangayId });
@@ -917,35 +901,28 @@ app.post('/api/send-2fa-email', (req, res) => {
         const expiry = new Date(Date.now() + 3600000); // 1 hour
 
         db.query('UPDATE users SET two_fa_token = ?, two_fa_token_expiry = ? WHERE user_id = ?',
-            [token, expiry, userId], (updateErr) => {
+            [token, expiry, userId], async (updateErr) => {
             if (updateErr) return res.status(500).json({ error: 'Failed to save verification token.' });
 
             const verifyLink = `http://localhost:3000/verify-2fa?token=${token}&userId=${userId}`;
 
-            const mailOptions = {
-                from: `"Cabuyao Health System" <${process.env.EMAIL_USER}>`,
-                to: user.email,
-                subject: 'Cabuyao Health — Verify Your Email for 2FA',
-                html: `
-                    <div style="max-width:600px;margin:0 auto;font-family:system-ui,sans-serif;background:#16171d;border:1px solid #2e303a;border-radius:8px;overflow:hidden;">
-                        <div style="background:#0d9488;padding:24px;text-align:center;">
-                            <h1 style="color:#fff;margin:0;font-size:28px;">CABUYAO HEALTH</h1>
-                        </div>
-                        <div style="background:#1f2028;padding:40px 32px;">
-                            <p style="color:#f3f4f6;font-size:16px;">Hi ${user.full_name},</p>
-                            <p style="color:#f3f4f6;font-size:16px;">You requested to enable Two-Factor Authentication on your account.</p>
-                            <div style="text-align:center;margin:32px 0;">
-                                <a href="${verifyLink}" style="background:#10b981;color:#fff;text-decoration:none;padding:14px 36px;font-size:16px;font-weight:bold;border-radius:6px;display:inline-block;">✅ Verify Email</a>
-                            </div>
-                            <p style="color:#6b7280;font-size:14px;border-top:1px solid #2e303a;padding-top:16px;">This link expires in 60 minutes. If you did not request this, ignore this email.</p>
-                        </div>
+            const sent = await sendEmail({ to: user.email, subject: 'Cabuyao Health — Verify Your Email for 2FA', html: `
+                <div style="max-width:600px;margin:0 auto;font-family:system-ui,sans-serif;background:#16171d;border:1px solid #2e303a;border-radius:8px;overflow:hidden;">
+                    <div style="background:#0d9488;padding:24px;text-align:center;">
+                        <h1 style="color:#fff;margin:0;font-size:28px;">CABUYAO HEALTH</h1>
                     </div>
-                `
-            };
-            transporter.sendMail(mailOptions, (mailErr) => {
-                if (mailErr) return res.status(500).json({ error: 'Failed to send email.' });
-                return res.status(200).json({ message: '2FA verification email sent.' });
-            });
+                    <div style="background:#1f2028;padding:40px 32px;">
+                        <p style="color:#f3f4f6;font-size:16px;">Hi ${user.full_name},</p>
+                        <p style="color:#f3f4f6;font-size:16px;">You requested to enable Two-Factor Authentication on your account.</p>
+                        <div style="text-align:center;margin:32px 0;">
+                            <a href="${verifyLink}" style="background:#10b981;color:#fff;text-decoration:none;padding:14px 36px;font-size:16px;font-weight:bold;border-radius:6px;display:inline-block;">✅ Verify Email</a>
+                        </div>
+                        <p style="color:#6b7280;font-size:14px;border-top:1px solid #2e303a;padding-top:16px;">This link expires in 60 minutes. If you did not request this, ignore this email.</p>
+                    </div>
+                </div>
+            ` });
+            if (!sent) return res.status(500).json({ error: 'Failed to send email.' });
+            return res.status(200).json({ message: '2FA verification email sent.' });
         });
     });
 });
@@ -996,33 +973,26 @@ app.post('/api/send-login-otp', (req, res) => {
         const expiry = new Date(Date.now() + 600000); // 10 minutes
 
         db.query('UPDATE users SET login_otp = ?, login_otp_expiry = ? WHERE user_id = ?',
-            [otp, expiry, userId], (updateErr) => {
+            [otp, expiry, userId], async (updateErr) => {
             if (updateErr) return res.status(500).json({ error: 'Failed to generate code.' });
 
-            const mailOptions = {
-                from: `"Cabuyao Health System" <${process.env.EMAIL_USER}>`,
-                to: user.email,
-                subject: 'Cabuyao Health — Your Login Verification Code',
-                html: `
-                    <div style="max-width:600px;margin:0 auto;font-family:system-ui,sans-serif;background:#16171d;border:1px solid #2e303a;border-radius:8px;overflow:hidden;">
-                        <div style="background:#0d9488;padding:24px;text-align:center;">
-                            <h1 style="color:#fff;margin:0;font-size:28px;">CABUYAO HEALTH</h1>
-                        </div>
-                        <div style="background:#1f2028;padding:40px 32px;text-align:center;">
-                            <p style="color:#f3f4f6;font-size:16px;">Hi ${user.full_name}, here is your login code:</p>
-                            <div style="font-size:36px;font-weight:bold;color:#10b981;letter-spacing:8px;margin:24px 0;">${otp}</div>
-                            <p style="color:#6b7280;font-size:14px;">This code expires in 10 minutes. If you did not attempt to log in, please secure your account.</p>
-                        </div>
+            const sent = await sendEmail({ to: user.email, subject: 'Cabuyao Health — Your Login Verification Code', html: `
+                <div style="max-width:600px;margin:0 auto;font-family:system-ui,sans-serif;background:#16171d;border:1px solid #2e303a;border-radius:8px;overflow:hidden;">
+                    <div style="background:#0d9488;padding:24px;text-align:center;">
+                        <h1 style="color:#fff;margin:0;font-size:28px;">CABUYAO HEALTH</h1>
                     </div>
-                `
-            };
-            transporter.sendMail(mailOptions, (mailErr) => {
-                if (mailErr) {
-                    console.log(`\n🔑 FALLBACK LOGIN OTP for ${user.email}: [ ${otp} ]\n`);
-                    return res.status(200).json({ message: 'Code generated. Check server console if email failed.' });
-                }
-                return res.status(200).json({ message: 'Verification code sent to your email.' });
-            });
+                    <div style="background:#1f2028;padding:40px 32px;text-align:center;">
+                        <p style="color:#f3f4f6;font-size:16px;">Hi ${user.full_name}, here is your login code:</p>
+                        <div style="font-size:36px;font-weight:bold;color:#10b981;letter-spacing:8px;margin:24px 0;">${otp}</div>
+                        <p style="color:#6b7280;font-size:14px;">This code expires in 10 minutes. If you did not attempt to log in, please secure your account.</p>
+                    </div>
+                </div>
+            ` });
+            if (!sent) {
+              console.log(`\n🔑 FALLBACK LOGIN OTP for ${user.email}: [ ${otp} ]\n`);
+              return res.status(200).json({ message: 'Code generated. Check server console if email failed.' });
+            }
+            return res.status(200).json({ message: 'Verification code sent to your email.' });
         });
     });
 });
@@ -1137,9 +1107,8 @@ function createNotificationForUsers(title, message, type, link_to, barangayId = 
                             <p style="color:#94a3b8;font-size:12px">Cabuyao City Disease Monitoring System</p>
                         </div>`
                     };
-                    transporter.sendMail(mailOptions, (mailErr) => {
-                        if (mailErr) console.error(`Email notification failed for user ${user.user_id}:`, mailErr.message);
-                    });
+                    sendEmail({ to: user.email, subject: mailOptions.subject, html: mailOptions.html })
+                        .catch(err => console.error(`Email notification failed for user ${user.user_id}:`, err.message));
                 }
 
                 // 3. SMS notification
