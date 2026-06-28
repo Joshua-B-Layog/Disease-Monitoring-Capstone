@@ -8,26 +8,26 @@ const mysql = require('mysql2');
 const cors = require('cors');
 const crypto = require('crypto');
 const axios = require('axios');
-const nodemailer = require('nodemailer');
 
-const transporter = nodemailer.createTransport({
-  host: 'smtp-relay.brevo.com',
-  port: 465,
-  secure: true,
-  auth: {
-    user: process.env.BREVO_EMAIL,
-    pass: process.env.BREVO_SMTP_KEY
+async function sendBrevoEmail(to, subject, htmlContent) {
+  try {
+    await axios.post('https://api.brevo.com/v3/smtp/email', {
+      sender: { name: 'Cabuyao Health System', email: process.env.BREVO_FROM },
+      to: [{ email: to }],
+      subject: subject,
+      htmlContent: htmlContent,
+    }, {
+      headers: {
+        'api-key': process.env.BREVO_API_KEY,
+        'Content-Type': 'application/json',
+      }
+    });
+    console.log(`✅ Email sent to: ${to}`);
+  } catch (err) {
+    console.error('❌ Brevo API error:', err.response?.data || err.message);
+    throw err;
   }
-});
-
-console.log('Brevo creds:', process.env.BREVO_EMAIL, process.env.BREVO_SMTP_KEY ? 'KEY_LOADED' : 'KEY_MISSING');
-transporter.verify((error, success) => {
-    if (error) {
-        console.error("❌ Email transporter FAILED:", error.message);
-    } else {
-        console.log("✅ Email transporter ready. Emails will send successfully.");
-    }
-});
+}
 
 const app = express();
 
@@ -803,17 +803,16 @@ app.post('/api/forgot-password', (req, res) => {
                 </div>
                 `
             };
-            transporter.sendMail(mailOptions, (mailErr, info) => {
-                if (mailErr) {
-                    console.error(" Email send FAILED:", mailErr.message);
-                    return res.status(500).json({ error: 'Email failed: ' + mailErr.message });
-                }
-                console.log(` Email sent to: ${userFound.email} | ID: ${info.messageId}`);
+            try {
+                await sendBrevoEmail(mailOptions.to, mailOptions.subject, mailOptions.html);
+                console.log(`✅ Email sent to: ${userFound.email}`);
                 return res.status(200).json({ 
                     message: `Recovery link sent to ${userFound.email}`,
                     routingTarget: 'email'
                 });
-            });
+            } catch (err) {
+                return res.status(500).json({ error: 'Email failed: ' + (err.response?.data || err.message) });
+            }
         });
     });
 });
