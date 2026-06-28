@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { API_URL } from './config';
 
 const CHO_BARANGAYS = {
   'CHO Unit I': ['Baclaran', 'Banlic', 'Bigaa', 'Butong', 'Gulod', 'Mamatid', 'Marinig', 'Sala', 'Barangay Uno (Poblacion)', 'Barangay Dos (Poblacion)', 'Barangay Tres (Poblacion)'],
@@ -68,7 +69,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
 
   const fetchUsers = () => {
     setLoading(true);
-    axios.get('http://localhost:5000/api/users')
+    axios.get(API_URL + '/api/users')
       .then(res => { setUsers(res.data); setLoading(false); })
       .catch(() => setLoading(false));
   };
@@ -76,7 +77,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
   useEffect(() => { fetchUsers(); }, []);
 
   useEffect(() => {
-    axios.get('http://localhost:5000/api/barangays')
+    axios.get(API_URL + '/api/barangays')
       .then(res => setBarangayList(res.data))
       .catch(() => {});
   }, []);
@@ -175,10 +176,10 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
 
     try {
       if (editingUser) {
-        await axios.put(`http://localhost:5000/api/users/${editingUser.user_id}`, payload);
+        await axios.put(`${API_URL}/api/users/${editingUser.user_id}`, payload);
         setSubmitMsg('User updated successfully!');
       } else {
-        await axios.post('http://localhost:5000/api/users', payload);
+        await axios.post(API_URL + '/api/users', payload);
         setSubmitMsg('User account created successfully!');
       }
       fetchUsers();
@@ -207,14 +208,14 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
     try {
       if (bulkDeleteMode) {
         for (const id of selectedIds) {
-          await axios.delete(`http://localhost:5000/api/users/${id}`);
+          await axios.delete(`${API_URL}/api/users/${id}`);
         }
         fetchUsers();
         setBulkDeleteMode(false);
         setSelectedIds([]);
         setDeleteTarget(null);
       } else {
-        await axios.delete(`http://localhost:5000/api/users/${deleteTarget.user_id}`);
+        await axios.delete(`${API_URL}/api/users/${deleteTarget.user_id}`);
         fetchUsers();
         setDeleteTarget(null);
       }
@@ -397,7 +398,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                               if (confirmDelete) {
                                 setDeleteTarget(user);
                               } else {
-                                axios.delete(`http://localhost:5000/api/users/${user.user_id}`)
+                                axios.delete(`${API_URL}/api/users/${user.user_id}`)
                                   .then(() => fetchUsers())
                                   .catch(err => alert('Delete failed: ' + (err.response?.data?.error || err.message)));
                               }

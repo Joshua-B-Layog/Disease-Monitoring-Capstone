@@ -1,4 +1,5 @@
   import React, { useState, useEffect } from 'react';
+  import { API_URL } from '../config';
 
   export default function Login({ onLoginSuccess, onForgotPassword, theme, toggleTheme }) {
     const [step, setStep] = useState('role'); // 'role', 'cho_select', 'bhw_select', 'auth', 'forgot_password', 'signup'
@@ -58,7 +59,7 @@
   );
 
     useEffect(() => {
-      fetch('http://localhost:5000/api/barangays')
+      fetch(API_URL + '/api/barangays')
         .then(res => res.json())
         .then(data => setBarangayList(data))
         .catch(err => console.error('Could not load barangays:', err));
@@ -131,7 +132,7 @@
         const device = getDeviceInfo();
         const location = 'Cabuyao, Calabarzon, Philippines';
 
-        const response = await fetch('http://localhost:5000/api/login', {
+        const response = await fetch(API_URL + '/api/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -168,7 +169,7 @@
                 // Hold off on logging in — send OTP and move to verification step
                 setPendingUser(sessionPayload);
                 try {
-                    await fetch('http://localhost:5000/api/send-login-otp', {
+                    await fetch(API_URL + '/api/send-login-otp', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ userId: data.user.id })
@@ -196,7 +197,7 @@ const handleLoginOtpSubmit = async (e) => {
     }
     setOtpLoading(true);
     try {
-        const response = await fetch('http://localhost:5000/api/verify-login-otp', {
+        const response = await fetch(API_URL + '/api/verify-login-otp', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId: pendingUser.id, otp: loginOtp })
@@ -230,7 +231,7 @@ const handleLoginOtpSubmit = async (e) => {
     }
 
     try {
-        const response = await fetch('http://localhost:5000/api/register', {
+        const response = await fetch(API_URL + '/api/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -284,7 +285,7 @@ const handleLoginOtpSubmit = async (e) => {
       }
 
       try {
-        const response = await fetch('http://localhost:5000/api/forgot-password', {
+        const response = await fetch(API_URL + '/api/forgot-password', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ identity: recoveryIdentity })

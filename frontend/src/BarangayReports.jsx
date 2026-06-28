@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { API_URL } from './config';
 
 // ── CHO Unit → Barangay mapping ──
 const CHO_BARANGAYS = {
@@ -42,10 +43,10 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
   const [now, setNow]                     = useState(Date.now());
 
   const fetchLiveData = () => {
-    axios.get('http://localhost:5000/api/disease_cases')
+    axios.get(API_URL + '/api/disease_cases')
       .then(res => setAllCases(res.data))
       .catch(() => {});
-    axios.get('http://localhost:5000/api/audit-logs')
+    axios.get(API_URL + '/api/audit-logs')
       .then(res => { setAuditLogs(res.data); setLastUpdated(Date.now()); })
       .catch(() => {});
   };
@@ -53,10 +54,10 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
   useEffect(() => {
     setStatsLoading(true);
     setAuditLoading(true);
-    axios.get('http://localhost:5000/api/disease_cases')
+    axios.get(API_URL + '/api/disease_cases')
       .then(res => { setAllCases(res.data); setStatsLoading(false); })
       .catch(() => setStatsLoading(false));
-    axios.get('http://localhost:5000/api/audit-logs')
+    axios.get(API_URL + '/api/audit-logs')
       .then(res => { setAuditLogs(res.data); setAuditLoading(false); setLastUpdated(Date.now()); })
       .catch(() => setAuditLoading(false));
     const interval = setInterval(fetchLiveData, 30000);

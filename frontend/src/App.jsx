@@ -9,6 +9,7 @@ import Login from './components/Login';
 import RecoverAccount from './components/RecoverAccount';
 import MapView from './MapView';
 
+import { API_URL } from './config';
 import './App.css';
 
 const getSavedFontScale = () => {
@@ -122,7 +123,7 @@ useEffect(() => {
   if (!loggedUserId) return;
 
   const fetchNotifications = () => {
-    fetch(`http://localhost:5000/api/notifications?userId=${loggedUserId}`)
+    fetch(`${API_URL}/api/notifications?userId=${loggedUserId}`)
       .then(res => res.json())
       .then(data => setNotifications(Array.isArray(data) ? data : []))
       .catch(() => {});
@@ -167,7 +168,7 @@ useEffect(() => {
     if (!loggedUserId) return;
     setProfileLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/users/${loggedUserId}/profile`);
+      const res = await fetch(`${API_URL}/api/users/${loggedUserId}/profile`);
       const data = await res.json();
       setProfileData(data);
     } catch (e) {
@@ -178,17 +179,17 @@ useEffect(() => {
   };
 
   const handleDismissNotification = (id) => {
-  fetch(`http://localhost:5000/api/notifications/${id}`, { method: 'DELETE' })
+  fetch(`${API_URL}/api/notifications/${id}`, { method: 'DELETE' })
     .then(() => setNotifications(prev => prev.filter(n => n.id !== id)));
   };
 
   const handleDismissAll = () => {
-    fetch(`http://localhost:5000/api/notifications?userId=${loggedUserId}`, { method: 'DELETE' })
+    fetch(`${API_URL}/api/notifications?userId=${loggedUserId}`, { method: 'DELETE' })
       .then(() => setNotifications([]));
   };
 
   const handleMarkRead = (id) => {
-    fetch(`http://localhost:5000/api/notifications/${id}/read`, { method: 'PUT' })
+    fetch(`${API_URL}/api/notifications/${id}/read`, { method: 'PUT' })
       .then(() => setNotifications(prev =>
         prev.map(n => n.id === id ? { ...n, is_read: 1 } : n)
       ));

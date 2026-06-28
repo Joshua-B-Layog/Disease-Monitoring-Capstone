@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { API_URL } from '../config';
 
 export default function ResetPasswordLanding() {
   const [email, setEmail] = useState('');
@@ -31,7 +32,7 @@ export default function ResetPasswordLanding() {
     setStatus({ type: '', msg: '' });
 
     try {
-      const response = await fetch('http://localhost:5000/api/reset-password', {
+      const response = await fetch(API_URL + '/api/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, token, newPassword })

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_URL } from '../config';
 
 export default function ForgotPasswordModal({ onClose }) {
   const [identity, setIdentity] = useState('');
@@ -13,7 +14,7 @@ export default function ForgotPasswordModal({ onClose }) {
     setError('');
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/api/forgot-password', {
+      const response = await fetch(API_URL + '/api/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ identity }),

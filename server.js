@@ -15,7 +15,9 @@ const app = express();
 // ==========================================
 // 2. MIDDLEWARE
 // ==========================================
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || '*',
+}));
 app.use(express.json({ limit: '10mb' })); // increased for base64 photo if needed later
 
 // ==========================================

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_URL } from '../config';
 
 export default function RecoverAccount() {
   const navigate = useNavigate();
@@ -14,7 +15,7 @@ export default function RecoverAccount() {
   const handleRequest = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('http://localhost:5000/api/forgot-password', {
+      const response = await fetch(API_URL + '/api/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ identity, method }),

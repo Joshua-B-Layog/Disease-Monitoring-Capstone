@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { API_URL } from './config';
 import './ManageCases.css';
 
 // ── All disease cards split into 2 pages of 6 ──
@@ -186,7 +187,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   // Fetch all cases
   const fetchCases = () => {
     setLoadingCases(true);
-    axios.get('http://localhost:5000/api/disease_cases')
+    axios.get(API_URL + '/api/disease_cases')
       .then(res => { setAllCases(res.data); setLoadingCases(false); setLastUpdated(Date.now()); })
       .catch(() => setLoadingCases(false));
   };
@@ -206,10 +207,10 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   }, []);
 
   useEffect(() => {
-    axios.get('http://localhost:5000/api/barangays')
+    axios.get(API_URL + '/api/barangays')
       .then(res => setBarangayList(res.data))
       .catch(() => {});
-    axios.get('http://localhost:5000/api/diseases')
+    axios.get(API_URL + '/api/diseases')
       .then(res => setAllDiseases(res.data))
       .catch(() => {});
   }, []);
@@ -244,8 +245,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     const interval = setInterval(() => {
       const payload = { ...formData, status: 'Draft' };
       const request = editingCase
-        ? axios.put(`http://localhost:5000/api/disease_cases/${editingCase.id}`, payload)
-        : axios.post('http://localhost:5000/api/disease_cases', payload);
+        ? axios.put(`${API_URL}/api/disease_cases/${editingCase.id}`, payload)
+        : axios.post(API_URL + '/api/disease_cases', payload);
 
       request
         .then(() => {
@@ -419,7 +420,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     if (!deleteTarget) return;
     setDeleteLoading(true);
     try {
-      await axios.delete(`http://localhost:5000/api/cases/${deleteTarget.case_id}`);
+      await axios.delete(`${API_URL}/api/cases/${deleteTarget.case_id}`);
       fetchCases();
       setDeleteTarget(null);
     } catch (err) {
@@ -493,10 +494,10 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
     try {
       if (editingCase) {
-        await axios.put(`http://localhost:5000/api/cases/${editingCase.case_id}`, payload);
+        await axios.put(`${API_URL}/api/cases/${editingCase.case_id}`, payload);
         setSubmitMsg('Case updated successfully!');
       } else {
-        await axios.post('http://localhost:5000/api/cases', payload);
+        await axios.post(API_URL + '/api/cases', payload);
         setSubmitMsg(isDraft ? 'Case saved as draft!' : 'Case added successfully!');
       }
       await fetchCases();
@@ -567,7 +568,30 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: compactMode ? '12px' : '20px' }}>
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+          <div onClick={() => { setSelectedDisease(null); setFilterStatus('Pending'); setTablePage(1); setView('list'); }}
+            style={{ flex: 1, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '12px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-main)' }}>📥 Inbox</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>Pending Approval</div>
+            </div>
+            <div style={{ background: '#f59e0b', color: '#fff', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '700' }}>
+              {baseCases.filter(c => c.status === 'Pending').length}
+            </div>
+          </div>
+          <div onClick={() => { setSelectedDisease(null); setFilterStatus('Draft'); setTablePage(1); setView('list'); }}
+            style={{ flex: 1, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '12px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-main)' }}>📤 Outbox</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>Cases You Submitted</div>
+            </div>
+            <div style={{ background: '#3b82f6', color: '#fff', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '700' }}>
+              {baseCases.filter(c => c.status === 'Draft').length}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: compactMode ? '12px' : '20px', marginTop: '16px' }}>
           {pageCards.map(disease => {
             const count = getCaseCount(disease);
             return (
@@ -928,7 +952,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                               if (confirmDelete) {
                                 setDeleteTarget(c);
                               } else {
-                                axios.delete(`http://localhost:5000/api/cases/${c.case_id}`)
+                                axios.delete(`${API_URL}/api/cases/${c.case_id}`)
                                   .then(() => fetchCases())
                                   .catch(err => alert('Delete failed: ' + (err.response?.data?.error || err.message)));
                               }

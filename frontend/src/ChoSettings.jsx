@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
+import { API_URL } from './config';
 import './ChoSettings.css';
 
 const translations = {
@@ -111,7 +112,7 @@ export default function CHOSettings({
   useEffect(() => {
     if (currentView !== 'notifications' || !userId) return;
     setNotifLoading(true);
-    fetch(`http://localhost:5000/api/notification-preferences/${userId}`)
+    fetch(`${API_URL}/api/notification-preferences/${userId}`)
       .then(r => r.json())
       .then(data => {
         setNotifications({
@@ -187,7 +188,7 @@ export default function CHOSettings({
   useEffect(() => {
     if (currentView === 'data') {
       setStorageLoading(true);
-      axios.get('http://localhost:5000/api/storage-stats')
+      axios.get(API_URL + '/api/storage-stats')
         .then(res => { setStorageStats(res.data); setStorageLoading(false); })
         .catch(() => setStorageLoading(false));
     }
@@ -212,7 +213,7 @@ export default function CHOSettings({
 
   const handleCreateBackup = (silent = false) => {
     setBackupLoading(true);
-    fetch('http://localhost:5000/api/backup')
+    fetch(API_URL + '/api/backup')
       .then(res => res.blob())
       .then(blob => {
         const url = URL.createObjectURL(blob);
@@ -236,7 +237,7 @@ export default function CHOSettings({
     if (!userId) return;
     setClearLoading(true);
     try {
-      await axios.delete(`http://localhost:5000/api/users/${userId}/my-data`);
+      await axios.delete(`${API_URL}/api/users/${userId}/my-data`);
       setClearSuccess('Your personal data has been cleared successfully. System data and other users are not affected.');
       setTimeout(() => {
         setShowClearModal(false);
@@ -267,7 +268,7 @@ export default function CHOSettings({
     }
 
     setProfileLoading(true);
-    axios.get(`http://localhost:5000/api/users/${userId}/profile`)
+    axios.get(`${API_URL}/api/users/${userId}/profile`)
       .then(res => {
         const d = res.data;
         const parts = (d.full_name || '').trim().split(' ');
@@ -296,7 +297,7 @@ export default function CHOSettings({
 
   // ── Load barangay list ──
   useEffect(() => {
-    axios.get('http://localhost:5000/api/barangays')
+    axios.get(API_URL + '/api/barangays')
       .then(res => setBarangayList(res.data))
       .catch(() => {});
   }, []);
@@ -320,7 +321,7 @@ export default function CHOSettings({
     setSaving(true);
     setSaveMsg('');
     try {
-      const res = await axios.put(`http://localhost:5000/api/users/${userId}/profile`, {
+      const res = await axios.put(`${API_URL}/api/users/${userId}/profile`, {
         firstName: profile.firstName,
         lastName: profile.lastName,
         email: profile.email,
@@ -355,7 +356,7 @@ export default function CHOSettings({
 
     setPasswordLoading(true);
     try {
-      await axios.put(`http://localhost:5000/api/users/${userId}/change-password`, {
+      await axios.put(`${API_URL}/api/users/${userId}/change-password`, {
         currentPassword: security.currentPassword,
         newPassword: security.newPassword,
       });
@@ -377,7 +378,7 @@ export default function CHOSettings({
       setDisableOtpError('');
       setDisableOtp('');
       try {
-        await axios.post('http://localhost:5000/api/send-login-otp', { userId });
+        await axios.post(API_URL + '/api/send-login-otp', { userId });
         setTwoFaStep('disable_otp_sent');
         setTwoFaMsg(`📧 A 6-digit code was sent to ${maskEmail(profile.email)}. Enter it below to disable 2FA.`);
       } catch (err) {
@@ -392,7 +393,7 @@ export default function CHOSettings({
     setTwoFaLoading(true);
     setTwoFaMsg('');
     try {
-      await axios.post('http://localhost:5000/api/send-2fa-email', { userId });
+      await axios.post(API_URL + '/api/send-2fa-email', { userId });
       setTwoFaStep('email_sent');
       setTwoFaMsg(`✅ Verification email sent to ${maskEmail(profile.email)}. Click the link in your email to activate 2FA.`);
     } catch (err) {
@@ -411,11 +412,11 @@ export default function CHOSettings({
     }
     setDisableOtpLoading(true);
     try {
-      const verifyRes = await axios.post('http://localhost:5000/api/verify-login-otp', {
+      const verifyRes = await axios.post(API_URL + '/api/verify-login-otp', {
         userId, otp: disableOtp,
       });
       if (verifyRes.status === 200) {
-        await axios.post('http://localhost:5000/api/disable-2fa', { userId });
+        await axios.post(API_URL + '/api/disable-2fa', { userId });
         setIsTwoFactorEnabled(false);
         setTwoFaStep('idle');
         setTwoFaMsg('✅ Two-Factor Authentication has been disabled.');
@@ -1057,7 +1058,7 @@ export default function CHOSettings({
               <button className="notifications-save-btn" onClick={async () => {
                 setNotifSaveMsg('');
                 try {
-                  const res = await fetch(`http://localhost:5000/api/notification-preferences/${userId}`, {
+                  const res = await fetch(`${API_URL}/api/notification-preferences/${userId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1319,26 +1320,23 @@ export default function CHOSettings({
                       </div>
                     </div>
                     <button onClick={async () => {
-                      const AUDIT_LOGS_DATA = [
-                        { id: 1,  timestamp: 'Jun 07, 2026 02:15 PM', userName: 'Pedro Santos', userRole: 'CHO', action: 'Created',  entity: 'Case Record',  details: 'Added Dengue entry for Patient DG-901 (Niugan)' },
-                        { id: 2,  timestamp: 'Jun 07, 2026 01:40 PM', userName: 'Maria Koars',  userRole: 'BHW', action: 'Updated',  entity: 'Case Record',  details: 'Changed COVID-19 status to Recovered for CV-1102' },
-                        { id: 3,  timestamp: 'Jun 07, 2026 11:15 AM', userName: 'Pedro Santos', userRole: 'CHO', action: 'Deleted',  entity: 'Case Record',  details: 'Removed duplicate Influenza A log item #FL-043' },
-                        { id: 4,  timestamp: 'Jun 06, 2026 04:10 PM', userName: 'Juan Danika',  userRole: 'CHO', action: 'Created',  entity: 'User Account', details: 'Provisioned BHW account credentials for Sector Pulo' },
-                        { id: 5,  timestamp: 'Jun 06, 2026 09:30 AM', userName: 'Juan Danika',  userRole: 'CHO', action: 'Logged In', entity: 'System',      details: 'Login from Chrome on Windows' },
-                        { id: 6,  timestamp: 'Jun 05, 2026 03:20 PM', userName: 'Maria Koars',  userRole: 'BHW', action: 'Updated',  entity: 'Case Record',  details: 'Updated severity for Dengue case DG-899 to Severe' },
-                        { id: 7,  timestamp: 'Jun 05, 2026 10:00 AM', userName: 'Pedro Santos', userRole: 'CHO', action: 'Created',  entity: 'Case Record',  details: 'Added Tuberculosis case TB-024 (Sala)' },
-                        { id: 8,  timestamp: 'Jun 04, 2026 02:45 PM', userName: 'Juan Danika',  userRole: 'CHO', action: 'Deleted',  entity: 'User Account', details: 'Deactivated BHW account ID PC03' },
-                        { id: 9,  timestamp: 'Jun 04, 2026 11:30 AM', userName: 'Maria Koars',  userRole: 'BHW', action: 'Logged In', entity: 'System',     details: 'Login from Firefox on Android' },
-                        { id: 10, timestamp: 'Jun 03, 2026 04:00 PM', userName: 'Pedro Santos', userRole: 'CHO', action: 'Updated',  entity: 'Case Record',  details: 'Changed status of CV-1089 to Recovered' },
-                      ];
                       try {
-                        const [caseRes, userRes] = await Promise.all([
-                          axios.get('http://localhost:5000/api/export-all'),
-                          axios.get('http://localhost:5000/api/users'),
+                        const [caseRes, userRes, auditRes] = await Promise.all([
+                          axios.get(API_URL + '/api/export-all'),
+                          axios.get(API_URL + '/api/users'),
+                          axios.get(API_URL + '/api/audit-logs'),
                         ]);
                         const cases = caseRes.data;
                         const users = userRes.data;
-                        const logs = AUDIT_LOGS_DATA;
+                        const logs = (auditRes.data || []).map((l, idx) => ({
+                          id: l.id ?? idx + 1,
+                          timestamp: new Date(l.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                          userName: l.user_name || '',
+                          userRole: l.user_role || '',
+                          action: l.action || '',
+                          entity: l.entity || '',
+                          details: l.details || '',
+                        }));
 
                         if (row.label === 'Export as PDF') {
                           const caseRows = cases.map(c =>

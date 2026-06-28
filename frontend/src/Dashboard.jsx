@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { API_URL } from './config';
 
 const ALL_DISEASES = [
   'Acute Respiratory Infection','Avian Influenza','Chickenpox','Cholera','Dengue',
@@ -40,7 +41,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   const [now, setNow] = useState(Date.now());
 
   const fetchCasesData = () => {
-    axios.get('http://localhost:5000/api/disease_cases')
+    axios.get(API_URL + '/api/disease_cases')
       .then((res) => { setCases(res.data); setLoading(false); setLastUpdated(Date.now()); })
       .catch(() => setLoading(false));
   };
