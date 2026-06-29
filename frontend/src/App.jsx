@@ -9,7 +9,7 @@ import Login from './components/Login';
 import RecoverAccount from './components/RecoverAccount';
 import MapView from './MapView';
 
-import { API_URL } from './config';
+import { API_URL } from './apiConfig';
 import './App.css';
 
 const getSavedFontScale = () => {

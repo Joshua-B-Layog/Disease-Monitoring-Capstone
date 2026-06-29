@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { API_URL } from '../config';
+import { API_URL } from '../apiConfig';
 
 export default function RecoverAccount() {
   const navigate = useNavigate();

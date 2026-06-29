@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { API_URL } from './config';
+import { API_URL } from './apiConfig';
 
 const ALL_DISEASES = [
   'Acute Respiratory Infection','Avian Influenza','Chickenpox','Cholera','Dengue',

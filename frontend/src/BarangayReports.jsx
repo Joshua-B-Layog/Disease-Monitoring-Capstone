@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { API_URL } from './config';
+import { API_URL } from './apiConfig';
 
 // ── CHO Unit → Barangay mapping ──
 const CHO_BARANGAYS = {
@@ -102,7 +102,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
 
   const fetchGeneratedReports = () => {
     setReportsLoading(true);
-    axios.get(`http://localhost:5000/api/generated-reports?cho_unit=${encodeURIComponent(reportScope)}`)
+    axios.get(`${API_URL}/api/generated-reports?cho_unit=${encodeURIComponent(reportScope)}`)
       .then(res => {
         const mapped = res.data.map(r => ({
           id: r.id,
@@ -142,7 +142,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
   const handleGenerateReport = () => {
     if (!genForm.name.trim()) { setGenError('Please enter a report name.'); return; }
 
-    axios.post('http://localhost:5000/api/generated-reports', {
+    axios.post(`${API_URL}/api/generated-reports`, {
       title: genForm.name,
       period: genForm.period,
       entity: genForm.entity,
@@ -209,7 +209,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
   const [viewReport, setViewReport] = useState(null);
 
   const handleDeleteReport = (id) => {
-    axios.delete(`http://localhost:5000/api/generated-reports/${id}`)
+    axios.delete(`${API_URL}/api/generated-reports/${id}`)
       .then(() => {
         setReportLogs(prev => prev.filter(r => r.id !== id));
         setViewReport(null);

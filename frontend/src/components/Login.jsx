@@ -1,5 +1,5 @@
   import React, { useState, useEffect } from 'react';
-  import { API_URL } from '../config';
+  import { API_URL } from '../apiConfig';
 
   export default function Login({ onLoginSuccess, onForgotPassword, theme, toggleTheme }) {
     const [step, setStep] = useState('role'); // 'role', 'cho_select', 'bhw_select', 'auth', 'forgot_password', 'signup'
@@ -581,7 +581,7 @@ const handleLoginOtpSubmit = async (e) => {
         onClick={async () => {
           if (!pendingUser) return;
           try {
-            await fetch('http://localhost:5000/api/send-login-otp', {
+            await fetch(`${API_URL}/api/send-login-otp`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ userId: pendingUser.id })

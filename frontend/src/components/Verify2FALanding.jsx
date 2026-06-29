@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { API_URL } from '../config';
+import { API_URL } from '../apiConfig';
 
 export default function Verify2FALanding() {
   const [status, setStatus] = useState('verifying'); // 'verifying' | 'success' | 'error'
