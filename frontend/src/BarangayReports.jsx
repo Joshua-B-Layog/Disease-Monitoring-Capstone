@@ -142,13 +142,32 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
   const handleGenerateReport = () => {
     if (!genForm.name.trim()) { setGenError('Please enter a report name.'); return; }
 
+    const now = new Date();
+    let cutoff;
+    switch (genForm.period) {
+      case 'Today':    cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate()); break;
+      case 'Weekly':   cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); break;
+      case 'Monthly':  cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); break;
+      case 'Quarterly':cutoff = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000); break;
+      case 'Yearly':   cutoff = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000); break;
+      default:         cutoff = null;
+    }
+    const periodLogs = cutoff
+      ? filteredAuditLogs.filter(l => new Date(l.created_at).getTime() >= cutoff.getTime())
+      : filteredAuditLogs;
+
+    if (periodLogs.length === 0) {
+      setGenError(`No log entries found for the selected period (${genForm.period}). Try a different period or adjust your filters.`);
+      return;
+    }
+
     axios.post(`${API_URL}/api/generated-reports`, {
       title: genForm.name,
       period: genForm.period,
       entity: genForm.entity,
       details: genForm.details,
       cho_unit: reportScope,
-      snapshotLogs: filteredAuditLogs,
+      snapshotLogs: periodLogs,
       created_by: null, // pass loggedUserId here if you have it available as a prop
     })
     .then(() => {
@@ -213,6 +232,8 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
       .then(() => {
         setReportLogs(prev => prev.filter(r => r.id !== id));
         setViewReport(null);
+        setModalShowAll(false);
+        setModalPage(1);
       })
       .catch(err => alert('Delete failed: ' + (err.response?.data?.error || err.message)));
   };
@@ -248,6 +269,8 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
   const [showDatePicker,  setShowDatePicker]  = useState(false);
   const [dateRange, setDateRange]             = useState({ start: '', end: '' });
   const [logPage, setLogPage]                 = useState(1);
+  const [modalShowAll, setModalShowAll]       = useState(false);
+  const [modalPage, setModalPage]             = useState(1);
 
   const actionDropRef  = useRef(null);
   const userDropRef    = useRef(null);
@@ -437,33 +460,63 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                   </tr>
                 </thead>
                 <tbody>
-                  {(viewReport.snapshotLogs || []).slice(0, 10).map(l => (
+                  {(viewReport.snapshotLogs || []).slice(...(modalShowAll ? [(modalPage - 1) * ITEMS_PER_PAGE, modalPage * ITEMS_PER_PAGE] : [0, 10])).map(l => (
                     <tr key={l.id} style={{ borderBottom: '1px solid #f8fafc' }}>
-                      <td style={{ padding: '8px 12px', textAlign: 'center', color: '#64748b', whiteSpace: 'nowrap' }}>{l.created_at ? new Date(l.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</td>
-                      <td style={{ padding: '8px 12px', textAlign: 'center' }}>
-                        <div style={{ fontWeight: '600', color: '#1e293b', fontSize: '12px' }}>{l.user_id}</div>
-                        <div style={{ color: '#94a3b8', fontSize: '11px' }}>{l.user_name}</div>
-                      </td>
-                      <td style={{ padding: '8px 12px', textAlign: 'center' }}>
-                        <span style={{ padding: '3px 10px', borderRadius: '10px', fontSize: '11px', fontWeight: '600', ...actionBadgeStyle(l.action) }}>{l.action}</span>
-                      </td>
-                      <td style={{ padding: '8px 12px', textAlign: 'center', color: '#475569', fontSize: '12px' }}>{l.entity}</td>
-                      <td style={{ padding: '8px 12px', color: '#64748b', fontSize: '12px' }}>{l.details}</td>
-                    </tr>
+                        <td style={{ padding: '8px 12px', textAlign: 'center', color: '#64748b', whiteSpace: 'nowrap' }}>{l.created_at ? new Date(l.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</td>
+                        <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                          <div style={{ fontWeight: '600', color: '#1e293b', fontSize: '12px' }}>{l.user_id}</div>
+                          <div style={{ color: '#94a3b8', fontSize: '11px' }}>{l.user_name}</div>
+                        </td>
+                        <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                          <span style={{ padding: '3px 10px', borderRadius: '10px', fontSize: '11px', fontWeight: '600', ...actionBadgeStyle(l.action) }}>{l.action}</span>
+                        </td>
+                        <td style={{ padding: '8px 12px', textAlign: 'center', color: '#475569', fontSize: '12px' }}>{l.entity}</td>
+                        <td style={{ padding: '8px 12px', color: '#64748b', fontSize: '12px' }}>{(l.details || '').replace(/\s*\(User ID:\s*\d+\)/gi, '').replace(/\s*\(Case ID:\s*\d+\)/gi, '')}</td>
+                        <td style={{ padding: '8px 12px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: l.user_role === 'CHO' ? '#2563eb' : '#16a34a' }}>
+                          {l.user_role === 'CHO' ? 'CHO Admin' : 'BHW'}
+                        </td>
+                      </tr>
                   ))}
                   {(viewReport.snapshotLogs || []).length === 0 && (
-                    <tr><td colSpan="5" style={{ textAlign: 'center', padding: '20px', color: '#94a3b8' }}>No log entries in this report.</td></tr>
+                    <tr><td colSpan="6" style={{ textAlign: 'center', padding: '20px', color: '#94a3b8' }}>No log entries in this report.</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
+
+            {modalShowAll && (() => {
+              const totalItems = (viewReport.snapshotLogs || []).length;
+              const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+              return totalPages > 1 ? (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #f1f5f9', alignItems: 'center' }}>
+                  <button onClick={() => setModalPage(p => Math.max(1, p - 1))} disabled={modalPage === 1}
+                    style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '6px', cursor: modalPage === 1 ? 'not-allowed' : 'pointer', color: modalPage === 1 ? '#cbd5e1' : '#475569' }}>
+                    ‹
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                    <button key={p} onClick={() => setModalPage(p)}
+                      style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: p === modalPage ? '#1e3a8a' : '#fff', color: p === modalPage ? '#fff' : '#475569', border: '1px solid #e2e8f0', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: p === modalPage ? '600' : '400' }}>
+                      {p}
+                    </button>
+                  ))}
+                  <button onClick={() => setModalPage(p => Math.min(totalPages, p + 1))} disabled={modalPage === totalPages}
+                    style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '6px', cursor: modalPage === totalPages ? 'not-allowed' : 'pointer', color: modalPage === totalPages ? '#cbd5e1' : '#475569' }}>
+                    ›
+                  </button>
+                </div>
+              ) : null;
+            })()}
 
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', paddingTop: '16px', borderTop: '1px solid #f1f5f9' }}>
               <button onClick={() => handleDeleteReport(viewReport.id)}
                 style={{ padding: '10px 20px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#dc2626', cursor: 'pointer' }}>
                 🗑️ Delete Report
               </button>
-              <button onClick={() => setViewReport(null)}
+              <button onClick={() => { setModalShowAll(s => !s); setModalPage(1); }}
+                style={{ padding: '10px 20px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#475569', cursor: 'pointer' }}>
+                {modalShowAll ? 'Show Less' : 'Show All'}
+              </button>
+              <button onClick={() => { setViewReport(null); setModalShowAll(false); setModalPage(1); }}
                 style={{ padding: '10px 28px', background: '#1e3a8a', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#fff', cursor: 'pointer' }}>
                 OK
               </button>
