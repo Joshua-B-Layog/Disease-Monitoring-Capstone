@@ -98,6 +98,22 @@ db.query(`CREATE TABLE IF NOT EXISTS audit_logs (
   else console.log('Audit logs table created/verified');
 });
 
+
+db.query(`CREATE TABLE IF NOT EXISTS generated_reports (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(255),
+  period VARCHAR(50),
+  entity VARCHAR(100),
+  details TEXT,
+  cho_unit VARCHAR(100),
+  snapshot_logs LONGTEXT,
+  created_by INT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)`, (err) => {
+  if (err) console.error('Error creating generated_reports table:', err.message);
+  else console.log('Generated reports table created/verified');
+});
+
 function createAuditLog(userId, userName, userRole, choUnit, barangay, action, entity, details) {
   db.query(
     'INSERT INTO audit_logs (user_id, user_name, user_role, cho_unit, barangay, action, entity, details) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -143,6 +159,38 @@ ORDER BY dc.case_id DESC
         }
         res.json(results);
     });
+});
+
+// ROUTE: Lookup patient by name/surname for auto-fill
+app.get('/api/patients/lookup', (req, res) => {
+  const { name } = req.query;
+  if (!name || name.trim().length < 2) {
+    return res.json([]);
+  }
+  const searchTerm = `%${name.trim()}%`;
+  const sql = `
+    SELECT dc1.patient_name, dc1.age, dc1.gender, dc1.contact,
+           dc1.address, dc1.barangay_id, b.name AS barangay_name,
+           dc1.symptoms, dc1.physician, dc1.latitude, dc1.longitude,
+           dc1.date_reported
+    FROM disease_cases dc1
+    LEFT JOIN barangays b ON dc1.barangay_id = b.id
+    INNER JOIN (
+      SELECT patient_name, MAX(date_reported) AS max_date
+      FROM disease_cases
+      WHERE patient_name LIKE ?
+      GROUP BY patient_name
+    ) dc2 ON dc1.patient_name = dc2.patient_name AND dc1.date_reported = dc2.max_date
+    ORDER BY dc1.date_reported DESC
+    LIMIT 10
+  `;
+  db.query(sql, [searchTerm], (err, results) => {
+    if (err) {
+      console.error("Patient lookup error:", err.message);
+      return res.status(500).json({ error: err.message });
+    }
+    res.json(results);
+  });
 });
 
 // ROUTE: Get list of diseases
@@ -255,12 +303,51 @@ app.post('/api/cases', (req, res) => {
 
     console.log("--- Add Case ---", { patient_name, disease_name, barangay_id });
 
-    const findDiseaseQuery = 'SELECT id FROM diseases WHERE LOWER(name) = LOWER(?)';
-    
-    db.query(findDiseaseQuery, [disease_name], (err, diseaseResults) => {
-        let diseaseId = diseaseResults && diseaseResults.length > 0 ? diseaseResults[0].id : null;
+    // ── Duplicate active case check ──
+    const activeStatuses = ['Active', 'Under Treatment', 'Pending'];
+    const checkDuplicate = (callback) => {
+        if (!patient_name || status === 'Draft') return callback();
+        db.query(
+            'SELECT case_id, status FROM disease_cases WHERE patient_name LIKE ? AND status IN (?, ?, ?) LIMIT 1',
+            [patient_name, 'Active', 'Under Treatment', 'Pending'],
+            (dupErr, dupResults) => {
+                if (dupErr) {
+                    console.error("Duplicate check error:", dupErr.message);
+                    return res.status(500).json({ error: dupErr.message });
+                }
+                if (dupResults && dupResults.length > 0) {
+                    return res.status(409).json({
+                        error: `Patient "${patient_name}" already has an active case (Status: ${dupResults[0].status}). Please resolve the existing case before adding a new one.`
+                    });
+                }
+                callback();
+            }
+        );
+    };
 
-        const doInsert = (dId) => {
+    if (!barangay_id) {
+      return res.status(400).json({ error: 'Please select an assigned barangay before saving.' });
+    }
+
+    if (contact && contact.trim()) {
+      db.query('SELECT case_id FROM disease_cases WHERE contact = ? AND contact IS NOT NULL AND contact != ? LIMIT 1', [contact.trim(), ''], (cErr, cRes) => {
+        if (cErr) return res.status(500).json({ error: cErr.message });
+        if (cRes && cRes.length > 0) {
+          return res.status(409).json({ error: 'That contact number is already in use by another patient. Please use a different contact number.' });
+        }
+        proceedToCheck();
+      });
+    } else {
+      proceedToCheck();
+    }
+
+    function proceedToCheck() {
+    checkDuplicate(() => {
+        const findDiseaseQuery = 'SELECT id FROM diseases WHERE LOWER(name) = LOWER(?)';
+        db.query(findDiseaseQuery, [disease_name], (err, diseaseResults) => {
+            let diseaseId = diseaseResults && diseaseResults.length > 0 ? diseaseResults[0].id : null;
+
+            const doInsert = (dId) => {
             const insertQuery = `
                 INSERT INTO disease_cases 
                 (patient_name, disease_id, age, severity, gender, status, contact, 
@@ -268,7 +355,7 @@ app.post('/api/cases', (req, res) => {
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
             `;
             const vals = [
-                patient_name, dId, age || null, severity, gender || 'Male',
+                patient_name, dId, age || 0, severity, gender || 'Male',
                 status || 'Active', contact || null, onset_date || null, address || null,
                 barangay_id || null, symptoms || null, physician || null,
                 latitude || null, longitude || null
@@ -282,7 +369,7 @@ app.post('/api/cases', (req, res) => {
                 console.log("✅ Case inserted, ID:", result.insertId);
 
                 // Write audit log entry
-                const auditUserId = req.body.user_id || null;
+                const auditUserId = (req.body && req.body.user_id) || null;
                 const auditDisease = disease_name || 'Unknown Disease';
                 const auditPatient = patient_name || 'Unknown Patient';
                 if (auditUserId) {
@@ -334,6 +421,8 @@ app.post('/api/cases', (req, res) => {
             doInsert(diseaseId);
         }
     });
+    });
+}
 });
 
 // ROUTE: Update existing case
@@ -362,7 +451,7 @@ app.put('/api/cases/:id', (req, res) => {
                 WHERE case_id = ?
             `;
             const vals = [
-                patient_name, dId, age || null, severity, gender || 'Male',
+                patient_name, dId, age || 0, severity, gender || 'Male',
                 status, contact || null, onset_date || null, address || null,
                 barangay_id || null, symptoms || null, physician || null,
                 latitude || null, longitude || null, id
@@ -379,7 +468,7 @@ app.put('/api/cases/:id', (req, res) => {
                 console.log("✅ Case updated:", id);
 
                 // Write audit log entry
-                const auditUserId = req.body.user_id || null;
+                const auditUserId = (req.body && req.body.user_id) || null;
                 const auditDisease = disease_name || 'Unknown Disease';
                 const auditPatient = patient_name || 'Unknown Patient';
                 if (auditUserId) {
@@ -422,6 +511,19 @@ app.put('/api/cases/:id', (req, res) => {
             });
         };
 
+        if (contact && contact.trim()) {
+          db.query('SELECT case_id FROM disease_cases WHERE contact = ? AND contact IS NOT NULL AND contact != ? AND case_id != ? LIMIT 1', [contact.trim(), '', id], (cErr, cRes) => {
+            if (cErr) return res.status(500).json({ error: cErr.message });
+            if (cRes && cRes.length > 0) {
+              return res.status(409).json({ error: 'That contact number is already in use by another patient. Please use a different contact number.' });
+            }
+            proceedToUpdate();
+          });
+        } else {
+          proceedToUpdate();
+        }
+
+        function proceedToUpdate() {
         if (!diseaseId && disease_name) {
             db.query('INSERT IGNORE INTO diseases (name) VALUES (?)', [disease_name], (dErr, dResult) => {
                 const newId = dResult && dResult.insertId ? dResult.insertId : null;
@@ -430,14 +532,45 @@ app.put('/api/cases/:id', (req, res) => {
         } else {
             doUpdate(diseaseId);
         }
+        }
     });
 });
 
 // ROUTE: Admin-edit a user account
-app.put('/api/users/:id', (req, res) => {
+app.put('/api/users/:id', async (req, res) => {
     const { id } = req.params;
     const { firstName, lastName, username, email, mobile, barangayId, isActive, role, loggedUserId } = req.body;
     const fullName = `${firstName.trim()} ${lastName.trim()}`;
+
+    // Check for duplicates excluding current user
+    const checkDupEditQuery = `
+        SELECT
+            SUM(username = ? AND user_id != ?) AS username_count,
+            SUM(email = ? AND user_id != ?) AS email_count,
+            SUM(mobile_number = ? AND user_id != ? AND ? != '' AND ? IS NOT NULL) AS mobile_count
+        FROM users
+    `;
+
+    const dupEditResult = await new Promise((resolve, reject) => {
+        db.query(checkDupEditQuery, [
+            username, id,
+            email, id,
+            mobile || '', id, mobile || '', mobile || ''
+        ], (err, rows) => {
+            if (err) reject(err);
+            else resolve(rows[0]);
+        });
+    });
+
+    if (dupEditResult.username_count > 0) {
+        return res.status(409).json({ error: 'A user with this username already exists.' });
+    }
+    if (dupEditResult.email_count > 0) {
+        return res.status(409).json({ error: 'A user with this email already exists.' });
+    }
+    if (mobile && dupEditResult.mobile_count > 0) {
+        return res.status(409).json({ error: 'A user with this contact number already exists.' });
+    }
 
     const updateQuery = `
         UPDATE users SET
@@ -539,7 +672,7 @@ app.delete('/api/cases/:id', (req, res) => {
             }
             
             // Write audit log entry
-            const auditUserId = req.body.user_id || null;
+            const auditUserId = (req.body && req.body.user_id) || null;
             const auditDisease = disease_name || 'Unknown Disease';
             const auditPatient = patient_name || 'Unknown Patient';
             if (auditUserId) {
@@ -613,6 +746,77 @@ app.post('/api/audit-logs', (req, res) => {
 });
 
 // ==========================================
+// GENERATED REPORTS ROUTES
+// ==========================================
+
+// GET all generated reports (newest first), optionally filtered by cho_unit
+app.get('/api/generated-reports', (req, res) => {
+  const { cho_unit } = req.query;
+  let sql = 'SELECT * FROM generated_reports';
+  const params = [];
+
+  if (cho_unit) {
+    sql += ' WHERE cho_unit = ?';
+    params.push(cho_unit);
+  }
+
+  sql += ' ORDER BY created_at DESC';
+
+  db.query(sql, params, (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    // Parse snapshot_logs back into an array for the frontend
+    const parsed = results.map(r => ({
+      ...r,
+      snapshotLogs: r.snapshot_logs ? JSON.parse(r.snapshot_logs) : []
+    }));
+    res.json(parsed);
+  });
+});
+
+// POST a new generated report
+app.post('/api/generated-reports', (req, res) => {
+  const { title, period, entity, details, cho_unit, snapshotLogs, created_by } = req.body;
+
+  if (!title) {
+    return res.status(400).json({ error: 'Report title is required.' });
+  }
+
+  const sql = `
+    INSERT INTO generated_reports (title, period, entity, details, cho_unit, snapshot_logs, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `;
+  const vals = [
+    title,
+    period || null,
+    entity || null,
+    details || null,
+    cho_unit || null,
+    JSON.stringify(snapshotLogs || []),
+    created_by || null
+  ];
+
+  db.query(sql, vals, (err, result) => {
+    if (err) {
+      console.error('Error creating generated report:', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+    res.status(201).json({ message: 'Report generated successfully', id: result.insertId });
+  });
+});
+
+// DELETE a generated report
+app.delete('/api/generated-reports/:id', (req, res) => {
+  const { id } = req.params;
+  db.query('DELETE FROM generated_reports WHERE id = ?', [id], (err, result) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Report not found.' });
+    }
+    res.json({ message: 'Report deleted successfully' });
+  });
+});
+
+// ==========================================
 // AUTHENTICATION ROUTES
 // ==========================================
 
@@ -657,6 +861,38 @@ app.post('/api/login', (req, res) => {
             if (selectedBarangay !== assignedBarangay) {
                 return res.status(403).json({ 
                     error: `Access denied. You are assigned to Brgy. ${user.assigned_barangay_name}, not Brgy. ${context.replace(/^Brgy\.\s*/i, '').trim()}.` 
+                });
+            }
+        }
+
+        if (role === 'CHO') {
+            const selectedUnit = context;
+
+            const CHO_UNIT_BARANGAYS = {
+                'CHO Unit I (Sala)': [
+                    'barangay uno (poblacion)', 'barangay dos (poblacion)', 'barangay tres (poblacion)',
+                    'sala', 'bigaa', 'butong', 'marinig', 'gulod', 'niugan', 'baclaran'
+                ],
+                'CHO Unit II (Pulo)': [
+                    'pulo', 'banay-banay', 'banlic', 'mamatid', 'san isidro', 'diezmo', 'pittland', 'casile'
+                ],
+            };
+
+            const allowedBarangays = CHO_UNIT_BARANGAYS[selectedUnit] || [];
+            const assignedBarangay = (user.assigned_barangay_name || '').trim().toLowerCase();
+
+            if (!assignedBarangay) {
+                return res.status(403).json({
+                    error: 'Your account has no assigned barangay. Please contact your administrator.'
+                });
+            }
+
+            if (!allowedBarangays.includes(assignedBarangay)) {
+                const userUnit = Object.entries(CHO_UNIT_BARANGAYS).find(([, list]) =>
+                    list.includes(assignedBarangay)
+                )?.[0] || 'another unit';
+                return res.status(403).json({
+                    error: `Access denied. You belong to ${userUnit}, not ${selectedUnit}.`
                 });
             }
         }
@@ -847,7 +1083,7 @@ app.post('/api/reset-password', (req, res) => {
 // ==========================================
 
 // ROUTE: Admin-create a user account
-app.post('/api/users', (req, res) => {
+app.post('/api/users', async (req, res) => {
     const { firstName, lastName, username, email, mobile, barangayId, isActive, password, generateTempPassword, role } = req.body;
 
     if (!firstName || !lastName || !username || !email || !barangayId) {
@@ -861,6 +1097,32 @@ app.post('/api/users', (req, res) => {
     if (generateTempPassword || !password) {
         tempPasswordGenerated = crypto.randomBytes(4).toString('hex');
         finalPassword = tempPasswordGenerated;
+    }
+
+    // Check for duplicates before inserting
+    const checkDuplicateQuery = `
+        SELECT
+            SUM(username = ?) AS username_count,
+            SUM(email = ?) AS email_count,
+            SUM(mobile_number = ? AND ? != '' AND ? IS NOT NULL) AS mobile_count
+        FROM users
+    `;
+
+    const dupResult = await new Promise((resolve, reject) => {
+        db.query(checkDuplicateQuery, [username, email, mobile || '', mobile || '', mobile || ''], (err, rows) => {
+            if (err) reject(err);
+            else resolve(rows[0]);
+        });
+    });
+
+    if (dupResult.username_count > 0) {
+        return res.status(409).json({ error: 'A user with this username already exists.' });
+    }
+    if (dupResult.email_count > 0) {
+        return res.status(409).json({ error: 'A user with this email already exists.' });
+    }
+    if (mobile && dupResult.mobile_count > 0) {
+        return res.status(409).json({ error: 'A user with this contact number already exists.' });
     }
 
     const insertQuery = `
@@ -878,7 +1140,7 @@ app.post('/api/users', (req, res) => {
         }
 
         if (tempPasswordGenerated) {
-            sendEmail({ to: email, subject: 'Your Cabuyao Health System Account', html: `
+            sendBrevoEmail(email, 'Your Cabuyao Health System Account', `
                 <div style="font-family:system-ui,sans-serif;padding:24px;">
                     <h2 style="color:#1e3a8a;">Welcome to Cabuyao Health System</h2>
                     <p>An account has been created for you as a Barangay Health Worker.</p>
@@ -886,7 +1148,7 @@ app.post('/api/users', (req, res) => {
                     <strong>Temporary Password:</strong> ${tempPasswordGenerated}</p>
                     <p>Please log in and change your password as soon as possible.</p>
                 </div>
-            ` }).catch(err => console.error('Temp password email failed:', err.message));
+            `).catch(err => console.error('Temp password email failed:', err.message));
         }
 
         console.log("✅ User added:", { username, fullName, barangayId });
@@ -911,7 +1173,8 @@ app.post('/api/send-2fa-email', (req, res) => {
 
             const verifyLink = `http://localhost:3000/verify-2fa?token=${token}&userId=${userId}`;
 
-            const sent = await sendEmail({ to: user.email, subject: 'Cabuyao Health — Verify Your Email for 2FA', html: `
+            try {
+                await sendBrevoEmail(user.email, 'Cabuyao Health — Verify Your Email for 2FA', `
                 <div style="max-width:600px;margin:0 auto;font-family:system-ui,sans-serif;background:#16171d;border:1px solid #2e303a;border-radius:8px;overflow:hidden;">
                     <div style="background:#0d9488;padding:24px;text-align:center;">
                         <h1 style="color:#fff;margin:0;font-size:28px;">CABUYAO HEALTH</h1>
@@ -925,8 +1188,10 @@ app.post('/api/send-2fa-email', (req, res) => {
                         <p style="color:#6b7280;font-size:14px;border-top:1px solid #2e303a;padding-top:16px;">This link expires in 60 minutes. If you did not request this, ignore this email.</p>
                     </div>
                 </div>
-            ` });
-            if (!sent) return res.status(500).json({ error: 'Failed to send email.' });
+                `);
+            } catch (err) {
+                return res.status(500).json({ error: 'Failed to send email.' });
+            }
             return res.status(200).json({ message: '2FA verification email sent.' });
         });
     });
@@ -981,7 +1246,8 @@ app.post('/api/send-login-otp', (req, res) => {
             [otp, expiry, userId], async (updateErr) => {
             if (updateErr) return res.status(500).json({ error: 'Failed to generate code.' });
 
-            const sent = await sendEmail({ to: user.email, subject: 'Cabuyao Health — Your Login Verification Code', html: `
+            try {
+                await sendBrevoEmail(user.email, 'Cabuyao Health — Your Login Verification Code', `
                 <div style="max-width:600px;margin:0 auto;font-family:system-ui,sans-serif;background:#16171d;border:1px solid #2e303a;border-radius:8px;overflow:hidden;">
                     <div style="background:#0d9488;padding:24px;text-align:center;">
                         <h1 style="color:#fff;margin:0;font-size:28px;">CABUYAO HEALTH</h1>
@@ -992,12 +1258,12 @@ app.post('/api/send-login-otp', (req, res) => {
                         <p style="color:#6b7280;font-size:14px;">This code expires in 10 minutes. If you did not attempt to log in, please secure your account.</p>
                     </div>
                 </div>
-            ` });
-            if (!sent) {
-              console.log(`\n🔑 FALLBACK LOGIN OTP for ${user.email}: [ ${otp} ]\n`);
-              return res.status(200).json({ message: 'Code generated. Check server console if email failed.' });
+                `);
+                return res.status(200).json({ message: 'Verification code sent to your email.' });
+            } catch (err) {
+                console.log(`\n🔑 FALLBACK LOGIN OTP for ${user.email}: [ ${otp} ]\n`);
+                return res.status(200).json({ message: 'Code generated. Check server console if email failed.' });
             }
-            return res.status(200).json({ message: 'Verification code sent to your email.' });
         });
     });
 });
@@ -1112,8 +1378,14 @@ function createNotificationForUsers(title, message, type, link_to, barangayId = 
                             <p style="color:#94a3b8;font-size:12px">Cabuyao City Disease Monitoring System</p>
                         </div>`
                     };
-                    sendEmail({ to: user.email, subject: mailOptions.subject, html: mailOptions.html })
-                        .catch(err => console.error(`Email notification failed for user ${user.user_id}:`, err.message));
+                    sendBrevoEmail(user.email, title, `
+                        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:12px">
+                            <h2 style="color:#1e293b;margin:0 0 8px 0">${title}</h2>
+                            <p style="color:#475569;font-size:15px;line-height:1.5">${message}</p>
+                            <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0" />
+                            <p style="color:#94a3b8;font-size:12px">Cabuyao City Disease Monitoring System</p>
+                        </div>`
+                    ).catch(err => console.error(`Email notification failed for user ${user.user_id}:`, err.message));
                 }
 
                 // 3. SMS notification

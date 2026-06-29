@@ -142,7 +142,7 @@ function PulseMarkers({ barangayData, onHover, onLeave, onClick }) {
   return null;
 }
 
-export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginBarangay }) {
+export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginBarangay, sessionContext }) {
   const [allCases, setAllCases]         = useState([]);
   const [barangayData, setBarangayData] = useState([]);
   const [filterBarangay, setFilterBarangay] = useState('All Barangays');
@@ -159,6 +159,16 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const barangayRef = useRef(null);
   const [purokOpen, setPurokOpen] = useState(false);
   const purokRef = useRef(null);
+
+  const CHO_UNIT_BARANGAYS = {
+    'CHO Unit I (Sala)': [
+      'Barangay Uno (Poblacion)', 'Barangay Dos (Poblacion)', 'Barangay Tres (Poblacion)',
+      'Sala', 'Bigaa', 'Butong', 'Marinig', 'Gulod', 'Niugan', 'Baclaran',
+    ],
+    'CHO Unit II (Pulo)': [
+      'Pulo', 'Banay-Banay', 'Banlic', 'Mamatid', 'San Isidro', 'Diezmo', 'Pittland', 'Casile',
+    ],
+  };
 
   useEffect(() => {
     const handler = (e) => {
@@ -200,9 +210,13 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       return true;
     });
 
+    const choUnitBarangays = sessionContext ? CHO_UNIT_BARANGAYS[sessionContext] || [] : [];
+
     const scopedFiltered = (loginRole === 'BHW' && loginBarangay)
       ? filtered.filter(c => c.barangay_name === loginBarangay)
-      : filtered;
+      : (loginRole === 'CHO' && choUnitBarangays.length > 0)
+        ? filtered.filter(c => choUnitBarangays.includes(c.barangay_name))
+        : filtered;
 
     const groups = {};
     scopedFiltered.forEach(c => {

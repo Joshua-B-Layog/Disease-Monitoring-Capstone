@@ -36,15 +36,24 @@
     const [barangayList, setBarangayList] = useState([]);
 
     const cabuyaoBarangays = [
-      { name: 'Baclaran', district: 'CHO 1' }, { name: 'Banaybanay', district: 'CHO 2' },
-      { name: 'Banlic', district: 'CHO 1' }, { name: 'Bigaa', district: 'CHO 1' },
-      { name: 'Butong', district: 'CHO 1' }, { name: 'Casile', district: 'CHO 2' },
-      { name: 'Diezmo', district: 'CHO 2' }, { name: 'Gulod', district: 'CHO 1' },
-      { name: 'Mamatid', district: 'CHO 1' }, { name: 'Marinig', district: 'CHO 1' },
-      { name: 'Niugan', district: 'CHO 2' }, { name: 'Pittland', district: 'CHO 2' },
-      { name: 'Pulo', district: 'CHO 2' }, { name: 'Sala', district: 'CHO 1' },
-      { name: 'San Isidro', district: 'CHO 2' }, { name: 'Poblacion I', district: 'CHO 1' },
-      { name: 'Poblacion II', district: 'CHO 1' }, { name: 'Poblacion III', district: 'CHO 1' }
+      { name: 'Barangay Uno (Poblacion)', district: 'CHO I' },
+      { name: 'Barangay Dos (Poblacion)', district: 'CHO I' },
+      { name: 'Barangay Tres (Poblacion)', district: 'CHO I' },
+      { name: 'Sala', district: 'CHO I' },
+      { name: 'Bigaa', district: 'CHO I' },
+      { name: 'Butong', district: 'CHO I' },
+      { name: 'Marinig', district: 'CHO I' },
+      { name: 'Gulod', district: 'CHO I' },
+      { name: 'Niugan', district: 'CHO I' },
+      { name: 'Baclaran', district: 'CHO I' },
+      { name: 'Pulo', district: 'CHO II' },
+      { name: 'Banay-Banay', district: 'CHO II' },
+      { name: 'Banlic', district: 'CHO II' },
+      { name: 'Mamatid', district: 'CHO II' },
+      { name: 'San Isidro', district: 'CHO II' },
+      { name: 'Diezmo', district: 'CHO II' },
+      { name: 'Pittland', district: 'CHO II' },
+      { name: 'Casile', district: 'CHO II' },
     ];
 
     // --- REMEMBER ME LOCAL STORAGE INITIALIZATION ---
@@ -529,41 +538,66 @@ const handleLoginOtpSubmit = async (e) => {
 
             {/* STEP 3.5: LOGIN OTP VERIFICATION */}
             {step === 'otp_login' && (
-              <>
-                <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
-                  <h2 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '8px' }}>Verify It's You</h2>
-                  <p style={{ color: 'var(--text-muted)' }}>
-                    We sent a 6-digit code to your registered email. Enter it below to complete sign-in.
-                  </p>
-                </div>
-
-                <form onSubmit={handleLoginOtpSubmit}>
-                  {otpError && (
-                    <div style={{ backgroundColor: '#fee2e2', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid #fca5a5' }}>
-                      {otpError}
-                    </div>
-                  )}
-
-                  <div className="form-group" style={{ textAlign: 'left' }}>
-                    <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontSize: '14px', fontWeight: '500' }}>Verification Code</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      placeholder="######"
-                      maxLength="6"
-                      value={loginOtp}
-                      onChange={(e) => setLoginOtp(e.target.value.replace(/\D/g, ''))}
-                      style={{ letterSpacing: '6px', textAlign: 'center', fontSize: '20px', fontWeight: 'bold' }}
-                      required
-                    />
-                  </div>
-
-                  <button type="submit" disabled={otpLoading} className="submit-btn" style={{ backgroundColor: '#10B981', color: '#FFFFFF', marginTop: '20px' }}>
-                    {otpLoading ? 'Verifying...' : 'Verify & Continue'}
-                  </button>
-                </form>
-              </>
-            )}
+  <>
+    <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
+      <h2 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '8px' }}>Verify It's You</h2>
+      <p style={{ color: 'var(--text-muted)' }}>
+        We sent a 6-digit code to your registered email. Enter it below to complete sign-in.
+      </p>
+    </div>
+    <form onSubmit={handleLoginOtpSubmit}>
+      {otpError && (
+        <div style={{ backgroundColor: '#fee2e2', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid #fca5a5' }}>
+          {otpError}
+        </div>
+      )}
+      <div className="form-group" style={{ textAlign: 'left' }}>
+        <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontSize: '14px', fontWeight: '500' }}>
+          Verification Code
+        </label>
+        <input
+          type="text"
+          className="form-input"
+          placeholder="Enter 6-digit code"
+          maxLength="6"
+          value={loginOtp}
+          onChange={(e) => setLoginOtp(e.target.value.replace(/\D/g, ''))}
+          style={{ letterSpacing: '6px', textAlign: 'center', fontSize: '20px', fontWeight: 'bold' }}
+          required
+          autoFocus
+        />
+      </div>
+      <button
+        type="submit"
+        disabled={otpLoading}
+        className="submit-btn"
+        style={{ backgroundColor: '#10B981', color: '#FFFFFF', marginTop: '20px' }}
+      >
+        {otpLoading ? 'Verifying...' : 'Verify & Continue'}
+      </button>
+    </form>
+    <div style={{ marginTop: '16px', textAlign: 'center' }}>
+      <span
+        onClick={async () => {
+          if (!pendingUser) return;
+          try {
+            await fetch('http://localhost:5000/api/send-login-otp', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId: pendingUser.id })
+            });
+            setOtpError('A new code has been sent to your email.');
+          } catch {
+            setOtpError('Failed to resend code. Please try again.');
+          }
+        }}
+        style={{ color: '#10B981', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
+      >
+        Resend Code
+      </span>
+    </div>
+  </>
+)}
 
 
 

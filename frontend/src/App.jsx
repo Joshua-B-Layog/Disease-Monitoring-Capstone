@@ -220,16 +220,17 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             compactMode={compactMode}
             loginRole={loginRole}
             loginBarangay={loggedUserBarangay}
+            sessionContext={sessionContext}
           />
         );
       case 'Manage Cases':
-        return <ManageCases caseFilter={caseFilter} setCaseFilter={setCaseFilter} dateFormat={dateFormat} autoSave={autoSave} confirmDelete={confirmDelete} keyboardShortcuts={keyboardShortcuts} fontScale={fontScale} compactMode={compactMode} loggedUserId={loggedUserId} loginRole={loginRole} loginBarangay={loggedUserBarangay} />;
+        return <ManageCases caseFilter={caseFilter} setCaseFilter={setCaseFilter} dateFormat={dateFormat} autoSave={autoSave} confirmDelete={confirmDelete} keyboardShortcuts={keyboardShortcuts} fontScale={fontScale} compactMode={compactMode} loggedUserId={loggedUserId} loginRole={loginRole} loginBarangay={loggedUserBarangay} sessionContext={sessionContext} />;
       case 'Map View':
-        return <MapView setActiveTab={setActiveTab} setCaseFilter={setCaseFilter} fontScale={fontScale} compactMode={compactMode} loginRole={loginRole} loginBarangay={loggedUserBarangay} />;
+        return <MapView setActiveTab={setActiveTab} setCaseFilter={setCaseFilter} fontScale={fontScale} compactMode={compactMode} loginRole={loginRole} loginBarangay={loggedUserBarangay} sessionContext={sessionContext} />;
       case 'User Accounts': 
         return <UserManagement dateFormat={dateFormat} confirmDelete={confirmDelete} fontScale={fontScale} compactMode={compactMode} loggedUserId={loggedUserId} />;
       case 'Audit Reports':
-        return <BarangayReports dateFormat={dateFormat} activeUser={{ role: loginRole, context: sessionContext }} fontScale={fontScale} compactMode={compactMode} />;
+        return <BarangayReports dateFormat={dateFormat} activeUser={{ role: loginRole, context: sessionContext }} fontScale={fontScale} compactMode={compactMode} loggedUserId={loggedUserId} />;
       case 'Settings':
         return (
           <ChoSettings

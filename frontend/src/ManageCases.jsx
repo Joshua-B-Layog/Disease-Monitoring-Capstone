@@ -3,6 +3,52 @@ import axios from 'axios';
 import { API_URL } from './config';
 import './ManageCases.css';
 
+const BARANGAY_COORDS = {
+  'Baclaran': [14.2050, 121.1050],
+  'Banay-Banay': [14.2400, 121.1350],
+  'Banlic': [14.2150, 121.1120],
+  'Barangay Dos (Poblacion)': [14.2260, 121.1230],
+  'Barangay Tres (Poblacion)': [14.2240, 121.1210],
+  'Barangay Uno (Poblacion)': [14.2280, 121.1250],
+  'Bigaa': [14.2180, 121.1300],
+  'Butong': [14.2100, 121.1180],
+  'Casile': [14.2050, 121.0900],
+  'Diezmo': [14.2320, 121.1000],
+  'Gulod': [14.2200, 121.1400],
+  'Mamatid': [14.2350, 121.1450],
+  'Marinig': [14.2150, 121.1500],
+  'Niugan': [14.2450, 121.1200],
+  'Pittland': [14.1980, 121.0950],
+  'Pulo': [14.2500, 121.1100],
+  'Sala': [14.2300, 121.1300],
+  'San Isidro': [14.2420, 121.0980],
+};
+
+const CHO_UNIT_BARANGAYS = {
+  'CHO Unit I (Sala)': [
+    'Barangay Uno (Poblacion)',
+    'Barangay Dos (Poblacion)',
+    'Barangay Tres (Poblacion)',
+    'Sala',
+    'Bigaa',
+    'Butong',
+    'Marinig',
+    'Gulod',
+    'Niugan',
+    'Baclaran',
+  ],
+  'CHO Unit II (Pulo)': [
+    'Pulo',
+    'Banay-Banay',
+    'Banlic',
+    'Mamatid',
+    'San Isidro',
+    'Diezmo',
+    'Pittland',
+    'Casile',
+  ],
+};
+
 // ── All disease cards split into 2 pages of 6 ──
 const DISEASE_PAGES = [
   [
@@ -56,7 +102,7 @@ const CASES_PER_PAGE = 10;
 const EMPTY_FORM = {
   patientName: '', diseaseType: '', age: '', severity: 'Mild',
   gender: 'Male', status: 'Active', contact: '', onsetDate: '',
-  address: '', barangayId: '', symptoms: '', physician: '',
+  address: '', purok: '', barangayId: '', symptoms: '', physician: '',
   lat: '', lng: '', specificDisease: ''
 };
 
@@ -89,7 +135,7 @@ const formatDateStr = (dateStr, fmt) => {
   return `${m}/${day}/${shortY}`;
 };
 
-export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, autoSave, confirmDelete, keyboardShortcuts, fontScale, compactMode, loggedUserId, loginRole, loginBarangay }) {
+export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, autoSave, confirmDelete, keyboardShortcuts, fontScale, compactMode, loggedUserId, loginRole, loginBarangay, sessionContext }) {
   const [view, setView] = useState('categories'); // 'categories' | 'list' | 'add' | 'edit'
   const [cardPage, setCardPage] = useState(0);
   const [selectedDisease, setSelectedDisease] = useState(null);
@@ -99,9 +145,13 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const [loadingCases, setLoadingCases] = useState(false);
   const [barangayList, setBarangayList] = useState([]);
   const [allDiseases, setAllDiseases] = useState([]);
+  const choUnitBarangays = sessionContext ? CHO_UNIT_BARANGAYS[sessionContext] || [] : [];
+
   const baseCases = (loginRole === 'BHW' && loginBarangay)
     ? allCases.filter(c => c.barangay_name === loginBarangay)
-    : allCases;
+    : (loginRole === 'CHO' && choUnitBarangays.length > 0)
+      ? allCases.filter(c => choUnitBarangays.includes(c.barangay_name))
+      : allCases;
 
   // Table filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -147,6 +197,14 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   // Delete modal
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Patient auto-fill lookup
+  const [patientLookupResults, setPatientLookupResults] = useState([]);
+  const [showLookupDropdown, setShowLookupDropdown] = useState(false);
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const lookupTimerRef = useRef(null);
+  const lookupDropdownRef = useRef(null);
+  const [formErrors, setFormErrors] = useState({});
 
   // Add/Edit form
   const [formData, setFormData] = useState({ ...EMPTY_FORM });
@@ -232,6 +290,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       if (barangayFormRef.current && !barangayFormRef.current.contains(e.target)) setBarangayFormOpen(false);
       if (diseaseFormRef.current && !diseaseFormRef.current.contains(e.target)) setDiseaseOpen(false);
       setSubDiseaseOpen(false);
+      if (lookupDropdownRef.current && !lookupDropdownRef.current.contains(e.target)) {
+        setShowLookupDropdown(false);
+      }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -288,6 +349,64 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     return () => document.removeEventListener('keydown', handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keyboardShortcuts, view, deleteTarget]);
+
+  const applyPatientAutoFill = (patient) => {
+    const brgy = barangayList.find(b => b.name === patient.barangay_name);
+    setFormData(prev => ({
+      ...prev,
+      patientName: patient.patient_name || '',
+      age: patient.age || '',
+      gender: patient.gender || 'Male',
+      contact: patient.contact || '',
+      address: patient.address || '',
+      barangayId: brgy ? brgy.id : (patient.barangay_id || ''),
+      symptoms: patient.symptoms || '',
+      physician: patient.physician || '',
+      lat: patient.latitude || '',
+      lng: patient.longitude || '',
+    }));
+    setShowLookupDropdown(false);
+  };
+
+  // ── Patient auto-fill: debounced lookup ──
+  useEffect(() => {
+    if (lookupTimerRef.current) {
+      clearTimeout(lookupTimerRef.current);
+    }
+
+    const name = (formData.patientName || '').trim();
+    if (name.length < 2) {
+      return;
+    }
+
+    lookupTimerRef.current = setTimeout(() => {
+      setLookupLoading(true);
+      axios.get(`${API_URL}/api/patients/lookup`, { params: { name } })
+        .then(res => {
+          const results = res.data || [];
+          setPatientLookupResults(results);
+          if (results.length === 1) {
+            applyPatientAutoFill(results[0]);
+            setShowLookupDropdown(false);
+          } else if (results.length > 1) {
+            setShowLookupDropdown(true);
+          } else {
+            setShowLookupDropdown(false);
+          }
+          setLookupLoading(false);
+        })
+        .catch(() => {
+          setPatientLookupResults([]);
+          setShowLookupDropdown(false);
+          setLookupLoading(false);
+        });
+    }, 300);
+
+    return () => {
+      if (lookupTimerRef.current) clearTimeout(lookupTimerRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.patientName]);
 
   // ── Match cases to disease card ──
   const matchesCard = (caseItem, card) => {
@@ -433,7 +552,14 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   // ── OPEN EDIT ──
   const openEdit = (caseItem) => {
     const brgy = barangayList.find(b => b.name === caseItem.barangay_name);
-    setFormData({
+    let parsedAddress = caseItem.address || '';
+    let parsedPurok = '';
+    if (parsedAddress.includes('|')) {
+      const [addrPart, purokPart] = parsedAddress.split('|');
+      parsedAddress = addrPart.trim();
+      parsedPurok = (purokPart || '').trim();
+    }
+    const filledForm = {
       patientName: caseItem.patient_name || '',
       diseaseType: caseItem.disease_name || '',
       age: caseItem.age || '',
@@ -442,16 +568,54 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       status: caseItem.status || 'Active',
       contact: caseItem.contact || '',
       onsetDate: caseItem.onset_date ? caseItem.onset_date.split('T')[0] : '',
-      address: caseItem.address || '',
+      address: parsedAddress,
+      purok: parsedPurok,
       barangayId: brgy ? brgy.id : '',
       symptoms: caseItem.symptoms || '',
       physician: caseItem.physician || '',
       lat: caseItem.latitude || '',
       lng: caseItem.longitude || '',
       specificDisease: '',
-    });
+    };
+    setFormData(filledForm);
     setEditingCase(caseItem);
+
+    const errors = {};
+    if (!filledForm.patientName.trim()) errors.patientName = true;
+    if (!filledForm.diseaseType) errors.diseaseType = true;
+    if (!filledForm.age) errors.age = true;
+    if (!filledForm.contact.trim()) errors.contact = true;
+    if (!filledForm.address.trim()) errors.address = true;
+    if (!filledForm.onsetDate) errors.onsetDate = true;
+    if (!filledForm.barangayId) errors.barangayId = true;
+    if (!filledForm.physician.trim()) errors.physician = true;
+    if (!filledForm.symptoms.trim()) errors.symptoms = true;
+    if (!filledForm.lat || !filledForm.lng) errors.location = true;
+    setFormErrors(errors);
+
     setView('edit');
+  };
+
+  const geocodeAddress = async (address) => {
+    if (!address || address.trim().length < 5) return;
+    try {
+      const query = encodeURIComponent(`${address}, Cabuyao, Laguna, Philippines`);
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`,
+        { headers: { 'Accept-Language': 'en', 'User-Agent': 'CabuyaoCDMS/1.0' } }
+      );
+      const data = await res.json();
+      if (data && data.length > 0) {
+        setFormData(prev => ({
+          ...prev,
+          lat: parseFloat(data[0].lat).toFixed(6),
+          lng: parseFloat(data[0].lon).toFixed(6),
+        }));
+        setFormErrors(prev => ({ ...prev, location: false }));
+      }
+    } catch (err) {
+      console.warn('Geocoding failed:', err);
+    }
   };
 
   // ── OPEN ADD ──
@@ -461,18 +625,54 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       diseaseType: selectedDisease?.dbName === 'Other' ? '' : (selectedDisease?.dbName || ''),
     });
     setEditingCase(null);
+    setFormErrors({});
     setView('add');
   };
 
   // ── SAVE CASE (Add or Edit) ──
   const handleSave = async (e, isDraft = false) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
+    if (submitLoading) return;
     setSubmitLoading(true);
     setSubmitMsg('');
 
-    const diseaseNameToSave = formData.diseaseType === 'Other Communicable Diseases'
+    if (!formData.barangayId) {
+      setFormErrors({ barangayId: true });
+      setSubmitMsg('Please select an assigned barangay.');
+      setSubmitLoading(false);
+      return;
+    }
+
+    if (!isDraft) {
+      const errors = {};
+      if (!formData.patientName.trim()) errors.patientName = true;
+      if (!formData.diseaseType) errors.diseaseType = true;
+      if (!formData.age) errors.age = true;
+      if (!formData.contact.trim()) errors.contact = true;
+      if (!formData.address.trim()) errors.address = true;
+      if (!formData.onsetDate) errors.onsetDate = true;
+      if (!formData.physician.trim()) errors.physician = true;
+      if (!formData.symptoms.trim()) errors.symptoms = true;
+      if (!formData.lat || !formData.lng) errors.location = true;
+      if (Object.keys(errors).length > 0) {
+        setFormErrors(errors);
+        setSubmitMsg('Please fill in all required fields highlighted in red.');
+        setSubmitLoading(false);
+        return;
+      }
+    }
+    setFormErrors({});
+
+    let diseaseNameToSave = formData.diseaseType === 'Other Communicable Diseases'
       ? (formData.specificDisease || 'Other')
       : formData.diseaseType;
+    if (isDraft && !diseaseNameToSave) {
+      diseaseNameToSave = '';
+    }
+
+    const combinedAddress = formData.purok
+      ? `${formData.address}${formData.address ? ' | ' : ''}${formData.purok}`
+      : formData.address;
 
     const payload = {
       patient_name: formData.patientName,
@@ -483,7 +683,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       status: isDraft ? 'Draft' : formData.status,
       contact: formData.contact,
       onset_date: formData.onsetDate || null,
-      address: formData.address,
+      address: combinedAddress,
       barangay_id: formData.barangayId || null,
       symptoms: formData.symptoms,
       physician: formData.physician,
@@ -1051,15 +1251,56 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 <h4 style={{ margin: 0, color: '#334155', fontSize: '14px', fontWeight: '700', paddingBottom: '8px', borderBottom: '1px solid #e2e8f0' }}>
                   Patient Information
                 </h4>
-                <div>
-                  <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Patient Full Name *</label>
-                  <input type="text" required placeholder="e.g. Juan Dela Cruz" style={inputStyle}
-                    value={formData.patientName} onChange={e => setFormData({ ...formData, patientName: e.target.value })} />
+                <div style={{ position: 'relative' }}>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>
+                    Patient Full Name *
+                    <span style={{ color: '#9ca3af', fontWeight: 400, fontSize: '11px', marginLeft: '6px' }}>
+                      (type surname to auto-fill past records)
+                    </span>
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input type="text" required placeholder="e.g. Juan Dela Cruz" style={{ ...inputStyle, border: formErrors.patientName ? '2px solid #ef4444' : '1px solid #d1d5db', background: formErrors.patientName ? '#fff5f5' : '#f9fafb' }}
+                      value={formData.patientName} onChange={e => { setFormData({ ...formData, patientName: e.target.value }); setFormErrors(prev => ({ ...prev, patientName: false })); }}
+                      onFocus={() => { if (patientLookupResults.length > 0) setShowLookupDropdown(true); }} />
+                    {lookupLoading && (
+                      <span style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', fontSize: '12px' }}>⌛</span>
+                    )}
+                  </div>
+                  {showLookupDropdown && patientLookupResults.length > 0 && (
+                    <div ref={lookupDropdownRef} style={{
+                      position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 300,
+                      maxHeight: '220px', overflowY: 'auto', marginTop: '2px',
+                      background: '#ffffff', border: '1px solid #d1d5db',
+                      borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                      padding: '4px',
+                    }}>
+                      <div style={{ padding: '6px 12px', fontSize: '11px', color: '#64748b', fontWeight: 600, borderBottom: '1px solid #e2e8f0', marginBottom: '2px' }}>
+                        Multiple matching records — click to select
+                      </div>
+                      {patientLookupResults.map((p, i) => (
+                        <div key={i}
+                          onClick={() => applyPatientAutoFill(p)}
+                          style={{
+                            padding: '8px 12px', cursor: 'pointer', fontSize: '13px',
+                            borderRadius: '6px', color: '#1f2937',
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                        >
+                          <span><strong>{p.patient_name}</strong> <span style={{ color: '#64748b' }}>— {p.barangay_name || 'N/A'}</span></span>
+                          <span style={{ color: '#9ca3af', fontSize: '11px' }}>
+                            {p.age || '?'}y
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Age</label>
-                    <input type="number" min="0" max="120" placeholder="25" style={inputStyle}
+                    <input type="number" min="0" max="120" placeholder="25" style={{ ...inputStyle, border: formErrors.age ? '2px solid #ef4444' : '1px solid #d1d5db', background: formErrors.age ? '#fff5f5' : '#f9fafb' }}
                       value={formData.age} onChange={e => setFormData({ ...formData, age: e.target.value })} />
                   </div>
                   <div>
@@ -1071,13 +1312,97 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Contact No.</label>
-                  <input type="text" placeholder="0918-234-2331" style={inputStyle}
+                  <input type="text" placeholder="0918-234-2331" style={{ ...inputStyle, border: formErrors.contact ? '2px solid #ef4444' : '1px solid #d1d5db', background: formErrors.contact ? '#fff5f5' : '#f9fafb' }}
                     value={formData.contact} onChange={e => setFormData({ ...formData, contact: e.target.value })} />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Address</label>
                   <input type="text" placeholder="123 Rizal St, San Isidro Cabuyao" style={inputStyle}
-                    value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} />
+                    value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })}
+                    onBlur={async (e) => {
+                      const addr = e.target.value.trim();
+                      if (!addr) return;
+
+                      const addrLower = addr.toLowerCase().replace(/[\-\s]/g, '');
+                      const matchedBarangay = barangayList.find(b => {
+                        const bNorm = b.name.toLowerCase().replace(/[\-\s().]/g, '');
+                        return addrLower.includes(bNorm);
+                      });
+
+                      if (matchedBarangay) {
+                        setFormData(prev => ({ ...prev, barangayId: String(matchedBarangay.id) }));
+                      }
+
+                      // ── detect Purok/Blk/Phase/Lot from the typed address ──
+                      if (loginRole === 'BHW') {
+                        const matchedPurok = PUROK_OPTIONS.find(p => {
+                          const pNorm = p.toLowerCase().replace(/[\s]/g, '');
+                          return addrLower.includes(pNorm);
+                        });
+                        if (matchedPurok) {
+                          setFormData(prev => ({ ...prev, purok: matchedPurok }));
+                        }
+                      }
+
+                      const barangayName = matchedBarangay?.name || barangayList.find(b => String(b.id) === String(formData.barangayId))?.name || '';
+                      const fullQuery = [addr, barangayName, 'Cabuyao', 'Laguna', 'Philippines'].filter(Boolean).join(', ');
+
+                      try {
+                        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(fullQuery)}&format=json&limit=1`);
+                        const data = await res.json();
+                        if (data && data.length > 0) {
+                          setFormData(prev => ({
+                            ...prev,
+                            barangayId: matchedBarangay ? String(matchedBarangay.id) : prev.barangayId,
+                            lat: parseFloat(data[0].lat).toFixed(6),
+                            lng: parseFloat(data[0].lon).toFixed(6),
+                          }));
+                        }
+                      } catch (_) {}
+                    }}
+                    onKeyDown={async (e) => {
+                      if (e.key !== 'Enter') return;
+                      e.preventDefault();
+                      const addr = e.target.value.trim();
+                      if (!addr) return;
+
+                      const addrLower = addr.toLowerCase().replace(/[\-\s]/g, '');
+                      const matchedBarangay = barangayList.find(b => {
+                        const bNorm = b.name.toLowerCase().replace(/[\-\s().]/g, '');
+                        return addrLower.includes(bNorm);
+                      });
+
+                      if (matchedBarangay) {
+                        setFormData(prev => ({ ...prev, barangayId: String(matchedBarangay.id) }));
+                      }
+
+                      // ── detect Purok/Blk/Phase/Lot from the typed address ──
+                      if (loginRole === 'BHW') {
+                        const matchedPurok = PUROK_OPTIONS.find(p => {
+                          const pNorm = p.toLowerCase().replace(/[\s]/g, '');
+                          return addrLower.includes(pNorm);
+                        });
+                        if (matchedPurok) {
+                          setFormData(prev => ({ ...prev, purok: matchedPurok }));
+                        }
+                      }
+
+                      const barangayName = matchedBarangay?.name || barangayList.find(b => String(b.id) === String(formData.barangayId))?.name || '';
+                      const fullQuery = [addr, barangayName, 'Cabuyao', 'Laguna', 'Philippines'].filter(Boolean).join(', ');
+
+                      try {
+                        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(fullQuery)}&format=json&limit=1`);
+                        const data = await res.json();
+                        if (data && data.length > 0) {
+                          setFormData(prev => ({
+                            ...prev,
+                            barangayId: matchedBarangay ? String(matchedBarangay.id) : prev.barangayId,
+                            lat: parseFloat(data[0].lat).toFixed(6),
+                            lng: parseFloat(data[0].lon).toFixed(6),
+                          }));
+                        }
+                      } catch (_) {}
+                    }} />
                 </div>
                 {loginRole === 'BHW' ? (
                   <div>
@@ -1093,7 +1418,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           border: `1px solid ${purokOpen ? '#3b82f6' : '#d1d5db'}`,
                         }}
                       >
-                        <span>{formData.address || '— Select Location —'}</span>
+                          <span>{formData.purok || '— Select Location —'}</span>
                         <span style={{
                           fontSize: '10px', opacity: 0.6, marginLeft: '8px',
                           transition: 'transform 0.2s', display: 'inline-block',
@@ -1109,30 +1434,30 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           padding: '4px',
                         }}>
                           <div
-                            onClick={() => { setFormData({ ...formData, address: '' }); setPurokOpen(false); }}
+                            onClick={() => { setFormData({ ...formData, purok: '' }); setPurokOpen(false); }}
                             style={{
                               padding: '8px 12px', cursor: 'pointer', fontSize: '13px',
                               borderRadius: '6px', color: '#64748b',
-                              background: !formData.address ? '#eff6ff' : 'transparent',
+                              background: !formData.purok ? '#eff6ff' : 'transparent',
                             }}
                             onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-                            onMouseLeave={e => { e.currentTarget.style.background = !formData.address ? '#eff6ff' : 'transparent'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = !formData.purok ? '#eff6ff' : 'transparent'; }}
                           >
                             — Select Location —
                           </div>
                           {PUROK_OPTIONS.map(p => (
                             <div
                               key={p}
-                              onClick={() => { setFormData({ ...formData, address: p }); setPurokOpen(false); }}
+                              onClick={() => { setFormData({ ...formData, purok: p }); setPurokOpen(false); }}
                               style={{
                                 padding: '8px 12px', cursor: 'pointer', fontSize: '13px',
                                 borderRadius: '6px',
-                                background: formData.address === p ? '#eff6ff' : 'transparent',
-                                color: formData.address === p ? '#2563eb' : '#1f2937',
-                                fontWeight: formData.address === p ? '600' : '400',
+                                background: formData.purok === p ? '#eff6ff' : 'transparent',
+                                color: formData.purok === p ? '#2563eb' : '#1f2937',
+                                fontWeight: formData.purok === p ? '600' : '400',
                               }}
                               onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-                              onMouseLeave={e => { e.currentTarget.style.background = formData.address === p ? '#eff6ff' : 'transparent'; }}
+                              onMouseLeave={e => { e.currentTarget.style.background = formData.purok === p ? '#eff6ff' : 'transparent'; }}
                             >
                               {p}
                             </div>
@@ -1152,7 +1477,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           ...inputStyle,
                           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                           cursor: 'pointer', textAlign: 'left',
-                          border: `1px solid ${barangayFormOpen ? '#3b82f6' : '#d1d5db'}`,
+                          border: formErrors.barangayId ? '2px solid #ef4444' : `1px solid ${barangayFormOpen ? '#3b82f6' : '#d1d5db'}`,
+                          background: formErrors.barangayId ? '#fff5f5' : '#f9fafb',
                         }}
                       >
                         <span>{barangayList.find(b => String(b.id) === String(formData.barangayId))?.name || '— Select Barangay —'}</span>
@@ -1171,7 +1497,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           padding: '4px',
                         }}>
                           <div
-                            onClick={() => { setFormData({ ...formData, barangayId: '' }); setBarangayFormOpen(false); }}
+                            onClick={() => { setFormData({ ...formData, barangayId: '' }); setBarangayFormOpen(false); setFormErrors(prev => ({ ...prev, barangayId: false })); }}
                             style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '13px', borderRadius: '6px', color: '#64748b' }}
                             onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
                             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
@@ -1181,7 +1507,15 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           {barangayList.map(b => (
                             <div
                               key={b.id}
-                              onClick={() => { setFormData({ ...formData, barangayId: b.id }); setBarangayFormOpen(false); }}
+                              onClick={() => {
+                                const coords = BARANGAY_COORDS[b.name];
+                                setFormData(prev => ({
+                                  ...prev,
+                                  barangayId: b.id,
+                                  lat: coords ? String(coords[0]) : prev.lat,
+                                  lng: coords ? String(coords[1]) : prev.lng,
+                                })); setBarangayFormOpen(false); setFormErrors(prev => ({ ...prev, barangayId: false }));
+                              }}
                               style={{
                                 padding: '8px 12px', cursor: 'pointer', fontSize: '13px', borderRadius: '6px',
                                 background: String(formData.barangayId) === String(b.id) ? '#eff6ff' : 'transparent',
@@ -1208,7 +1542,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 </h4>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Disease Type</label>
-                  <div style={{ position: 'relative' }} ref={diseaseFormRef}>
+                  <div style={{ position: 'relative', outline: formErrors.diseaseType ? '2px solid #ef4444' : 'none', borderRadius: '6px' }} ref={diseaseFormRef}>
                     <button
                       type="button"
                       onClick={() => setDiseaseOpen(!diseaseOpen)}
@@ -1235,7 +1569,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         padding: '4px',
                       }}>
                         <div
-                          onClick={() => { setFormData({ ...formData, diseaseType: '' }); setDiseaseOpen(false); }}
+                          onClick={() => { setFormData({ ...formData, diseaseType: '' }); setDiseaseOpen(false); setFormErrors(prev => ({ ...prev, diseaseType: false })); }}
                           style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '13px', borderRadius: '6px', color: '#64748b' }}
                           onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
                           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
@@ -1245,7 +1579,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         {ALL_DISEASE_OPTIONS.concat(['Other Communicable Diseases']).map(d => (
                           <div
                             key={d}
-                            onClick={() => { setFormData({ ...formData, diseaseType: d }); setDiseaseOpen(false); }}
+                            onClick={() => { setFormData({ ...formData, diseaseType: d }); setDiseaseOpen(false); setFormErrors(prev => ({ ...prev, diseaseType: false })); }}
                             style={{
                               padding: '8px 12px', cursor: 'pointer', fontSize: '13px', borderRadius: '6px',
                               background: formData.diseaseType === d ? '#eff6ff' : 'transparent',
@@ -1287,12 +1621,34 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Date of Onset</label>
-                  <input type="date" style={inputStyle} value={formData.onsetDate}
-                    onChange={e => setFormData({ ...formData, onsetDate: e.target.value })} />
+                  <div style={{ position: 'relative', cursor: 'pointer' }}
+                    onClick={() => {
+                      const el = document.getElementById('onset-date-input');
+                      if (el) {
+                        if (typeof el.showPicker === 'function') {
+                          el.showPicker();
+                        } else {
+                          el.focus();
+                        }
+                      }
+                    }}>
+                    <input id="onset-date-input" type="date" style={{ ...inputStyle, paddingRight: '36px', cursor: 'pointer', border: formErrors.onsetDate ? '2px solid #ef4444' : '1px solid #d1d5db', background: formErrors.onsetDate ? '#fff5f5' : '#f9fafb' }} value={formData.onsetDate}
+                      onChange={e => { setFormData({ ...formData, onsetDate: e.target.value }); setFormErrors(prev => ({ ...prev, onsetDate: false })); }} />
+                    <span style={{
+                      position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
+                      pointerEvents: 'none', color: '#64748b', display: 'flex', alignItems: 'center',
+                    }}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                        <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+                        <line x1="3" y1="10" x2="21" y2="10"/>
+                      </svg>
+                    </span>
+                  </div>
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Attending Physician</label>
-                  <input type="text" placeholder="Dr. Jose Reyes, MD" style={inputStyle}
+                  <input type="text" placeholder="Dr. Jose Reyes, MD" style={{ ...inputStyle, border: formErrors.physician ? '2px solid #ef4444' : '1px solid #d1d5db', background: formErrors.physician ? '#fff5f5' : '#f9fafb' }}
                     value={formData.physician} onChange={e => setFormData({ ...formData, physician: e.target.value })} />
                 </div>
               </div>
@@ -1302,7 +1658,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             <div style={{ marginBottom: '20px' }}>
               <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Symptoms & Observations</label>
               <textarea placeholder="e.g. Fever (39.5°C), Severe Headache, Muscle and Joint Pain..." rows="3"
-                style={{ ...inputStyle, resize: 'vertical' }}
+                style={{ ...inputStyle, resize: 'vertical', border: formErrors.symptoms ? '2px solid #ef4444' : '1px solid #d1d5db', background: formErrors.symptoms ? '#fff5f5' : '#f9fafb' }}
                 value={formData.symptoms} onChange={e => setFormData({ ...formData, symptoms: e.target.value })} />
             </div>
 
@@ -1323,12 +1679,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <div style={{ flex: 1 }}>
                       <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', marginBottom: '4px' }}>Latitude (N)</label>
-                      <input type="text" placeholder="e.g. 14.2253" style={inputStyle}
+                      <input type="text" placeholder="e.g. 14.2253" style={{ ...inputStyle, border: formErrors.location ? '2px solid #ef4444' : '1px solid #d1d5db', background: formErrors.location ? '#fff5f5' : '#f9fafb' }}
                         value={formData.lat} onChange={e => setFormData({ ...formData, lat: e.target.value })} />
                     </div>
                     <div style={{ flex: 1 }}>
                       <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', marginBottom: '4px' }}>Longitude (E)</label>
-                      <input type="text" placeholder="e.g. 121.3025" style={inputStyle}
+                      <input type="text" placeholder="e.g. 121.3025" style={{ ...inputStyle, border: formErrors.location ? '2px solid #ef4444' : '1px solid #d1d5db', background: formErrors.location ? '#fff5f5' : '#f9fafb' }}
                         value={formData.lng} onChange={e => setFormData({ ...formData, lng: e.target.value })} />
                     </div>
                   </div>

@@ -3,8 +3,28 @@ import axios from 'axios';
 import { API_URL } from './config';
 
 const CHO_BARANGAYS = {
-  'CHO Unit I': ['Baclaran', 'Banlic', 'Bigaa', 'Butong', 'Gulod', 'Mamatid', 'Marinig', 'Sala', 'Barangay Uno (Poblacion)', 'Barangay Dos (Poblacion)', 'Barangay Tres (Poblacion)'],
-  'CHO Unit II': ['Banay-Banay', 'Casile', 'Diezmo', 'Niugan', 'Pittland', 'Pulo', 'San Isidro'],
+  'CHO Unit I': [
+    'Barangay Uno (Poblacion)',
+    'Barangay Dos (Poblacion)',
+    'Barangay Tres (Poblacion)',
+    'Sala',
+    'Bigaa',
+    'Butong',
+    'Marinig',
+    'Gulod',
+    'Niugan',
+    'Baclaran',
+  ],
+  'CHO Unit II': [
+    'Pulo',
+    'Banay-Banay',
+    'Banlic',
+    'Mamatid',
+    'San Isidro',
+    'Diezmo',
+    'Pittland',
+    'Casile',
+  ],
 };
 
 const normalize = (s) => (s || '').toLowerCase().replace(/[\s\-().]/g, '');
@@ -157,6 +177,40 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
     e.preventDefault();
     setSubmitLoading(true);
     setSubmitMsg('');
+
+    // Client-side duplicate check against already-loaded users list
+    const trimmedUsername = formData.username.trim().toLowerCase();
+    const trimmedEmail = formData.email.trim().toLowerCase();
+    const trimmedMobile = formData.mobile.trim();
+
+    const duplicateUsername = users.find(u =>
+        u.username.toLowerCase() === trimmedUsername &&
+        (!editingUser || u.user_id !== editingUser.user_id)
+    );
+    const duplicateEmail = users.find(u =>
+        (u.email || '').toLowerCase() === trimmedEmail &&
+        (!editingUser || u.user_id !== editingUser.user_id)
+    );
+    const duplicateMobile = trimmedMobile && users.find(u =>
+        (u.mobile_number || '').trim() === trimmedMobile &&
+        (!editingUser || u.user_id !== editingUser.user_id)
+    );
+
+    if (duplicateUsername) {
+        setSubmitMsg('Error: A user with this username already exists.');
+        setSubmitLoading(false);
+        return;
+    }
+    if (duplicateEmail) {
+        setSubmitMsg('Error: A user with this email already exists.');
+        setSubmitLoading(false);
+        return;
+    }
+    if (duplicateMobile) {
+        setSubmitMsg('Error: A user with this contact number already exists.');
+        setSubmitLoading(false);
+        return;
+    }
 
     const payload = {
       firstName: formData.firstName,

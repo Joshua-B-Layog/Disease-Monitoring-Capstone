@@ -216,6 +216,20 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+
+CREATE TABLE IF NOT EXISTS generated_reports (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(255),
+  period VARCHAR(50),
+  entity VARCHAR(100),
+  details TEXT,
+  cho_unit VARCHAR(100),
+  snapshot_logs JSON,
+  created_by INT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
 --
 -- Indexes for dumped tables
 --
@@ -245,6 +259,16 @@ ALTER TABLE `disease_cases`
 ALTER TABLE `users`
   ADD PRIMARY KEY (`user_id`);
 
+
+
+--
+-- Indexes for table `generated_reports`
+--
+ALTER TABLE `generated_reports`
+  ADD PRIMARY KEY (`id`);
+
+
+
 --
 -- AUTO_INCREMENT for dumped tables
 --
@@ -273,6 +297,12 @@ ALTER TABLE `disease_cases`
 ALTER TABLE `users`
   MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 COMMIT;
+
+--
+-- AUTO_INCREMENT for table `generated_reports`
+--
+ALTER TABLE `generated_reports`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;

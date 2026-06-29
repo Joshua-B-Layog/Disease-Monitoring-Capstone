@@ -4,8 +4,28 @@ import { API_URL } from './config';
 
 // ── CHO Unit → Barangay mapping ──
 const CHO_BARANGAYS = {
-  'CHO Unit I (Sala)': ['Baclaran', 'Banlic', 'Bigaa', 'Butong', 'Gulod', 'Mamatid', 'Marinig', 'Sala', 'Barangay Uno (Poblacion)', 'Barangay Dos (Poblacion)', 'Barangay Tres (Poblacion)'],
-  'CHO Unit II (Pulo)': ['Banay-Banay', 'Casile', 'Diezmo', 'Niugan', 'Pitland', 'Pulo', 'San Isidro'],
+  'CHO Unit I (Sala)': [
+    'Barangay Uno (Poblacion)',
+    'Barangay Dos (Poblacion)',
+    'Barangay Tres (Poblacion)',
+    'Sala',
+    'Bigaa',
+    'Butong',
+    'Marinig',
+    'Gulod',
+    'Niugan',
+    'Baclaran',
+  ],
+  'CHO Unit II (Pulo)': [
+    'Pulo',
+    'Banay-Banay',
+    'Banlic',
+    'Mamatid',
+    'San Isidro',
+    'Diezmo',
+    'Pittland',
+    'Casile',
+  ],
 };
 
 // Barangays shown in the "Covered Barangays" card (Unit I scope)
@@ -30,9 +50,20 @@ const REPORT_TYPE_SORT_OPTIONS = [
 
 
 
-export default function BarangayReports({ activeUser, fontScale, compactMode, dateFormat }) {
-  const choUnit    = activeUser?.context || 'CHO Unit I (Sala)';
-  const myBarangays = CHO_BARANGAYS[choUnit] || Object.values(CHO_BARANGAYS).flat();
+export default function BarangayReports({ activeUser, fontScale, compactMode, dateFormat, loggedUserId }) {
+  const isBHW       = activeUser?.role === 'BHW';
+  const choUnit     = activeUser?.context || 'CHO Unit I (Sala)';
+
+  // For BHW: just their own barangay. For CHO: their unit's barangay list.
+  const myBarangayName = isBHW
+    ? choUnit.replace(/^Brgy\.\s*/i, '').trim()
+    : null;
+
+  const myBarangays = isBHW
+    ? [myBarangayName]
+    : (CHO_BARANGAYS[choUnit] || Object.values(CHO_BARANGAYS).flat());
+
+  const reportScope = isBHW ? myBarangayName : choUnit;
 
   // ── Live data ──
   const [allCases, setAllCases]           = useState([]);
@@ -69,6 +100,30 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
     return () => clearInterval(interval);
   }, []);
 
+  const fetchGeneratedReports = () => {
+    setReportsLoading(true);
+    axios.get(`http://localhost:5000/api/generated-reports?cho_unit=${encodeURIComponent(reportScope)}`)
+      .then(res => {
+        const mapped = res.data.map(r => ({
+          id: r.id,
+          title: r.title,
+          timestamp: `Generated ${new Date(r.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`,
+          period: r.period,
+          entity: r.entity,
+          details: r.details,
+          createdAt: new Date(r.created_at),
+          snapshotLogs: r.snapshotLogs || [],
+        }));
+        setReportLogs(mapped);
+        setReportsLoading(false);
+      })
+      .catch(() => setReportsLoading(false));
+  };
+
+  useEffect(() => {
+    fetchGeneratedReports();
+  }, [reportScope]);
+
   const myCases         = allCases.filter(c => myBarangays.includes(c.barangay_name));
   const casesAdded      = myCases.length;
   const casesUpdated    = myCases.filter(c => c.status === 'Recovered' || c.status === 'Under Treatment').length;
@@ -77,6 +132,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
 
   // ── Generated Report Logs ──
   const [reportLogs, setReportLogs] = useState([]);
+  const [reportsLoading, setReportsLoading] = useState(true);
 
   // ── Generate Report Modal ──
   const [showGenModal, setShowGenModal] = useState(false);
@@ -85,22 +141,25 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
 
   const handleGenerateReport = () => {
     if (!genForm.name.trim()) { setGenError('Please enter a report name.'); return; }
-    const now     = new Date();
-    const timeStr = now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
-    const newReport = {
-      id: Date.now(),
+
+    axios.post('http://localhost:5000/api/generated-reports', {
       title: genForm.name,
-      timestamp: `Generated Today, ${timeStr}`,
       period: genForm.period,
       entity: genForm.entity,
       details: genForm.details,
-      createdAt: now,
-      snapshotLogs: [...filteredAuditLogs],
-    };
-    setReportLogs(prev => [newReport, ...prev]);
-    setShowGenModal(false);
-    setGenForm({ name: '', period: 'Today', entity: 'Case Records', details: '' });
-    setGenError('');
+      cho_unit: reportScope,
+      snapshotLogs: filteredAuditLogs,
+      created_by: null, // pass loggedUserId here if you have it available as a prop
+    })
+    .then(() => {
+      fetchGeneratedReports();
+      setShowGenModal(false);
+      setGenForm({ name: '', period: 'Today', entity: 'Case Records', details: '' });
+      setGenError('');
+    })
+    .catch(err => {
+      setGenError('Failed to save report: ' + (err.response?.data?.error || err.message));
+    });
   };
 
   // ── Download helpers ──
@@ -150,8 +209,12 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
   const [viewReport, setViewReport] = useState(null);
 
   const handleDeleteReport = (id) => {
-    setReportLogs(prev => prev.filter(r => r.id !== id));
-    setViewReport(null);
+    axios.delete(`http://localhost:5000/api/generated-reports/${id}`)
+      .then(() => {
+        setReportLogs(prev => prev.filter(r => r.id !== id));
+        setViewReport(null);
+      })
+      .catch(err => alert('Delete failed: ' + (err.response?.data?.error || err.message)));
   };
 
   // ── Report Logs filter / sort ──
@@ -228,6 +291,15 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
 
     const matchAction = filterAction === 'All Actions' || log.action === filterAction;
 
+    // ── restrict to this user's scope ──
+    let matchScope = true;
+    if (isBHW) {
+      matchScope = log.barangay === myBarangayName;
+    } else {
+      // CHO: only logs from barangays in their unit, or CHO-level actions in their own unit
+      matchScope = myBarangays.includes(log.barangay) || log.cho_unit === choUnit;
+    }
+
     let matchUser = true;
     if (filterUserRole === 'CHO Users') {
       matchUser = log.user_role === 'CHO';
@@ -247,7 +319,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
       matchDate = logDate >= new Date(dateRange.start) && logDate <= new Date(dateRange.end);
     }
 
-    return matchSearch && matchAction && matchUser && matchDate;
+    return matchSearch && matchAction && matchScope && matchUser && matchDate;
   });
 
   const totalLogPages  = Math.max(1, Math.ceil(filteredAuditLogs.length / ITEMS_PER_PAGE));
@@ -469,7 +541,9 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
       {/* ── PAGE HEADER ── */}
       <div style={{ marginBottom: '20px' }}>
         <h2 style={{ margin: '0 0 2px 0', fontSize: '22px', fontWeight: '700', color: '#0f172a' }}>Audit Reports</h2>
-        <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>{choUnit} — Monitoring {myBarangays.length} barangays</p>
+        <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
+          {isBHW ? `Brgy. ${myBarangayName}` : choUnit} — Monitoring {myBarangays.length} barangay{myBarangays.length !== 1 ? 's' : ''}
+        </p>
       </div>
 
       {/* ── TOP FILTER BAR ── */}
@@ -587,7 +661,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
         {/* ── Quick Stats ── */}
         <div style={s.card}>
           <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', fontWeight: '700', color: '#1e293b' }}>Quick Stats</h3>
-          <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: '#94a3b8' }}>{choUnit}</p>
+          <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: '#94a3b8' }}>{isBHW ? `Brgy. ${myBarangayName}` : choUnit}</p>
 
           {statsLoading ? (
             <div style={{ textAlign: 'center', padding: '20px', color: '#94a3b8', fontSize: '13px' }}>Loading from database...</div>
@@ -608,7 +682,9 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
           )}
 
           <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid #f1f5f9' }}>
-            <p style={{ ...s.label, display: 'block', marginBottom: '8px' }}>Covered Barangays</p>
+            <p style={{ ...s.label, display: 'block', marginBottom: '8px' }}>
+              {isBHW ? 'Assigned Barangay' : 'Covered Barangays'}
+            </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
               {myBarangays.map(b => (
                 <span key={b} style={{ fontSize: '11px', padding: '3px 9px', background: '#f1f5f9', borderRadius: '10px', color: '#475569', fontWeight: '500' }}>{b}</span>

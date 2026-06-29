@@ -25,7 +25,7 @@ const formatDateStr = (dateStr, fmt) => {
   return `${m}/${day}/${shortY}`;
 };
 
-const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMode, loginRole, loginBarangay }) => {
+const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMode, loginRole, loginBarangay, sessionContext }) => {
   const [cases, setCases] = useState([]);
   const [selectedDisease, setSelectedDisease] = useState('Dengue');
   const [loading, setLoading] = useState(true);
@@ -33,6 +33,16 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   const [currentPage, setCurrentPage] = useState(1);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const exportRef = useRef(null);
+
+  const CHO_UNIT_BARANGAYS = {
+    'CHO Unit I (Sala)': [
+      'Barangay Uno (Poblacion)', 'Barangay Dos (Poblacion)', 'Barangay Tres (Poblacion)',
+      'Sala', 'Bigaa', 'Butong', 'Marinig', 'Gulod', 'Niugan', 'Baclaran',
+    ],
+    'CHO Unit II (Pulo)': [
+      'Pulo', 'Banay-Banay', 'Banlic', 'Mamatid', 'San Isidro', 'Diezmo', 'Pittland', 'Casile',
+    ],
+  };
 
   const [diseaseOpen, setDiseaseOpen] = useState(false);
   const diseaseRef = useRef(null);
@@ -70,9 +80,13 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  const choUnitBarangays = sessionContext ? CHO_UNIT_BARANGAYS[sessionContext] || [] : [];
+
   const displayCases = (loginRole === 'BHW' && loginBarangay)
     ? cases.filter(c => c.barangay_name === loginBarangay)
-    : cases;
+    : (loginRole === 'CHO' && choUnitBarangays.length > 0)
+      ? cases.filter(c => choUnitBarangays.includes(c.barangay_name))
+      : cases;
 
   if (loading) {
     return <div style={{ color: 'var(--text-main)', padding: '40px', textAlign: 'center' }}>Loading dashboard data...</div>;
