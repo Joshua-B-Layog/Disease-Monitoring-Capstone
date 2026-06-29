@@ -948,9 +948,9 @@ app.post('/api/register', (req, res) => {
         if (!isNaN(parsed)) assignedBarangayId = parsed;
     } else if (role === 'CHO' && context) {
         if (context.includes('Sala') || context.includes('Unit I')) {
-            assignedBarangayId = 18;
-        } else if (context.includes('Pulo') || context.includes('Unit II')) {
             assignedBarangayId = 17;
+        } else if (context.includes('Pulo') || context.includes('Unit II')) {
+            assignedBarangayId = 16;
         }
     }
 
