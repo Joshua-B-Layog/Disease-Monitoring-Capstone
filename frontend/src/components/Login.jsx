@@ -1,5 +1,5 @@
   import React, { useState, useEffect } from 'react';
-  import { API_URL } from '../apiConfig';
+  import { API_URL } from '../config';
 
   export default function Login({ onLoginSuccess, onForgotPassword, theme, toggleTheme }) {
     const [step, setStep] = useState('role'); // 'role', 'cho_select', 'bhw_select', 'auth', 'forgot_password', 'signup'

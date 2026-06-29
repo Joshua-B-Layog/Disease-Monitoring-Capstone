@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { API_URL } from './apiConfig';
+import { API_URL } from './config';
 
 const CHO_BARANGAYS = {
   'CHO Unit I': [

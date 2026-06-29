@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { API_URL } from '../apiConfig';
+import { API_URL } from '../config';
 
 export default function ForgotPasswordModal({ onClose }) {
   const [identity, setIdentity] = useState('');

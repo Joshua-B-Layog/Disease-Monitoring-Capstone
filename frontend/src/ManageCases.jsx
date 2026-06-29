@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { API_URL } from './apiConfig';
+import { API_URL } from './config';
 import './ManageCases.css';
 
 const BARANGAY_COORDS = {

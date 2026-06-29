@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { API_URL } from '../apiConfig';
+import { API_URL } from '../config';
 
 export default function ResetPasswordLanding() {
   const [email, setEmail] = useState('');

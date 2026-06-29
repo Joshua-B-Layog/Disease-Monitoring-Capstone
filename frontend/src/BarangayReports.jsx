@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { API_URL } from './apiConfig';
+import { API_URL } from './config';
 
 // ── CHO Unit → Barangay mapping ──
 const CHO_BARANGAYS = {
