@@ -767,7 +767,10 @@ app.get('/api/generated-reports', (req, res) => {
     // Parse snapshot_logs back into an array for the frontend
     const parsed = results.map(r => ({
       ...r,
-      snapshotLogs: r.snapshot_logs ? JSON.parse(r.snapshot_logs) : []
+      snapshotLogs:
+    typeof r.snapshot_logs === "string"
+        ? JSON.parse(r.snapshot_logs)
+        : (r.snapshot_logs || [])
     }));
     res.json(parsed);
   });
