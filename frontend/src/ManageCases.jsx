@@ -180,6 +180,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   // Barangay filter dropdown
   const [barangayOpen, setBarangayOpen] = useState(false);
   const barangayRef = useRef(null);
+  const subDiseaseRef = useRef(null);
 
   // Purok/Blk/Phase filter dropdown
   const [purokOpen, setPurokOpen] = useState(false);
@@ -289,7 +290,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       }
       if (barangayFormRef.current && !barangayFormRef.current.contains(e.target)) setBarangayFormOpen(false);
       if (diseaseFormRef.current && !diseaseFormRef.current.contains(e.target)) setDiseaseOpen(false);
-      setSubDiseaseOpen(false);
+      if (subDiseaseRef.current && !subDiseaseRef.current.contains(e.target)) {
+        setSubDiseaseOpen(false);
+      }
       if (lookupDropdownRef.current && !lookupDropdownRef.current.contains(e.target)) {
         setShowLookupDropdown(false);
       }
@@ -1031,7 +1034,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
             {/* ── NEW: Remaining Diseases sub-filter (only for "Other" card) ── */}
             {isOtherCard && (
-              <div style={{ position: 'relative' }}>
+              <div style={{ position: 'relative' }} ref={subDiseaseRef}>
                 <button
                   onClick={() => setSubDiseaseOpen(!subDiseaseOpen)}
                   style={{
