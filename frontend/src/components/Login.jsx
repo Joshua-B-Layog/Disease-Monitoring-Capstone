@@ -23,6 +23,7 @@
 
     // Sign-Up Form States
     const [signupName, setSignupName] = useState('');
+    const [signupUsername, setSignupUsername] = useState('');
     const [signupEmail, setSignupEmail] = useState('');
     const [signupPassword, setSignupPassword] = useState('');
     const [signupConfirmPassword, setSignupConfirmPassword] = useState('');
@@ -224,6 +225,16 @@ const handleLoginOtpSubmit = async (e) => {
     }
 };
 
+    const getPasswordStrength = (pw) => {
+      if (!pw || pw.length < 7) return 'low';
+      const hasUpper = /[A-Z]/.test(pw);
+      const hasNumber = /[0-9]/.test(pw);
+      const hasSpecial = /[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\\/;'`~]/.test(pw);
+      if (hasUpper && hasNumber && hasSpecial) return 'strong';
+      if (!hasUpper && !hasSpecial) return 'low';
+      return 'medium';
+    };
+
     // --- REGISTER ACCOUNT SUBMISSION ---
     const handleSignupSubmit = async (e) => {
     e.preventDefault();
@@ -232,6 +243,10 @@ const handleLoginOtpSubmit = async (e) => {
 
     if (signupPassword !== signupConfirmPassword) {
         setSignupError('Passwords do not match.');
+        return;
+    }
+    if (getPasswordStrength(signupPassword) === 'low') {
+        setSignupError('Password is too weak. Use at least 7 characters with uppercase, number, and special character.');
         return;
     }
     if (signupMobile && signupMobile.length < 10) {
@@ -245,6 +260,7 @@ const handleLoginOtpSubmit = async (e) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 name: signupName,
+                username: signupUsername,
                 email: signupEmail,
                 mobile: signupMobile,
                 password: signupPassword,
@@ -254,19 +270,20 @@ const handleLoginOtpSubmit = async (e) => {
         });
 
         if (response.ok) {
-            // Clear all signup fields
-            setSignupName('');
-            setSignupEmail('');
-            setSignupMobile('');
-            setSignupPassword('');
-            setSignupConfirmPassword('');
-            setSignupRole('CHO');
-            setSignupContext('CHO Unit I (Sala)');
             setSignupError('');
-
-            // Show brief success then go back to role selection
             setSignupSuccess('Account registered successfully! Redirecting to login...');
+
+            // Keep form fields visible as-submitted during the redirect delay,
+            // then clear everything once we navigate back to role selection.
             setTimeout(() => {
+                setSignupName('');
+                setSignupUsername('');
+                setSignupEmail('');
+                setSignupMobile('');
+                setSignupPassword('');
+                setSignupConfirmPassword('');
+                setSignupRole('CHO');
+                setSignupContext('');
                 setSignupSuccess('');
                 setSelectedContext('');
                 setSelectedRole('CHO');
@@ -677,6 +694,19 @@ const handleLoginOtpSubmit = async (e) => {
                             />
                         </div>
 
+                        {/* Username */}
+                        <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
+                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '13px', fontWeight: '500' }}>Username</label>
+                            <input
+                                type="text"
+                                className="form-input"
+                                placeholder="e.g. juandelacruz"
+                                value={signupUsername}
+                                onChange={(e) => setSignupUsername(e.target.value)}
+                                required
+                            />
+                        </div>
+
                         {/* Email */}
                         <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
                             <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '13px', fontWeight: '500' }}>Email Address</label>
@@ -732,6 +762,7 @@ const handleLoginOtpSubmit = async (e) => {
                                     onChange={(e) => setSignupContext(e.target.value)}
                                     style={{ width: '100%', height: '42px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0 10px' }}
                                 >
+                                    <option value="" disabled>— Select Unit Assignment —</option>
                                     <option value="CHO Unit I (Sala)">CHO Unit I (Main - Sala)</option>
                                     <option value="CHO Unit II (Pulo)">CHO Unit II (Extension - Pulo)</option>
                                 </select>
@@ -820,6 +851,16 @@ const handleLoginOtpSubmit = async (e) => {
                                     {signupPassword === signupConfirmPassword ? '✓ Passwords match' : '✗ Passwords do not match'}
                                 </p>
                             )}
+                            {signupPassword && (() => {
+                                const strength = getPasswordStrength(signupPassword);
+                                const styles = {
+                                    low: { color: '#ef4444', text: '✗ Weak — needs uppercase + number + special' },
+                                    medium: { color: '#eab308', text: '~ Medium — add uppercase, number & special for strongest' },
+                                    strong: { color: '#10b981', text: '✓ Strong password' },
+                                };
+                                const s = styles[strength];
+                                return <p style={{ fontSize: '12px', marginTop: '5px', color: s.color }}>{s.text}</p>;
+                            })()}
                         </div>
 
                         <button type="submit" className="submit-btn" style={{ backgroundColor: '#10B981', color: '#FFFFFF', marginTop: '20px', width: '100%' }}>

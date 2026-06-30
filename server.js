@@ -935,11 +935,11 @@ app.post('/api/login', (req, res) => {
 
 // ROUTE: Register new user
 app.post('/api/register', (req, res) => {
-    const { name, email, mobile, password, role, context } = req.body;
+    const { name, username: bodyUsername, email, mobile, password, role, context } = req.body;
 
     console.log("--- Registration Request ---", { name, email, role, context });
 
-    const username = email.split('@')[0];
+    const username = bodyUsername || email.split('@')[0];
 
     let assignedBarangayId = null;
 
@@ -947,12 +947,27 @@ app.post('/api/register', (req, res) => {
         const parsed = parseInt(context);
         if (!isNaN(parsed)) assignedBarangayId = parsed;
     } else if (role === 'CHO' && context) {
-        if (context.includes('Sala') || context.includes('Unit I')) {
-            assignedBarangayId = 17;
-        } else if (context.includes('Pulo') || context.includes('Unit II')) {
+        console.log("--- CHO Registration Context Check ---", { rawContext: context });
+        if (context.includes('Unit II') || context.includes('Pulo')) {
             assignedBarangayId = 16;
+        } else if (context.includes('Unit I') || context.includes('Sala')) {
+            assignedBarangayId = 17;
+        } else {
+            console.warn("CHO context did not match any known unit:", context);
         }
+        console.log("--- Resolved assignedBarangayId ---", assignedBarangayId);
     }
+
+    // Duplicate-username check
+    const checkUsernameQuery = 'SELECT user_id FROM users WHERE username = ?';
+    db.query(checkUsernameQuery, [username], (err, rows) => {
+        if (err) {
+            console.error("Username check error:", err.message);
+            return res.status(500).json({ message: 'Registration failed: ' + err.message });
+        }
+        if (rows.length > 0) {
+            return res.status(409).json({ message: 'This username is already taken.' });
+        }
 
     const insertQuery = `
         INSERT INTO users (username, full_name, email, mobile_number, password, role, assigned_barangay_id, is_active) 
@@ -970,6 +985,7 @@ app.post('/api/register', (req, res) => {
         console.log("✅ Registered:", { username, role, assignedBarangayId });
         res.status(200).json({ message: 'Account registered successfully!' });
     });
+});
 });
 
 // ==========================================
