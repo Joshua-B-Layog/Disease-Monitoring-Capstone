@@ -200,7 +200,7 @@ const getPurokGroups = (barangayName, cases) => {
 
   return Object.values(groups).map(g => ({
     purok: g.purok,
-    barangayName: barangayName + ' - ' + g.purok,
+    barangayName: g.purok === 'Unspecified' ? barangayName : barangayName + ' - ' + g.purok,
     barangay: barangayName,
     coords: g.validCoordCount > 0
       ? [g.latSum / g.validCoordCount, g.lngSum / g.validCoordCount]
