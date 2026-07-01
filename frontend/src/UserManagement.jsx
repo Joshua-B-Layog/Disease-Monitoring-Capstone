@@ -563,17 +563,19 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                 </div>
               )}
 
-              <div style={{ marginBottom: '24px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '8px', fontWeight: '500' }}>Status</label>
-                <div style={{ display: 'flex', gap: '20px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: '#334155', cursor: 'pointer' }}>
-                    <input type="radio" checked={formData.isActive} onChange={() => setFormData({ ...formData, isActive: true })} /> Active
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: '#334155', cursor: 'pointer' }}>
-                    <input type="radio" checked={!formData.isActive} onChange={() => setFormData({ ...formData, isActive: false })} /> Inactive
-                  </label>
+              {editingUser && (
+                <div style={{ marginBottom: '24px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '8px', fontWeight: '500' }}>Status</label>
+                  <div style={{ display: 'flex', gap: '20px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: '#334155', cursor: 'pointer' }}>
+                      <input type="radio" checked={formData.isActive} onChange={() => setFormData({ ...formData, isActive: true })} /> Active
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: '#334155', cursor: 'pointer' }}>
+                      <input type="radio" checked={!formData.isActive} onChange={() => setFormData({ ...formData, isActive: false })} /> Inactive
+                    </label>
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', paddingTop: '16px', borderTop: '1px solid #f1f5f9' }}>
                 <button type="button" onClick={() => {

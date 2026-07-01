@@ -382,6 +382,10 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     ],
   };
 
+  const scopedBarangayOptions = (loginRole === 'CHO' && sessionContext && CHO_UNIT_BARANGAYS[sessionContext])
+    ? CHO_UNIT_BARANGAYS[sessionContext]
+    : ALL_BARANGAYS;
+
   useEffect(() => {
     const handler = (e) => {
       if (barangayRef.current && !barangayRef.current.contains(e.target)) {
@@ -550,7 +554,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                     <span style={{ flex: 1 }}>All Barangays</span>
                     {filterBarangay === 'All Barangays' && <span style={{ color: '#60a5fa', fontSize: '12px' }}>✓</span>}
                   </div>
-                  {ALL_BARANGAYS.map(b => (
+                  {scopedBarangayOptions.map(b => (
                     <div
                       key={b}
                       onClick={() => { setFilterBarangay(b); setBarangayOpen(false); }}

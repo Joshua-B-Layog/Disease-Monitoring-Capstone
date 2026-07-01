@@ -147,6 +147,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const [barangayList, setBarangayList] = useState([]);
   const [allDiseases, setAllDiseases] = useState([]);
   const choUnitBarangays = sessionContext ? CHO_UNIT_BARANGAYS[sessionContext] || [] : [];
+  const scopedBarangayOptions = (loginRole === 'CHO' && sessionContext && CHO_UNIT_BARANGAYS[sessionContext])
+    ? CHO_UNIT_BARANGAYS[sessionContext]
+    : CABUYAO_BARANGAYS;
 
   const baseCases = (loginRole === 'BHW' && loginBarangay)
     ? allCases.filter(c => c.barangay_name === loginBarangay)
@@ -984,7 +987,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     >
                       All Barangays
                     </div>
-                    {CABUYAO_BARANGAYS.map(b => (
+                    {scopedBarangayOptions.map(b => (
                       <div
                         key={b}
                         className={`mc-custom-dropdown-item ${filterBarangay === b ? 'mc-custom-dropdown-item--active' : ''}`}
