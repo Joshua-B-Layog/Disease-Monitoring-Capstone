@@ -1329,7 +1329,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
                       const addrLower = addr.toLowerCase().replace(/[\-\s]/g, '');
                       const matchedBarangay = barangayList.find(b => {
-                        const bNorm = b.name.toLowerCase().replace(/[\-\s().]/g, '');
+                        const bNorm = b.name.replace(/\(.*?\)/g, '').toLowerCase().replace(/[\-\s().]/g, '').trim();
                         return addrLower.includes(bNorm);
                       });
 
@@ -1359,30 +1359,38 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                             lat: parseFloat(data[0].lat).toFixed(6),
                             lng: parseFloat(data[0].lon).toFixed(6),
                           }));
-                        } else if (matchedBarangay) {
-                          const purokCoords = matchedPurok
-                            ? findPurokCoords(matchedBarangay.name, matchedPurok, BARANGAY_COORDS)
-                            : null;
-                          const fallbackCoords = purokCoords || BARANGAY_COORDS[matchedBarangay.name];
-                          if (fallbackCoords) {
-                            setFormData(prev => ({
-                              ...prev,
-                              barangayId: String(matchedBarangay.id),
-                              lat: String(fallbackCoords[0]),
-                              lng: String(fallbackCoords[1]),
-                            }));
+                        } else {
+                          const targetB = matchedBarangay || (formData.barangayId
+                            ? barangayList.find(b => String(b.id) === String(formData.barangayId))
+                            : null);
+                          if (targetB) {
+                            const purokCoords = matchedPurok
+                              ? findPurokCoords(targetB.name, matchedPurok, BARANGAY_COORDS)
+                              : null;
+                            const fallbackCoords = purokCoords || BARANGAY_COORDS[targetB.name];
+                            if (fallbackCoords) {
+                              setFormData(prev => ({
+                                ...prev,
+                                barangayId: String(targetB.id),
+                                lat: String(fallbackCoords[0]),
+                                lng: String(fallbackCoords[1]),
+                              }));
+                            }
                           }
                         }
                       } catch (_) {
-                        if (matchedBarangay) {
+                        const targetB = matchedBarangay || (formData.barangayId
+                          ? barangayList.find(b => String(b.id) === String(formData.barangayId))
+                          : null);
+                        if (targetB) {
                           const purokCoords = matchedPurok
-                            ? findPurokCoords(matchedBarangay.name, matchedPurok, BARANGAY_COORDS)
+                            ? findPurokCoords(targetB.name, matchedPurok, BARANGAY_COORDS)
                             : null;
-                          const fallbackCoords = purokCoords || BARANGAY_COORDS[matchedBarangay.name];
+                          const fallbackCoords = purokCoords || BARANGAY_COORDS[targetB.name];
                           if (fallbackCoords) {
                             setFormData(prev => ({
                               ...prev,
-                              barangayId: String(matchedBarangay.id),
+                              barangayId: String(targetB.id),
                               lat: String(fallbackCoords[0]),
                               lng: String(fallbackCoords[1]),
                             }));
@@ -1398,7 +1406,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
                       const addrLower = addr.toLowerCase().replace(/[\-\s]/g, '');
                       const matchedBarangay = barangayList.find(b => {
-                        const bNorm = b.name.toLowerCase().replace(/[\-\s().]/g, '');
+                        const bNorm = b.name.replace(/\(.*?\)/g, '').toLowerCase().replace(/[\-\s().]/g, '').trim();
                         return addrLower.includes(bNorm);
                       });
 
@@ -1428,30 +1436,38 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                             lat: parseFloat(data[0].lat).toFixed(6),
                             lng: parseFloat(data[0].lon).toFixed(6),
                           }));
-                        } else if (matchedBarangay) {
-                          const purokCoords = matchedPurok
-                            ? findPurokCoords(matchedBarangay.name, matchedPurok, BARANGAY_COORDS)
-                            : null;
-                          const fallbackCoords = purokCoords || BARANGAY_COORDS[matchedBarangay.name];
-                          if (fallbackCoords) {
-                            setFormData(prev => ({
-                              ...prev,
-                              barangayId: String(matchedBarangay.id),
-                              lat: String(fallbackCoords[0]),
-                              lng: String(fallbackCoords[1]),
-                            }));
+                        } else {
+                          const targetB = matchedBarangay || (formData.barangayId
+                            ? barangayList.find(b => String(b.id) === String(formData.barangayId))
+                            : null);
+                          if (targetB) {
+                            const purokCoords = matchedPurok
+                              ? findPurokCoords(targetB.name, matchedPurok, BARANGAY_COORDS)
+                              : null;
+                            const fallbackCoords = purokCoords || BARANGAY_COORDS[targetB.name];
+                            if (fallbackCoords) {
+                              setFormData(prev => ({
+                                ...prev,
+                                barangayId: String(targetB.id),
+                                lat: String(fallbackCoords[0]),
+                                lng: String(fallbackCoords[1]),
+                              }));
+                            }
                           }
                         }
                       } catch (_) {
-                        if (matchedBarangay) {
+                        const targetB = matchedBarangay || (formData.barangayId
+                          ? barangayList.find(b => String(b.id) === String(formData.barangayId))
+                          : null);
+                        if (targetB) {
                           const purokCoords = matchedPurok
-                            ? findPurokCoords(matchedBarangay.name, matchedPurok, BARANGAY_COORDS)
+                            ? findPurokCoords(targetB.name, matchedPurok, BARANGAY_COORDS)
                             : null;
-                          const fallbackCoords = purokCoords || BARANGAY_COORDS[matchedBarangay.name];
+                          const fallbackCoords = purokCoords || BARANGAY_COORDS[targetB.name];
                           if (fallbackCoords) {
                             setFormData(prev => ({
                               ...prev,
-                              barangayId: String(matchedBarangay.id),
+                              barangayId: String(targetB.id),
                               lat: String(fallbackCoords[0]),
                               lng: String(fallbackCoords[1]),
                             }));
