@@ -2,26 +2,27 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { API_URL } from './config';
 import './ManageCases.css';
+import { findPurokCoords } from './data/coordinates';
 
 const BARANGAY_COORDS = {
-  'Baclaran': [14.2050, 121.1050],
-  'Banay-Banay': [14.2400, 121.1350],
-  'Banlic': [14.2150, 121.1120],
-  'Barangay Dos (Poblacion)': [14.2260, 121.1230],
-  'Barangay Tres (Poblacion)': [14.2240, 121.1210],
-  'Barangay Uno (Poblacion)': [14.2280, 121.1250],
-  'Bigaa': [14.2180, 121.1300],
-  'Butong': [14.2100, 121.1180],
-  'Casile': [14.2050, 121.0900],
-  'Diezmo': [14.2320, 121.1000],
-  'Gulod': [14.2200, 121.1400],
-  'Mamatid': [14.2350, 121.1450],
-  'Marinig': [14.2150, 121.1500],
-  'Niugan': [14.2450, 121.1200],
-  'Pittland': [14.1980, 121.0950],
-  'Pulo': [14.2500, 121.1100],
-  'Sala': [14.2300, 121.1300],
-  'San Isidro': [14.2420, 121.0980],
+  'Baclaran': [14.2450, 121.1630],
+  'Banay-Banay': [14.2550, 121.1300],
+  'Banlic': [14.2330, 121.1380],
+  'Barangay Dos (Poblacion)': [14.2770, 121.1260],
+  'Barangay Tres (Poblacion)': [14.2760, 121.1230],
+  'Barangay Uno (Poblacion)': [14.2800, 121.1240],
+  'Bigaa': [14.2860, 121.1300],
+  'Butong': [14.2850, 121.1370],
+  'Casile': [14.1830, 121.0350],
+  'Diezmo': [14.2340, 121.1000],
+  'Gulod': [14.2530, 121.1590],
+  'Mamatid': [14.2360, 121.1600],
+  'Marinig': [14.2660, 121.1480],
+  'Niugan': [14.2690, 121.1340],
+  'Pittland': [14.2160, 121.0600],
+  'Pulo': [14.2480, 121.1390],
+  'Sala': [14.2690, 121.1350],
+  'San Isidro': [14.2490, 121.1430],
 };
 
 const CHO_UNIT_BARANGAYS = {
@@ -1337,14 +1338,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       }
 
                       // ── detect Purok/Blk/Phase/Lot from the typed address ──
-                      if (loginRole === 'BHW') {
-                        const matchedPurok = PUROK_OPTIONS.find(p => {
-                          const pNorm = p.toLowerCase().replace(/[\s]/g, '');
-                          return addrLower.includes(pNorm);
-                        });
-                        if (matchedPurok) {
-                          setFormData(prev => ({ ...prev, purok: matchedPurok }));
-                        }
+                      const matchedPurok = PUROK_OPTIONS.find(p => {
+                        const pNorm = p.toLowerCase().replace(/[\s]/g, '');
+                        return addrLower.includes(pNorm);
+                      });
+                      if (matchedPurok) {
+                        setFormData(prev => ({ ...prev, purok: matchedPurok }));
                       }
 
                       const barangayName = matchedBarangay?.name || barangayList.find(b => String(b.id) === String(formData.barangayId))?.name || '';
@@ -1360,8 +1359,36 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                             lat: parseFloat(data[0].lat).toFixed(6),
                             lng: parseFloat(data[0].lon).toFixed(6),
                           }));
+                        } else if (matchedBarangay) {
+                          const purokCoords = matchedPurok
+                            ? findPurokCoords(matchedBarangay.name, matchedPurok, BARANGAY_COORDS)
+                            : null;
+                          const fallbackCoords = purokCoords || BARANGAY_COORDS[matchedBarangay.name];
+                          if (fallbackCoords) {
+                            setFormData(prev => ({
+                              ...prev,
+                              barangayId: String(matchedBarangay.id),
+                              lat: String(fallbackCoords[0]),
+                              lng: String(fallbackCoords[1]),
+                            }));
+                          }
                         }
-                      } catch (_) {}
+                      } catch (_) {
+                        if (matchedBarangay) {
+                          const purokCoords = matchedPurok
+                            ? findPurokCoords(matchedBarangay.name, matchedPurok, BARANGAY_COORDS)
+                            : null;
+                          const fallbackCoords = purokCoords || BARANGAY_COORDS[matchedBarangay.name];
+                          if (fallbackCoords) {
+                            setFormData(prev => ({
+                              ...prev,
+                              barangayId: String(matchedBarangay.id),
+                              lat: String(fallbackCoords[0]),
+                              lng: String(fallbackCoords[1]),
+                            }));
+                          }
+                        }
+                      }
                     }}
                     onKeyDown={async (e) => {
                       if (e.key !== 'Enter') return;
@@ -1380,14 +1407,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       }
 
                       // ── detect Purok/Blk/Phase/Lot from the typed address ──
-                      if (loginRole === 'BHW') {
-                        const matchedPurok = PUROK_OPTIONS.find(p => {
-                          const pNorm = p.toLowerCase().replace(/[\s]/g, '');
-                          return addrLower.includes(pNorm);
-                        });
-                        if (matchedPurok) {
-                          setFormData(prev => ({ ...prev, purok: matchedPurok }));
-                        }
+                      const matchedPurok = PUROK_OPTIONS.find(p => {
+                        const pNorm = p.toLowerCase().replace(/[\s]/g, '');
+                        return addrLower.includes(pNorm);
+                      });
+                      if (matchedPurok) {
+                        setFormData(prev => ({ ...prev, purok: matchedPurok }));
                       }
 
                       const barangayName = matchedBarangay?.name || barangayList.find(b => String(b.id) === String(formData.barangayId))?.name || '';
@@ -1403,8 +1428,36 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                             lat: parseFloat(data[0].lat).toFixed(6),
                             lng: parseFloat(data[0].lon).toFixed(6),
                           }));
+                        } else if (matchedBarangay) {
+                          const purokCoords = matchedPurok
+                            ? findPurokCoords(matchedBarangay.name, matchedPurok, BARANGAY_COORDS)
+                            : null;
+                          const fallbackCoords = purokCoords || BARANGAY_COORDS[matchedBarangay.name];
+                          if (fallbackCoords) {
+                            setFormData(prev => ({
+                              ...prev,
+                              barangayId: String(matchedBarangay.id),
+                              lat: String(fallbackCoords[0]),
+                              lng: String(fallbackCoords[1]),
+                            }));
+                          }
                         }
-                      } catch (_) {}
+                      } catch (_) {
+                        if (matchedBarangay) {
+                          const purokCoords = matchedPurok
+                            ? findPurokCoords(matchedBarangay.name, matchedPurok, BARANGAY_COORDS)
+                            : null;
+                          const fallbackCoords = purokCoords || BARANGAY_COORDS[matchedBarangay.name];
+                          if (fallbackCoords) {
+                            setFormData(prev => ({
+                              ...prev,
+                              barangayId: String(matchedBarangay.id),
+                              lat: String(fallbackCoords[0]),
+                              lng: String(fallbackCoords[1]),
+                            }));
+                          }
+                        }
+                      }
                     }} />
                 </div>
                 {loginRole === 'BHW' ? (
