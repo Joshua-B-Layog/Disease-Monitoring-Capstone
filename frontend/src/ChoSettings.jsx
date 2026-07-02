@@ -151,6 +151,7 @@ export default function CHOSettings({
     confirmDelete: localStorage.getItem('cdms_confirm_delete') !== 'false',
     keyboardShortcuts: localStorage.getItem('cdms_keyboardShortcuts') === 'true',
   });
+  const [systemPrefsSnapshot, setSystemPrefsSnapshot] = useState(null);
 
   const t = (key) => {
     const code = langCodeMap[systemPrefs.displayLanguage] || 'en';
@@ -185,6 +186,20 @@ export default function CHOSettings({
   useEffect(() => {
     if (onKeyboardShortcutsChange) onKeyboardShortcutsChange(systemPrefs.keyboardShortcuts);
   }, [systemPrefs.keyboardShortcuts, onKeyboardShortcutsChange]);
+  const takeSystemSnapshot = () => ({
+    theme,
+    fontSize: systemPrefs.fontSize,
+    compactView: systemPrefs.compactView,
+    displayLanguage: systemPrefs.displayLanguage,
+    timeZone: systemPrefs.timeZone,
+    dateFormat: systemPrefs.dateFormat,
+    autoSave: systemPrefs.autoSave,
+    confirmDelete: systemPrefs.confirmDelete,
+    keyboardShortcuts: systemPrefs.keyboardShortcuts,
+  });
+  useEffect(() => {
+    if (currentView === 'system') setSystemPrefsSnapshot(takeSystemSnapshot());
+  }, [currentView]);
   useEffect(() => {
     if (currentView === 'data') {
       setStorageLoading(true);
@@ -1089,7 +1104,30 @@ export default function CHOSettings({
         {/* ── SYSTEM PREFERENCES VIEW ── */}
         {currentView === 'system' && (
           <div className="detail-view-container security-view-view">
-            <button className="back-to-settings-btn" onClick={() => setCurrentView('menu')}>← Back to Settings</button>
+            <button className="back-to-settings-btn" onClick={() => {
+              if (systemPrefsSnapshot) {
+                if (theme !== systemPrefsSnapshot.theme) toggleTheme();
+                if (systemPrefs.fontSize !== systemPrefsSnapshot.fontSize) {
+                  const scale = systemPrefsSnapshot.fontSize === 'Small' ? '0.9' : systemPrefsSnapshot.fontSize === 'Large' ? '1.15' : '1';
+                  if (onFontSizeChange) onFontSizeChange(scale);
+                }
+                if (systemPrefs.compactView !== systemPrefsSnapshot.compactView) {
+                  if (onCompactChange) onCompactChange(systemPrefsSnapshot.compactView);
+                }
+                setSystemPrefs({
+                  ...systemPrefs,
+                  fontSize: systemPrefsSnapshot.fontSize,
+                  compactView: systemPrefsSnapshot.compactView,
+                  displayLanguage: systemPrefsSnapshot.displayLanguage,
+                  timeZone: systemPrefsSnapshot.timeZone,
+                  dateFormat: systemPrefsSnapshot.dateFormat,
+                  autoSave: systemPrefsSnapshot.autoSave,
+                  confirmDelete: systemPrefsSnapshot.confirmDelete,
+                  keyboardShortcuts: systemPrefsSnapshot.keyboardShortcuts,
+                });
+              }
+              setCurrentView('menu');
+            }}>← Back to Settings</button>
 
             <div className="security-section-card">
               <div className="security-card-header">
@@ -1241,7 +1279,10 @@ export default function CHOSettings({
             </div>
 
             <div className="notifications-action-container">
-              <button className="notifications-save-btn" onClick={() => setCurrentView('menu')}>{t('Save Preferences')}</button>
+              <button className="notifications-save-btn" onClick={() => {
+                setSystemPrefsSnapshot(takeSystemSnapshot());
+                setCurrentView('menu');
+              }}>{t('Save Preferences')}</button>
             </div>
           </div>
         )}
