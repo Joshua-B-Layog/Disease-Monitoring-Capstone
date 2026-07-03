@@ -96,6 +96,24 @@ const norm = (s) => {
   return s.toLowerCase().replace(/[\s\-().]/g, '');
 };
 
+function getPolygonCentroid(geometry) {
+  if (!geometry) return null;
+  let coords = [];
+  if (geometry.type === 'Polygon') {
+    coords = geometry.coordinates[0];
+  } else if (geometry.type === 'MultiPolygon') {
+    let largest = geometry.coordinates[0][0];
+    geometry.coordinates.forEach(poly => {
+      if (poly[0].length > largest.length) largest = poly[0];
+    });
+    coords = largest;
+  }
+  if (!coords.length) return null;
+  let latSum = 0, lngSum = 0;
+  coords.forEach(([lng, lat]) => { latSum += lat; lngSum += lng; });
+  return [latSum / coords.length, lngSum / coords.length];
+}
+
 // Maps GeoJSON ADM4_EN values to DB's barangays.name values
 const GEOJSON_TO_DB_NAME = {
   'Baclaran': 'Baclaran',
@@ -133,8 +151,22 @@ const PUROK_OPTIONS = [
 
 const findCoords = (name) => {
   if (!name) return null;
-  if (BARANGAY_COORDS[name]) return BARANGAY_COORDS[name];
   const n = norm(name);
+
+  // Primary source: derive centroid from the actual GeoJSON polygon (same shape data as the choropleth)
+  const feature = cabuyaoBoundaries.features.find(f => {
+    const props = f.properties || {};
+    const rawName = props.ADM4_EN || '';
+    const mappedName = GEOJSON_TO_DB_NAME[rawName] || rawName;
+    return norm(mappedName) === n;
+  });
+  if (feature) {
+    const centroid = getPolygonCentroid(feature.geometry);
+    if (centroid) return centroid;
+  }
+
+  // Fallback: hardcoded table, only used if no GeoJSON match is found
+  if (BARANGAY_COORDS[name]) return BARANGAY_COORDS[name];
   for (const [key, val] of Object.entries(BARANGAY_COORDS)) {
     if (norm(key) === n) return val;
   }

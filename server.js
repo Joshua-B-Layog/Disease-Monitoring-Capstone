@@ -936,26 +936,17 @@ app.post('/api/login', (req, res) => {
 // ROUTE: Register new user
 app.post('/api/register', (req, res) => {
     const { name, username: bodyUsername, email, mobile, password, role, context } = req.body;
+    const enforcedRole = 'BHW'; // Public self-registration is BHW-only. CHO accounts must be created via User Management by an existing CHO admin.
 
-    console.log("--- Registration Request ---", { name, email, role, context });
+    console.log("--- Registration Request ---", { name, email, role: enforcedRole, context });
 
     const username = bodyUsername || email.split('@')[0];
 
     let assignedBarangayId = null;
 
-    if (role === 'BHW' && context) {
+    if (context) {
         const parsed = parseInt(context);
         if (!isNaN(parsed)) assignedBarangayId = parsed;
-    } else if (role === 'CHO' && context) {
-        console.log("--- CHO Registration Context Check ---", { rawContext: context });
-        if (context.includes('Unit II') || context.includes('Pulo')) {
-            assignedBarangayId = 16;
-        } else if (context.includes('Unit I') || context.includes('Sala')) {
-            assignedBarangayId = 17;
-        } else {
-            console.warn("CHO context did not match any known unit:", context);
-        }
-        console.log("--- Resolved assignedBarangayId ---", assignedBarangayId);
     }
 
     // Duplicate-username check
@@ -974,7 +965,7 @@ app.post('/api/register', (req, res) => {
         VALUES (?, ?, ?, ?, ?, ?, ?, 1)
     `;
 
-    db.query(insertQuery, [username, name, email, mobile || null, password, role, assignedBarangayId], (err, result) => {
+    db.query(insertQuery, [username, name, email, mobile || null, password, enforcedRole, assignedBarangayId], (err, result) => {
         if (err) {
             console.error("MySQL Registration Error:", err.message);
             if (err.code === 'ER_DUP_ENTRY') {
@@ -982,7 +973,7 @@ app.post('/api/register', (req, res) => {
             }
             return res.status(500).json({ message: 'Registration failed: ' + err.message });
         }
-        console.log("✅ Registered:", { username, role, assignedBarangayId });
+        console.log("✅ Registered:", { username, role: enforcedRole, assignedBarangayId });
         res.status(200).json({ message: 'Account registered successfully!' });
     });
 });
