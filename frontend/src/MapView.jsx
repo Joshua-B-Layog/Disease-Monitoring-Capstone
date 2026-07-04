@@ -90,6 +90,28 @@ const getTopDisease = (diseases) => {
   return entries[0][0];
 };
 
+const DISEASE_CAUSES = {
+  'dengue': 'Likely caused by stagnant water collecting near homes after rain, allowing mosquitoes to breed.',
+  'leptospirosis': 'Likely caused by floodwater or stagnant water contaminated with animal urine in the area.',
+  'cholera': 'Likely caused by contaminated water sources or poor sanitation in the address.',
+  'typhoid fever': 'Likely caused by contaminated food or water supply in the area.',
+  'diarrhea': 'Likely caused by unsafe drinking water or poor sanitation nearby.',
+  'malaria': 'Likely caused by stagnant water bodies supporting mosquito breeding in the area.',
+  'chickenpox': 'Likely spread through close contact in densely populated housing.',
+  'measles': 'Likely spread through close contact in densely populated housing.',
+  'tuberculosis': 'Likely spread through prolonged close contact in crowded living conditions.',
+  'covid-19': 'Likely spread through close contact in densely populated housing.',
+  'hand foot and mouth disease': 'Likely spread through close contact among children in the area.',
+  'hepatitis a': 'Likely caused by contaminated food or water supply in the area.',
+};
+
+function getDiseaseCause(diseaseName) {
+  if (!diseaseName) return 'Cause unclear — insufficient data for this address component.';
+  const key = diseaseName.trim().toLowerCase();
+  return DISEASE_CAUSES[key] ||
+    'Cause unclear — likely linked to environmental or sanitation conditions in this address component (Lot/Blk/Phase/Purok).';
+}
+
 // Safe normalize — never crashes on non-string input
 const norm = (s) => {
   if (typeof s !== 'string') return '';
@@ -149,6 +171,43 @@ const PUROK_OPTIONS = [
   'Lot 1', 'Lot 2', 'Lot 3', 'Lot 4', 'Lot 5'
 ];
 
+function extractLocationUnit(address) {
+  if (!address) return null;
+  const a = address.toUpperCase();
+  const found = { blk: null, lot: null, phase: null, purok: null };
+
+  const blkMatch = a.match(/\bBLOCK\s*(\d+)\b/)
+    || a.match(/\bBLK\.?\s*(\d+)\b/)
+    || a.match(/\bB\.?\s*(\d+)(?=\s|,|$|[A-Z])/);
+  if (blkMatch) found.blk = blkMatch[1];
+
+  const lotMatch = a.match(/\bLOT\.?\s*(\d+)\b/)
+    || a.match(/\bL\.?\s*(\d+)(?=\s|,|$|[A-Z])/);
+  if (lotMatch) found.lot = lotMatch[1];
+
+  const phaseMatch = a.match(/\bPHASE\s*(\d+)\b/)
+    || a.match(/\bPH\.?\s*(\d+)\b/);
+  if (phaseMatch) found.phase = phaseMatch[1];
+
+  const purokMatch = a.match(/\bPUROK\s*(\d+)\b/)
+    || a.match(/\bPRK\.?\s*(\d+)\b/);
+  if (purokMatch) found.purok = purokMatch[1];
+
+  const hasExplicitWord = /\b(BLK|BLOCK|LOT|PHASE|PH\.|PUROK|PRK)\b/.test(a);
+  if (!hasExplicitWord && !found.phase && !found.purok) {
+    const bareCount = (found.blk ? 1 : 0) + (found.lot ? 1 : 0);
+    if (bareCount < 2) return null;
+  }
+
+  const parts = [];
+  if (found.phase) parts.push(`Phase ${found.phase}`);
+  if (found.blk) parts.push(`Blk ${found.blk}`);
+  if (found.lot) parts.push(`Lot ${found.lot}`);
+  if (found.purok) parts.push(`Purok ${found.purok}`);
+
+  return parts.length > 0 ? parts.join(' ') : null;
+}
+
 const findCoords = (name) => {
   if (!name) return null;
   const n = norm(name);
@@ -187,12 +246,28 @@ const getRisk = (count) => {
   return { color: '#10b981', ring: 'rgba(16,185,129,0.3)', label: 'Low Risk' };
 };
 
+function getGradientColor(count) {
+  const clamped = Math.min(count, 40);
+  if (clamped <= 10) {
+    const t = clamped / 10;
+    const r = Math.round(16 + t * (245 - 16));
+    const g = Math.round(185 + t * (158 - 185));
+    const b = Math.round(129 + t * (11 - 129));
+    return `rgb(${r},${g},${b})`;
+  } else {
+    const t = Math.min((clamped - 10) / 30, 1);
+    const r = Math.round(245 + t * (220 - 245));
+    const g = Math.round(158 + t * (0 - 158));
+    const b = Math.round(11 + t * (38 - 11));
+    return `rgb(${r},${g},${b})`;
+  }
+}
+
 const getGeoJsonStyle = (feature, barangayData) => {
   const dbName = getDbNameFromGeoJson(feature.properties.ADM4_EN);
   const match = barangayData.find(b => b.barangayName === dbName);
-  const topDisease = match ? getTopDisease(match.diseases) : null;
-  const fillColor = topDisease ? getDiseaseColor(topDisease) : '#374151';
   const count = match ? match.totalCases : 0;
+  const fillColor = count > 0 ? getGradientColor(count) : '#374151';
   return {
     fillColor,
     fillOpacity: count > 0 ? 0.5 : 0.12,
@@ -210,13 +285,7 @@ const getPurokGroups = (barangayName, cases) => {
     const [, purokPart] = (c.address || '').split('|');
     let purok = (purokPart || '').trim();
     if (!purok) {
-      const addrLower = (c.address || '').toLowerCase().replace(/[\s\-]/g, '');
-      const matched = PUROK_OPTIONS.find(p => {
-        if (p === 'All Puroks') return false;
-        const pNorm = p.toLowerCase().replace(/[\s]/g, '');
-        return addrLower.includes(pNorm);
-      });
-      purok = matched || 'Unspecified';
+      purok = extractLocationUnit(c.address) || 'Unspecified';
     }
     const hasCoords = c.latitude && c.longitude && !isNaN(parseFloat(c.latitude)) && !isNaN(parseFloat(c.longitude));
 
@@ -342,7 +411,7 @@ function ChoroplethLayer({ barangayData, onHover, onLeave, onClick }) {
   const style = (feature) => {
     const match = findMatch(feature);
     const count = match ? match.totalCases : 0;
-    const fillColor = match ? getRisk(count).color : '#444';
+    const fillColor = match ? getGradientColor(count) : '#444';
     return {
       fillColor,
       weight: 1,
@@ -392,6 +461,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const [filterSeverity, setFilterSeverity] = useState('All Severities');
   const [filterPurok, setFilterPurok] = useState('All Puroks');
   const [tooltip, setTooltip] = useState(null);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [popup,   setPopup]   = useState(null);
   const [lastUpdated, setLastUpdated]   = useState(null);
   const [now, setNow]                   = useState(Date.now());
@@ -413,6 +483,28 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       'Pulo', 'Banay-Banay', 'Banlic', 'Mamatid', 'San Isidro', 'Diezmo', 'Pittland', 'Casile',
     ],
   };
+
+  const scopedCasesForPurok = (() => {
+    if (loginRole === 'BHW' && loginBarangay) {
+      return allCases.filter(c => c.barangay_name === loginBarangay);
+    }
+    if (loginRole === 'CHO' && sessionContext && CHO_UNIT_BARANGAYS[sessionContext]) {
+      const unitBarangays = CHO_UNIT_BARANGAYS[sessionContext];
+      let scoped = allCases.filter(c => unitBarangays.includes(c.barangay_name));
+      if (filterBarangay !== 'All Barangays') {
+        scoped = scoped.filter(c => c.barangay_name === filterBarangay);
+      }
+      return scoped;
+    }
+    return allCases;
+  })();
+  const dynamicPurokOptions = ['All Puroks', ...Array.from(
+    new Set(
+      scopedCasesForPurok
+        .map(c => extractLocationUnit(c.address))
+        .filter(Boolean)
+    )
+  ).sort()];
 
   const scopedBarangayOptions = (loginRole === 'CHO' && sessionContext && CHO_UNIT_BARANGAYS[sessionContext])
     ? CHO_UNIT_BARANGAYS[sessionContext]
@@ -666,7 +758,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                 borderRadius: '8px', boxShadow: '0 12px 32px rgba(0,0,0,0.3)',
                 padding: '4px', textAlign: 'left',
               }}>
-                {PUROK_OPTIONS.map(p => (
+                {dynamicPurokOptions.map(p => (
                   <div
                     key={p}
                     onClick={() => { setFilterPurok(p); setPurokOpen(false); }}
@@ -756,7 +848,12 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       </div>
 
       {/* ── MAP AREA ── */}
-      <div style={{ flex: 1, position: 'relative', minWidth: 0 }}>
+      <div style={{ flex: 1, position: 'relative', minWidth: 0 }}
+        onMouseMove={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+        }}
+      >
         <MapContainer
           center={(loginRole === 'BHW' && loginBarangay && findCoords(loginBarangay)) 
             ? findCoords(loginBarangay) 
@@ -837,6 +934,35 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
             <div style={{ marginTop: '8px', fontSize: '10px', color: 'var(--text-muted)', fontStyle: 'italic' }}>Click pin for full details</div>
           </div>
         )}
+
+        {/* MOUSE-FOLLOWING DISEASE CAUSE TOOLTIP */}
+        {tooltip && (() => {
+          const top = getTop5(tooltip.diseases)[0];
+          if (!top) return null;
+          const [diseaseName, count] = top;
+          return (
+            <div style={{
+              position: 'absolute',
+              left: mousePos.x + 18,
+              top: mousePos.y + 18,
+              zIndex: 1001,
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '8px',
+              padding: '10px 14px',
+              maxWidth: '260px',
+              boxShadow: '0 8px 20px rgba(0,0,0,0.35)',
+              pointerEvents: 'none',
+            }}>
+              <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '4px' }}>
+                {diseaseName} <span style={{ color: '#10b981', fontWeight: '700' }}>({count})</span>
+              </div>
+              <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                {getDiseaseCause(diseaseName)}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* CLICK POPUP */}
         {popup && (

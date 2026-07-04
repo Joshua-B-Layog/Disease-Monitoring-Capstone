@@ -1,4 +1,14 @@
 import React from 'react';
+import dashboardIcon from './assets/dashboard-panel.svg';
+import caseMgmtIcon from './assets/case-management.svg';
+import auditIcon from './assets/audit-reports.svg';
+import mapIcon from './assets/map.svg';
+import userIcon from './assets/user.svg';
+import settingsIcon from './assets/settings.svg';
+import choLogo from './assets/cho.svg';
+
+const iconStyle = { width: 18, height: 18, verticalAlign: 'middle', marginRight: '6px' };
+const Img = (src) => <img src={src} alt="" style={iconStyle} />;
 
 const translations = {
   en: { 'Dashboard':'Dashboard','Manage Cases':'Manage Cases','Audit Reports':'Audit Reports','Map View':'Map View','User Accounts':'User Accounts','Settings':'Settings' },
@@ -13,19 +23,19 @@ const Sidebar = ({ role, activeTab, setActiveTab, language }) => {
   // Define menu configurations
   const menuConfig = {
     CHO: [
-      { name: 'Dashboard', icon: '📊' },
-      { name: 'Manage Cases', icon: '📁' },
-      { name: 'Audit Reports', icon: '🏘️' },
-      { name: 'Map View', icon: '📍' },
-      { name: 'User Accounts', icon: '👤' },
-      { name: 'Settings', icon: '⚙️' }
+      { name: 'Dashboard', icon: Img(dashboardIcon) },
+      { name: 'Manage Cases', icon: Img(caseMgmtIcon) },
+      { name: 'Audit Reports', icon: Img(auditIcon) },
+      { name: 'Map View', icon: Img(mapIcon) },
+      { name: 'User Accounts', icon: Img(userIcon) },
+      { name: 'Settings', icon: Img(settingsIcon) }
     ],
     BHW: [
-      { name: 'Dashboard', icon: '📊' },
-      { name: 'Manage Cases', icon: '📋' },
-      { name: 'Audit Reports', icon: '📁' },
-      { name: 'Map View', icon: '🗺️' },
-      { name: 'Settings', icon: '⚙️' },
+      { name: 'Dashboard', icon: Img(dashboardIcon) },
+      { name: 'Manage Cases', icon: Img(caseMgmtIcon) },
+      { name: 'Audit Reports', icon: Img(auditIcon) },
+      { name: 'Map View', icon: Img(mapIcon) },
+      { name: 'Settings', icon: Img(settingsIcon) },
     ]
   };
 
@@ -33,8 +43,9 @@ const Sidebar = ({ role, activeTab, setActiveTab, language }) => {
 
   return (
     <div className="sidebar">
-      <div className="sidebar-logo">
-        <h3>{role === 'CHO' ? 'CHO Admin' : 'BHW Portal'}</h3>
+      <div className="sidebar-logo" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <img src={choLogo} alt="CHO" style={{ width: '28px', height: '28px' }} />
+        <h3 style={{ margin: 0 }}>{role === 'CHO' ? 'CHO Admin' : 'BHW Portal'}</h3>
       </div>
       <div className="sidebar-menu">
         {menuItems.map((item) => (

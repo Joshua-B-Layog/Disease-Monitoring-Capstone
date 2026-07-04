@@ -230,6 +230,19 @@ CREATE TABLE IF NOT EXISTS generated_reports (
 );
 
 
+CREATE TABLE IF NOT EXISTS case_inbox (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  case_id INT NOT NULL,
+  from_user_id INT,
+  from_user_name VARCHAR(255),
+  from_cho_unit VARCHAR(100),
+  to_cho_unit VARCHAR(100),
+  status ENUM('pending','accepted','rejected') DEFAULT 'pending',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  resolved_at TIMESTAMP NULL,
+  FOREIGN KEY (case_id) REFERENCES disease_cases(case_id) ON DELETE CASCADE
+);
+
 --
 -- Indexes for dumped tables
 --

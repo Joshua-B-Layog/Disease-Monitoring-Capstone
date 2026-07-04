@@ -3,6 +3,13 @@ import axios from 'axios';
 import { API_URL } from './config';
 import './ManageCases.css';
 import { findPurokCoords } from './data/coordinates';
+import feverIcon from './assets/fever.svg';
+import influenzaAIcon from './assets/influenza-a.svg';
+import leptospirosisIcon from './assets/leptospirosis.svg';
+import tuberculosisIcon from './assets/tuberculosis.svg';
+import typhoidIcon from './assets/typhoid-fever.svg';
+
+const diseaseImgStyle = { width: 28, height: 28, verticalAlign: 'middle' };
 
 const BARANGAY_COORDS = {
   'Baclaran': [14.2450, 121.1630],
@@ -53,12 +60,12 @@ const CHO_UNIT_BARANGAYS = {
 // ── All disease cards split into 2 pages of 6 ──
 const DISEASE_PAGES = [
   [
-    { id: 1, name: 'Dengue Fever', dbName: 'Dengue', icon: '🌡️', color: '#ef4444', desc: 'A viral infection transmitted by Aedes mosquitoes, causing high fever and severe body aches.' },
-    { id: 2, name: 'Influenza A', dbName: 'Influenza A', icon: '🦠', color: '#f59e0b', desc: 'A highly contagious respiratory illness caused by influenza viruses, leading to seasonal outbreaks.' },
+    { id: 1, name: 'Dengue Fever', dbName: 'Dengue', icon: <img src={feverIcon} alt="" style={diseaseImgStyle} />, color: '#ef4444', desc: 'A viral infection transmitted by Aedes mosquitoes, causing high fever and severe body aches.' },
+    { id: 2, name: 'Influenza A', dbName: 'Influenza A', icon: <img src={influenzaAIcon} alt="" style={diseaseImgStyle} />, color: '#f59e0b', desc: 'A highly contagious respiratory illness caused by influenza viruses, leading to seasonal outbreaks.' },
     { id: 3, name: 'Covid-19', dbName: 'Covid-19', icon: '🛡️', color: '#3b82f6', desc: 'An infectious respiratory disease caused by the SARS-CoV-2 virus, requiring close contact tracing.' },
-    { id: 4, name: 'Leptospirosis', dbName: 'Leptospirosis', icon: '💧', color: '#10b981', desc: 'A bacterial disease spread through contaminated water, posing a high risk during flood seasons.' },
-    { id: 5, name: 'Tuberculosis', dbName: 'Tuberculosis', icon: '🫁', color: '#f97316', desc: 'An infectious bacterial disease that primarily affects the lungs, requiring long-term treatment.' },
-    { id: 6, name: 'Typhoid Fever', dbName: 'Typhoid Fever', icon: '🧫', color: '#8b5cf6', desc: 'A systemic infection caused by Salmonella Typhi, spread through contaminated food and water.' },
+    { id: 4, name: 'Leptospirosis', dbName: 'Leptospirosis', icon: <img src={leptospirosisIcon} alt="" style={diseaseImgStyle} />, color: '#10b981', desc: 'A bacterial disease spread through contaminated water, posing a high risk during flood seasons.' },
+    { id: 5, name: 'Tuberculosis', dbName: 'Tuberculosis', icon: <img src={tuberculosisIcon} alt="" style={diseaseImgStyle} />, color: '#f97316', desc: 'An infectious bacterial disease that primarily affects the lungs, requiring long-term treatment.' },
+    { id: 6, name: 'Typhoid Fever', dbName: 'Typhoid Fever', icon: <img src={typhoidIcon} alt="" style={diseaseImgStyle} />, color: '#8b5cf6', desc: 'A systemic infection caused by Salmonella Typhi, spread through contaminated food and water.' },
   ],
   [
     { id: 7, name: 'Cholera', dbName: 'Cholera', icon: '🌊', color: '#0ea5e9', desc: 'An acute diarrheal infection caused by ingestion of food or water contaminated with Vibrio cholerae.' },
@@ -97,6 +104,43 @@ const PUROK_OPTIONS = [
   'Phase 1', 'Phase 2', 'Phase 3',
   'Lot 1', 'Lot 2', 'Lot 3', 'Lot 4', 'Lot 5'
 ];
+
+function extractLocationUnit(address) {
+  if (!address) return null;
+  const a = address.toUpperCase();
+  const found = { blk: null, lot: null, phase: null, purok: null };
+
+  const blkMatch = a.match(/\bBLOCK\s*(\d+)\b/)
+    || a.match(/\bBLK\.?\s*(\d+)\b/)
+    || a.match(/\bB\.?\s*(\d+)(?=\s|,|$|[A-Z])/);
+  if (blkMatch) found.blk = blkMatch[1];
+
+  const lotMatch = a.match(/\bLOT\.?\s*(\d+)\b/)
+    || a.match(/\bL\.?\s*(\d+)(?=\s|,|$|[A-Z])/);
+  if (lotMatch) found.lot = lotMatch[1];
+
+  const phaseMatch = a.match(/\bPHASE\s*(\d+)\b/)
+    || a.match(/\bPH\.?\s*(\d+)\b/);
+  if (phaseMatch) found.phase = phaseMatch[1];
+
+  const purokMatch = a.match(/\bPUROK\s*(\d+)\b/)
+    || a.match(/\bPRK\.?\s*(\d+)\b/);
+  if (purokMatch) found.purok = purokMatch[1];
+
+  const hasExplicitWord = /\b(BLK|BLOCK|LOT|PHASE|PH\.|PUROK|PRK)\b/.test(a);
+  if (!hasExplicitWord && !found.phase && !found.purok) {
+    const bareCount = (found.blk ? 1 : 0) + (found.lot ? 1 : 0);
+    if (bareCount < 2) return null;
+  }
+
+  const parts = [];
+  if (found.phase) parts.push(`Phase ${found.phase}`);
+  if (found.blk) parts.push(`Blk ${found.blk}`);
+  if (found.lot) parts.push(`Lot ${found.lot}`);
+  if (found.purok) parts.push(`Purok ${found.purok}`);
+
+  return parts.length > 0 ? parts.join(' ') : null;
+}
 
 const CASES_PER_PAGE = 10;
 
@@ -1341,12 +1385,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       }
 
                       // ── detect Purok/Blk/Phase/Lot from the typed address ──
-                      const matchedPurok = PUROK_OPTIONS.find(p => {
-                        const pNorm = p.toLowerCase().replace(/[\s]/g, '');
-                        return addrLower.includes(pNorm);
-                      });
-                      if (matchedPurok) {
-                        setFormData(prev => ({ ...prev, purok: matchedPurok }));
+                      const unit = extractLocationUnit(addr);
+                      if (unit) {
+                        setFormData(prev => ({ ...prev, purok: unit }));
                       }
 
                       const barangayName = matchedBarangay?.name || barangayList.find(b => String(b.id) === String(formData.barangayId))?.name || '';
@@ -1367,8 +1408,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                             ? barangayList.find(b => String(b.id) === String(formData.barangayId))
                             : null);
                           if (targetB) {
-                            const purokCoords = matchedPurok
-                              ? findPurokCoords(targetB.name, matchedPurok, BARANGAY_COORDS)
+                            const purokCoords = unit
+                              ? findPurokCoords(targetB.name, unit, BARANGAY_COORDS)
                               : null;
                             const fallbackCoords = purokCoords || BARANGAY_COORDS[targetB.name];
                             if (fallbackCoords) {
@@ -1386,8 +1427,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           ? barangayList.find(b => String(b.id) === String(formData.barangayId))
                           : null);
                         if (targetB) {
-                          const purokCoords = matchedPurok
-                            ? findPurokCoords(targetB.name, matchedPurok, BARANGAY_COORDS)
+                          const purokCoords = unit
+                            ? findPurokCoords(targetB.name, unit, BARANGAY_COORDS)
                             : null;
                           const fallbackCoords = purokCoords || BARANGAY_COORDS[targetB.name];
                           if (fallbackCoords) {
@@ -1401,7 +1442,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         }
                       }
                     }}
-                    onKeyDown={async (e) => {
+                      onKeyDown={async (e) => {
                       if (e.key !== 'Enter') return;
                       e.preventDefault();
                       const addr = e.target.value.trim();
@@ -1418,12 +1459,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       }
 
                       // ── detect Purok/Blk/Phase/Lot from the typed address ──
-                      const matchedPurok = PUROK_OPTIONS.find(p => {
-                        const pNorm = p.toLowerCase().replace(/[\s]/g, '');
-                        return addrLower.includes(pNorm);
-                      });
-                      if (matchedPurok) {
-                        setFormData(prev => ({ ...prev, purok: matchedPurok }));
+                      const unit = extractLocationUnit(addr);
+                      if (unit) {
+                        setFormData(prev => ({ ...prev, purok: unit }));
                       }
 
                       const barangayName = matchedBarangay?.name || barangayList.find(b => String(b.id) === String(formData.barangayId))?.name || '';
@@ -1444,8 +1482,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                             ? barangayList.find(b => String(b.id) === String(formData.barangayId))
                             : null);
                           if (targetB) {
-                            const purokCoords = matchedPurok
-                              ? findPurokCoords(targetB.name, matchedPurok, BARANGAY_COORDS)
+                            const purokCoords = unit
+                              ? findPurokCoords(targetB.name, unit, BARANGAY_COORDS)
                               : null;
                             const fallbackCoords = purokCoords || BARANGAY_COORDS[targetB.name];
                             if (fallbackCoords) {
@@ -1463,8 +1501,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           ? barangayList.find(b => String(b.id) === String(formData.barangayId))
                           : null);
                         if (targetB) {
-                          const purokCoords = matchedPurok
-                            ? findPurokCoords(targetB.name, matchedPurok, BARANGAY_COORDS)
+                          const purokCoords = unit
+                            ? findPurokCoords(targetB.name, unit, BARANGAY_COORDS)
                             : null;
                           const fallbackCoords = purokCoords || BARANGAY_COORDS[targetB.name];
                           if (fallbackCoords) {
@@ -1740,8 +1778,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             {/* Location & Coordinates + map preview */}
             <div style={{ marginBottom: '28px' }}>
               <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '10px', fontWeight: '600' }}>
-                Location & Coordinates{' '}
-                <span style={{ color: '#9ca3af', fontWeight: '400', fontSize: '12px' }}>(optional)</span>
+                Location & Coordinates
               </label>
 
               <div style={{ display: 'grid', gridTemplateColumns: hasCoords ? '1fr 1fr' : '1fr', gap: '20px', alignItems: 'start' }}>

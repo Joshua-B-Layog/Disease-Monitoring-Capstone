@@ -29,6 +29,34 @@ async function sendBrevoEmail(to, subject, htmlContent) {
   }
 }
 
+const CHO_UNIT_BARANGAYS = {
+  'CHO Unit I (Sala)': [
+    'Barangay Uno (Poblacion)', 'Barangay Dos (Poblacion)', 'Barangay Tres (Poblacion)',
+    'Sala', 'Bigaa', 'Butong', 'Marinig', 'Gulod', 'Niugan', 'Baclaran',
+  ],
+  'CHO Unit II (Pulo)': [
+    'Pulo', 'Banay-Banay', 'Banlic', 'Mamatid', 'San Isidro', 'Diezmo', 'Pittland', 'Casile',
+  ],
+};
+
+function detectBarangayFromAddress(address) {
+  if (!address) return null;
+  const addrLower = address.toLowerCase().replace(/[-\s]/g, '');
+  const allBarangays = Object.values(CHO_UNIT_BARANGAYS).flat();
+  const match = allBarangays.find(b => {
+    const bNorm = b.replace(/\(.*?\)/g, '').toLowerCase().replace(/[-\s().]/g, '').trim();
+    return addrLower.includes(bNorm);
+  });
+  return match || null;
+}
+
+function getChoUnitForBarangayName(barangayName) {
+  for (const [unit, list] of Object.entries(CHO_UNIT_BARANGAYS)) {
+    if (list.some(b => b.toLowerCase() === (barangayName || '').toLowerCase())) return unit;
+  }
+  return null;
+}
+
 const app = express();
 
 // ==========================================
@@ -112,6 +140,22 @@ db.query(`CREATE TABLE IF NOT EXISTS generated_reports (
 )`, (err) => {
   if (err) console.error('Error creating generated_reports table:', err.message);
   else console.log('Generated reports table created/verified');
+});
+
+db.query(`CREATE TABLE IF NOT EXISTS case_inbox (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  case_id INT NOT NULL,
+  from_user_id INT,
+  from_user_name VARCHAR(255),
+  from_cho_unit VARCHAR(100),
+  to_cho_unit VARCHAR(100),
+  status ENUM('pending','accepted','rejected') DEFAULT 'pending',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  resolved_at TIMESTAMP NULL,
+  FOREIGN KEY (case_id) REFERENCES disease_cases(case_id) ON DELETE CASCADE
+)`, (err) => {
+  if (err) console.error('Error creating case_inbox table:', err.message);
+  else console.log('Case inbox table created/verified');
 });
 
 function createAuditLog(userId, userName, userRole, choUnit, barangay, action, entity, details) {
@@ -326,6 +370,19 @@ app.post('/api/cases', (req, res) => {
     };
 
     if (!barangay_id) {
+      const detectedBarangay = detectBarangayFromAddress(address);
+      const submitterChoUnit = req.body.submitter_cho_unit || null;
+      if (detectedBarangay && submitterChoUnit) {
+        const targetUnit = getChoUnitForBarangayName(detectedBarangay);
+        if (targetUnit && targetUnit !== submitterChoUnit) {
+          return res.status(409).json({
+            crossUnit: true,
+            detectedBarangay,
+            targetUnit,
+            message: `This is a ${targetUnit} address. Do you want to put it on the inbox to send it to ${targetUnit}?`
+          });
+        }
+      }
       return res.status(400).json({ error: 'Please select an assigned barangay before saving.' });
     }
 
@@ -423,6 +480,102 @@ app.post('/api/cases', (req, res) => {
     });
     });
 }
+});
+
+// ROUTE: Route case to inbox (cross-unit)
+app.post('/api/cases/route-to-inbox', (req, res) => {
+  const {
+    patient_name, disease_name, age, severity, gender, status, contact,
+    onset_date, address, symptoms, physician, latitude, longitude,
+    submitter_user_id, submitter_name, from_cho_unit, to_cho_unit
+  } = req.body;
+
+  const insertCaseQuery = `
+    INSERT INTO disease_cases
+    (patient_name, disease_id, age, severity, gender, status, contact,
+     onset_date, address, barangay_id, symptoms, physician, latitude, longitude, date_reported)
+    VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, NOW())
+  `;
+  const findDiseaseQuery = 'SELECT id FROM diseases WHERE LOWER(name) = LOWER(?)';
+  db.query(findDiseaseQuery, [disease_name], (err, diseaseResults) => {
+    const diseaseId = diseaseResults && diseaseResults.length > 0 ? diseaseResults[0].id : null;
+    db.query(
+      insertCaseQuery.replace('disease_id) VALUES (?, NULL,', 'disease_id) VALUES (?, ?,'),
+      [patient_name, diseaseId, age || 0, severity, gender || 'Male', status || 'Pending',
+       contact || null, onset_date || null, address || null, symptoms || null,
+       physician || null, latitude || null, longitude || null],
+      (insertErr, result) => {
+        if (insertErr) {
+          console.error('route-to-inbox insert error:', insertErr.message);
+          return res.status(500).json({ error: insertErr.message });
+        }
+        const caseId = result.insertId;
+        db.query(
+          'INSERT INTO case_inbox (case_id, from_user_id, from_user_name, from_cho_unit, to_cho_unit, status) VALUES (?, ?, ?, ?, ?, ?)',
+          [caseId, submitter_user_id || null, submitter_name || 'Unknown', from_cho_unit, to_cho_unit, 'pending'],
+          (inboxErr, inboxResult) => {
+            if (inboxErr) {
+              console.error('case_inbox insert error:', inboxErr.message);
+              return res.status(500).json({ error: inboxErr.message });
+            }
+            createNotificationForUsers(
+              'New Case Reported',
+              `${submitter_name || 'A user'} from ${from_cho_unit} sent you a case needing barangay assignment: ${patient_name} (${disease_name}).`,
+              'info', 'Inbox', null, 'new_case_reported'
+            );
+            res.status(200).json({ message: 'Case routed to inbox successfully.', case_id: caseId, inbox_id: inboxResult.insertId });
+          }
+        );
+      }
+    );
+  });
+});
+
+// GET inbox items for a CHO unit
+app.get('/api/case-inbox', (req, res) => {
+ const { cho_unit, status } = req.query;
+ let sql = `
+ SELECT ci.*, dc.patient_name, dc.address, dc.disease_id, d.name AS disease_name,
+ dc.severity, dc.status AS case_status, dc.date_reported, dc.age, dc.gender
+ FROM case_inbox ci
+ JOIN disease_cases dc ON ci.case_id = dc.case_id
+ LEFT JOIN diseases d ON dc.disease_id = d.id
+ WHERE 1=1
+ `;
+ const params = [];
+ if (cho_unit) { sql += ' AND ci.to_cho_unit = ?'; params.push(cho_unit); }
+ if (status) { sql += ' AND ci.status = ?'; params.push(status); }
+ sql += ' ORDER BY ci.created_at DESC';
+ db.query(sql, params, (err, results) => {
+ if (err) return res.status(500).json({ error: err.message });
+ res.json(results);
+ });
+});
+
+// Accept: mark inbox item accepted (case still needs barangay_id set via edit)
+app.put('/api/case-inbox/:id/accept', (req, res) => {
+ const { id } = req.params;
+ db.query(
+ "UPDATE case_inbox SET status = 'accepted', resolved_at = NOW() WHERE id = ?",
+ [id],
+ (err) => {
+ if (err) return res.status(500).json({ error: err.message });
+ res.json({ message: 'Case accepted. Please finalize the assigned barangay.' });
+ }
+ );
+});
+
+// Reject: mark inbox item rejected
+app.put('/api/case-inbox/:id/reject', (req, res) => {
+ const { id } = req.params;
+ db.query(
+ "UPDATE case_inbox SET status = 'rejected', resolved_at = NOW() WHERE id = ?",
+ [id],
+ (err) => {
+ if (err) return res.status(500).json({ error: err.message });
+ res.json({ message: 'Case rejected.' });
+ }
+ );
 });
 
 // ROUTE: Update existing case
@@ -871,16 +1024,6 @@ app.post('/api/login', (req, res) => {
         if (role === 'CHO') {
             const selectedUnit = context;
 
-            const CHO_UNIT_BARANGAYS = {
-                'CHO Unit I (Sala)': [
-                    'barangay uno (poblacion)', 'barangay dos (poblacion)', 'barangay tres (poblacion)',
-                    'sala', 'bigaa', 'butong', 'marinig', 'gulod', 'niugan', 'baclaran'
-                ],
-                'CHO Unit II (Pulo)': [
-                    'pulo', 'banay-banay', 'banlic', 'mamatid', 'san isidro', 'diezmo', 'pittland', 'casile'
-                ],
-            };
-
             const allowedBarangays = CHO_UNIT_BARANGAYS[selectedUnit] || [];
             const assignedBarangay = (user.assigned_barangay_name || '').trim().toLowerCase();
 
@@ -890,7 +1033,7 @@ app.post('/api/login', (req, res) => {
                 });
             }
 
-            if (!allowedBarangays.includes(assignedBarangay)) {
+            if (!allowedBarangays.some(b => b.toLowerCase() === assignedBarangay)) {
                 const userUnit = Object.entries(CHO_UNIT_BARANGAYS).find(([, list]) =>
                     list.includes(assignedBarangay)
                 )?.[0] || 'another unit';
