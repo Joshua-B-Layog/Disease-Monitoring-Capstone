@@ -239,6 +239,7 @@ CREATE TABLE IF NOT EXISTS case_inbox (
   to_cho_unit VARCHAR(100),
   status ENUM('pending','accepted','rejected') DEFAULT 'pending',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  notes TEXT,
   resolved_at TIMESTAMP NULL,
   FOREIGN KEY (case_id) REFERENCES disease_cases(case_id) ON DELETE CASCADE
 );
@@ -316,6 +317,14 @@ COMMIT;
 --
 ALTER TABLE `generated_reports`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+
+ALTER TABLE `case_inbox` 
+  ADD COLUMN to_barangay_id INT NULL AFTER to_cho_unit;
+
+
+ALTER TABLE `case_inbox` 
+ADD FOREIGN KEY (to_barangay_id) REFERENCES `barangays`(id);
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;

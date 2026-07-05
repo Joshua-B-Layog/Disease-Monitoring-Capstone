@@ -427,3 +427,17 @@ html, body, #root {
   font-weight: 600;
   color: var(--text-main);
 }
+
+.inbox-avatar-circle {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: #3b82f6;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+}

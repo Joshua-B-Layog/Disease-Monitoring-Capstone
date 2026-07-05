@@ -95,7 +95,7 @@ const ALL_DISEASE_OPTIONS = [
 const CABUYAO_BARANGAYS = [
   'Baclaran','Banay-Banay','Banlic','Barangay Dos (Poblacion)','Barangay Tres (Poblacion)',
   'Barangay Uno (Poblacion)','Bigaa','Butong','Casile','Diezmo','Gulod','Mamatid',
-  'Marinig','Niugan','Pitland','Pulo','Sala','San Isidro'
+  'Marinig','Niugan','Pittland','Pulo','Sala','San Isidro'
 ];
 
 const PUROK_OPTIONS = [
@@ -180,11 +180,19 @@ const formatDateStr = (dateStr, fmt) => {
   return `${m}/${day}/${shortY}`;
 };
 
-export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, autoSave, confirmDelete, keyboardShortcuts, fontScale, compactMode, loggedUserId, loginRole, loginBarangay, sessionContext }) {
-  const [view, setView] = useState('categories'); // 'categories' | 'list' | 'add' | 'edit'
+export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, autoSave, confirmDelete, keyboardShortcuts, fontScale, compactMode, loggedUserId, loginRole, loginBarangay, sessionContext, initialView, onInitialViewConsumed }) {
+  const [view, setView] = useState('categories');
+  const [inboxItems, setInboxItems] = useState([]);
+  const [outboxItems, setOutboxItems] = useState([]);
+  const [inboxLoading, setInboxLoading] = useState(false);
   const [cardPage, setCardPage] = useState(0);
   const [selectedDisease, setSelectedDisease] = useState(null);
   const [editingCase, setEditingCase] = useState(null);
+  const [routingStep, setRoutingStep] = useState(null);
+  const [routingData, setRoutingData] = useState(null);
+  const [routingDescription, setRoutingDescription] = useState('');
+  const [routingTargetType, setRoutingTargetType] = useState(null);
+  const [routingTargetBarangay, setRoutingTargetBarangay] = useState('');
 
   const [allCases, setAllCases] = useState([]);
   const [loadingCases, setLoadingCases] = useState(false);
@@ -194,6 +202,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const scopedBarangayOptions = (loginRole === 'CHO' && sessionContext && CHO_UNIT_BARANGAYS[sessionContext])
     ? CHO_UNIT_BARANGAYS[sessionContext]
     : CABUYAO_BARANGAYS;
+  const scopedBarangayList = (loginRole === 'CHO' && scopedBarangayOptions.length > 0)
+    ? barangayList.filter(b => scopedBarangayOptions.includes(b.name))
+    : barangayList;
 
   const baseCases = (loginRole === 'BHW' && loginBarangay)
     ? allCases.filter(c => c.barangay_name === loginBarangay)
@@ -291,6 +302,13 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [caseFilter]);
 
+  useEffect(() => {
+    if (initialView === 'inbox') {
+      setView('inbox');
+      if (onInitialViewConsumed) onInitialViewConsumed();
+    }
+  }, [initialView]);
+
   // Fetch all cases
   const fetchCases = () => {
     setLoadingCases(true);
@@ -307,6 +325,164 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const fetchInbox = () => {
+    setInboxLoading(true);
+    const params = { status: 'pending' };
+    if (loginRole === 'BHW' && loginBarangay) {
+      const matched = barangayList.find(b => b.name === loginBarangay);
+      if (matched) params.barangay_id = matched.id;
+    } else {
+      params.cho_unit = sessionContext;
+    }
+    axios.get(`${API_URL}/api/case-inbox`, { params })
+      .then(res => { setInboxItems(res.data); setInboxLoading(false); })
+      .catch(() => setInboxLoading(false));
+  };
+
+  const getChoUnitForBarangay = (barangayName) => {
+    const normalized = (barangayName || '').replace(/^Brgy\.\s*/i, '').trim().toLowerCase();
+    for (const [unit, list] of Object.entries(CHO_UNIT_BARANGAYS)) {
+      if (list.some(b => b.toLowerCase() === normalized)) return unit;
+    }
+    return null;
+  };
+
+  const fetchOutbox = () => {
+    const choUnit = loginRole === 'BHW' && loginBarangay
+      ? getChoUnitForBarangay(loginBarangay)
+      : sessionContext;
+    const params = { cho_unit: choUnit };
+    if (loginRole === 'BHW' && loginBarangay) {
+      params.barangay = loginBarangay;
+      params.user_id = loggedUserId;
+    }
+    axios.get(`${API_URL}/api/case-outbox`, { params })
+      .then(res => setOutboxItems(res.data))
+      .catch(() => {});
+  };
+
+  const handleAcceptInboxItem = (item) => {
+    axios.put(`${API_URL}/api/case-inbox/${item.id}/accept`)
+      .then(res => {
+        const caseId = res.data.case_id;
+        const diseaseCard = findCardForDisease(item.disease_name);
+        if (diseaseCard) setSelectedDisease(diseaseCard);
+        fetchInbox();
+        fetchCases();
+        openEdit({
+          case_id: caseId,
+          patient_name: item.patient_name,
+          disease_name: item.disease_name,
+          age: item.age,
+          severity: item.severity,
+          gender: item.gender,
+          status: 'Active',
+          contact: item.contact,
+          onset_date: item.onset_date,
+          address: item.address,
+          barangay_name: '',
+          symptoms: item.symptoms,
+          physician: item.physician,
+          latitude: item.latitude,
+          longitude: item.longitude,
+        });
+      })
+      .catch(err => alert('Accept failed: ' + (err.response?.data?.error || err.message)));
+  };
+
+  const handleRoutingDelete = () => {
+    setRoutingStep(null);
+    setRoutingData(null);
+    setRoutingDescription('');
+    setRoutingTargetType(null);
+    setRoutingTargetBarangay('');
+    setView('categories');
+  };
+
+  const handleRoutingSendToDescription = () => {
+    setRoutingTargetType('unit');
+    setRoutingStep('description');
+  };
+
+  const handleRoutingShowBhwStep = () => {
+    setRoutingTargetType('barangay');
+    setRoutingTargetBarangay(routingData?.detectedBarangay || '');
+    setRoutingStep('target-bhw');
+  };
+
+  const handleRoutingCancelDescription = () => {
+    setRoutingStep('confirm');
+  };
+
+  const handleRoutingSendToBhw = async () => {
+    if (!routingData) return;
+    const { payload, detectedBarangay } = routingData;
+    const targetBarangay = routingTargetBarangay || detectedBarangay;
+    if (!targetBarangay) {
+      setSubmitMsg('Please select a target barangay.');
+      return;
+    }
+    setSubmitLoading(true);
+    try {
+      await axios.post(`${API_URL}/api/cases/route-to-barangay-inbox`, {
+        ...payload,
+        submitter_user_id: loggedUserId || null,
+        submitter_name: loggedUserId ? String(loggedUserId) : 'Unknown',
+        from_cho_unit: (loginRole === 'BHW' && loginBarangay ? getChoUnitForBarangay(loginBarangay) : sessionContext) || null,
+        target_barangay_name: targetBarangay,
+        notes: routingDescription || null,
+      });
+      setSubmitMsg('Case sent to ' + targetBarangay + ' BHW inbox successfully!');
+      setRoutingStep(null);
+      setRoutingData(null);
+      setRoutingDescription('');
+      setRoutingTargetType(null);
+      await fetchCases();
+      setTimeout(() => { setView('list'); setSubmitMsg(''); setSubmitLoading(false); }, 1200);
+    } catch (routeErr) {
+      setSubmitMsg('Error: ' + (routeErr.response?.data?.error || routeErr.message));
+      setSubmitLoading(false);
+    }
+  };
+
+  const handleRoutingSend = async () => {
+    if (!routingData) return;
+    const { targetUnit, payload } = routingData;
+    setSubmitLoading(true);
+    try {
+      await axios.post(`${API_URL}/api/cases/route-to-inbox`, {
+        ...payload,
+        submitter_user_id: loggedUserId || null,
+        submitter_name: loggedUserId ? String(loggedUserId) : 'Unknown',
+        from_cho_unit: (loginRole === 'BHW' && loginBarangay ? getChoUnitForBarangay(loginBarangay) : sessionContext) || null,
+        to_cho_unit: targetUnit,
+        notes: routingDescription || null,
+      });
+      setSubmitMsg('Case sent to ' + targetUnit + ' inbox successfully!');
+      setRoutingStep(null);
+      setRoutingData(null);
+      setRoutingDescription('');
+      setRoutingTargetType(null);
+      setRoutingTargetBarangay('');
+      await fetchCases();
+      setTimeout(() => { setView('list'); setSubmitMsg(''); setSubmitLoading(false); }, 1200);
+    } catch (routeErr) {
+      setSubmitMsg('Error: ' + (routeErr.response?.data?.error || routeErr.message));
+      setSubmitLoading(false);
+    }
+  };
+
+  const handleRejectInboxItem = (item) => {
+    axios.put(`${API_URL}/api/case-inbox/${item.id}/reject`)
+      .then(() => fetchInbox())
+      .catch(err => alert('Reject failed: ' + (err.response?.data?.error || err.message)));
+  };
+
+  useEffect(() => {
+    if (view === 'inbox') fetchInbox();
+    if (view === 'outbox') fetchOutbox();
+  }, [view, sessionContext]);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -687,6 +863,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     setSubmitLoading(true);
     setSubmitMsg('');
 
+    console.log('[handleSave] submitting. address:', formData.address, 'barangayId:', formData.barangayId, 'loginRole:', loginRole, 'loginBarangay:', loginBarangay);
+
     if (!formData.barangayId) {
       setFormErrors({ barangayId: true });
       setSubmitMsg('Please select an assigned barangay.');
@@ -748,12 +926,53 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         await axios.put(`${API_URL}/api/cases/${editingCase.case_id}`, payload);
         setSubmitMsg('Case updated successfully!');
       } else {
-        await axios.post(API_URL + '/api/cases', payload);
+        await axios.post(API_URL + '/api/cases', {
+          ...payload,
+          submitter_cho_unit: sessionContext || null,
+          submitter_role: loginRole || null,
+          submitter_own_barangay: loginBarangay || null,
+        });
         setSubmitMsg(isDraft ? 'Case saved as draft!' : 'Case added successfully!');
       }
       await fetchCases();
+      const diseaseCard = findCardForDisease(formData.diseaseType);
+      if (diseaseCard) setSelectedDisease(diseaseCard);
       setTimeout(() => { setView('list'); setSubmitMsg(''); setSubmitLoading(false); }, 1200);
     } catch (err) {
+      if (err.response?.status === 409 && err.response?.data?.crossBarangay) {
+        const { detectedBarangay, message } = err.response.data;
+        const confirmed = window.confirm(message);
+        if (confirmed) {
+          try {
+            await axios.post(`${API_URL}/api/cases/route-to-barangay-inbox`, {
+              ...payload,
+              submitter_user_id: loggedUserId || null,
+              submitter_name: loggedUserId ? String(loggedUserId) : 'Unknown',
+              from_cho_unit: (loginRole === 'BHW' && loginBarangay ? getChoUnitForBarangay(loginBarangay) : sessionContext) || null,
+              target_barangay_name: detectedBarangay,
+            });
+            setSubmitMsg('Case sent to ' + detectedBarangay + ' BHW inbox successfully!');
+            await fetchCases();
+            const diseaseCard = findCardForDisease(formData.diseaseType);
+            if (diseaseCard) setSelectedDisease(diseaseCard);
+            setTimeout(() => { setView('list'); setSubmitMsg(''); setSubmitLoading(false); }, 1200);
+          } catch (routeErr) {
+            setSubmitMsg('Error: ' + (routeErr.response?.data?.error || routeErr.message));
+            setSubmitLoading(false);
+          }
+        } else {
+          setSubmitMsg('Please select the correct assigned barangay.');
+          setSubmitLoading(false);
+        }
+        return;
+      }
+      if (err.response?.status === 409 && err.response?.data?.crossUnit) {
+        const { targetUnit, message, detectedBarangay } = err.response.data;
+        setRoutingData({ targetUnit, message, detectedBarangay, payload });
+        setRoutingStep('confirm');
+        setSubmitLoading(false);
+        return;
+      }
       setSubmitMsg('Error: ' + (err.response?.data?.error || err.message));
       setSubmitLoading(false);
     }
@@ -777,7 +996,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   if (view === 'categories') {
     const pageCards = DISEASE_PAGES[cardPage];
     return (
-      <div style={{ padding: compactMode ? '14px' : '28px', color: 'var(--text-main)', fontSize: `calc(14px * ${fs})` }}>
+      <div style={{ padding: compactMode ? '24px 14px 14px' : '48px 28px 28px', color: 'var(--text-main)', fontSize: `calc(14px * ${fs})` }}>
         <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>
           Dashboard / Manage Cases
         </div>
@@ -788,56 +1007,45 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               Choose which disease program you want to view, add, or manage cases for
             </p>
           </div>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            {keyboardShortcuts && (
-              <div style={{ position: 'relative' }} ref={shortcutsRef}>
-                <button onClick={() => setShowShortcutsGuide(!showShortcutsGuide)}
-                  style={{ width: '30px', height: '30px', borderRadius: '50%', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '14px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  ?
-                </button>
-                {showShortcutsGuide && (
-                  <div style={{ position: 'absolute', top: '110%', right: 0, width: '240px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', padding: '14px', fontSize: '13px' }}>
-                    <div style={{ fontWeight: '700', marginBottom: '10px', color: 'var(--text-main)' }}>Keyboard Shortcuts</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>New Case</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', border: '1px solid var(--border-color)' }}>N</kbd></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>Save Form</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', border: '1px solid var(--border-color)' }}>Ctrl+S</kbd></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>Close / Back</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', border: '1px solid var(--border-color)' }}>Esc</kbd></div>
-                    </div>
-                  </div>
-                )}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '12px' }}>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <div onClick={() => { setView('inbox'); }}
+                style={{ padding: '6px 14px', borderRadius: '20px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '13px', fontWeight: '500', color: 'var(--text-main)', whiteSpace: 'nowrap', textAlign: 'center', minWidth: '70px' }}>
+                Inbox
               </div>
-            )}
-            <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Page {cardPage + 1} / {DISEASE_PAGES.length}</span>
-            <button onClick={() => setCardPage(0)} disabled={cardPage === 0}
-              style={{ padding: '7px 16px', background: cardPage === 0 ? 'var(--input-bg)' : '#1E3A8A', color: cardPage === 0 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: cardPage === 0 ? 'not-allowed' : 'pointer', fontSize: '13px' }}>
-              ← Prev
-            </button>
-            <button onClick={() => setCardPage(1)} disabled={cardPage === 1}
-              style={{ padding: '7px 16px', background: cardPage === 1 ? 'var(--input-bg)' : '#1E3A8A', color: cardPage === 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: cardPage === 1 ? 'not-allowed' : 'pointer', fontSize: '13px' }}>
-              Next →
-            </button>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
-          <div onClick={() => { setSelectedDisease(null); setFilterStatus('Pending'); setTablePage(1); setView('list'); }}
-            style={{ flex: 1, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '12px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-main)' }}>📥 Inbox</div>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>Pending Approval</div>
+              <div onClick={() => { setView('outbox'); }}
+                style={{ padding: '6px 14px', borderRadius: '20px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '13px', fontWeight: '500', color: 'var(--text-main)', whiteSpace: 'nowrap', textAlign: 'center', minWidth: '70px' }}>
+                Outbox
+              </div>
             </div>
-            <div style={{ background: '#f59e0b', color: '#fff', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '700' }}>
-              {baseCases.filter(c => c.status === 'Pending').length}
-            </div>
-          </div>
-          <div onClick={() => { setSelectedDisease(null); setFilterStatus('Draft'); setTablePage(1); setView('list'); }}
-            style={{ flex: 1, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '12px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-main)' }}>📤 Outbox</div>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>Cases You Submitted</div>
-            </div>
-            <div style={{ background: '#3b82f6', color: '#fff', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '700' }}>
-              {baseCases.filter(c => c.status === 'Draft').length}
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              {keyboardShortcuts && (
+                <div style={{ position: 'relative' }} ref={shortcutsRef}>
+                  <button onClick={() => setShowShortcutsGuide(!showShortcutsGuide)}
+                    style={{ width: '30px', height: '30px', borderRadius: '50%', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '14px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    ?
+                  </button>
+                  {showShortcutsGuide && (
+                    <div style={{ position: 'absolute', top: '110%', right: 0, width: '240px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', padding: '14px', fontSize: '13px' }}>
+                      <div style={{ fontWeight: '700', marginBottom: '10px', color: 'var(--text-main)' }}>Keyboard Shortcuts</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>New Case</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', border: '1px solid var(--border-color)' }}>N</kbd></div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>Save Form</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', border: '1px solid var(--border-color)' }}>Ctrl+S</kbd></div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>Close / Back</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', border: '1px solid var(--border-color)' }}>Esc</kbd></div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Page {cardPage + 1} / {DISEASE_PAGES.length}</span>
+              <button onClick={() => setCardPage(0)} disabled={cardPage === 0}
+                style={{ padding: '7px 16px', background: cardPage === 0 ? 'var(--input-bg)' : '#1E3A8A', color: cardPage === 0 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: cardPage === 0 ? 'not-allowed' : 'pointer', fontSize: '13px' }}>
+                ← Prev
+              </button>
+              <button onClick={() => setCardPage(1)} disabled={cardPage === 1}
+                style={{ padding: '7px 16px', background: cardPage === 1 ? 'var(--input-bg)' : '#1E3A8A', color: cardPage === 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: cardPage === 1 ? 'not-allowed' : 'pointer', fontSize: '13px' }}>
+                Next →
+              </button>
             </div>
           </div>
         </div>
@@ -883,6 +1091,124 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             <div key={i} onClick={() => setCardPage(i)}
               style={{ width: '10px', height: '10px', borderRadius: '50%', cursor: 'pointer', background: cardPage === i ? '#3b82f6' : 'var(--border-color)', transition: 'background 0.2s' }} />
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ═══════════════════════════════════
+  // VIEW: INBOX (Gmail-style)
+  // ═══════════════════════════════════
+  if (view === 'inbox') {
+    return (
+      <div style={{ padding: compactMode ? '14px' : '28px', color: 'var(--text-main)', fontSize: `calc(14px * ${fs})` }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <div>
+            <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '4px' }}>Dashboard / Manage Cases / Inbox</div>
+            <h2 style={{ margin: 0, fontSize: '22px' }}> Inbox</h2>
+          </div>
+          <button onClick={() => setView('categories')}
+            style={{ padding: '8px 18px', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', fontSize: '13px' }}>
+            ← Back
+          </button>
+        </div>
+        <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
+          {inboxLoading ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading inbox...</div>
+          ) : inboxItems.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Inbox is empty.</div>
+          ) : (
+            inboxItems.map(item => (
+              <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '14.4px', color: 'var(--text-muted)', lineHeight: 1, textAlign: 'left' }}>
+                    {item.from_user_role === 'BHW'
+                      ? `From BHW (${item.from_sender_barangay_name || 'Unknown'})`
+                      : `From ${item.from_cho_unit || 'Unknown Unit'}`}
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '6px', alignItems: 'center' }}>
+                    <div className="inbox-avatar-circle">
+                      {item.from_user_role === 'BHW' && item.from_sender_barangay_name
+                        ? item.from_sender_barangay_name.slice(0, 2).toUpperCase()
+                        : (item.from_cho_unit || 'U').replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '13px', color: 'var(--text-main)' }}>
+                        {item.patient_name} · {item.disease_name} ({item.severity})
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {item.address}
+                      </div>
+                      {item.notes && (
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          "{item.notes}"
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>
+                  {new Date(item.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+                </div>
+                <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                  <button onClick={() => handleAcceptInboxItem(item)} title="Accept"
+                    style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #10b981', background: 'rgba(16,185,129,0.1)', color: '#10b981', cursor: 'pointer', fontSize: '16px' }}>
+                    ✓
+                  </button>
+                  <button onClick={() => handleRejectInboxItem(item)} title="Reject"
+                    style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #ef4444', background: 'rgba(239,68,68,0.1)', color: '#ef4444', cursor: 'pointer', fontSize: '16px' }}>
+                    ✕
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ═══════════════════════════════════
+  // VIEW: OUTBOX (Gmail-style)
+  // ═══════════════════════════════════
+  if (view === 'outbox') {
+    return (
+      <div style={{ padding: compactMode ? '14px' : '28px', color: 'var(--text-main)', fontSize: `calc(14px * ${fs})` }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <div>
+            <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '4px' }}>Dashboard / Manage Cases / Outbox</div>
+            <h2 style={{ margin: 0, fontSize: '22px' }}> Outbox</h2>
+          </div>
+          <button onClick={() => setView('categories')}
+            style={{ padding: '8px 18px', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', fontSize: '13px' }}>
+            ← Back
+          </button>
+        </div>
+        <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
+          {outboxItems.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Outbox is empty.</div>
+          ) : (
+            outboxItems.map(item => (
+              <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)' }}>
+                <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: item.status === 'accepted' ? '#10b981' : item.status === 'rejected' ? '#ef4444' : '#f59e0b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '11px', flexShrink: 0 }}>
+                  {item.status === 'accepted' ? '✓' : item.status === 'rejected' ? '✕' : '…'}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '14px', fontWeight: '600' }}>
+                    {item.patient_name} · {item.disease_name}
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '10px' }}>
+                    {item.direction === 'sent' ? 'Sent to' : 'Received from'} {item.direction === 'sent' ? (item.to_cho_unit || item.to_barangay_name || '—') : (item.from_barangay_name ? `BHW (${item.from_barangay_name})` : item.from_cho_unit || '—')}
+                    {item.direction === 'sent' && <span> · Status: <span style={{ textTransform: 'capitalize', fontWeight: '600', color: item.status === 'accepted' ? '#10b981' : item.status === 'rejected' ? '#ef4444' : '#f59e0b' }}>{item.status}</span></span>}
+                    {item.barangay_name && <span> · Assigned to {item.barangay_name}</span>}
+                  </div>
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>
+                  {new Date(item.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     );
@@ -1375,10 +1701,19 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       if (!addr) return;
 
                       const addrLower = addr.toLowerCase().replace(/[\-\s]/g, '');
-                      const matchedBarangay = barangayList.find(b => {
+                      let matchedBarangay = barangayList.find(b => {
                         const bNorm = b.name.replace(/\(.*?\)/g, '').toLowerCase().replace(/[\-\s().]/g, '').trim();
                         return addrLower.includes(bNorm);
                       });
+                      if (!matchedBarangay) {
+                        const BARANGAY_ALIASES = { 'bugtong': 'Butong', 'pitland': 'Pittland' };
+                        for (const [alias, realName] of Object.entries(BARANGAY_ALIASES)) {
+                          if (addrLower.includes(alias)) {
+                            matchedBarangay = barangayList.find(b => b.name.toLowerCase() === realName.toLowerCase());
+                            if (matchedBarangay) break;
+                          }
+                        }
+                      }
 
                       if (matchedBarangay) {
                         setFormData(prev => ({ ...prev, barangayId: String(matchedBarangay.id) }));
@@ -1449,10 +1784,19 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       if (!addr) return;
 
                       const addrLower = addr.toLowerCase().replace(/[\-\s]/g, '');
-                      const matchedBarangay = barangayList.find(b => {
+                      let matchedBarangay = barangayList.find(b => {
                         const bNorm = b.name.replace(/\(.*?\)/g, '').toLowerCase().replace(/[\-\s().]/g, '').trim();
                         return addrLower.includes(bNorm);
                       });
+                      if (!matchedBarangay) {
+                        const BARANGAY_ALIASES = { 'bugtong': 'Butong', 'pitland': 'Pittland' };
+                        for (const [alias, realName] of Object.entries(BARANGAY_ALIASES)) {
+                          if (addrLower.includes(alias)) {
+                            matchedBarangay = barangayList.find(b => b.name.toLowerCase() === realName.toLowerCase());
+                            if (matchedBarangay) break;
+                          }
+                        }
+                      }
 
                       if (matchedBarangay) {
                         setFormData(prev => ({ ...prev, barangayId: String(matchedBarangay.id) }));
@@ -1594,7 +1938,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           background: formErrors.barangayId ? '#fff5f5' : '#f9fafb',
                         }}
                       >
-                        <span>{barangayList.find(b => String(b.id) === String(formData.barangayId))?.name || '— Select Barangay —'}</span>
+                        <span>{scopedBarangayList.find(b => String(b.id) === String(formData.barangayId))?.name || '— Select Barangay —'}</span>
                         <span style={{
                           fontSize: '10px', opacity: 0.6, marginLeft: '8px',
                           transition: 'transform 0.2s', display: 'inline-block',
@@ -1617,7 +1961,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           >
                             — Select Barangay —
                           </div>
-                          {barangayList.map(b => (
+                          {scopedBarangayList.map(b => (
                             <div
                               key={b.id}
                               onClick={() => {
@@ -1835,6 +2179,112 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             </div>
           </form>
         </div>
+
+        {/* Routing modal */}
+        {routingStep && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)' }}>
+            <div style={{ background: 'var(--bg-surface)', borderRadius: '12px', padding: '28px', maxWidth: '480px', width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }}>
+              {routingStep === 'confirm' && (
+                <>
+                  <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', color: 'var(--text-main)' }}>
+                    This address is not within our covered barangays, do you want to give it to {routingData?.targetUnit}?
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                    <button onClick={handleRoutingDelete}
+                      style={{ padding: '10px 24px', borderRadius: '6px', border: '1px solid #ef4444', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}>
+                      ✕ Delete
+                    </button>
+                    {loginRole === 'BHW' ? (
+                      <>
+                        <button onClick={handleRoutingSendToDescription}
+                          style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#3b82f6', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}>
+                          → Send to CHO I
+                        </button>
+                        <button onClick={handleRoutingShowBhwStep}
+                          style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#10b981', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}>
+                          → Send to BHW
+                        </button>
+                      </>
+                    ) : (
+                      <button onClick={handleRoutingSendToDescription}
+                        style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#3b82f6', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}>
+                        → Send
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+              {routingStep === 'description' && (
+                <>
+                  <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', color: 'var(--text-main)' }}>
+                    Add a note about this case
+                  </div>
+                  <textarea
+                    value={routingDescription}
+                    onChange={e => setRoutingDescription(e.target.value)}
+                    placeholder="Describe the issue or any additional information..."
+                    rows={4}
+                    style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '14px', resize: 'vertical', boxSizing: 'border-box', outline: 'none' }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px' }}>
+                    <button onClick={handleRoutingCancelDescription}
+                      style={{ padding: '10px 24px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-main)', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}>
+                      ← Cancel
+                    </button>
+                    <button onClick={handleRoutingSend}
+                      style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#3b82f6', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}>
+                      Send
+                    </button>
+                  </div>
+                </>
+              )}
+              {routingStep === 'target-bhw' && (
+                <>
+                  <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', color: 'var(--text-main)' }}>
+                    Select target barangay
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px', maxHeight: '200px', overflowY: 'auto' }}>
+                    {scopedBarangayOptions.map(b => (
+                      <div
+                        key={b}
+                        onClick={() => setRoutingTargetBarangay(b)}
+                        style={{
+                          padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px',
+                          background: routingTargetBarangay === b ? '#3b82f6' : 'var(--input-bg)',
+                          color: routingTargetBarangay === b ? '#fff' : 'var(--text-main)',
+                          border: routingTargetBarangay === b ? 'none' : '1px solid var(--border-color)',
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        {b}
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: '13px', fontWeight: '500', marginBottom: '6px', color: 'var(--text-muted)' }}>
+                    Add a note (optional)
+                  </div>
+                  <textarea
+                    value={routingDescription}
+                    onChange={e => setRoutingDescription(e.target.value)}
+                    placeholder="Describe the issue or any additional information..."
+                    rows={3}
+                    style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '14px', resize: 'vertical', boxSizing: 'border-box', outline: 'none', marginBottom: '12px' }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                    <button onClick={() => { setRoutingStep('confirm'); setRoutingTargetBarangay(''); }}
+                      style={{ padding: '10px 24px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-main)', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}>
+                      ← Back
+                    </button>
+                    <button onClick={handleRoutingSendToBhw}
+                      style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#10b981', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}>
+                      Send
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     );
   }

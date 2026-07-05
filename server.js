@@ -47,7 +47,13 @@ function detectBarangayFromAddress(address) {
     const bNorm = b.replace(/\(.*?\)/g, '').toLowerCase().replace(/[-\s().]/g, '').trim();
     return addrLower.includes(bNorm);
   });
-  return match || null;
+  if (match) return match;
+  // Check common misspellings/aliases
+  const BARANGAY_ALIASES = { 'bugtong': 'Butong', 'pitland': 'Pittland' };
+  for (const [alias, barangay] of Object.entries(BARANGAY_ALIASES)) {
+    if (addrLower.includes(alias)) return barangay;
+  }
+  return null;
 }
 
 function getChoUnitForBarangayName(barangayName) {
@@ -55,6 +61,12 @@ function getChoUnitForBarangayName(barangayName) {
     if (list.some(b => b.toLowerCase() === (barangayName || '').toLowerCase())) return unit;
   }
   return null;
+}
+
+function isSameBarangay(name1, name2) {
+  if (!name1 || !name2) return false;
+  const norm = (s) => s.toLowerCase().replace(/[\s\-().]/g, '');
+  return norm(name1) === norm(name2);
 }
 
 const app = express();
@@ -369,12 +381,38 @@ app.post('/api/cases', (req, res) => {
         );
     };
 
-    if (!barangay_id) {
-      const detectedBarangay = detectBarangayFromAddress(address);
-      const submitterChoUnit = req.body.submitter_cho_unit || null;
+    const detectedBarangay = detectBarangayFromAddress(address);
+    const submitterChoUnit = req.body.submitter_cho_unit || null;
+    const submitterRole = req.body.submitter_role || null;
+    const submitterOwnBarangay = req.body.submitter_own_barangay || null;
+    console.log("🔍 detectBarangayFromAddress:", JSON.stringify({ address, detectedBarangay, submitterChoUnit, submitterRole }));
+
+    function routeOrProceed(selectedBarangayName) {
+      console.log("🔍 routeOrProceed:", JSON.stringify({ detectedBarangay, selectedBarangayName, submitterChoUnit, submitterRole, barangay_id }));
       if (detectedBarangay && submitterChoUnit) {
         const targetUnit = getChoUnitForBarangayName(detectedBarangay);
-        if (targetUnit && targetUnit !== submitterChoUnit) {
+        console.log("🔍 Cross-unit check:", JSON.stringify({ targetUnit, submitterChoUnit, mismatch: targetUnit !== submitterChoUnit }));
+
+        if (submitterRole === 'BHW') {
+          if (submitterOwnBarangay && isSameBarangay(detectedBarangay, submitterOwnBarangay)) {
+            // detected barangay matches BHW's own assignment, no routing needed
+            return proceedAfterCrossCheck();
+          } else if (targetUnit === submitterChoUnit) {
+            return res.status(409).json({
+              crossBarangay: true,
+              detectedBarangay,
+              targetUnit,
+              message: `This address belongs to Barangay ${detectedBarangay}. Do you want to send this case to the ${detectedBarangay} BHW?`
+            });
+          } else if (targetUnit && targetUnit !== submitterChoUnit) {
+            return res.status(409).json({
+              crossUnit: true,
+              detectedBarangay,
+              targetUnit,
+              message: `This is a ${targetUnit} address. Do you want to put it on the inbox to send it to ${targetUnit}?`
+            });
+          }
+        } else if (targetUnit && targetUnit !== submitterChoUnit) {
           return res.status(409).json({
             crossUnit: true,
             detectedBarangay,
@@ -383,19 +421,35 @@ app.post('/api/cases', (req, res) => {
           });
         }
       }
-      return res.status(400).json({ error: 'Please select an assigned barangay before saving.' });
+
+      if (!barangay_id && !detectedBarangay) {
+        return res.status(400).json({ error: 'Please select an assigned barangay before saving.' });
+      }
+
+      proceedAfterCrossCheck();
     }
 
-    if (contact && contact.trim()) {
-      db.query('SELECT case_id FROM disease_cases WHERE contact = ? AND contact IS NOT NULL AND contact != ? LIMIT 1', [contact.trim(), ''], (cErr, cRes) => {
-        if (cErr) return res.status(500).json({ error: cErr.message });
-        if (cRes && cRes.length > 0) {
-          return res.status(409).json({ error: 'That contact number is already in use by another patient. Please use a different contact number.' });
-        }
-        proceedToCheck();
+    if (barangay_id) {
+      db.query('SELECT name FROM barangays WHERE id = ?', [barangay_id], (bErr, bRes) => {
+        if (bErr) return res.status(500).json({ error: bErr.message });
+        const selectedName = bRes.length > 0 ? bRes[0].name : null;
+        routeOrProceed(selectedName);
       });
     } else {
-      proceedToCheck();
+      routeOrProceed(null);
+    }
+    function proceedAfterCrossCheck() {
+      if (contact && contact.trim()) {
+        db.query('SELECT case_id FROM disease_cases WHERE contact = ? AND contact IS NOT NULL AND contact != ? LIMIT 1', [contact.trim(), ''], (cErr, cRes) => {
+          if (cErr) return res.status(500).json({ error: cErr.message });
+          if (cRes && cRes.length > 0) {
+            return res.status(409).json({ error: 'That contact number is already in use by another patient. Please use a different contact number.' });
+          }
+          proceedToCheck();
+        });
+      } else {
+        proceedToCheck();
+      }
     }
 
     function proceedToCheck() {
@@ -482,100 +536,282 @@ app.post('/api/cases', (req, res) => {
 }
 });
 
-// ROUTE: Route case to inbox (cross-unit)
+// ROUTE: Route case to inbox (cross-unit) — stores all case data in case_inbox, no disease_cases entry yet
 app.post('/api/cases/route-to-inbox', (req, res) => {
-  const {
-    patient_name, disease_name, age, severity, gender, status, contact,
-    onset_date, address, symptoms, physician, latitude, longitude,
-    submitter_user_id, submitter_name, from_cho_unit, to_cho_unit
-  } = req.body;
+    const {
+        patient_name, disease_name, age, severity, gender, status, contact,
+        onset_date, address, symptoms, physician, latitude, longitude,
+        submitter_user_id, submitter_name, from_cho_unit, to_cho_unit, notes
+    } = req.body;
 
-  const insertCaseQuery = `
-    INSERT INTO disease_cases
-    (patient_name, disease_id, age, severity, gender, status, contact,
-     onset_date, address, barangay_id, symptoms, physician, latitude, longitude, date_reported)
-    VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, NOW())
-  `;
-  const findDiseaseQuery = 'SELECT id FROM diseases WHERE LOWER(name) = LOWER(?)';
-  db.query(findDiseaseQuery, [disease_name], (err, diseaseResults) => {
-    const diseaseId = diseaseResults && diseaseResults.length > 0 ? diseaseResults[0].id : null;
     db.query(
-      insertCaseQuery.replace('disease_id) VALUES (?, NULL,', 'disease_id) VALUES (?, ?,'),
-      [patient_name, diseaseId, age || 0, severity, gender || 'Male', status || 'Pending',
-       contact || null, onset_date || null, address || null, symptoms || null,
-       physician || null, latitude || null, longitude || null],
-      (insertErr, result) => {
-        if (insertErr) {
-          console.error('route-to-inbox insert error:', insertErr.message);
-          return res.status(500).json({ error: insertErr.message });
-        }
-        const caseId = result.insertId;
-        db.query(
-          'INSERT INTO case_inbox (case_id, from_user_id, from_user_name, from_cho_unit, to_cho_unit, status) VALUES (?, ?, ?, ?, ?, ?)',
-          [caseId, submitter_user_id || null, submitter_name || 'Unknown', from_cho_unit, to_cho_unit, 'pending'],
-          (inboxErr, inboxResult) => {
+        `INSERT INTO case_inbox
+        (case_id, from_user_id, from_user_name, from_cho_unit, to_cho_unit, status, notes,
+         patient_name, disease_name, age, severity, gender, contact,
+         onset_date, address, symptoms, physician, latitude, longitude)
+        VALUES (NULL, ?, ?, ?, ?, 'pending', ?,
+         ?, ?, ?, ?, ?, ?,
+         ?, ?, ?, ?, ?, ?)`,
+        [submitter_user_id || null, submitter_name || 'Unknown', from_cho_unit, to_cho_unit, notes || null,
+         patient_name, disease_name || '', age || 0, severity, gender || 'Male', contact || null,
+         onset_date || null, address || null, symptoms || null, physician || null,
+         latitude || null, longitude || null],
+        (inboxErr, inboxResult) => {
             if (inboxErr) {
-              console.error('case_inbox insert error:', inboxErr.message);
-              return res.status(500).json({ error: inboxErr.message });
+                console.error('route-to-inbox insert error:', inboxErr.message);
+                return res.status(500).json({ error: inboxErr.message });
             }
             createNotificationForUsers(
-              'New Case Reported',
-              `${submitter_name || 'A user'} from ${from_cho_unit} sent you a case needing barangay assignment: ${patient_name} (${disease_name}).`,
-              'info', 'Inbox', null, 'new_case_reported'
+                'New Case Reported',
+                `${submitter_name || 'A user'} from ${from_cho_unit} sent a case needing assignment: ${patient_name} (${disease_name}).`,
+                'info', 'Inbox', null, 'new_case_reported', to_cho_unit
             );
-            res.status(200).json({ message: 'Case routed to inbox successfully.', case_id: caseId, inbox_id: inboxResult.insertId });
-          }
-        );
-      }
+            res.status(200).json({ message: 'Case routed to inbox successfully.', inbox_id: inboxResult.insertId });
+        }
     );
-  });
+});
+
+app.post('/api/cases/route-to-barangay-inbox', (req, res) => {
+    const {
+        patient_name, disease_name, age, severity, gender, status, contact,
+        onset_date, address, symptoms, physician, latitude, longitude,
+        submitter_user_id, submitter_name, from_cho_unit, target_barangay_name, notes
+    } = req.body;
+
+    db.query('SELECT id FROM barangays WHERE LOWER(name) = LOWER(?)', [target_barangay_name], (bErr, bResults) => {
+        if (bErr) return res.status(500).json({ error: bErr.message });
+        if (!bResults || bResults.length === 0) {
+            return res.status(400).json({ error: 'Target barangay not found.' });
+        }
+        const targetBarangayId = bResults[0].id;
+
+        const findDiseaseQuery = 'SELECT id FROM diseases WHERE LOWER(name) = LOWER(?)';
+        db.query(findDiseaseQuery, [disease_name], (err, diseaseResults) => {
+            const diseaseId = diseaseResults && diseaseResults.length > 0 ? diseaseResults[0].id : null;
+            db.query(
+                `INSERT INTO disease_cases
+                (patient_name, disease_id, age, severity, gender, status, contact,
+                 onset_date, address, barangay_id, symptoms, physician, latitude, longitude, date_reported)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, NOW())`,
+                [patient_name, diseaseId, age || 0, severity, gender || 'Male', status || 'Pending',
+                 contact || null, onset_date || null, address || null, symptoms || null,
+                 physician || null, latitude || null, longitude || null],
+                (insertErr, result) => {
+                    if (insertErr) {
+                        console.error('route-to-barangay-inbox insert error:', insertErr.message);
+                        return res.status(500).json({ error: insertErr.message });
+                    }
+                    const caseId = result.insertId;
+                    db.query(
+                        'INSERT INTO case_inbox (case_id, from_user_id, from_user_name, from_cho_unit, to_barangay_id, status) VALUES (?, ?, ?, ?, ?, ?)',
+                        [caseId, submitter_user_id || null, submitter_name || 'Unknown', from_cho_unit || null, targetBarangayId, 'pending'],
+                        (inboxErr, inboxResult) => {
+                            if (inboxErr) {
+                                console.error('case_inbox insert error:', inboxErr.message);
+                                return res.status(500).json({ error: inboxErr.message });
+                            }
+                            const msg = notes
+                                ? `${submitter_name || 'A BHW'} sent you a case needing your review: ${patient_name} (${disease_name}). Note: "${notes}"`
+                                : `${submitter_name || 'A BHW'} sent you a case needing your review: ${patient_name} (${disease_name}).`;
+                            createNotificationForUsers(
+                                'New Case Reported',
+                                msg,
+                                'info', 'Inbox', targetBarangayId, 'new_case_reported'
+                            );
+                            res.status(200).json({ message: 'Case routed to barangay inbox successfully.', case_id: caseId, inbox_id: inboxResult.insertId });
+                        }
+                    );
+                }
+            );
+        });
+    });
 });
 
 // GET inbox items for a CHO unit
 app.get('/api/case-inbox', (req, res) => {
- const { cho_unit, status } = req.query;
- let sql = `
- SELECT ci.*, dc.patient_name, dc.address, dc.disease_id, d.name AS disease_name,
- dc.severity, dc.status AS case_status, dc.date_reported, dc.age, dc.gender
- FROM case_inbox ci
- JOIN disease_cases dc ON ci.case_id = dc.case_id
- LEFT JOIN diseases d ON dc.disease_id = d.id
- WHERE 1=1
- `;
- const params = [];
- if (cho_unit) { sql += ' AND ci.to_cho_unit = ?'; params.push(cho_unit); }
- if (status) { sql += ' AND ci.status = ?'; params.push(status); }
- sql += ' ORDER BY ci.created_at DESC';
- db.query(sql, params, (err, results) => {
- if (err) return res.status(500).json({ error: err.message });
- res.json(results);
- });
+    const { cho_unit, barangay_id, status } = req.query;
+    let sql = `
+    SELECT ci.*,
+      COALESCE(ci.patient_name, dc.patient_name) AS patient_name,
+      COALESCE(ci.disease_name, d.name) AS disease_name,
+      COALESCE(ci.severity, dc.severity) AS severity,
+      COALESCE(ci.age, dc.age) AS age,
+      COALESCE(ci.gender, dc.gender) AS gender,
+      COALESCE(ci.contact, dc.contact) AS contact,
+      COALESCE(ci.onset_date, dc.onset_date) AS onset_date,
+      COALESCE(ci.address, dc.address) AS address,
+      COALESCE(ci.symptoms, dc.symptoms) AS symptoms,
+      COALESCE(ci.physician, dc.physician) AS physician,
+      COALESCE(ci.latitude, dc.latitude) AS latitude,
+      COALESCE(ci.longitude, dc.longitude) AS longitude,
+      dc.status AS case_status, dc.date_reported,
+      b.name AS to_barangay_name,
+      u.role AS from_user_role,
+      ub.name AS from_sender_barangay_name
+    FROM case_inbox ci
+    LEFT JOIN disease_cases dc ON ci.case_id = dc.case_id
+    LEFT JOIN diseases d ON dc.disease_id = d.id
+    LEFT JOIN barangays b ON ci.to_barangay_id = b.id
+    LEFT JOIN users u ON ci.from_user_id = u.user_id
+    LEFT JOIN barangays ub ON u.assigned_barangay_id = ub.id
+    WHERE 1=1
+    `;
+    const params = [];
+    if (barangay_id) {
+        sql += ' AND ci.to_barangay_id = ?';
+        params.push(barangay_id);
+    } else if (cho_unit) {
+        sql += ' AND ci.to_cho_unit = ?';
+        params.push(cho_unit);
+    }
+    if (status) { sql += ' AND ci.status = ?'; params.push(status); }
+    sql += ' ORDER BY ci.created_at DESC';
+    db.query(sql, params, (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(results);
+    });
 });
 
-// Accept: mark inbox item accepted (case still needs barangay_id set via edit)
+// GET outbox items sent BY a CHO unit
+app.get('/api/case-outbox', (req, res) => {
+    const { cho_unit, barangay, user_id } = req.query;
+    if (!cho_unit) return res.status(400).json({ error: 'cho_unit is required.' });
+    const unitBarangays = CHO_UNIT_BARANGAYS[cho_unit] || [];
+    let sql;
+    let params;
+    if (barangay && user_id) {
+        // BHW: match by from_user_id (sent) or target barangay (received)
+        sql = `
+        SELECT ci.*,
+          COALESCE(ci.patient_name, dc.patient_name) AS patient_name,
+          COALESCE(ci.disease_name, d.name) AS disease_name,
+          COALESCE(ci.severity, dc.severity) AS severity,
+          COALESCE(ci.age, dc.age) AS age,
+          COALESCE(ci.gender, dc.gender) AS gender,
+          COALESCE(ci.contact, dc.contact) AS contact,
+          COALESCE(ci.onset_date, dc.onset_date) AS onset_date,
+          COALESCE(ci.address, dc.address) AS address,
+          COALESCE(ci.symptoms, dc.symptoms) AS symptoms,
+          COALESCE(ci.physician, dc.physician) AS physician,
+          COALESCE(ci.latitude, dc.latitude) AS latitude,
+          COALESCE(ci.longitude, dc.longitude) AS longitude,
+          dc.status AS case_status, dc.date_reported, dc.barangay_id,
+          b.name AS barangay_name,
+          tb.name AS to_barangay_name,
+          ub.name AS from_barangay_name,
+          CASE WHEN ci.from_user_id = ? THEN 'sent' ELSE 'received' END AS direction
+        FROM case_inbox ci
+        LEFT JOIN disease_cases dc ON ci.case_id = dc.case_id
+        LEFT JOIN diseases d ON dc.disease_id = d.id
+        LEFT JOIN barangays b ON dc.barangay_id = b.id
+        LEFT JOIN barangays tb ON ci.to_barangay_id = tb.id
+        LEFT JOIN users u ON ci.from_user_id = u.user_id
+        LEFT JOIN barangays ub ON u.assigned_barangay_id = ub.id
+        WHERE (ci.from_user_id = ? OR tb.name = ?)
+        `;
+        params = [user_id, user_id, barangay];
+    } else {
+        // CHO: match by from_cho_unit, to_cho_unit, or unit barangays
+        sql = `
+        SELECT ci.*,
+          COALESCE(ci.patient_name, dc.patient_name) AS patient_name,
+          COALESCE(ci.disease_name, d.name) AS disease_name,
+          COALESCE(ci.severity, dc.severity) AS severity,
+          COALESCE(ci.age, dc.age) AS age,
+          COALESCE(ci.gender, dc.gender) AS gender,
+          COALESCE(ci.contact, dc.contact) AS contact,
+          COALESCE(ci.onset_date, dc.onset_date) AS onset_date,
+          COALESCE(ci.address, dc.address) AS address,
+          COALESCE(ci.symptoms, dc.symptoms) AS symptoms,
+          COALESCE(ci.physician, dc.physician) AS physician,
+          COALESCE(ci.latitude, dc.latitude) AS latitude,
+          COALESCE(ci.longitude, dc.longitude) AS longitude,
+          dc.status AS case_status, dc.date_reported, dc.barangay_id,
+          b.name AS barangay_name,
+          tb.name AS to_barangay_name,
+          ub.name AS from_barangay_name,
+          CASE WHEN ci.from_cho_unit = ? THEN 'sent' ELSE 'received' END AS direction
+        FROM case_inbox ci
+        LEFT JOIN disease_cases dc ON ci.case_id = dc.case_id
+        LEFT JOIN diseases d ON dc.disease_id = d.id
+        LEFT JOIN barangays b ON dc.barangay_id = b.id
+        LEFT JOIN barangays tb ON ci.to_barangay_id = tb.id
+        LEFT JOIN users u ON ci.from_user_id = u.user_id
+        LEFT JOIN barangays ub ON u.assigned_barangay_id = ub.id
+        WHERE (ci.from_cho_unit = ? OR ci.to_cho_unit = ?)
+        `;
+        params = [cho_unit, cho_unit, cho_unit];
+        if (unitBarangays.length > 0) {
+            const placeholders = unitBarangays.map(() => '?').join(',');
+            sql += ` OR tb.name IN (${placeholders})`;
+            params.push(...unitBarangays);
+        }
+    }
+    sql += ' ORDER BY ci.created_at DESC';
+    db.query(sql, params, (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(results);
+    });
+});
+
+// Accept: create disease_cases entry from inbox data, then mark accepted
 app.put('/api/case-inbox/:id/accept', (req, res) => {
- const { id } = req.params;
- db.query(
- "UPDATE case_inbox SET status = 'accepted', resolved_at = NOW() WHERE id = ?",
- [id],
- (err) => {
- if (err) return res.status(500).json({ error: err.message });
- res.json({ message: 'Case accepted. Please finalize the assigned barangay.' });
- }
- );
+    const { id } = req.params;
+    db.query(
+        'SELECT * FROM case_inbox WHERE id = ?',
+        [id],
+        (err, rows) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (rows.length === 0) return res.status(404).json({ error: 'Inbox item not found.' });
+            const item = rows[0];
+
+            const findDiseaseQuery = 'SELECT id FROM diseases WHERE LOWER(name) = LOWER(?)';
+            db.query(findDiseaseQuery, [item.disease_name], (dErr, dRes) => {
+                const diseaseId = dRes && dRes.length > 0 ? dRes[0].id : null;
+                db.query(
+                    `INSERT INTO disease_cases
+                    (patient_name, disease_id, age, severity, gender, status, contact,
+                     onset_date, address, symptoms, physician, latitude, longitude, date_reported)
+                    VALUES (?, ?, ?, ?, ?, 'Active', ?, ?, ?, ?, ?, ?, ?, NOW())`,
+                    [item.patient_name, diseaseId, item.age || 0, item.severity, item.gender || 'Male',
+                     item.contact || null, item.onset_date || null, item.address || null,
+                     item.symptoms || null, item.physician || null, item.latitude || null, item.longitude || null],
+                    (insertErr, result) => {
+                        if (insertErr) {
+                            console.error('Accept insert error:', insertErr.message);
+                            return res.status(500).json({ error: insertErr.message });
+                        }
+                        const caseId = result.insertId;
+                        db.query(
+                            "UPDATE case_inbox SET case_id = ?, status = 'accepted', resolved_at = NOW() WHERE id = ?",
+                            [caseId, id],
+                            (updateErr) => {
+                                if (updateErr) {
+                                    console.error('Accept update error:', updateErr.message);
+                                    return res.status(500).json({ error: updateErr.message });
+                                }
+                                res.json({ message: 'Case accepted.', case_id: caseId });
+                            }
+                        );
+                    }
+                );
+            });
+        }
+    );
 });
 
 // Reject: mark inbox item rejected
 app.put('/api/case-inbox/:id/reject', (req, res) => {
- const { id } = req.params;
- db.query(
- "UPDATE case_inbox SET status = 'rejected', resolved_at = NOW() WHERE id = ?",
- [id],
- (err) => {
- if (err) return res.status(500).json({ error: err.message });
- res.json({ message: 'Case rejected.' });
- }
- );
+    const { id } = req.params;
+    db.query(
+        "UPDATE case_inbox SET status = 'rejected', resolved_at = NOW() WHERE id = ?",
+        [id],
+        (err, result) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (result.affectedRows === 0) return res.status(404).json({ error: 'Inbox item not found.' });
+            res.json({ message: 'Case rejected.' });
+        }
+    );
 });
 
 // ROUTE: Update existing case
@@ -1451,20 +1687,21 @@ app.post('/api/verify-login-otp', (req, res) => {
 
 
 // ==========================================
-// TextBee SMS Gateway — free, uses Android phone as SMS gateway
+// Brevo SMS Gateway
 async function sendSMS(to, message) {
-    const apiKey = process.env.TEXTBEE_API_KEY;
-    const deviceId = process.env.TEXTBEE_DEVICE_ID;
-    if (!apiKey || !deviceId || apiKey === 'your_textbee_api_key_here') {
-        console.log(`\n[TextBee not configured] Would send SMS to ${to}: ${message}\n`);
+    const apiKey = process.env.BREVO_API_KEY;
+    if (!apiKey) {
+        console.log(`\n[Brevo SMS not configured] Would send SMS to ${to}: ${message}\n`);
         return;
     }
-    const response = await axios.post(
-        `https://api.textbee.dev/api/v1/gateway/devices/${deviceId}/send-sms`,
-        { recipients: [to], message },
-        { headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' } }
-    );
-    return response.data;
+    await axios.post('https://api.brevo.com/v3/transactionalSMS/sms', {
+        sender: 'Cabuyao',
+        recipient: to,
+        content: message,
+        type: 'transactional'
+    }, {
+        headers: { 'api-key': apiKey, 'Content-Type': 'application/json' }
+    });
 }
 
 function formatPhone(phone) {
@@ -1478,34 +1715,49 @@ function formatPhone(phone) {
 // ==========================================
 
 // Helper function to create notification for active users with scope + preferences
-function createNotificationForUsers(title, message, type, link_to, barangayId = null, eventType = null) {
-    db.query('SELECT user_id, role, assigned_barangay_id, email, mobile_number FROM users WHERE is_active = 1', (err, users) => {
+function createNotificationForUsers(title, message, type, link_to, barangayId = null, eventType = null, choUnit = null) {
+    db.query(
+        `SELECT u.user_id, u.role, u.assigned_barangay_id, u.email, u.mobile_number, b.name AS barangay_name
+         FROM users u
+         LEFT JOIN barangays b ON u.assigned_barangay_id = b.id
+         WHERE u.is_active = 1`,
+        (err, users) => {
         if (err) {
             console.error('Error fetching active users for notifications:', err.message);
             return;
         }
 
         users.forEach(user => {
+            // If choUnit is provided, only notify users whose barangay belongs to that unit
+            if (choUnit) {
+                const unitBarangays = CHO_UNIT_BARANGAYS[choUnit] || [];
+                const userBelongsToUnit = user.barangay_name && unitBarangays.some(b => b.toLowerCase() === user.barangay_name.toLowerCase());
+                if (!userBelongsToUnit) return;
+            }
+
+            // When choUnit is provided, only notify CHO users in that unit (skip BHW)
+            if (choUnit && user.role === 'BHW') return;
+
             // Scope: CHO must match barangay (same as BHW now)
             const isCho = user.role === 'CHO' && (barangayId === null || Number(user.assigned_barangay_id) === Number(barangayId));
             const isAssignedBhw = user.role === 'BHW' && (barangayId === null || Number(user.assigned_barangay_id) === Number(barangayId));
-            
+
             if (!isCho && !isAssignedBhw) return;
 
             // Fetch this user's notification preferences
             const prefQuery = 'SELECT * FROM notification_preferences WHERE user_id = ?';
             db.query(prefQuery, [user.user_id], (prefErr, prefRows) => {
                 let prefs = {
-                    push_notifications: false, email_notifications: false, sms_notifications: false,
-                    new_case_reported: false, case_status_updated: false, high_risk_alert: false,
-                    weekly_summary: false, system_maintenance: false,
+                    push_notifications: true, email_notifications: false, sms_notifications: false,
+                    new_case_reported: true, case_status_updated: true, high_risk_alert: true,
+                    weekly_summary: false, system_maintenance: true,
                 };
                 if (!prefErr && prefRows.length > 0) {
                     prefs = { ...prefs, ...prefRows[0] };
                 }
 
                 // Determine if this event is allowed by user preferences
-                const eventAllowed = !eventType || eventType === 'delete' || prefs[eventType] === true;
+                const eventAllowed = !eventType || eventType === 'delete' || prefs[eventType] == true;
 
                 // 1. In-app notification (Push) — only if push_notifications is ON
                 if (prefs.push_notifications && eventAllowed) {

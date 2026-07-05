@@ -51,6 +51,7 @@ function App() {
   const [confirmDelete, setConfirmDelete] = useState(() => localStorage.getItem('cdms_confirm_delete') !== 'false');
   const [keyboardShortcuts, setKeyboardShortcuts] = useState(false);
   const [fontScale, setFontScale] = useState(getSavedFontScale);
+  const [pendingInboxView, setPendingInboxView] = useState(null);
   const [compactMode, setCompactMode] = useState(getSavedCompact);
   const [openProfileView, setOpenProfileView] = useState(false);
 
@@ -224,7 +225,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
           />
         );
       case 'Manage Cases':
-        return <ManageCases caseFilter={caseFilter} setCaseFilter={setCaseFilter} dateFormat={dateFormat} autoSave={autoSave} confirmDelete={confirmDelete} keyboardShortcuts={keyboardShortcuts} fontScale={fontScale} compactMode={compactMode} loggedUserId={loggedUserId} loginRole={loginRole} loginBarangay={loggedUserBarangay} sessionContext={sessionContext} />;
+        return <ManageCases caseFilter={caseFilter} setCaseFilter={setCaseFilter} dateFormat={dateFormat} autoSave={autoSave} confirmDelete={confirmDelete} keyboardShortcuts={keyboardShortcuts} fontScale={fontScale} compactMode={compactMode} loggedUserId={loggedUserId} loginRole={loginRole} loginBarangay={loggedUserBarangay} sessionContext={sessionContext} initialView={pendingInboxView} onInitialViewConsumed={() => setPendingInboxView(null)} />;
       case 'Map View':
         return <MapView setActiveTab={setActiveTab} setCaseFilter={setCaseFilter} fontScale={fontScale} compactMode={compactMode} loginRole={loginRole} loginBarangay={loggedUserBarangay} sessionContext={sessionContext} />;
       case 'User Accounts': 
@@ -363,7 +364,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                     background: '#ef4444', color: 'white', borderRadius: '50%',
                     width: '16px', height: '16px', fontSize: '10px', fontWeight: '700',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    lineHeight: 1
+                    paddingTop: '1px'
                   }}>
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
@@ -464,7 +465,8 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                               {n.link_to && (
                                 <button onClick={() => {
                                   handleMarkRead(n.id);
-                                  setActiveTab(n.link_to);
+                                  if (n.link_to === 'Inbox') setPendingInboxView('inbox');
+                                  setActiveTab(n.link_to === 'Inbox' ? 'Manage Cases' : n.link_to);
                                   setShowNotifications(false);
                                 }} style={{
                                   background: 'none', border: 'none', color: '#10b981',
