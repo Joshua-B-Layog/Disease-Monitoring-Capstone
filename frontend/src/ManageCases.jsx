@@ -740,24 +740,26 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       result = result.filter(c => c.status === filterStatus);
     }
     if (filterPurok !== 'All Puroks') {
-      console.log('[getFilteredCases] filterPurok =', JSON.stringify(filterPurok), 'sample addresses:', result.slice(0, 5).map(c => c.address));
+      console.log('[getFilteredCases] filterPurok =', JSON.stringify(filterPurok), 'total cases before purok filter:', result.length, 'sample addresses:', result.slice(0, 5).map(c => c.address));
       const normalize = (s) => (s || '').toUpperCase().replace(/[.\-\s]/g, '');
       const target = normalize(filterPurok);
       const comps = [...filterPurok.matchAll(/(Purok|Blk|Lot|Phase)\s+(\d+[A-Z]?)/gi)];
+      console.log('[purok filter] target:', target, 'comps:', comps.map(c => ({ type: c[1], num: c[2] })));
 
       result = result.filter(c => {
         const addr = c.address || '';
         const parts = addr.split('|');
         const purokPart = parts.length > 1 ? parts[1] : '';
         const purokPartNormalized = normalize(purokPart);
+        let matched = false;
 
         // Exact match against the stored purok segment (handles "SouthVille 1A" and similar names)
-        if (purokPartNormalized === target) return true;
+        if (purokPartNormalized === target) { matched = true; }
 
         // Structured Purok/Blk/Lot/Phase component match (handles "Purok 2", "Blk 1 Lot 6", etc.)
-        if (comps.length > 0) {
+        if (!matched && comps.length > 0) {
           const fullAddrUpper = addr.toUpperCase();
-          return comps.every(([, type, num]) => {
+          matched = comps.every(([, type, num]) => {
             const reStr = type === 'Purok' ? `(?:PUROK|PRK)\\.?[\\s-]*${num}(?!\\d)` :
                           type === 'Blk'   ? `(?:BLK|BLOCK|B)\\.?[\\s-]*${num}(?!\\d)` :
                           type === 'Lot'   ? `(?:LOT|L)\\.?[\\s-]*${num}(?!\\d)` :
@@ -767,7 +769,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         }
 
         // Fallback: plain substring match anywhere in the full address
-        return normalize(addr).includes(target);
+        if (!matched) {
+          matched = normalize(addr).includes(target);
+        }
+
+        console.log('[purok filter] case id:', c.case_id, 'address:', JSON.stringify(addr), '→', matched ? 'KEPT' : 'DROPPED', '(purokPart:', JSON.stringify(purokPart), '| norm:', purokPartNormalized, '| target:', target, ')');
+        return matched;
       });
     }
     return result;
