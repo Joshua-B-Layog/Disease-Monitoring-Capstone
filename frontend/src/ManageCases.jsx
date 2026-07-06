@@ -1748,6 +1748,22 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       }
 
                       const barangayName = matchedBarangay?.name || barangayList.find(b => String(b.id) === String(formData.barangayId))?.name || '';
+
+                      // Prefer purok offset coordinates over Nominatim
+                      const purokCoords = unit && barangayName
+                        ? findPurokCoords(barangayName, unit, BARANGAY_COORDS)
+                        : null;
+                      if (purokCoords) {
+                        const targetB = matchedBarangay || (formData.barangayId
+                          ? barangayList.find(b => String(b.id) === String(formData.barangayId))
+                          : null);
+                        setFormData(prev => ({
+                          ...prev,
+                          barangayId: String(targetB?.id || prev.barangayId),
+                          lat: String(purokCoords[0]),
+                          lng: String(purokCoords[1]),
+                        }));
+                      } else {
                       const fullQuery = [addr, barangayName, 'Cabuyao', 'Laguna', 'Philippines'].filter(Boolean).join(', ');
 
                       try {
@@ -1765,10 +1781,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                             ? barangayList.find(b => String(b.id) === String(formData.barangayId))
                             : null);
                           if (targetB) {
-                            const purokCoords = unit
-                              ? findPurokCoords(targetB.name, unit, BARANGAY_COORDS)
-                              : null;
-                            const fallbackCoords = purokCoords || BARANGAY_COORDS[targetB.name];
+                            const fallbackCoords = BARANGAY_COORDS[targetB.name];
                             if (fallbackCoords) {
                               setFormData(prev => ({
                                 ...prev,
@@ -1784,10 +1797,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           ? barangayList.find(b => String(b.id) === String(formData.barangayId))
                           : null);
                         if (targetB) {
-                          const purokCoords = unit
-                            ? findPurokCoords(targetB.name, unit, BARANGAY_COORDS)
-                            : null;
-                          const fallbackCoords = purokCoords || BARANGAY_COORDS[targetB.name];
+                          const fallbackCoords = BARANGAY_COORDS[targetB.name];
                           if (fallbackCoords) {
                             setFormData(prev => ({
                               ...prev,
@@ -1797,6 +1807,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                             }));
                           }
                         }
+                      }
                       }
                     }}
                       onKeyDown={async (e) => {
@@ -1831,6 +1842,22 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       }
 
                       const barangayName = matchedBarangay?.name || barangayList.find(b => String(b.id) === String(formData.barangayId))?.name || '';
+
+                      // Prefer purok offset coordinates over Nominatim
+                      const purokCoords = unit && barangayName
+                        ? findPurokCoords(barangayName, unit, BARANGAY_COORDS)
+                        : null;
+                      if (purokCoords) {
+                        const targetB = matchedBarangay || (formData.barangayId
+                          ? barangayList.find(b => String(b.id) === String(formData.barangayId))
+                          : null);
+                        setFormData(prev => ({
+                          ...prev,
+                          barangayId: String(targetB?.id || prev.barangayId),
+                          lat: String(purokCoords[0]),
+                          lng: String(purokCoords[1]),
+                        }));
+                      } else {
                       const fullQuery = [addr, barangayName, 'Cabuyao', 'Laguna', 'Philippines'].filter(Boolean).join(', ');
 
                       try {
@@ -1848,10 +1875,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                             ? barangayList.find(b => String(b.id) === String(formData.barangayId))
                             : null);
                           if (targetB) {
-                            const purokCoords = unit
-                              ? findPurokCoords(targetB.name, unit, BARANGAY_COORDS)
-                              : null;
-                            const fallbackCoords = purokCoords || BARANGAY_COORDS[targetB.name];
+                            const fallbackCoords = BARANGAY_COORDS[targetB.name];
                             if (fallbackCoords) {
                               setFormData(prev => ({
                                 ...prev,
@@ -1867,10 +1891,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           ? barangayList.find(b => String(b.id) === String(formData.barangayId))
                           : null);
                         if (targetB) {
-                          const purokCoords = unit
-                            ? findPurokCoords(targetB.name, unit, BARANGAY_COORDS)
-                            : null;
-                          const fallbackCoords = purokCoords || BARANGAY_COORDS[targetB.name];
+                          const fallbackCoords = BARANGAY_COORDS[targetB.name];
                           if (fallbackCoords) {
                             setFormData(prev => ({
                               ...prev,
@@ -1880,6 +1901,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                             }));
                           }
                         }
+                      }
                       }
                     }} />
                 </div>

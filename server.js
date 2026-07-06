@@ -440,7 +440,7 @@ app.post('/api/cases', (req, res) => {
     }
     function proceedAfterCrossCheck() {
       if (contact && contact.trim()) {
-        db.query('SELECT case_id FROM disease_cases WHERE contact = ? AND contact IS NOT NULL AND contact != ? LIMIT 1', [contact.trim(), ''], (cErr, cRes) => {
+        db.query('SELECT case_id FROM disease_cases WHERE contact = ? AND contact IS NOT NULL AND contact != ? AND patient_name != ? LIMIT 1', [contact.trim(), '', patient_name], (cErr, cRes) => {
           if (cErr) return res.status(500).json({ error: cErr.message });
           if (cRes && cRes.length > 0) {
             return res.status(409).json({ error: 'That contact number is already in use by another patient. Please use a different contact number.' });
@@ -901,7 +901,7 @@ app.put('/api/cases/:id', (req, res) => {
         };
 
         if (contact && contact.trim()) {
-          db.query('SELECT case_id FROM disease_cases WHERE contact = ? AND contact IS NOT NULL AND contact != ? AND case_id != ? LIMIT 1', [contact.trim(), '', id], (cErr, cRes) => {
+          db.query('SELECT case_id FROM disease_cases WHERE contact = ? AND contact IS NOT NULL AND contact != ? AND case_id != ? AND patient_name != ? LIMIT 1', [contact.trim(), '', id, patient_name], (cErr, cRes) => {
             if (cErr) return res.status(500).json({ error: cErr.message });
             if (cRes && cRes.length > 0) {
               return res.status(409).json({ error: 'That contact number is already in use by another patient. Please use a different contact number.' });

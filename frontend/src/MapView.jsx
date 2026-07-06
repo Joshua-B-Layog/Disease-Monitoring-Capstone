@@ -455,6 +455,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const [allCases, setAllCases]         = useState([]);
   const [barangayData, setBarangayData] = useState([]);
   const [purokData, setPurokData]       = useState([]);
+  const [hotspotData, setHotspotData]   = useState([]);
   const [filterBarangay, setFilterBarangay] = useState('All Barangays');
   const [filterStatus,   setFilterStatus]   = useState('All Status');
   const [filterDate,     setFilterDate]     = useState('');
@@ -565,6 +566,27 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         ? filtered.filter(c => choUnitBarangays.includes(c.barangay_name))
         : filtered;
 
+    // Active Hotspots — scope-only, ignores barangay/purok filter
+    const scopeBase = allCases.filter(c => {
+      if (filterStatus   !== 'All Status'     && c.status    !== filterStatus)   return false;
+      if (filterSeverity !== 'All Severities' && c.severity  !== filterSeverity) return false;
+      if (filterDate && c.date_reported && !c.date_reported.startsWith(filterDate)) return false;
+      return true;
+    });
+    const scopedHotspots = (loginRole === 'BHW' && loginBarangay)
+      ? scopeBase.filter(c => c.barangay_name === loginBarangay)
+      : (loginRole === 'CHO' && choUnitBarangays.length > 0)
+        ? scopeBase.filter(c => choUnitBarangays.includes(c.barangay_name))
+        : scopeBase;
+    const hGroups = {};
+    scopedHotspots.forEach(c => {
+      const bn = findCanonicalName(c.barangay_name);
+      if (!bn) return;
+      if (!hGroups[bn]) hGroups[bn] = { barangayName: bn, totalCases: 0 };
+      hGroups[bn].totalCases++;
+    });
+    setHotspotData(Object.values(hGroups));
+
     const groups = {};
     scopedFiltered.forEach(c => {
       const bn = findCanonicalName(c.barangay_name);
@@ -604,9 +626,9 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     setPopup(null);
   };
 
-  const highCount   = barangayData.filter(b => b.totalCases > 20).length;
-  const mediumCount = barangayData.filter(b => b.totalCases >= 10 && b.totalCases <= 20).length;
-  const lowCount    = barangayData.filter(b => b.totalCases < 10).length;
+  const highCount   = hotspotData.filter(b => b.totalCases > 20).length;
+  const mediumCount = hotspotData.filter(b => b.totalCases >= 10 && b.totalCases <= 20).length;
+  const lowCount    = hotspotData.filter(b => b.totalCases < 10).length;
 
   const SEL = {
     width: '100%', padding: '9px 12px',
