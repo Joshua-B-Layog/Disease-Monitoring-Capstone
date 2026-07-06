@@ -1748,9 +1748,9 @@ function createNotificationForUsers(title, message, type, link_to, barangayId = 
             const prefQuery = 'SELECT * FROM notification_preferences WHERE user_id = ?';
             db.query(prefQuery, [user.user_id], (prefErr, prefRows) => {
                 let prefs = {
-                    push_notifications: true, email_notifications: false, sms_notifications: false,
-                    new_case_reported: true, case_status_updated: true, high_risk_alert: true,
-                    weekly_summary: false, system_maintenance: true,
+                    push_notifications: false, email_notifications: false, sms_notifications: false,
+                    new_case_reported: false, case_status_updated: false, high_risk_alert: false,
+                    weekly_summary: false, system_maintenance: false,
                 };
                 if (!prefErr && prefRows.length > 0) {
                     prefs = { ...prefs, ...prefRows[0] };
