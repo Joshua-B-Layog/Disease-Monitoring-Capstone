@@ -275,7 +275,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
   // --- PRINT ---
   const handlePrint = () => {
-    const rows = paginatedCases.map(c =>
+    const rows = displayCases.map(c =>
       `<tr>
         <td>#${String(c.case_id).padStart(3,'0')}</td>
         <td>${c.patient_name || ''}</td>
@@ -303,12 +303,12 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         @media print { button { display: none; } }
       </style></head><body>
       <h2>Cabuyao Disease Monitoring System</h2>
-      <p>Report generated: ${new Date().toLocaleString()} &nbsp;|&nbsp; Page ${currentPage} of ${totalPages} &nbsp;|&nbsp; Date Range: ${dateRange.start} to ${dateRange.end}</p>
+      <p>Report generated: ${new Date().toLocaleString()} &nbsp;|&nbsp; Date Range: ${dateRange.start} to ${dateRange.end}</p>
 
       <h3>${selectedDisease} Cases by Barangay</h3>
       <div class="bar-section">${buildBarChartHTML()}</div>
 
-      <h3>Case Records (Page ${currentPage})</h3>
+      <h3>Recent Case Records</h3>
       <table class="main">
         <thead><tr><th>ID</th><th>Patient Name</th><th>Age</th><th>Barangay</th><th>Disease</th><th>Severity</th><th>Status</th></tr></thead>
         <tbody>${rows}</tbody>
