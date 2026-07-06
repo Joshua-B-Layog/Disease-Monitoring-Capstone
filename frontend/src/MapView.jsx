@@ -626,9 +626,10 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     setPopup(null);
   };
 
-  const highCount   = hotspotData.filter(b => b.totalCases > 20).length;
-  const mediumCount = hotspotData.filter(b => b.totalCases >= 10 && b.totalCases <= 20).length;
-  const lowCount    = hotspotData.filter(b => b.totalCases < 10).length;
+  const activeData  = filterBarangay !== 'All Barangays' && purokData.length > 0 ? purokData : hotspotData;
+  const highCount   = activeData.filter(b => b.totalCases > 20).length;
+  const mediumCount = activeData.filter(b => b.totalCases >= 10 && b.totalCases <= 20).length;
+  const lowCount    = activeData.filter(b => b.totalCases < 10).length;
 
   const SEL = {
     width: '100%', padding: '9px 12px',
