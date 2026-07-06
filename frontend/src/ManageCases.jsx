@@ -312,6 +312,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     if (card) {
       setSelectedDisease(card);
       setFilterBarangay(targetBarangay || 'All Barangays');
+      if (caseFilter.purok) setFilterPurok(caseFilter.purok);
       setSearchQuery('');
       setFilterStatus('All Status');
       setTablePage(1);
@@ -327,7 +328,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     }
 
     // Clear the filter so navigating back works normally
-    if (setCaseFilter) setCaseFilter({ disease: '', barangay: '' });
+    if (setCaseFilter) setCaseFilter({ disease: '', barangay: '', purok: '' });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [caseFilter]);
 

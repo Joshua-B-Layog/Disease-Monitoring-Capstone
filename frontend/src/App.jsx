@@ -55,7 +55,7 @@ function App() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedDisease, setSelectedDisease] = useState('Dengue');
   const [dateRange, setDateRange]         = useState({ start: '2026-01-01', end: '2026-05-28' });
-  const [caseFilter, setCaseFilter]       = useState({ disease: '', barangay: '' });
+  const [caseFilter, setCaseFilter]       = useState({ disease: '', barangay: '', purok: '' });
 
   const [language, setLanguage]           = useState('en');
   const [timeZone, setTimeZone]           = useState('Asia/Manila');

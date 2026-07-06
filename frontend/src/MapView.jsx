@@ -643,8 +643,8 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const getTop5 = (diseases) =>
     Object.entries(diseases).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
-  const goToDisease = (barangayName, diseaseName) => {
-    if (setCaseFilter) setCaseFilter({ disease: diseaseName.trim(), barangay: barangayName });
+  const goToDisease = (barangayName, diseaseName, purok) => {
+    if (setCaseFilter) setCaseFilter({ disease: diseaseName.trim(), barangay: barangayName, purok: purok || '' });
     if (setActiveTab)  setActiveTab('Manage Cases');
     setPopup(null);
   };
@@ -1069,7 +1069,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, marginLeft: '10px' }}>
                         <span style={{ fontSize: '14px', fontWeight: '700', color: '#10b981' }}>{count}</span>
-                        <button onClick={() => goToDisease(popup.barangayName, disease)}
+                        <button onClick={() => goToDisease(popup.barangay || popup.barangayName, disease, popup.purok)}
                           style={{ padding: '5px 12px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', whiteSpace: 'nowrap' }}>
                           Go To →
                         </button>
