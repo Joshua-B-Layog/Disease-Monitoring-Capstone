@@ -317,6 +317,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       if (caseFilter.purok) {
         gotoActiveRef.current = true;
         setFilterPurok(caseFilter.purok);
+        console.log('[caseFilter effect] set filterPurok to:', caseFilter.purok);
       }
       setSearchQuery('');
       setFilterStatus('All Status');
@@ -339,10 +340,11 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
   // Reset purok filter when user manually switches disease card (not during Go To)
   useEffect(() => {
-    if (!gotoActiveRef.current) {
-      setFilterPurok('All Puroks');
+    if (gotoActiveRef.current) {
+      gotoActiveRef.current = false;
+      return;
     }
-    gotoActiveRef.current = false;
+    setFilterPurok('All Puroks');
   }, [selectedDisease]);
 
   useEffect(() => {
