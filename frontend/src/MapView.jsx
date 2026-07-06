@@ -192,13 +192,13 @@ function extractLocationUnit(address) {
   const a = address.toUpperCase();
   const found = { blk: null, lot: null, phase: null, purok: null };
 
-  const blkMatch = a.match(/\bBLOCK\s*(\d+)\b/)
-    || a.match(/\bBLK\.?\s*(\d+)\b/)
-    || a.match(/\bB\.?\s*(\d+)(?=\s|,|$|[A-Z])/);
+  const blkMatch = a.match(/\bBLOCK\s*(\d+[A-Z]?)\b/)
+    || a.match(/\bBLK\.?\s*(\d+[A-Z]?)\b/)
+    || a.match(/\bB\.?\s*(\d+[A-Z]?)(?=\s|,|$|[A-Z])/);
   if (blkMatch) found.blk = blkMatch[1];
 
-  const lotMatch = a.match(/\bLOT\.?\s*(\d+)\b/)
-    || a.match(/\bL\.?\s*(\d+)(?=\s|,|$|[A-Z])/);
+  const lotMatch = a.match(/\bLOT\.?\s*(\d+[A-Z]?)\b/)
+    || a.match(/\bL\.?\s*(\d+[A-Z]?)(?=\s|,|$|[A-Z])/);
   if (lotMatch) found.lot = lotMatch[1];
 
   const phaseMatch = a.match(/\bPHASE\s*(\d+)\b/)
@@ -221,7 +221,14 @@ function extractLocationUnit(address) {
   if (found.lot) parts.push(`Lot ${found.lot}`);
   if (found.purok) parts.push(`Purok ${found.purok}`);
 
-  return parts.length > 0 ? parts.join(' ') : null;
+  if (parts.length > 0) return parts.join(' ');
+
+  const knownSubds = ['SOUTHVILLE 1A', 'SOUTHVILLE 1B', 'SOUTHVILLE 2', 'SOUTHVILLE 3'];
+  for (const subd of knownSubds) {
+    if (a.includes(subd)) return subd;
+  }
+
+  return null;
 }
 
 const findCoords = (name) => {

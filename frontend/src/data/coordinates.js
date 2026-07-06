@@ -10,6 +10,10 @@ const PUROK_OFFSETS = {
   'Lot 1': [-0.008, -0.002],    'Lot 2': [0.003, -0.009],
   'Lot 3': [-0.003, 0.009],     'Lot 4': [0.009, 0.004],
   'Lot 5': [-0.009, 0.006],
+  'Southville 1A': [-0.010, 0.008],
+  'Southville 1B': [-0.008, 0.010],
+  'Southville 2':  [-0.012, 0.006],
+  'Southville 3':  [-0.006, 0.012],
 };
 
 export function findPurokCoords(barangay, purok, barangayCoords) {
