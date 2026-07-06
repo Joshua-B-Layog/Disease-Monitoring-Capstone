@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { MapContainer, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -508,6 +508,24 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     ],
   };
 
+  const scopedGeoJson = useMemo(() => {
+    let allowedBarangays = null;
+    if (loginRole === 'BHW' && loginBarangay) {
+      allowedBarangays = [loginBarangay];
+    } else if (loginRole === 'CHO' && sessionContext && CHO_UNIT_BARANGAYS[sessionContext]) {
+      allowedBarangays = CHO_UNIT_BARANGAYS[sessionContext];
+    }
+    if (!allowedBarangays) return cabuyaoBoundaries;
+    const canonSet = new Set(allowedBarangays.map(b => norm(b)));
+    return {
+      ...cabuyaoBoundaries,
+      features: cabuyaoBoundaries.features.filter(f => {
+        const mapped = getDbNameFromGeoJson(f.properties.ADM4_EN);
+        return canonSet.has(norm(mapped));
+      }),
+    };
+  }, [loginRole, loginBarangay, sessionContext]);
+
   const scopedCasesForPurok = (() => {
     if (loginRole === 'BHW' && loginBarangay) {
       return allCases.filter(c => c.barangay_name === loginBarangay);
@@ -903,9 +921,9 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         <MapContainer
           center={(loginRole === 'BHW' && loginBarangay && findCoords(loginBarangay)) 
             ? findCoords(loginBarangay) 
-            : CABUYAO_CENTER} zoom={14} minZoom={13} maxZoom={18}
+            : CABUYAO_CENTER} zoom={14} minZoom={12} maxZoom={19} scrollWheelZoom={true}
           maxBounds={CABUYAO_BOUNDS}
-          maxBoundsViscosity={1.0}
+          maxBoundsViscosity={0.6}
           style={{ width: '100%', height: '100%' }}>
           <TileLayer
             attribution='&copy; OpenStreetMap contributors &copy; CARTO'
@@ -915,7 +933,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           {loginRole !== 'BHW' && filterBarangay === 'All Barangays' ? (
             <GeoJSON
               ref={geoJsonLayerRef}
-              data={cabuyaoBoundaries}
+              data={scopedGeoJson}
               style={(feature) => getGeoJsonStyle(feature, barangayData)}
               onEachFeature={(feature, layer) => {
                 const barangayName = getDbNameFromGeoJson(feature.properties.ADM4_EN);

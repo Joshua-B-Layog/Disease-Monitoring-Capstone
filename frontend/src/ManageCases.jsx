@@ -925,7 +925,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
     if (!formData.barangayId) {
       setFormErrors({ barangayId: true });
-      setSubmitMsg('Please select an assigned barangay.');
+      setSubmitMsg('Error: Please select an assigned barangay.');
       setSubmitLoading(false);
       return;
     }
@@ -943,7 +943,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       if (!formData.lat || !formData.lng) errors.location = true;
       if (Object.keys(errors).length > 0) {
         setFormErrors(errors);
-        setSubmitMsg('Please fill in all required fields highlighted in red.');
+        setSubmitMsg('Error: Please fill in all required fields highlighted in red.');
         setSubmitLoading(false);
         return;
       }
@@ -1765,7 +1765,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         return addrLower.includes(bNorm);
                       });
                       if (!matchedBarangay) {
-                        const BARANGAY_ALIASES = { 'bugtong': 'Butong', 'pitland': 'Pittland' };
+                        const BARANGAY_ALIASES = { 'bugtong': 'Butong', 'pitland': 'Pittland', 'poblacion1': 'Barangay Uno (Poblacion)', 'poblacion 1': 'Barangay Uno (Poblacion)', 'poblacion2': 'Barangay Dos (Poblacion)', 'poblacion 2': 'Barangay Dos (Poblacion)', 'poblacion3': 'Barangay Tres (Poblacion)', 'poblacion 3': 'Barangay Tres (Poblacion)' };
                         for (const [alias, realName] of Object.entries(BARANGAY_ALIASES)) {
                           if (addrLower.includes(alias)) {
                             matchedBarangay = barangayList.find(b => b.name.toLowerCase() === realName.toLowerCase());
@@ -1859,7 +1859,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         return addrLower.includes(bNorm);
                       });
                       if (!matchedBarangay) {
-                        const BARANGAY_ALIASES = { 'bugtong': 'Butong', 'pitland': 'Pittland' };
+                        const BARANGAY_ALIASES = { 'bugtong': 'Butong', 'pitland': 'Pittland', 'poblacion1': 'Barangay Uno (Poblacion)', 'poblacion 1': 'Barangay Uno (Poblacion)', 'poblacion2': 'Barangay Dos (Poblacion)', 'poblacion 2': 'Barangay Dos (Poblacion)', 'poblacion3': 'Barangay Tres (Poblacion)', 'poblacion 3': 'Barangay Tres (Poblacion)' };
                         for (const [alias, realName] of Object.entries(BARANGAY_ALIASES)) {
                           if (addrLower.includes(alias)) {
                             matchedBarangay = barangayList.find(b => b.name.toLowerCase() === realName.toLowerCase());

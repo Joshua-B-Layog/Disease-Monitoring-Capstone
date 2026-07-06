@@ -49,7 +49,7 @@ function detectBarangayFromAddress(address) {
   });
   if (match) return match;
   // Check common misspellings/aliases
-  const BARANGAY_ALIASES = { 'bugtong': 'Butong', 'pitland': 'Pittland' };
+  const BARANGAY_ALIASES = { 'bugtong': 'Butong', 'pitland': 'Pittland', 'poblacion1': 'Barangay Uno (Poblacion)', 'poblacion 1': 'Barangay Uno (Poblacion)', 'poblacion2': 'Barangay Dos (Poblacion)', 'poblacion 2': 'Barangay Dos (Poblacion)', 'poblacion3': 'Barangay Tres (Poblacion)', 'poblacion 3': 'Barangay Tres (Poblacion)' };
   for (const [alias, barangay] of Object.entries(BARANGAY_ALIASES)) {
     if (addrLower.includes(alias)) return barangay;
   }
