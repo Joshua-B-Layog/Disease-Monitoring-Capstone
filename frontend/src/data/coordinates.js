@@ -20,9 +20,23 @@ export function findPurokCoords(barangay, purok, barangayCoords) {
   if (!barangay || !purok) return null;
   const center = barangayCoords[barangay];
   if (!center) return null;
-  const offset = PUROK_OFFSETS[purok];
-  if (!offset) return null;
-  return [center[0] + offset[0], center[1] + offset[1]];
+
+  const exact = PUROK_OFFSETS[purok];
+  if (exact) return [center[0] + exact[0], center[1] + exact[1]];
+
+  // Compound string like "Blk 2 Purok 5" — sum individual offsets
+  const parts = purok.split(/\s+/);
+  if (parts.length >= 2) {
+    let latOff = 0, lngOff = 0, found = false;
+    for (let i = 0; i < parts.length; i += 2) {
+      const key = parts[i] + ' ' + (parts[i + 1] || '');
+      const off = PUROK_OFFSETS[key];
+      if (off) { latOff += off[0]; lngOff += off[1]; found = true; }
+    }
+    if (found) return [center[0] + latOff, center[1] + lngOff];
+  }
+
+  return null;
 }
 
 export default PUROK_OFFSETS;
