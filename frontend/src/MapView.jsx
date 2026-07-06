@@ -644,6 +644,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     Object.entries(diseases).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
   const goToDisease = (barangayName, diseaseName, purok) => {
+    console.log('[goToDisease]', { barangayName, diseaseName, purok });
     if (setCaseFilter) setCaseFilter({ disease: diseaseName.trim(), barangay: barangayName, purok: purok || '' });
     if (setActiveTab)  setActiveTab('Manage Cases');
     setPopup(null);

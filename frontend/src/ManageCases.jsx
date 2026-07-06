@@ -303,6 +303,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
   // ── Handle incoming caseFilter from MapView "Go To →" ──
   useEffect(() => {
+    console.log('[ManageCases] caseFilter received:', caseFilter);
     if (!caseFilter || (!caseFilter.disease && !caseFilter.barangay)) return;
 
     const targetDisease = caseFilter.disease || '';
@@ -737,6 +738,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       result = result.filter(c => c.status === filterStatus);
     }
     if (filterPurok !== 'All Puroks') {
+      console.log('[getFilteredCases] filterPurok =', JSON.stringify(filterPurok), 'sample addresses:', result.slice(0, 5).map(c => c.address));
       const normalize = (s) => (s || '').toUpperCase().replace(/[.\-\s]/g, '');
       const target = normalize(filterPurok);
       const comps = [...filterPurok.matchAll(/(Purok|Blk|Lot|Phase)\s+(\d+[A-Z]?)/gi)];
