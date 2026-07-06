@@ -103,13 +103,29 @@ const DISEASE_CAUSES = {
   'covid-19': 'Likely spread through close contact in densely populated housing.',
   'hand foot and mouth disease': 'Likely spread through close contact among children in the area.',
   'hepatitis a': 'Likely caused by contaminated food or water supply in the area.',
+  'hepatitis b': 'Likely spread through contact with infected blood or bodily fluids in the area.',
+  'hepatitis c': 'Likely spread through contact with infected blood in the area.',
+  'hiv/aids': 'Likely spread through contact with infected bodily fluids.',
+  'rabies': 'Likely caused by exposure to infected animals, particularly stray dogs in the vicinity.',
+  'influenza a': 'Likely spread through respiratory droplets in crowded indoor spaces.',
+  'influenza a (h1n1)': 'Likely spread through respiratory droplets in crowded indoor spaces.',
+  'acute respiratory infection': 'Likely caused by viral or bacterial infection spread through coughing or sneezing in close quarters.',
+  'avian influenza': 'Likely caused by contact with infected poultry or contaminated surfaces in the area.',
+  'diphtheria': 'Likely spread through respiratory droplets or close contact in crowded conditions.',
+  'ebola': 'Likely spread through direct contact with blood or bodily fluids of an infected person.',
+  'leprosy': 'Likely spread through prolonged close contact in crowded living conditions.',
+  'meningococcemia': 'Likely spread through respiratory droplets in crowded indoor spaces.',
+  'pertussis': 'Likely spread through coughing or sneezing in close contact with others.',
+  'poliomyelitis': 'Likely caused by contaminated water or poor sanitation in the area.',
+  'sars': 'Likely spread through respiratory droplets in crowded indoor spaces.',
+  'sore eyes': 'Likely spread through direct contact with infected eye secretions or contaminated surfaces.',
 };
 
 function getDiseaseCause(diseaseName) {
-  if (!diseaseName) return 'Cause unclear — insufficient data for this address component.';
+  if (!diseaseName) return 'Cause unclear - insufficient data for this address component.';
   const key = diseaseName.trim().toLowerCase();
   return DISEASE_CAUSES[key] ||
-    'Cause unclear — likely linked to environmental or sanitation conditions in this address component (Lot/Blk/Phase/Purok).';
+    'Cause unclear - likely linked to environmental or sanitation conditions in this address component (Lot/Blk/Phase/Purok).';
 }
 
 // Safe normalize — never crashes on non-string input
