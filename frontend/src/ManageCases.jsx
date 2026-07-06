@@ -737,8 +737,22 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       result = result.filter(c => c.status === filterStatus);
     }
     if (filterPurok !== 'All Puroks') {
-      const q = filterPurok.toLowerCase();
-      result = result.filter(c => (c.address || '').toLowerCase().includes(q));
+      const comps = [...filterPurok.matchAll(/(Purok|Blk|Lot|Phase)\s+(\d+[A-Z]?)/gi)];
+      if (comps.length > 0) {
+        result = result.filter(c => {
+          const addr = (c.address || '').toUpperCase();
+          return comps.every(([, type, num]) => {
+            const reStr = type === 'Purok' ? `(?:PUROK|PRK)\\.?[\\s-]*${num}(?!\\d)` :
+                          type === 'Blk'   ? `(?:BLK|BLOCK|B)\\.?[\\s-]*${num}(?!\\d)` :
+                          type === 'Lot'   ? `(?:LOT|L)\\.?[\\s-]*${num}(?!\\d)` :
+                          `(?:PHASE|PH)\\.?[\\s-]*${num}(?!\\d)`;
+            return new RegExp(reStr).test(addr);
+          });
+        });
+      } else {
+        const q = filterPurok.toLowerCase();
+        result = result.filter(c => (c.address || '').toLowerCase().includes(q));
+      }
     }
     return result;
   };
