@@ -1,6 +1,6 @@
   import React, { useState, useEffect, useRef } from 'react';
   import { API_URL } from '../config';
-  import choLogo from '../assets/cho.svg';
+  import ChoLogoIcon from '../assets/ChoLogo';
 
   export default function Login({ onLoginSuccess, onForgotPassword, theme, toggleTheme }) {
     const [step, setStep] = useState('role'); // 'role', 'cho_select', 'bhw_select', 'auth', 'forgot_password', 'signup', 'cho_contact'
@@ -383,7 +383,7 @@ const handleLoginOtpSubmit = async (e) => {
           <div className="login-form-container">
             
             <div className="brand-logo" style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '30px' }}>
-              <div className="circle-logo" style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#1E3A8A', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}><img src={choLogo} alt="CHO" style={{ width: '24px', height: '24px' }} /></div>
+              <div className="circle-logo" style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#1E3A8A', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}><ChoLogoIcon size={32} /></div>
               <div className="brand-text" style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--text-main)' }}>
                 Cabuyao Health
               </div>

@@ -3,13 +3,35 @@ import axios from 'axios';
 import { API_URL } from './config';
 import './ManageCases.css';
 import { findPurokCoords } from './data/coordinates';
-import feverIcon from './assets/fever.svg';
-import influenzaAIcon from './assets/influenza-a.svg';
-import leptospirosisIcon from './assets/leptospirosis.svg';
-import tuberculosisIcon from './assets/tuberculosis.svg';
-import typhoidIcon from './assets/typhoid-fever.svg';
+const FeverIcon = ({ color = '#ef4444', size = 28 }) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
+    <path d="M23.909,10.583c-.104,.345-.297,.668-.587,.924l-.512,.451-1.277-1.451-1.5,1.322,1.277,1.45-1.646,1.45-1.263-1.434-1.5,1.322,1.262,1.433-1.793,1.718-.025-.036-.013,.014c-.02-.018-2.005-1.748-4.336-1.748s-4.316,1.73-4.336,1.748l-1.33-1.493c.103-.092,2.559-2.254,5.666-2.254,.741,0,1.44,.128,2.084,.316l6.598-5.81c.83-.73,2.093-.65,2.823,.179,.015,.017,.024,.036,.038,.054C22.117,3.698,17.495,0,12,0,5.373,0,0,5.373,0,12s5.373,12,12,12,12-5.373,12-12c0-.48-.036-.951-.091-1.417Zm-8.413-2.583c.828,0,1.5,.672,1.5,1.5s-.672,1.5-1.5,1.5-1.5-.672-1.5-1.5,.672-1.5,1.5-1.5Zm-7,0c.828,0,1.5,.672,1.5,1.5s-.672,1.5-1.5,1.5-1.5-.672-1.5-1.5,.672-1.5,1.5-1.5Z"/>
+  </svg>
+);
 
-const diseaseImgStyle = { width: 28, height: 28, verticalAlign: 'middle' };
+const InfluenzaAIcon = ({ color = '#f59e0b', size = 28 }) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
+    <path d="m20.354,15.348l2.396.619c.083.022.168.032.25.032.445,0,.851-.299.968-.75.138-.534-.183-1.08-.718-1.218l-2.363-.611c.074-.463.113-.938.113-1.422s-.039-.958-.113-1.422l2.363-.611c.535-.138.856-.684.718-1.218-.139-.534-.683-.86-1.218-.718l-2.396.619c-.331-.822-.779-1.584-1.325-2.266l1.559-1.559c.283.111.591.173.913.173,1.379,0,2.5-1.121,2.5-2.5s-1.121-2.5-2.5-2.5-2.5,1.121-2.5,2.5c0,.322.062.63.173.913l-1.559,1.559c-.682-.546-1.444-.994-2.266-1.325l.619-2.397c.138-.534-.183-1.08-.718-1.218-.539-.144-1.08.183-1.219.718l-.611,2.363c-.463-.074-.938-.113-1.421-.113s-.958.039-1.421.113l-.611-2.363c-.138-.535-.682-.861-1.219-.718-.535.138-.856.684-.718,1.218l.619,2.397c-.822.331-1.584.779-2.266,1.325l-1.559-1.559c.111-.283.173-.591.173-.913,0-1.379-1.121-2.5-2.5-2.5S0,1.121,0,2.5s1.121,2.5,2.5,2.5c.322,0,.63-.062.913-.173l1.559,1.559c-.546.682-.994,1.444-1.325,2.266l-2.396-.619c-.534-.143-1.08.184-1.218.718s.183,1.08.718,1.218l2.363.611c-.074.463-.113.938-.113,1.422,0,.489.04,.97.115,1.438l-2.359.592c-.536.134-.861.678-.726,1.213.114.454.521.757.969.757.081,0,.163-.01.245-.03l2.41-.605c.33.816.776,1.572,1.318,2.25l-1.559,1.559c-.283-.111-.591-.173-.913-.173-1.379,0-2.5,1.121-2.5,2.5s1.121,2.5,2.5,2.5,2.5-1.121,2.5-2.5c0-.322-.062-.63-.173-.913l1.559-1.559c.682.546,1.444.994,2.266,1.325l-.619,2.397c-.138.534.183,1.08.718,1.218.084.022.168.032.251.032.445,0,.851-.299.968-.75l.611-2.363c.463.074.938.113,1.421.113s.958-.039,1.421-.113l.611,2.363c.117.451.522.75.968.75.083,0,.167-.01.251-.032.535-.138.856-.684.718-1.218l-.619-2.397c.822-.331,1.584-.779,2.266-1.325l1.559,1.559c-.111.283-.173.591-.173.913,0,1.379,1.121,2.5,2.5,2.5s2.5-1.121,2.5-2.5-1.121-2.5-2.5-2.5c-.322,0-.63.062-.913.173l-1.559-1.559c.546-.682.994-1.444,1.325-2.266ZM12,6.964c.828,0,1.5.672,1.5,1.5s-.672,1.5-1.5,1.5-1.5-.672-1.5-1.5.672-1.5,1.5-1.5Zm-5.036,5.036c0-.828.672-1.5,1.5-1.5.828,0,1.5.672,1.5,1.5,0,.828-.672,1.5-1.5,1.5-.828,0-1.5-.672-1.5-1.5Zm3.536,3.536c0-.828.672-1.5,1.5-1.5.828,0,1.5.672,1.5,1.5,0,.828-.672,1.5-1.5,1.5-.828,0-1.5-.672-1.5-1.5Zm3.536-3.536c0-.828.672-1.5,1.5-1.5s1.5.672,1.5,1.5c0,.828-.672,1.5-1.5,1.5s-1.5-.672-1.5-1.5Z"/>
+  </svg>
+);
+
+const LeptospirosisIcon = ({ color = '#10b981', size = 28 }) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
+    <path d="m5.47,12.377L.244,21.337c-.689,1.181.163,2.663,1.53,2.663h10.453c1.367,0,2.218-1.483,1.53-2.663l-5.226-8.96c-.683-1.171-2.376-1.171-3.059,0Zm1.53,10.623h0c-.552,0-1-.448-1-1h0c0-.552.448-1,1-1h0c.552,0,1,.448,1,1h0c0,.552-.448,1-1,1Zm-1-4v-3c0-.552.448-1,1-1h0c.552,0,1,.448,1,1v3c0,.552-.448,1-1,1h0c-.552,0-1-.448-1-1Zm18-2.5c0,3.038-2.462,5.5-5.5,5.5-1,0-2.311-.497-2.61-.658-.085-.348-.218-.69-.406-1.013l-5.227-8.96c-.118-.201-.256-.383-.403-.556.932-.517,2.004-.813,3.146-.813,1.435,0,2.758.471,3.833,1.259.526-.167,1.086-.259,1.667-.259,3.038,0,5.5,2.462,5.5,5.5ZM7,9.498c-1.356,0-2.574.699-3.257,1.871l-1.384,2.373c-1.175-.906-2.016-2.225-2.27-3.753,0,0,0-.001,0-.002-.053-.322-.088-.651-.088-.988,0-.33.034-.651.085-.967C.49,5.217,2.623,3.157,5.424,3.009c1.126-1.847,3.15-3.009,5.326-3.009,1.444,0,2.81.488,3.919,1.39.573-.256,1.194-.39,1.831-.39,1.914,0,3.592,1.24,4.22,2.996,1.657.302,2.947,1.621,3.216,3.289.002.012.061.675.061.675,0,1.489-.701,2.258-.972,2.573-1.259-.957-2.824-1.532-4.524-1.532-.438,0-.873.038-1.303.114-1.278-.731-2.712-1.114-4.197-1.114-1.865,0-3.587.611-4.99,1.634-.323-.088-.662-.136-1.01-.136Z"/>
+  </svg>
+);
+
+const TuberculosisIcon = ({ color = '#f97316', size = 28 }) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
+    <path d="m18 12c-3.314 0-6 2.686-6 6s2.686 6 6 6 6-2.686 6-6-2.686-6-6-6zm-1.5 10c-.828 0-1.5-.672-1.5-1.5s.672-1.5 1.5-1.5 1.5.672 1.5 1.5-.672 1.5-1.5 1.5zm.5-4c-1.105 0-2-.895-2-2s.895-2 2-2 2 .895 2 2-.895 2-2 2zm4 2c-.828 0-1.5-.672-1.5-1.5s.672-1.5 1.5-1.5 1.5.672 1.5 1.5-.672 1.5-1.5 1.5zm-8-9.608v-6.396h3.022c2.794 0,5.219 1.929,5.847 4.651l.634 2.746c-1.284-.878-2.834-1.393-4.503-1.393-1.805 0-3.466.608-4.806 1.62-.125-.39-.194-.803-.194-1.228zm-2.453 10.494c-.531 1.067-1.494 1.895-2.703 2.218l-2.637.703c-.352.12-.777.189-1.204.19h-.006c-1.049 0-2.078-.428-2.826-1.176-.755-.753-1.17-1.757-1.17-2.827 0-1.402.16-2.805.475-4.169l1.656-7.177c.628-2.723 3.053-4.651 5.847-4.651h3.022v6.396c0 1.725-1.1 3.25-2.735 3.795l-2.581.86c-.523.175-.807.741-.632 1.265.174.529.754.807,1.265.632l2.581-.86c.587-.196 1.12-.483 1.6-.835-.316.859-.498 1.783-.498 2.751 0 1.018.199 1.989.547 2.885zm2.453-16.89h-2v-3c0-.553.447-1 1-1s1 .448 1 1z"/>
+  </svg>
+);
+
+const TyphoidIcon = ({ color = '#8b5cf6', size = 28 }) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
+    <path d="m24,10v-2h-2.075c-.081-.581-.226-1.146-.447-1.682l1.772-1.051-1.021-1.72-1.773,1.052c-.156-.193-.32-.379-.498-.557h0c-.237-.238-.491-.446-.752-.642l.993-1.814-1.754-.961-.995,1.817c-.472-.174-.958-.295-1.451-.363V0h-2v2.088c-.569.084-1.129.234-1.667.459l-1.092-1.794-1.708,1.04,1.085,1.782c-.178.146-.351.301-.518.467l-.779.779-1.422-1.422-1.414,1.414,1.422,1.422-1.672,1.672-1.422-1.422-1.414,1.414,1.422,1.422-.779.779c-.166.166-.321.339-.467.517l-1.782-1.085-1.04,1.708,1.794,1.092c-.225.538-.375,1.098-.459,1.667H0v2h2.079c.069.493.189.979.363,1.451l-1.817.995.961,1.754,1.814-.993c.196.261.405.515.642.752.178.178.365.344.557.499l-1.052,1.772,1.72,1.021,1.053-1.775c.542.222,1.107.367,1.68.446v2.078h2v-2.087c.576-.085,1.143-.239,1.686-.468l1.134,1.862,1.708-1.04-1.13-1.856c.173-.142.341-.293.502-.454l.779-.779,1.488,1.488,1.414-1.414-1.488-1.488,1.672-1.672,1.488,1.488,1.414-1.414-1.488-1.488.779-.779c.161-.161.312-.329.455-.502l1.855,1.129,1.04-1.708-1.858-1.131c.228-.538.381-1.105.467-1.689h2.083Zm-16.5,6c-.828,0-1.5-.672-1.5-1.5s.672-1.5,1.5-1.5,1.5.672,1.5,1.5-.672,1.5-1.5,1.5Zm6-1c-.828,0-1.5-.672-1.5-1.5s.672-1.5,1.5-1.5,1.5.672,1.5,1.5-.672,1.5-1.5,1.5Zm1-6c-.828,0-1.5-.672-1.5-1.5s.672-1.5,1.5-1.5,1.5.672,1.5,1.5-.672,1.5-1.5,1.5Z"/>
+  </svg>
+);
 
 const BARANGAY_COORDS = {
   'Baclaran': [14.2450, 121.1630],
@@ -60,12 +82,12 @@ const CHO_UNIT_BARANGAYS = {
 // ── All disease cards split into 2 pages of 6 ──
 const DISEASE_PAGES = [
   [
-    { id: 1, name: 'Dengue Fever', dbName: 'Dengue', icon: <img src={feverIcon} alt="" style={diseaseImgStyle} />, color: '#ef4444', desc: 'A viral infection transmitted by Aedes mosquitoes, causing high fever and severe body aches.' },
-    { id: 2, name: 'Influenza A', dbName: 'Influenza A', icon: <img src={influenzaAIcon} alt="" style={diseaseImgStyle} />, color: '#f59e0b', desc: 'A highly contagious respiratory illness caused by influenza viruses, leading to seasonal outbreaks.' },
+    { id: 1, name: 'Dengue Fever', dbName: 'Dengue', icon: <FeverIcon color="#ef4444" />, color: '#ef4444', desc: 'A viral infection transmitted by Aedes mosquitoes, causing high fever and severe body aches.' },
+    { id: 2, name: 'Influenza A', dbName: 'Influenza A', icon: <InfluenzaAIcon color="#f59e0b" />, color: '#f59e0b', desc: 'A highly contagious respiratory illness caused by influenza viruses, leading to seasonal outbreaks.' },
     { id: 3, name: 'Covid-19', dbName: 'Covid-19', icon: '🛡️', color: '#3b82f6', desc: 'An infectious respiratory disease caused by the SARS-CoV-2 virus, requiring close contact tracing.' },
-    { id: 4, name: 'Leptospirosis', dbName: 'Leptospirosis', icon: <img src={leptospirosisIcon} alt="" style={diseaseImgStyle} />, color: '#10b981', desc: 'A bacterial disease spread through contaminated water, posing a high risk during flood seasons.' },
-    { id: 5, name: 'Tuberculosis', dbName: 'Tuberculosis', icon: <img src={tuberculosisIcon} alt="" style={diseaseImgStyle} />, color: '#f97316', desc: 'An infectious bacterial disease that primarily affects the lungs, requiring long-term treatment.' },
-    { id: 6, name: 'Typhoid Fever', dbName: 'Typhoid Fever', icon: <img src={typhoidIcon} alt="" style={diseaseImgStyle} />, color: '#8b5cf6', desc: 'A systemic infection caused by Salmonella Typhi, spread through contaminated food and water.' },
+    { id: 4, name: 'Leptospirosis', dbName: 'Leptospirosis', icon: <LeptospirosisIcon color="#10b981" />, color: '#10b981', desc: 'A bacterial disease spread through contaminated water, posing a high risk during flood seasons.' },
+    { id: 5, name: 'Tuberculosis', dbName: 'Tuberculosis', icon: <TuberculosisIcon color="#f97316" />, color: '#f97316', desc: 'An infectious bacterial disease that primarily affects the lungs, requiring long-term treatment.' },
+    { id: 6, name: 'Typhoid Fever', dbName: 'Typhoid Fever', icon: <TyphoidIcon color="#8b5cf6" />, color: '#8b5cf6', desc: 'A systemic infection caused by Salmonella Typhi, spread through contaminated food and water.' },
   ],
   [
     { id: 7, name: 'Cholera', dbName: 'Cholera', icon: '🌊', color: '#0ea5e9', desc: 'An acute diarrheal infection caused by ingestion of food or water contaminated with Vibrio cholerae.' },

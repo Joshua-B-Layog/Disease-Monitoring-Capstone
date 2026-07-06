@@ -36,6 +36,19 @@ function App() {
   const [loggedUserId, setLoggedUserId]   = useState(null);
   const [loggedUserBarangay, setLoggedUserBarangay] = useState(null);
 
+  const CHO_UNIT_BARANGAYS = {
+    'CHO Unit I (Sala)': ['Barangay Uno (Poblacion)', 'Barangay Dos (Poblacion)', 'Barangay Tres (Poblacion)', 'Sala', 'Bigaa', 'Butong', 'Marinig', 'Gulod', 'Niugan', 'Baclaran'],
+    'CHO Unit II (Pulo)': ['Pulo', 'Banay-Banay', 'Banlic', 'Mamatid', 'San Isidro', 'Diezmo', 'Pittland', 'Casile'],
+  };
+  const getChoUnitForBarangay = (barangay) => {
+    const norm = barangay.replace(/\(.*?\)/g, '').trim().toLowerCase();
+    for (const [unit, bList] of Object.entries(CHO_UNIT_BARANGAYS)) {
+      if (bList.some(b => b.replace(/\(.*?\)/g, '').trim().toLowerCase() === norm)) return unit;
+    }
+    return null;
+  };
+  const sidebarChoUnit = loginRole === 'CHO' ? sessionContext : getChoUnitForBarangay(loggedUserBarangay);
+
   const [profilePhoto, setProfilePhoto]   = useState(null);
 
   const [activeTab, setActiveTab]         = useState('Dashboard');  
@@ -328,7 +341,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
 
   return (
     <div className="dashboard-layout">
-      <Sidebar role={loginRole} activeTab={activeTab} setActiveTab={setActiveTab} language={language} />
+      <Sidebar role={loginRole} activeTab={activeTab} setActiveTab={setActiveTab} language={language} choUnit={sidebarChoUnit} />
 
       <div className="main-content">
         <div className="top-nav">
