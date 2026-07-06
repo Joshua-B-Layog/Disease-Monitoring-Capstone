@@ -737,22 +737,34 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       result = result.filter(c => c.status === filterStatus);
     }
     if (filterPurok !== 'All Puroks') {
+      const normalize = (s) => (s || '').toUpperCase().replace(/[.\-\s]/g, '');
+      const target = normalize(filterPurok);
       const comps = [...filterPurok.matchAll(/(Purok|Blk|Lot|Phase)\s+(\d+[A-Z]?)/gi)];
-      if (comps.length > 0) {
-        result = result.filter(c => {
-          const addr = (c.address || '').toUpperCase();
+
+      result = result.filter(c => {
+        const addr = c.address || '';
+        const parts = addr.split('|');
+        const purokPart = parts.length > 1 ? parts[1] : '';
+        const purokPartNormalized = normalize(purokPart);
+
+        // Exact match against the stored purok segment (handles "SouthVille 1A" and similar names)
+        if (purokPartNormalized === target) return true;
+
+        // Structured Purok/Blk/Lot/Phase component match (handles "Purok 2", "Blk 1 Lot 6", etc.)
+        if (comps.length > 0) {
+          const fullAddrUpper = addr.toUpperCase();
           return comps.every(([, type, num]) => {
             const reStr = type === 'Purok' ? `(?:PUROK|PRK)\\.?[\\s-]*${num}(?!\\d)` :
                           type === 'Blk'   ? `(?:BLK|BLOCK|B)\\.?[\\s-]*${num}(?!\\d)` :
                           type === 'Lot'   ? `(?:LOT|L)\\.?[\\s-]*${num}(?!\\d)` :
                           `(?:PHASE|PH)\\.?[\\s-]*${num}(?!\\d)`;
-            return new RegExp(reStr).test(addr);
+            return new RegExp(reStr).test(fullAddrUpper);
           });
-        });
-      } else {
-        const q = filterPurok.toLowerCase();
-        result = result.filter(c => (c.address || '').toLowerCase().includes(q));
-      }
+        }
+
+        // Fallback: plain substring match anywhere in the full address
+        return normalize(addr).includes(target);
+      });
     }
     return result;
   };
