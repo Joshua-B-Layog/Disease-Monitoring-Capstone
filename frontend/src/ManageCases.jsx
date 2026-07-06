@@ -216,6 +216,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const [inboxLoading, setInboxLoading] = useState(false);
   const [cardPage, setCardPage] = useState(0);
   const [selectedDisease, setSelectedDisease] = useState(null);
+  const gotoActiveRef = useRef(false);
   const [editingCase, setEditingCase] = useState(null);
   const [routingStep, setRoutingStep] = useState(null);
   const [routingData, setRoutingData] = useState(null);
@@ -312,7 +313,10 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     if (card) {
       setSelectedDisease(card);
       setFilterBarangay(targetBarangay || 'All Barangays');
-      if (caseFilter.purok) setFilterPurok(caseFilter.purok);
+      if (caseFilter.purok) {
+        gotoActiveRef.current = true;
+        setFilterPurok(caseFilter.purok);
+      }
       setSearchQuery('');
       setFilterStatus('All Status');
       setTablePage(1);
@@ -331,6 +335,14 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     if (setCaseFilter) setCaseFilter({ disease: '', barangay: '', purok: '' });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [caseFilter]);
+
+  // Reset purok filter when user manually switches disease card (not during Go To)
+  useEffect(() => {
+    if (!gotoActiveRef.current) {
+      setFilterPurok('All Puroks');
+    }
+    gotoActiveRef.current = false;
+  }, [selectedDisease]);
 
   useEffect(() => {
     if (initialView === 'inbox') {
@@ -588,7 +600,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
       if (e.key === 'Escape') {
         if (deleteTarget) { setDeleteTarget(null); return; }
-        if (view === 'add' || view === 'edit') { setView('list'); }
+        if (view === 'add' || view === 'edit') { setView('list'); setFilterPurok('All Puroks'); }
       }
 
       if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
@@ -1621,7 +1633,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
     return (
       <div style={{ padding: compactMode ? '14px' : '28px', fontSize: `calc(14px * ${fs})` }}>
-        <button onClick={() => setView('list')}
+        <button onClick={() => { setView('list'); setFilterPurok('All Puroks'); }}
           style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', marginBottom: '20px', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
           ← Back to {selectedDisease?.name} Cases
         </button>
@@ -2214,7 +2226,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
             {/* Action buttons */}
             <div style={{ display: 'flex', justifyContent: 'center', gap: '14px', paddingTop: '24px', borderTop: '1px solid #e2e8f0' }}>
-              <button type="button" onClick={() => setView('list')}
+              <button type="button" onClick={() => { setView('list'); setFilterPurok('All Puroks'); }}
                 style={{ padding: '10px 32px', borderRadius: '6px', border: 'none', background: '#e2e8f0', color: '#475569', cursor: 'pointer', fontWeight: '500' }}>
                 Cancel
               </button>
