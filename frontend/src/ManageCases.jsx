@@ -216,7 +216,6 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const [inboxLoading, setInboxLoading] = useState(false);
   const [cardPage, setCardPage] = useState(0);
   const [selectedDisease, setSelectedDisease] = useState(null);
-  const gotoActiveRef = useRef(false);
   const [editingCase, setEditingCase] = useState(null);
   const [routingStep, setRoutingStep] = useState(null);
   const [routingData, setRoutingData] = useState(null);
@@ -303,7 +302,6 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
   // ── Handle incoming caseFilter from MapView "Go To →" ──
   useEffect(() => {
-    console.log('[ManageCases] caseFilter received:', caseFilter);
     if (!caseFilter || (!caseFilter.disease && !caseFilter.barangay)) return;
 
     const targetDisease = caseFilter.disease || '';
@@ -315,9 +313,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       setSelectedDisease(card);
       setFilterBarangay(targetBarangay || 'All Barangays');
       if (caseFilter.purok) {
-        gotoActiveRef.current = true;
         setFilterPurok(caseFilter.purok);
-        console.log('[caseFilter effect] set filterPurok to:', caseFilter.purok);
       }
       setSearchQuery('');
       setFilterStatus('All Status');
@@ -337,15 +333,6 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     if (setCaseFilter) setCaseFilter({ disease: '', barangay: '', purok: '' });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [caseFilter]);
-
-  // Reset purok filter when user manually switches disease card (not during Go To)
-  useEffect(() => {
-    if (gotoActiveRef.current) {
-      gotoActiveRef.current = false;
-      return;
-    }
-    setFilterPurok('All Puroks');
-  }, [selectedDisease]);
 
   useEffect(() => {
     if (initialView === 'inbox') {
@@ -740,26 +727,23 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       result = result.filter(c => c.status === filterStatus);
     }
     if (filterPurok !== 'All Puroks') {
-      console.log('[getFilteredCases] filterPurok =', JSON.stringify(filterPurok), 'total cases before purok filter:', result.length, 'sample addresses:', result.slice(0, 5).map(c => c.address));
       const normalize = (s) => (s || '').toUpperCase().replace(/[.\-\s]/g, '');
       const target = normalize(filterPurok);
       const comps = [...filterPurok.matchAll(/(Purok|Blk|Lot|Phase)\s+(\d+[A-Z]?)/gi)];
-      console.log('[purok filter] target:', target, 'comps:', comps.map(c => ({ type: c[1], num: c[2] })));
 
       result = result.filter(c => {
         const addr = c.address || '';
         const parts = addr.split('|');
         const purokPart = parts.length > 1 ? parts[1] : '';
         const purokPartNormalized = normalize(purokPart);
-        let matched = false;
 
         // Exact match against the stored purok segment (handles "SouthVille 1A" and similar names)
-        if (purokPartNormalized === target) { matched = true; }
+        if (purokPartNormalized === target) return true;
 
         // Structured Purok/Blk/Lot/Phase component match (handles "Purok 2", "Blk 1 Lot 6", etc.)
-        if (!matched && comps.length > 0) {
+        if (comps.length > 0) {
           const fullAddrUpper = addr.toUpperCase();
-          matched = comps.every(([, type, num]) => {
+          return comps.every(([, type, num]) => {
             const reStr = type === 'Purok' ? `(?:PUROK|PRK)\\.?[\\s-]*${num}(?!\\d)` :
                           type === 'Blk'   ? `(?:BLK|BLOCK|B)\\.?[\\s-]*${num}(?!\\d)` :
                           type === 'Lot'   ? `(?:LOT|L)\\.?[\\s-]*${num}(?!\\d)` :
@@ -769,12 +753,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         }
 
         // Fallback: plain substring match anywhere in the full address
-        if (!matched) {
-          matched = normalize(addr).includes(target);
-        }
-
-        console.log('[purok filter] case id:', c.case_id, 'address:', JSON.stringify(addr), '→', matched ? 'KEPT' : 'DROPPED', '(purokPart:', JSON.stringify(purokPart), '| norm:', purokPartNormalized, '| target:', target, ')');
-        return matched;
+        return normalize(addr).includes(target);
       });
     }
     return result;
@@ -1136,6 +1115,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               <div key={disease.id}
                 onClick={() => {
                   setSelectedDisease(disease);
+                  setFilterPurok('All Puroks');
                   setTablePage(1);
                   setSearchQuery('');
                   setFilterBarangay('All Barangays');
