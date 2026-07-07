@@ -676,7 +676,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     setPopup(null);
   };
 
-  const activeData  = filterBarangay !== 'All Barangays' && purokData.length > 0 ? purokData : hotspotData;
+  const activeData  = (filterBarangay !== 'All Barangays' || loginRole === 'BHW') && purokData.length > 0 ? purokData : barangayData;
   const highCount   = activeData.filter(b => b.totalCases > 20).length;
   const mediumCount = activeData.filter(b => b.totalCases >= 10 && b.totalCases <= 20).length;
   const lowCount    = activeData.filter(b => b.totalCases < 10).length;
