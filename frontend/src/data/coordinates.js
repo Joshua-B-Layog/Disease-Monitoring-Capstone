@@ -52,15 +52,47 @@ export function getPointInBarangay(geoJsonFeature, seedKey) {
   const geometry = geoJsonFeature.geometry;
   const { minLng, maxLng, minLat, maxLat } = getBoundingBox(geometry);
 
-  for (let attempt = 0; attempt < 60; attempt++) {
+  const w = maxLng - minLng;
+  const h = maxLat - minLat;
+
+  // Divide bbox into 6 vertical strips so purok pins spread across the barangay
+  const purokMatch = seedKey.match(/Purok\s+(\d+)/);
+  let strip;
+  if (purokMatch) {
+    const num = parseInt(purokMatch[1], 10);
+    if (num >= 1 && num <= 5) {
+      strip = num - 1; // P1→0, P2→1, P3→2, P4→3, P5→4
+    } else {
+      strip = Math.floor(seededRandom(seedKey + '_strip') * 6);
+    }
+  } else {
+    strip = Math.floor(seededRandom(seedKey + '_strip') * 6);
+  }
+
+  const stripMinLng = minLng + strip * (w / 6);
+  const stripMaxLng = minLng + (strip + 1) * (w / 6);
+
+  for (let attempt = 0; attempt < 120; attempt++) {
     const rx = seededRandom(seedKey + '#' + attempt);
     const ry = seededRandom(seedKey + '@' + attempt);
-    const lng = minLng + rx * (maxLng - minLng);
-    const lat = minLat + ry * (maxLat - minLat);
+    const lng = stripMinLng + rx * (stripMaxLng - stripMinLng);
+    const lat = minLat + ry * h;
     if (pointInFeature(lng, lat, geometry)) {
       return [lat, lng];
     }
   }
+
+  // Fallback: full bounding box
+  for (let attempt = 0; attempt < 60; attempt++) {
+    const rx = seededRandom(seedKey + '_fb#' + attempt);
+    const ry = seededRandom(seedKey + '_fb@' + attempt);
+    const lng = minLng + rx * w;
+    const lat = minLat + ry * h;
+    if (pointInFeature(lng, lat, geometry)) {
+      return [lat, lng];
+    }
+  }
+
   return null;
 }
 
