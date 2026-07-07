@@ -588,7 +588,10 @@ export default function CHOSettings({
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <h2 style={{ fontSize: '24px', fontWeight: '600', color: 'var(--text-main)', margin: 0 }}>{displayName}</h2>
                     <p style={{ fontSize: '14px', color: 'var(--text-muted)', margin: 0 }}>
-                      {activeUser?.role || 'CHO'} Specialist — {profile.assignment || activeUser?.context || ''}
+                      {activeUser?.role === 'BHW'
+                        ? `BHW — ${profile.assignment || activeUser?.context || ''}`
+                        : `${activeUser?.role || 'CHO'} Specialist — ${profile.assignment || activeUser?.context || ''}`
+                      }
                     </p>
                     <button onClick={() => fileInputRef.current.click()}
                       style={{ background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '8px 18px', fontSize: '14px', fontWeight: '500', cursor: 'pointer', marginTop: '6px', width: 'fit-content' }}>

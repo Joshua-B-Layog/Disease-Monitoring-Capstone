@@ -723,7 +723,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                   fontSize: '10px', opacity: 0.6, flexShrink: 0, marginLeft: '8px',
                   transition: 'transform 0.2s', display: 'inline-block',
                   transform: barangayOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                }}>▾</span>
+                }}>▼</span>
               </button>
               {barangayOpen && (
                 <div style={{
@@ -821,7 +821,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                 fontSize: '10px', opacity: 0.6, flexShrink: 0, marginLeft: '8px',
                 transition: 'transform 0.2s', display: 'inline-block',
                 transform: purokOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-              }}>▾</span>
+              }}>▼</span>
             </button>
             {purokOpen && (
               <div style={{

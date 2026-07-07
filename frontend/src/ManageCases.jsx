@@ -1410,7 +1410,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                   <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
                 </svg>
-                Export ▾
+                Export ▼
               </button>
               {showExportMenu && (
                 <div style={{ position: 'absolute', top: '110%', right: 0, width: '180px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
@@ -1458,7 +1458,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               <div style={{ position: 'relative' }} ref={barangayRef}>
                 <button className="mc-custom-dropdown-btn" onClick={() => setBarangayOpen(!barangayOpen)}>
                   <span>{filterBarangay}</span>
-                  <span style={{ marginLeft: '6px', opacity: 0.6 }}>▾</span>
+                  <span style={{ marginLeft: '6px', opacity: 0.6 }}>▼</span>
                 </button>
                 {barangayOpen && (
                   <div className="mc-custom-dropdown-panel">
@@ -1487,7 +1487,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               <div style={{ position: 'relative' }} ref={purokRef}>
                 <button className="mc-custom-dropdown-btn" onClick={() => setPurokOpen(!purokOpen)}>
                   <span>{filterPurok}</span>
-                  <span style={{ marginLeft: '6px', opacity: 0.6 }}>▾</span>
+                  <span style={{ marginLeft: '6px', opacity: 0.6 }}>▼</span>
                 </button>
                 {purokOpen && (
                   <div className="mc-custom-dropdown-panel">
@@ -1538,7 +1538,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   }}
                 >
                   <span>{filterSubDisease === 'All Remaining Diseases' ? 'Remaining Diseases' : filterSubDisease}</span>
-                  <span style={{ opacity: 0.6 }}>▾</span>
+                  <span style={{ opacity: 0.6 }}>▼</span>
                 </button>
                 {subDiseaseOpen && (
                   <div style={{
@@ -2025,7 +2025,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           fontSize: '10px', opacity: 0.6, marginLeft: '8px',
                           transition: 'transform 0.2s', display: 'inline-block',
                           transform: purokOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                        }}>▾</span>
+                        }}>▼</span>
                       </button>
                       {purokOpen && (
                         <div style={{
@@ -2088,7 +2088,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           fontSize: '10px', opacity: 0.6, marginLeft: '8px',
                           transition: 'transform 0.2s', display: 'inline-block',
                           transform: barangayFormOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                        }}>▾</span>
+                        }}>▼</span>
                       </button>
                       {barangayFormOpen && (
                         <div style={{
@@ -2160,7 +2160,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         fontSize: '10px', opacity: 0.6, marginLeft: '8px',
                         transition: 'transform 0.2s', display: 'inline-block',
                         transform: diseaseOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                      }}>▾</span>
+                      }}>▼</span>
                     </button>
                     {diseaseOpen && (
                       <div style={{

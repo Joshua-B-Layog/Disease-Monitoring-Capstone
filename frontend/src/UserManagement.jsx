@@ -326,7 +326,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
               style={{ ...inputStyle, width: '100%', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}
             >
               <span>{filterBarangay}</span>
-              <span style={{ marginLeft: '6px', opacity: 0.6 }}>▾</span>
+              <span style={{ marginLeft: '6px', opacity: 0.6 }}>▼</span>
             </button>
             {barangayOpen && (
               <div style={{

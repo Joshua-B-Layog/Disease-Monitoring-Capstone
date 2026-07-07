@@ -685,7 +685,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                 <div style={{ position: 'relative' }}>
                   <button onClick={() => setShowDownloadMenu(showDownloadMenu === file.id ? null : file.id)}
                     style={{ padding: '6px 14px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', color: '#475569', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    ⬇ Download ▾
+                    ⬇ Download ▼
                   </button>
                   {showDownloadMenu === file.id && (
                     <div style={{ position: 'absolute', top: '110%', right: 0, background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 300, minWidth: '160px', overflow: 'hidden' }}>

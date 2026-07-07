@@ -552,7 +552,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                     className="dropdown-item"
                     onClick={openProfileModal}
                   >
-                    {t('CHO Profile')}
+                    {loginRole === 'BHW' ? 'BHW Profile' : t('CHO Profile')}
                   </div>
                   <div
                     className="dropdown-item"
@@ -613,7 +613,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                   {loggedUser || 'System Officer'}
                 </h2>
                 <p style={{ margin: 0, color: 'rgba(255,255,255,0.75)', fontSize: '14px' }}>
-                  {loginRole} Specialist — {sessionContext}
+                  {loginRole === 'BHW' ? `BHW — ${sessionContext}` : `${loginRole} Specialist — ${sessionContext}`}
                 </p>
               </div>
             </div>

@@ -815,7 +815,7 @@ const handleLoginOtpSubmit = async (e) => {
                                         fontSize: '24px', opacity: 0.6, marginLeft: '8px',
                                         transition: 'transform 0.2s', display: 'inline-block',
                                         transform: signupBarangayOpen ? 'rotate(180deg)' : 'rotate(0deg)'
-                                    }}>▾</span>
+                                    }}>▼</span>
                                 </button>
                                 {signupBarangayOpen && (
                                     <div style={{
