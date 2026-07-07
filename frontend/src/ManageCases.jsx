@@ -1786,22 +1786,10 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
                       const barangayName = matchedBarangay?.name || barangayList.find(b => String(b.id) === String(formData.barangayId))?.name || '';
 
-                      // Prefer purok offset coordinates over Nominatim
-                      const purokCoords = unit && barangayName
-                        ? findPurokCoords(barangayName, unit, BARANGAY_COORDS)
-                        : null;
-                      if (purokCoords) {
-                        const targetB = matchedBarangay || (formData.barangayId
-                          ? barangayList.find(b => String(b.id) === String(formData.barangayId))
-                          : null);
-                        setFormData(prev => ({
-                          ...prev,
-                          barangayId: String(targetB?.id || prev.barangayId),
-                          lat: String(purokCoords[0]),
-                          lng: String(purokCoords[1]),
-                        }));
-                      } else {
+                      // Try Nominatim first for most accurate geocoding
                       const fullQuery = [addr, barangayName, 'Cabuyao', 'Laguna', 'Philippines'].filter(Boolean).join(', ');
+
+                      let coordsResolved = false;
 
                       try {
                         const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(fullQuery)}&format=json&limit=1`);
@@ -1813,23 +1801,29 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                             lat: parseFloat(data[0].lat).toFixed(6),
                             lng: parseFloat(data[0].lon).toFixed(6),
                           }));
-                        } else {
+                          coordsResolved = true;
+                        }
+                      } catch (_) {}
+
+                      if (!coordsResolved) {
+                        const purokCoords = unit && barangayName
+                          ? findPurokCoords(barangayName, unit, BARANGAY_COORDS)
+                          : null;
+                        if (purokCoords) {
                           const targetB = matchedBarangay || (formData.barangayId
                             ? barangayList.find(b => String(b.id) === String(formData.barangayId))
                             : null);
-                          if (targetB) {
-                            const fallbackCoords = BARANGAY_COORDS[targetB.name];
-                            if (fallbackCoords) {
-                              setFormData(prev => ({
-                                ...prev,
-                                barangayId: String(targetB.id),
-                                lat: String(fallbackCoords[0]),
-                                lng: String(fallbackCoords[1]),
-                              }));
-                            }
-                          }
+                          setFormData(prev => ({
+                            ...prev,
+                            barangayId: String(targetB?.id || prev.barangayId),
+                            lat: String(purokCoords[0]),
+                            lng: String(purokCoords[1]),
+                          }));
+                          coordsResolved = true;
                         }
-                      } catch (_) {
+                      }
+
+                      if (!coordsResolved) {
                         const targetB = matchedBarangay || (formData.barangayId
                           ? barangayList.find(b => String(b.id) === String(formData.barangayId))
                           : null);
@@ -1844,7 +1838,6 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                             }));
                           }
                         }
-                      }
                       }
                     }}
                       onKeyDown={async (e) => {
@@ -1880,22 +1873,10 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
                       const barangayName = matchedBarangay?.name || barangayList.find(b => String(b.id) === String(formData.barangayId))?.name || '';
 
-                      // Prefer purok offset coordinates over Nominatim
-                      const purokCoords = unit && barangayName
-                        ? findPurokCoords(barangayName, unit, BARANGAY_COORDS)
-                        : null;
-                      if (purokCoords) {
-                        const targetB = matchedBarangay || (formData.barangayId
-                          ? barangayList.find(b => String(b.id) === String(formData.barangayId))
-                          : null);
-                        setFormData(prev => ({
-                          ...prev,
-                          barangayId: String(targetB?.id || prev.barangayId),
-                          lat: String(purokCoords[0]),
-                          lng: String(purokCoords[1]),
-                        }));
-                      } else {
+                      // Try Nominatim first for most accurate geocoding
                       const fullQuery = [addr, barangayName, 'Cabuyao', 'Laguna', 'Philippines'].filter(Boolean).join(', ');
+
+                      let coordsResolved = false;
 
                       try {
                         const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(fullQuery)}&format=json&limit=1`);
@@ -1907,23 +1888,29 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                             lat: parseFloat(data[0].lat).toFixed(6),
                             lng: parseFloat(data[0].lon).toFixed(6),
                           }));
-                        } else {
+                          coordsResolved = true;
+                        }
+                      } catch (_) {}
+
+                      if (!coordsResolved) {
+                        const purokCoords = unit && barangayName
+                          ? findPurokCoords(barangayName, unit, BARANGAY_COORDS)
+                          : null;
+                        if (purokCoords) {
                           const targetB = matchedBarangay || (formData.barangayId
                             ? barangayList.find(b => String(b.id) === String(formData.barangayId))
                             : null);
-                          if (targetB) {
-                            const fallbackCoords = BARANGAY_COORDS[targetB.name];
-                            if (fallbackCoords) {
-                              setFormData(prev => ({
-                                ...prev,
-                                barangayId: String(targetB.id),
-                                lat: String(fallbackCoords[0]),
-                                lng: String(fallbackCoords[1]),
-                              }));
-                            }
-                          }
+                          setFormData(prev => ({
+                            ...prev,
+                            barangayId: String(targetB?.id || prev.barangayId),
+                            lat: String(purokCoords[0]),
+                            lng: String(purokCoords[1]),
+                          }));
+                          coordsResolved = true;
                         }
-                      } catch (_) {
+                      }
+
+                      if (!coordsResolved) {
                         const targetB = matchedBarangay || (formData.barangayId
                           ? barangayList.find(b => String(b.id) === String(formData.barangayId))
                           : null);
@@ -1938,7 +1925,6 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                             }));
                           }
                         }
-                      }
                       }
                     }} />
                 </div>
