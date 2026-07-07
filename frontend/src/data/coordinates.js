@@ -52,6 +52,10 @@ export function getPointInBarangay(geoJsonFeature, seedKey) {
   const geometry = geoJsonFeature.geometry;
   const { minLng, maxLng, minLat, maxLat } = getBoundingBox(geometry);
 
+  // Niugan Mabitac phases — specific coordinates
+  if (seedKey === 'Niugan|Mabitac Phase 1' || seedKey === 'Niugan|Phase 1') return [14.2602, 121.1283];
+  if (seedKey === 'Niugan|Mabitac Phase 2' || seedKey === 'Niugan|Phase 2') return [14.2613, 121.1285];
+
   const w = maxLng - minLng;
   const h = maxLat - minLat;
 

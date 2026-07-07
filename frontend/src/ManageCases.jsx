@@ -170,6 +170,9 @@ function extractLocationUnit(address) {
     || a.match(/\bL\.?\s*(\d+[A-Z]?)(?=\s|,|$|[A-Z])/);
   if (lotMatch) found.lot = lotMatch[1];
 
+  const mabitacMatch = a.match(/\bMABITAC\s+PHASE\s*(\d+)\b/);
+  if (mabitacMatch) return `Mabitac Phase ${mabitacMatch[1]}`;
+
   const phaseMatch = a.match(/\bPHASE\s*(\d+)\b/)
     || a.match(/\bPH\.?\s*(\d+)\b/);
   if (phaseMatch) found.phase = phaseMatch[1];
