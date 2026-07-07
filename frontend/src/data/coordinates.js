@@ -55,41 +55,57 @@ export function getPointInBarangay(geoJsonFeature, seedKey) {
   const w = maxLng - minLng;
   const h = maxLat - minLat;
 
-  // Divide bbox into 6 vertical strips so purok pins spread across the barangay
+  // Assign a grid cell (3 cols × 2 rows) so puroks spread horizontally and vertically
+  let col, row;
   const purokMatch = seedKey.match(/Purok\s+(\d+)/);
-  let strip;
   if (purokMatch) {
     const num = parseInt(purokMatch[1], 10);
-    if (num >= 1 && num <= 5) {
-      strip = num - 1; // P1→0, P2→1, P3→2, P4→3, P5→4
+    const mapping = { 1: [0,0], 2: [1,0], 3: [2,0], 4: [0,1], 5: [1,1] };
+    if (mapping[num]) {
+      col = mapping[num][0];
+      row = mapping[num][1];
     } else {
-      strip = Math.floor(seededRandom(seedKey + '_strip') * 6);
+      const i = Math.floor(seededRandom(seedKey + '_cell') * 6);
+      col = i % 3;
+      row = Math.floor(i / 3);
     }
   } else {
-    strip = Math.floor(seededRandom(seedKey + '_strip') * 6);
+    const i = Math.floor(seededRandom(seedKey + '_cell') * 6);
+    col = i % 3;
+    row = Math.floor(i / 3);
   }
 
-  const stripMinLng = minLng + strip * (w / 6);
-  const stripMaxLng = minLng + (strip + 1) * (w / 6);
+  // Cell boundaries
+  const cellMinLng = minLng + col * (w / 3);
+  const cellMaxLng = minLng + (col + 1) * (w / 3);
+  const cellMinLat = minLat + row * (h / 2);
+  const cellMaxLat = minLat + (row + 1) * (h / 2);
 
-  for (let attempt = 0; attempt < 120; attempt++) {
-    const rx = seededRandom(seedKey + '#' + attempt);
-    const ry = seededRandom(seedKey + '@' + attempt);
-    const lng = stripMinLng + rx * (stripMaxLng - stripMinLng);
-    const lat = minLat + ry * h;
-    if (pointInFeature(lng, lat, geometry)) {
-      return [lat, lng];
+  const cellW = cellMaxLng - cellMinLng;
+  const cellH = cellMaxLat - cellMinLat;
+  const GRID = 16;
+
+  // Systematic 16x16 scan of the cell with per-subcell dithering
+  for (let gy = 0; gy < GRID; gy++) {
+    for (let gx = 0; gx < GRID; gx++) {
+      const dither = seededRandom(seedKey + '_d_' + gy + '_' + gx);
+      const lng = cellMinLng + (gx + dither * 0.9) * cellW / GRID;
+      const lat = cellMinLat + (gy + dither * 0.9) * cellH / GRID;
+      if (pointInFeature(lng, lat, geometry)) {
+        return [lat, lng];
+      }
     }
   }
 
-  // Fallback: full bounding box
-  for (let attempt = 0; attempt < 60; attempt++) {
-    const rx = seededRandom(seedKey + '_fb#' + attempt);
-    const ry = seededRandom(seedKey + '_fb@' + attempt);
-    const lng = minLng + rx * w;
-    const lat = minLat + ry * h;
-    if (pointInFeature(lng, lat, geometry)) {
-      return [lat, lng];
+  // Fallback: full bbox 16x16 scan
+  for (let gy = 0; gy < GRID; gy++) {
+    for (let gx = 0; gx < GRID; gx++) {
+      const dither = seededRandom(seedKey + '_fb_d_' + gy + '_' + gx);
+      const lng = minLng + (gx + dither * 0.9) * w / GRID;
+      const lat = minLat + (gy + dither * 0.9) * h / GRID;
+      if (pointInFeature(lng, lat, geometry)) {
+        return [lat, lng];
+      }
     }
   }
 
