@@ -1,42 +1,67 @@
-// Approximate offsets (lat, lng) for purok/blk/lot/phase markers relative to barangay center
-const PUROK_OFFSETS = {
-  'Purok 1': [-0.004, -0.006],  'Purok 2': [0.004, -0.004],
-  'Purok 3': [0.002, 0.005],    'Purok 4': [-0.005, 0.003],
-  'Purok 5': [0.006, -0.002],   'Purok 6': [-0.003, 0.007],
-  'Blk 1': [-0.007, -0.005],    'Blk 2': [0.005, 0.006],
-  'Blk 3': [-0.002, -0.007],    'Blk 4': [0.007, 0.003],
-  'Blk 5': [-0.006, 0.004],     'Phase 1': [0.004, -0.008],
-  'Phase 2': [-0.004, 0.008],   'Phase 3': [0.008, 0.002],
-  'Lot 1': [-0.008, -0.002],    'Lot 2': [0.003, -0.009],
-  'Lot 3': [-0.003, 0.009],     'Lot 4': [0.009, 0.004],
-  'Lot 5': [-0.009, 0.006],
-  'Southville 1A': [-0.010, 0.008],
-  'Southville 1B': [-0.008, 0.010],
-  'Southville 2':  [-0.012, 0.006],
-  'Southville 3':  [-0.006, 0.012],
-};
-
-export function findPurokCoords(barangay, purok, barangayCoords) {
-  if (!barangay || !purok) return null;
-  const center = barangayCoords[barangay];
-  if (!center) return null;
-
-  const exact = PUROK_OFFSETS[purok];
-  if (exact) return [center[0] + exact[0], center[1] + exact[1]];
-
-  // Compound string like "Blk 2 Purok 5" — sum individual offsets
-  const parts = purok.split(/\s+/);
-  if (parts.length >= 2) {
-    let latOff = 0, lngOff = 0, found = false;
-    for (let i = 0; i < parts.length; i += 2) {
-      const key = parts[i] + ' ' + (parts[i + 1] || '');
-      const off = PUROK_OFFSETS[key];
-      if (off) { latOff += off[0]; lngOff += off[1]; found = true; }
-    }
-    if (found) return [center[0] + latOff, center[1] + lngOff];
+function seededRandom(seed) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) {
+    h = (Math.imul(31, h) + seed.charCodeAt(i)) | 0;
   }
+  h ^= h << 13; h ^= h >>> 17; h ^= h << 5;
+  return ((h >>> 0) % 1000000) / 1000000;
+}
 
+function pointInRing(lng, lat, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    const intersect =
+      (yi > lat) !== (yj > lat) &&
+      lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function pointInFeature(lng, lat, geometry) {
+  if (!geometry) return false;
+  if (geometry.type === 'Polygon') {
+    return pointInRing(lng, lat, geometry.coordinates[0]);
+  }
+  if (geometry.type === 'MultiPolygon') {
+    return geometry.coordinates.some(poly => pointInRing(lng, lat, poly[0]));
+  }
+  return false;
+}
+
+function getBoundingBox(geometry) {
+  let coords = [];
+  if (geometry.type === 'Polygon') coords = geometry.coordinates[0];
+  else if (geometry.type === 'MultiPolygon') {
+    geometry.coordinates.forEach(poly => { coords = coords.concat(poly[0]); });
+  }
+  let minLng = Infinity, maxLng = -Infinity, minLat = Infinity, maxLat = -Infinity;
+  coords.forEach(([lng, lat]) => {
+    if (lng < minLng) minLng = lng;
+    if (lng > maxLng) maxLng = lng;
+    if (lat < minLat) minLat = lat;
+    if (lat > maxLat) maxLat = lat;
+  });
+  return { minLng, maxLng, minLat, maxLat };
+}
+
+export function getPointInBarangay(geoJsonFeature, seedKey) {
+  if (!geoJsonFeature || !geoJsonFeature.geometry) return null;
+  const geometry = geoJsonFeature.geometry;
+  const { minLng, maxLng, minLat, maxLat } = getBoundingBox(geometry);
+
+  for (let attempt = 0; attempt < 60; attempt++) {
+    const rx = seededRandom(seedKey + '#' + attempt);
+    const ry = seededRandom(seedKey + '@' + attempt);
+    const lng = minLng + rx * (maxLng - minLng);
+    const lat = minLat + ry * (maxLat - minLat);
+    if (pointInFeature(lng, lat, geometry)) {
+      return [lat, lng];
+    }
+  }
   return null;
 }
 
-export default PUROK_OFFSETS;
+export default {};

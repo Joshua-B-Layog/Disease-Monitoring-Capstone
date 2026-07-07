@@ -7,7 +7,7 @@ import { API_URL } from './config';
 import { GeoJSON } from 'react-leaflet';
 import cabuyaoBoundaries from './data/cabuyao_barangays.geojson.json';
 import cabuyaoGeoJSON from './data/cabuyao_barangays.geojson';
-import PUROK_OFFSETS, { findPurokCoords } from './data/coordinates';
+import { getPointInBarangay } from './data/coordinates';
 
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -328,7 +328,13 @@ const getPurokGroups = (barangayName, cases) => {
     barangay: barangayName,
     coords: g.validCoordCount > 0
       ? [g.latSum / g.validCoordCount, g.lngSum / g.validCoordCount]
-      : findPurokCoords(barangayName, g.purok, BARANGAY_COORDS) || centroid,
+      : (() => {
+          const feature = cabuyaoBoundaries.features.find(f => {
+            const mapped = GEOJSON_TO_DB_NAME[f.properties.ADM4_EN] || f.properties.ADM4_EN;
+            return norm(mapped) === norm(barangayName);
+          });
+          return getPointInBarangay(feature, `${barangayName}|${g.purok}`) || centroid;
+        })(),
     totalCases: g.cases.length,
     diseases: g.cases.reduce((acc, c) => {
       const d = c.disease_name || 'Unknown';
