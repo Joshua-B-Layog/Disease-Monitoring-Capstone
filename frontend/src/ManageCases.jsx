@@ -108,10 +108,10 @@ const KNOWN_DB_NAMES = DISEASE_PAGES.flat()
   .map(d => d.dbName.toLowerCase());
 
 const ALL_DISEASE_OPTIONS = [
-  'Dengue','Influenza A','Covid-19','Leptospirosis','Tuberculosis','Typhoid Fever',
+  'Dengue','Diarrhea','Covid-19','Leptospirosis','Tuberculosis','Typhoid Fever',
   'Cholera','Measles','Hepatitis A','Hepatitis B','Rabies',
   'Acute Respiratory Infection','Avian Influenza','Chickenpox','Diphtheria','Ebola',
-  'Hand Foot and Mouth Disease','Hepatitis C','HIV/AIDS','Influenza','Influenza A (H1N1)',
+  'Hand Foot and Mouth Disease','Hepatitis C','HIV/AIDS','Influenza',
   'Leprosy','Malaria','Meningococcemia','Pertussis','Poliomyelitis','SARS','Sore Eyes',
 ];
 

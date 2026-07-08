@@ -72,22 +72,24 @@ CREATE TABLE `diseases` (
 --
 
 INSERT INTO `diseases` (`id`, `name`) VALUES
-(3, 'Acute Respiratory Infection'),
-(4, 'Avian Influenza'),
-(5, 'Chickenpox'),
-(6, 'Cholera'),
-(8, 'Covid-19'),
-(7, 'Dengue'),
-(9, 'Diphtheria'),
-(10, 'Ebola'),
-(11, 'Hand Foot and Mouth Disease'),
-(12, 'Hepatitis A'),
-(13, 'Hepatitis B'),
-(14, 'Hepatitis C'),
-(15, 'HIV/AIDS'),
-(16, 'Influenza'),
-(17, 'Influenza A (H1N1)'),
-(18, 'Leprosy'),
+(1, 'Acute Respiratory Infection'),
+(2, 'Avian Influenza'),
+(3, 'Chickenpox'),
+(4, 'Cholera'),
+(5, 'Covid-19'),
+(6, 'Dengue'),
+(7, 'Diarrhea'),
+(8, 'Diphtheria'),
+(9, 'Ebola'),
+(10, 'Hand Foot and Mouth Disease'),
+(11, 'Hepatitis A'),
+(12, 'Hepatitis B'),
+(13, 'Hepatitis C'),
+(14, 'HIV/AIDS'),
+(15, 'Influenza'),
+(16, 'Influenza A'),
+(17, 'Leprosy'),
+(18, 'Leptospirosis'),
 (19, 'Malaria'),
 (20, 'Measles'),
 (21, 'Meningococcemia'),
@@ -96,8 +98,8 @@ INSERT INTO `diseases` (`id`, `name`) VALUES
 (24, 'Rabies'),
 (25, 'SARS'),
 (26, 'Sore Eyes'),
-(1, 'Tuberculosis'),
-(2, 'Typhoid Fever');
+(27, 'Tuberculosis'),
+(28, 'Typhoid Fever');
 
 -- --------------------------------------------------------
 
@@ -129,19 +131,19 @@ CREATE TABLE `disease_cases` (
 --
 
 INSERT INTO `disease_cases` (`case_id`, `patient_name`, `barangay_id`, `status`, `date_reported`, `disease_id`, `severity`, `age`, `gender`, `contact`, `onset_date`, `address`, `symptoms`, `physician`, `latitude`, `longitude`) VALUES
-(1, 'Juan Dela Cruz', 1, 'Active', '2026-05-28 01:02:58', 1, 'Severe', 24, 'Male', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(2, 'Maria Santos', 2, 'Active', '2026-05-28 01:02:58', 1, 'Moderate', 15, 'Male', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(3, 'Pedro Reyes', 3, 'Active', '2026-05-28 01:02:58', 1, 'Mild', 19, 'Male', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(4, 'Ana Lim', 1, 'Active', '2026-05-28 01:02:58', 2, 'Asymptomatic', 35, 'Male', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(5, 'Lim Anthony', 4, 'Active', '2026-05-28 01:02:58', 2, 'Asymptomatic', 20, 'Male', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(6, 'Kara Leam', 2, 'Active', '2026-05-28 01:02:58', 6, 'Asymptomatic', 28, 'Male', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(7, 'Anastasia Kim', 2, 'Active', '2026-05-28 01:02:58', 6, 'Asymptomatic', 57, 'Male', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(8, 'Pang Subaru', 5, 'Active', '2026-05-28 01:02:58', 6, 'Asymptomatic', 34, 'Male', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(9, 'Limuel Sam', 1, 'Under Treatment', '2026-05-28 01:02:58', 7, 'Asymptomatic', 9, 'Male', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(10, 'Apprel Kia', 3, 'Active', '2026-05-28 01:02:58', 8, 'Asymptomatic', 17, 'Male', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(11, 'John Smith', 6, 'Deceased', '2026-05-28 01:02:58', 8, 'Asymptomatic', 42, 'Male', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(12, 'Kara Touche', 2, 'Active', '2026-05-28 01:02:58', 9, 'Asymptomatic', 21, 'Male', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(13, 'Limuel Sam', 15, 'Recovered', '2026-06-16 01:27:36', 7, 'Moderate', 21, 'Male', '09445651201', NULL, '992 Niugan Cabuyao City Laguna', 'dasdadasda', 'Dr. Jose Reyes', 14.263300, 121.127300);
+(1, 'Juan Dela Cruz', 1, 'Active', '2026-05-28 01:02:58', 27, 'Severe', 24, 'Male', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(2, 'Maria Santos', 2, 'Active', '2026-05-28 01:02:58', 27, 'Moderate', 15, 'Male', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(3, 'Pedro Reyes', 3, 'Active', '2026-05-28 01:02:58', 27, 'Mild', 19, 'Male', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(4, 'Ana Lim', 1, 'Active', '2026-05-28 01:02:58', 28, 'Asymptomatic', 35, 'Male', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(5, 'Lim Anthony', 4, 'Active', '2026-05-28 01:02:58', 28, 'Asymptomatic', 20, 'Male', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(6, 'Kara Leam', 2, 'Active', '2026-05-28 01:02:58', 4, 'Asymptomatic', 28, 'Male', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(7, 'Anastasia Kim', 2, 'Active', '2026-05-28 01:02:58', 4, 'Asymptomatic', 57, 'Male', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(8, 'Pang Subaru', 5, 'Active', '2026-05-28 01:02:58', 4, 'Asymptomatic', 34, 'Male', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(9, 'Limuel Sam', 1, 'Under Treatment', '2026-05-28 01:02:58', 6, 'Asymptomatic', 9, 'Male', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(10, 'Apprel Kia', 3, 'Active', '2026-05-28 01:02:58', 5, 'Asymptomatic', 17, 'Male', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(11, 'John Smith', 6, 'Deceased', '2026-05-28 01:02:58', 5, 'Asymptomatic', 42, 'Male', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(12, 'Kara Touche', 2, 'Active', '2026-05-28 01:02:58', 8, 'Asymptomatic', 21, 'Male', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(13, 'Limuel Sam', 15, 'Recovered', '2026-06-16 01:27:36', 6, 'Moderate', 21, 'Male', '09445651201', NULL, '992 Niugan Cabuyao City Laguna', 'dasdadasda', 'Dr. Jose Reyes', 14.263300, 121.127300);
 
 -- --------------------------------------------------------
 
@@ -297,7 +299,7 @@ ALTER TABLE `barangays`
 -- AUTO_INCREMENT for table `diseases`
 --
 ALTER TABLE `diseases`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=90;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=29;
 
 --
 -- AUTO_INCREMENT for table `disease_cases`

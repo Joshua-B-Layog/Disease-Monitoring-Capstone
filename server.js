@@ -561,11 +561,22 @@ app.post('/api/cases/route-to-inbox', (req, res) => {
                 console.error('route-to-inbox insert error:', inboxErr.message);
                 return res.status(500).json({ error: inboxErr.message });
             }
-            createNotificationForUsers(
-                'New Case Reported',
-                `${submitter_name || 'A user'} from ${from_cho_unit} sent a case needing assignment: ${patient_name} (${disease_name}).`,
-                'info', 'Inbox', null, 'new_case_reported', to_cho_unit
-            );
+            // Detect target barangay from address for scoped notification
+            const detectedBrgy = detectBarangayFromAddress(address || '');
+            const doNotify = (brgyId) => {
+                createNotificationForUsers(
+                    'New Case Reported',
+                    `${submitter_name || 'A user'} from ${from_cho_unit} sent a case needing assignment: ${patient_name} (${disease_name}).`,
+                    'info', 'Inbox', brgyId, 'new_case_reported', to_cho_unit
+                );
+            };
+            if (detectedBrgy) {
+                db.query('SELECT id FROM barangays WHERE LOWER(name) = LOWER(?)', [detectedBrgy], (bErr, bRes) => {
+                    doNotify(!bErr && bRes && bRes.length > 0 ? bRes[0].id : null);
+                });
+            } else {
+                doNotify(null);
+            }
             res.status(200).json({ message: 'Case routed to inbox successfully.', inbox_id: inboxResult.insertId });
         }
     );
@@ -1735,8 +1746,9 @@ function createNotificationForUsers(title, message, type, link_to, barangayId = 
                 if (!userBelongsToUnit) return;
             }
 
-            // When choUnit is provided, only notify CHO users in that unit (skip BHW)
-            if (choUnit && user.role === 'BHW') return;
+            // When choUnit is provided and no specific barangay, only notify CHO (skip BHW)
+            // When both choUnit and barangayId are provided, BHW assigned to that barangay also get notified
+            if (choUnit && user.role === 'BHW' && barangayId === null) return;
 
             // Scope: CHO must match barangay (same as BHW now)
             const isCho = user.role === 'CHO' && (barangayId === null || Number(user.assigned_barangay_id) === Number(barangayId));

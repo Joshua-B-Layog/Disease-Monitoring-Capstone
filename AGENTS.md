@@ -34,14 +34,12 @@ Barangay Tres (Poblacion), Barangay Uno (Poblacion), Bigaa,
 Butong, Casile, Diezmo, Gulod, Mamatid, Marinig, Niugan,
 Pitland, Pulo, Sala, San Isidro
 
-## 26 Communicable Diseases Tracked
-Dengue, Covid-19, Tuberculosis, Typhoid Fever, Cholera,
-Measles, Hepatitis A, Hepatitis B, Rabies, Leptospirosis,
-Influenza A, Influenza A (H1N1), Acute Respiratory Infection,
-Avian Influenza, Chickenpox, Diphtheria, Ebola,
-Hand Foot and Mouth Disease, Hepatitis C, HIV/AIDS,
-Leprosy, Malaria, Meningococcemia, Pertussis,
-Poliomyelitis, SARS, Sore Eyes
+## 28 Communicable Diseases Tracked
+Acute Respiratory Infection, Avian Influenza, Chickenpox, Cholera, Covid-19, Dengue,
+Diarrhea, Diphtheria, Ebola, Hand Foot and Mouth Disease, Hepatitis A, Hepatitis B,
+Hepatitis C, HIV/AIDS, Influenza, Influenza A, Leprosy,
+Leptospirosis, Malaria, Measles, Meningococcemia, Pertussis, Poliomyelitis, Rabies,
+SARS, Sore Eyes, Tuberculosis, Typhoid Fever
 
 ## Important Rules When Editing
 - Never hardcode colors — always use CSS variables for themed components

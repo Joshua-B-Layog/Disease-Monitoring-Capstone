@@ -4,9 +4,9 @@ import { API_URL } from './config';
 
 const ALL_DISEASES = [
   'Acute Respiratory Infection','Avian Influenza','Chickenpox','Cholera','Dengue',
-  'Covid-19','Diphtheria','Ebola','Hand Foot and Mouth Disease','Hepatitis A',
-  'Hepatitis B','Hepatitis C','HIV/AIDS','Influenza','Influenza A (H1N1)',
-  'Leprosy','Malaria','Measles','Meningococcemia','Pertussis','Poliomyelitis',
+  'Diarrhea','Covid-19','Diphtheria','Ebola','Hand Foot and Mouth Disease','Hepatitis A',
+  'Hepatitis B','Hepatitis C','HIV/AIDS','Influenza','Influenza A',
+  'Leprosy','Leptospirosis','Malaria','Measles','Meningococcemia','Pertussis','Poliomyelitis',
   'Rabies','SARS','Sore Eyes','Tuberculosis','Typhoid Fever',
 ];
 
@@ -112,6 +112,21 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     .map(([label, count]) => ({ label, count }));
   const highestCount = sortedBars.length > 0 ? sortedBars[0].count : 1;
 
+  const isBhw = loginRole === 'BHW';
+
+  // Disease-level counts for BHW view (all 26 diseases)
+  const diseaseCounts = {};
+  ALL_DISEASES.forEach(d => { diseaseCounts[d] = 0; });
+  displayCases.forEach(c => {
+    if (c.disease_name) {
+      const matched = ALL_DISEASES.find(d => d.toLowerCase() === c.disease_name.toLowerCase());
+      if (matched) diseaseCounts[matched]++;
+    }
+  });
+  const diseaseBars = Object.entries(diseaseCounts)
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count);
+
   // --- PAGINATION ---
   const totalPages = Math.ceil(displayCases.length / CASES_PER_PAGE);
   const paginatedCases = displayCases.slice(
@@ -120,22 +135,23 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   );
 
   // ─── SHARED: build bar chart HTML block for exports ───
-  const buildBarChartHTML = () => {
-    if (sortedBars.length === 0) {
-      return `<p style="color:#64748b;font-size:14px;">No cases found for ${selectedDisease}.</p>`;
+  const buildBarChartHTML = (bars = sortedBars, title = `${selectedDisease} Cases by Barangay`, highest = highestCount) => {
+    if (bars.length === 0) {
+      return `<p style="color:#64748b;font-size:14px;">No cases found.</p>`;
     }
-    const barRows = sortedBars.map((bar, i) => {
-      const pct = Math.round((bar.count / highestCount) * 100);
+    const barRows = bars.map((bar, i) => {
+      const pct = highest > 0 ? Math.round((bar.count / highest) * 100) : 0;
       const color = i === 0 ? '#ef4444' : i === 1 ? '#f59e0b' : '#3b82f6';
       return `
         <tr>
           <td style="padding:6px 10px 6px 0;font-size:13px;white-space:nowrap;min-width:160px;">${bar.label}</td>
           <td style="padding:6px 0;width:100%;">
-            <div style="background:#e2e8f0;border-radius:4px;height:14px;width:100%;overflow:hidden;">
-              <div style="background:${color};height:100%;width:${pct}%;border-radius:4px;"></div>
+            <div style="background:#e2e8f0;border-radius:4px;height:24px;width:100%;overflow:hidden;position:relative;">
+              <div style="background:${color};height:100%;width:${pct}%;border-radius:4px;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;color:#fff;font-weight:700;font-size:14px;box-sizing:border-box;min-width:${bar.count > 0 ? '24px' : '0'};">
+                ${bar.count > 0 ? bar.count : ''}
+              </div>
             </div>
           </td>
-          <td style="padding:6px 0 6px 10px;font-size:13px;font-weight:600;white-space:nowrap;">${bar.count} case${bar.count !== 1 ? 's' : ''}</td>
         </tr>`;
     }).join('');
     return `
@@ -159,6 +175,9 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
   // --- EXPORT: WORD ---
   const handleExportWord = () => {
+    const eBars = isBhw ? diseaseBars : sortedBars;
+    const eTitle = isBhw ? 'All Diseases - Case Counts' : `${selectedDisease} Cases by Barangay`;
+    const eHighest = isBhw ? (diseaseBars.length > 0 ? diseaseBars[0].count : 1) : highestCount;
     const html = `
       <html><head><meta charset="utf-8"><title>CDMS Report</title>
       <style>
@@ -175,8 +194,8 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       <h2>Cabuyao Disease Monitoring System — Dashboard Export</h2>
       <p>Generated: ${new Date().toLocaleDateString()} &nbsp;|&nbsp; Date Range: ${dateRange.start} to ${dateRange.end}</p>
 
-      <h3>${selectedDisease} Cases by Barangay</h3>
-      <div class="bar-section">${buildBarChartHTML()}</div>
+      <h3>${eTitle}</h3>
+      <div class="bar-section">${buildBarChartHTML(eBars, eTitle, eHighest)}</div>
 
       <h3>Case Records</h3>
       <table class="main">
@@ -219,6 +238,9 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
   // --- EXPORT: PPT ---
   const handleExportPPT = () => {
+    const eBars = isBhw ? diseaseBars : sortedBars;
+    const eTitle = isBhw ? 'All Diseases — Case Counts' : `${selectedDisease} Cases by Barangay`;
+    const eHighest = isBhw ? (diseaseBars.length > 0 ? diseaseBars[0].count : 1) : highestCount;
     const html = `
       <html><head><meta charset="utf-8"><title>CDMS Slide Export</title>
       <style>
@@ -232,10 +254,10 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         .stat .lbl { font-size: 12px; color: #9ca3af; margin-top: 4px; }
         table.bars { width: 100%; border-collapse: collapse; }
         table.bars td { padding: 5px 8px; font-size: 13px; color: #e2e8f0; }
-        .track { background: #334155; border-radius: 4px; height: 14px; width: 100%; overflow: hidden; }
-        .fill-red { background: #ef4444; height: 100%; border-radius: 4px; }
-        .fill-amber { background: #f59e0b; height: 100%; border-radius: 4px; }
-        .fill-blue { background: #3b82f6; height: 100%; border-radius: 4px; }
+        .track { background: #334155; border-radius: 4px; height: 24px; width: 100%; overflow: hidden; position: relative; }
+        .fill-red { background: #ef4444; height: 100%; border-radius: 4px; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; color: #fff; font-weight: 700; font-size: 14px; box-sizing: border-box; }
+        .fill-amber { background: #f59e0b; height: 100%; border-radius: 4px; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; color: #fff; font-weight: 700; font-size: 14px; box-sizing: border-box; }
+        .fill-blue { background: #3b82f6; height: 100%; border-radius: 4px; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; color: #fff; font-weight: 700; font-size: 14px; box-sizing: border-box; }
         footer { color: #4b5563; font-size: 11px; margin-top: 40px; border-top: 1px solid #1e293b; padding-top: 12px; }
       </style></head><body>
       <h1>Cabuyao Disease Monitoring System</h1>
@@ -248,17 +270,16 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         <div class="stat"><div class="num" style="color:#ef4444;">${deathCases}</div><div class="lbl">Deaths</div></div>
       </div>
 
-      <h2>${selectedDisease} Cases by Barangay</h2>
-      ${sortedBars.length === 0
-        ? `<p>No cases found for ${selectedDisease}.</p>`
+      <h2>${eTitle}</h2>
+      ${eBars.length === 0
+        ? `<p>No cases found.</p>`
         : `<table class="bars"><tbody>
-            ${sortedBars.map((bar, i) => {
-              const pct = Math.round((bar.count / highestCount) * 100);
+            ${eBars.map((bar, i) => {
+              const pct = eHighest > 0 ? Math.round((bar.count / eHighest) * 100) : 0;
               const fillClass = i === 0 ? 'fill-red' : i === 1 ? 'fill-amber' : 'fill-blue';
               return `<tr>
                 <td style="min-width:170px;white-space:nowrap;">${bar.label}</td>
-                <td style="width:100%;"><div class="track"><div class="${fillClass}" style="width:${pct}%;"></div></div></td>
-                <td style="min-width:60px;text-align:right;">${bar.count}</td>
+                <td style="width:100%;"><div class="track"><div class="${fillClass}" style="width:${pct}%;">${bar.count > 0 ? bar.count : ''}</div></div></td>
               </tr>`;
             }).join('')}
           </tbody></table>`
@@ -275,6 +296,9 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
   // --- PRINT ---
   const handlePrint = () => {
+    const eBars = isBhw ? diseaseBars : sortedBars;
+    const eTitle = isBhw ? 'All Diseases — Case Counts' : `${selectedDisease} Cases by Barangay`;
+    const eHighest = isBhw ? (diseaseBars.length > 0 ? diseaseBars[0].count : 1) : highestCount;
     const rows = displayCases.map(c =>
       `<tr>
         <td>#${String(c.case_id).padStart(3,'0')}</td>
@@ -305,8 +329,8 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       <h2>Cabuyao Disease Monitoring System</h2>
       <p>Report generated: ${new Date().toLocaleString()} &nbsp;|&nbsp; Date Range: ${dateRange.start} to ${dateRange.end}</p>
 
-      <h3>${selectedDisease} Cases by Barangay</h3>
-      <div class="bar-section">${buildBarChartHTML()}</div>
+      <h3>${eTitle}</h3>
+      <div class="bar-section">${buildBarChartHTML(eBars, eTitle, eHighest)}</div>
 
       <h3>Recent Case Records</h3>
       <table class="main">
@@ -356,9 +380,34 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         {/* BAR CHART */}
           <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' }}>
           <h4 style={{ color: 'var(--text-main)', margin: '0 0 16px 0', fontSize: '15px', fontWeight: '600' }}>
-            {selectedDisease} Cases by Barangay
+            {isBhw ? 'All Diseases - Case Counts' : `${selectedDisease} Cases by Barangay`}
           </h4>
-          {sortedBars.length === 0 ? (
+          {isBhw ? (
+            <div style={{ maxHeight: '480px', overflowY: 'auto', paddingRight: '4px' }}>
+              {diseaseBars.map((bar, i) => {
+                const dHighest = diseaseBars.length > 0 ? diseaseBars[0].count : 1;
+                return (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                    <span style={{ minWidth: '180px', fontSize: '13px', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {bar.label}
+                    </span>
+                    <div style={{ flex: 1, background: 'var(--input-bg)', height: '24px', borderRadius: '6px', overflow: 'hidden', position: 'relative' }}>
+                      <div style={{
+                        width: dHighest > 0 ? `${(bar.count / dHighest) * 100}%` : '0%',
+                        background: '#3b82f6',
+                        height: '100%', borderRadius: '6px', transition: 'width 0.4s ease',
+                        display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+                        paddingRight: '8px', color: '#fff', fontWeight: '700', fontSize: '14px',
+                        boxSizing: 'border-box'
+                      }}>
+                        {bar.count > 0 ? bar.count : ''}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : sortedBars.length === 0 ? (
             <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '20px 0' }}>
               No cases found for {selectedDisease}.
             </div>
@@ -367,14 +416,19 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
               {sortedBars.map((bar, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
                   <span style={{ minWidth: '180px', fontSize: '13px', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {bar.label} ({bar.count})
+                    {bar.label}
                   </span>
-                  <div style={{ flex: 1, background: 'var(--input-bg)', height: '12px', borderRadius: '6px', overflow: 'hidden' }}>
+                  <div style={{ flex: 1, background: 'var(--input-bg)', height: '24px', borderRadius: '6px', overflow: 'hidden', position: 'relative' }}>
                     <div style={{
                       width: `${(bar.count / highestCount) * 100}%`,
                       background: i === 0 ? '#ef4444' : i === 1 ? '#f59e0b' : '#3b82f6',
-                      height: '100%', borderRadius: '6px', transition: 'width 0.4s ease'
-                    }} />
+                      height: '100%', borderRadius: '6px', transition: 'width 0.4s ease',
+                      display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+                      paddingRight: '8px', color: '#fff', fontWeight: '700', fontSize: '14px',
+                      boxSizing: 'border-box'
+                    }}>
+                      {bar.count > 0 ? bar.count : ''}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -386,8 +440,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <h4 style={{ color: 'var(--text-main)', margin: '0', fontSize: '15px', fontWeight: '600' }}>Filter & Controls</h4>
 
-          {/* Disease dropdown */}
-          <div>
+          {!isBhw && <div>
             <label style={{ color: 'var(--text-muted)', fontSize: '11px', display: 'block', marginBottom: '4px' }}>Disease</label>
             <div style={{ position: 'relative' }} ref={diseaseRef}>
               <button
@@ -423,7 +476,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                 </div>
               )}
             </div>
-          </div>
+          </div>}
 
           {/* ── FIX: Date range — stacked so neither overflows ── */}
           <div>
