@@ -102,16 +102,27 @@ const DISEASE_PAGES = [
 
 const OTHER_CARD = DISEASE_PAGES[1][5]; // the "Other" card object
 
-// All known disease dbNames for "Other" matching
-const KNOWN_DB_NAMES = DISEASE_PAGES.flat()
+// Card dbNames sorted by length descending (longest-first for prefix matching)
+const SORTED_CARD_DBNAMES = DISEASE_PAGES.flat()
   .filter(d => d.dbName !== 'Other')
-  .map(d => d.dbName.toLowerCase());
+  .map(d => d.dbName.toLowerCase())
+  .sort((a, b) => b.length - a.length);
+
+// Find the best-matching card dbName for a disease name (prefix matching)
+const findBestCardDbName = (diseaseName) => {
+  if (!diseaseName) return null;
+  const dn = diseaseName.toLowerCase();
+  for (const cdn of SORTED_CARD_DBNAMES) {
+    if (dn === cdn || dn.startsWith(cdn + ' ')) return cdn;
+  }
+  return null;
+};
 
 const ALL_DISEASE_OPTIONS = [
   'Dengue','Diarrhea','Covid-19','Leptospirosis','Tuberculosis','Typhoid Fever',
   'Cholera','Measles','Hepatitis A','Hepatitis B','Rabies',
   'Acute Respiratory Infection','Avian Influenza','Chickenpox','Diphtheria','Ebola',
-  'Hand Foot and Mouth Disease','Hepatitis C','HIV/AIDS','Influenza',
+  'Hand Foot and Mouth Disease','Hepatitis C','HIV/AIDS','Influenza','Influenza A',
   'Leprosy','Malaria','Meningococcemia','Pertussis','Poliomyelitis','SARS','Sore Eyes',
 ];
 
@@ -212,20 +223,17 @@ const EMPTY_FORM = {
   lat: '', lng: '', specificDisease: ''
 };
 
-// Helper: find which card a disease_name belongs to
+// Helper: find which card a disease_name belongs to (prefix matching)
 const findCardForDisease = (diseaseName) => {
   if (!diseaseName) return null;
-  const dn = diseaseName.toLowerCase();
-  // Check all named cards first
+  const best = findBestCardDbName(diseaseName);
+  if (!best) return OTHER_CARD;
   for (const page of DISEASE_PAGES) {
     for (const card of page) {
-      if (card.dbName === 'Other') continue;
-      if (dn === card.dbName.toLowerCase()) return card;
+      if (card.dbName !== 'Other' && card.dbName.toLowerCase() === best) return card;
     }
   }
-  // If not found in named cards → it belongs to "Other"
-  if (!KNOWN_DB_NAMES.includes(dn)) return OTHER_CARD;
-  return null;
+  return OTHER_CARD;
 };
 
 const formatDateStr = (dateStr, fmt) => {
@@ -719,14 +727,14 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.patientName]);
 
-  // ── Match cases to disease card ──
+  // ── Match cases to disease card (prefix matching) ──
   const matchesCard = (caseItem, card) => {
     if (!caseItem.disease_name) return false;
-    const dn = caseItem.disease_name.toLowerCase();
     if (card.dbName === 'Other') {
-      return !KNOWN_DB_NAMES.includes(dn);
+      return !findBestCardDbName(caseItem.disease_name);
     }
-    return dn === card.dbName.toLowerCase();
+    const best = findBestCardDbName(caseItem.disease_name);
+    return best === card.dbName.toLowerCase();
   };
 
   const getCaseCount = (card) => baseCases.filter(c => matchesCard(c, card)).length;
@@ -735,13 +743,13 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const getOtherDiseaseNames = () => {
     const names = new Set();
     allDiseases.forEach(d => {
-      if (!KNOWN_DB_NAMES.includes(d.name.toLowerCase())) {
+      if (!findBestCardDbName(d.name)) {
         names.add(d.name);
       }
     });
     allCases.forEach(c => {
       if (!c.disease_name) return;
-      if (!KNOWN_DB_NAMES.includes(c.disease_name.toLowerCase())) {
+      if (!findBestCardDbName(c.disease_name)) {
         names.add(c.disease_name);
       }
     });

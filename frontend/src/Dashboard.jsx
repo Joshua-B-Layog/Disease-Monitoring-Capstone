@@ -10,6 +10,19 @@ const ALL_DISEASES = [
   'Rabies','SARS','Sore Eyes','Tuberculosis','Typhoid Fever',
 ];
 
+// Sorted by length descending for prefix matching (longest-first)
+const SORTED_ALL_DISEASES = [...ALL_DISEASES].sort((a, b) => b.length - a.length);
+
+const findBestDisease = (diseaseName) => {
+  if (!diseaseName) return null;
+  const dn = diseaseName.toLowerCase();
+  for (const d of SORTED_ALL_DISEASES) {
+    const dl = d.toLowerCase();
+    if (dn === dl || dn.startsWith(dl + ' ')) return d;
+  }
+  return null;
+};
+
 const CASES_PER_PAGE = 10;
 
 const formatDateStr = (dateStr, fmt) => {
@@ -98,10 +111,12 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   const recoveredCases = displayCases.filter(c => c.status === 'Recovered').length;
   const deathCases = displayCases.filter(c => c.status === 'Deceased').length;
 
-  // --- BAR CHART DATA ---
-  const diseaseFilteredCases = displayCases.filter(
-    c => c.disease_name && c.disease_name.toLowerCase() === selectedDisease.toLowerCase()
-  );
+  // --- BAR CHART DATA (prefix matching for variants) ---
+  const diseaseFilteredCases = displayCases.filter(c => {
+    if (!c.disease_name) return false;
+    const best = findBestDisease(c.disease_name);
+    return best && best.toLowerCase() === selectedDisease.toLowerCase();
+  });
   const barangayCounts = {};
   diseaseFilteredCases.forEach(item => {
     const name = item.barangay_name || `Barangay ${item.barangay_id}`;
@@ -114,12 +129,12 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
   const isBhw = loginRole === 'BHW';
 
-  // Disease-level counts for BHW view (all 26 diseases)
+  // Disease-level counts (prefix matching for variants)
   const diseaseCounts = {};
   ALL_DISEASES.forEach(d => { diseaseCounts[d] = 0; });
   displayCases.forEach(c => {
     if (c.disease_name) {
-      const matched = ALL_DISEASES.find(d => d.toLowerCase() === c.disease_name.toLowerCase());
+      const matched = findBestDisease(c.disease_name);
       if (matched) diseaseCounts[matched]++;
     }
   });
