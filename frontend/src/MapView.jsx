@@ -654,6 +654,10 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const barangayRef = useRef(null);
   const [purokOpen, setPurokOpen] = useState(false);
   const purokRef = useRef(null);
+  const [statusOpen, setStatusOpen] = useState(false);
+  const statusRef = useRef(null);
+  const [severityOpen, setSeverityOpen] = useState(false);
+  const severityRef = useRef(null);
   const geoJsonLayerRef = useRef(null);
   const barangayDataRef = useRef(barangayData);
   useEffect(() => { barangayDataRef.current = barangayData; }, [barangayData]);
@@ -709,6 +713,8 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         setBarangayOpen(false);
       }
       if (purokRef.current && !purokRef.current.contains(e.target)) setPurokOpen(false);
+      if (statusRef.current && !statusRef.current.contains(e.target)) setStatusOpen(false);
+      if (severityRef.current && !severityRef.current.contains(e.target)) setSeverityOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -935,16 +941,25 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         {/* Status */}
         <div>
           <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Status</label>
-          <div style={{ position: 'relative' }}>
-            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ ...SEL, appearance: 'none', paddingRight: '28px', cursor: 'pointer' }}>
-              <option>All Status</option>
-              <option>Active</option>
-              <option>Pending</option>
-              <option>Under Treatment</option>
-              <option>Recovered</option>
-              <option>Deceased</option>
-            </select>
-            <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '10px', pointerEvents: 'none', opacity: 0.6 }}>▼</span>
+          <div style={{ position: 'relative' }} ref={statusRef}>
+            <button type="button" onClick={() => setStatusOpen(!statusOpen)}
+              style={{ ...SEL, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' }}>
+              <span>{filterStatus}</span>
+              <span style={{ fontSize: '10px', opacity: 0.6, transition: 'transform 0.2s', transform: statusOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+            </button>
+            {statusOpen && (
+              <div style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', zIndex: 100, overflow: 'hidden' }}>
+                {['All Status', 'Active', 'Pending', 'Under Treatment', 'Recovered', 'Deceased'].map(s => (
+                  <button key={s} type="button"
+                    onClick={() => { setFilterStatus(s); setStatusOpen(false); }}
+                    style={{ display: 'block', width: '100%', padding: '10px 14px', background: filterStatus === s ? 'var(--input-bg)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: filterStatus === s ? '600' : '400' }}
+                    onMouseEnter={e => { if (filterStatus !== s) e.target.style.background = 'var(--input-bg)'; }}
+                    onMouseLeave={e => { if (filterStatus !== s) e.target.style.background = 'transparent'; }}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -1012,15 +1027,25 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         {/* Severity — includes Asymptomatic */}
         <div>
           <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Severity</label>
-          <div style={{ position: 'relative' }}>
-            <select value={filterSeverity} onChange={e => setFilterSeverity(e.target.value)} style={{ ...SEL, appearance: 'none', paddingRight: '28px', cursor: 'pointer' }}>
-              <option>All Severities</option>
-              <option>Mild</option>
-              <option>Moderate</option>
-              <option>Severe</option>
-              <option>Asymptomatic</option>
-            </select>
-            <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '10px', pointerEvents: 'none', opacity: 0.6 }}>▼</span>
+          <div style={{ position: 'relative' }} ref={severityRef}>
+            <button type="button" onClick={() => setSeverityOpen(!severityOpen)}
+              style={{ ...SEL, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' }}>
+              <span>{filterSeverity}</span>
+              <span style={{ fontSize: '10px', opacity: 0.6, transition: 'transform 0.2s', transform: severityOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+            </button>
+            {severityOpen && (
+              <div style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', zIndex: 100, overflow: 'hidden' }}>
+                {['All Severities', 'Mild', 'Moderate', 'Severe', 'Asymptomatic'].map(s => (
+                  <button key={s} type="button"
+                    onClick={() => { setFilterSeverity(s); setSeverityOpen(false); }}
+                    style={{ display: 'block', width: '100%', padding: '10px 14px', background: filterSeverity === s ? 'var(--input-bg)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: filterSeverity === s ? '600' : '400' }}
+                    onMouseEnter={e => { if (filterSeverity !== s) e.target.style.background = 'var(--input-bg)'; }}
+                    onMouseLeave={e => { if (filterSeverity !== s) e.target.style.background = 'transparent'; }}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

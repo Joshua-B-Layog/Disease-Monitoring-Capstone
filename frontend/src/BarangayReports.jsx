@@ -276,6 +276,10 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
   const userDropRef    = useRef(null);
   const subDropRef     = useRef(null);
   const datePickerRef  = useRef(null);
+  const [periodOpen, setPeriodOpen] = useState(false);
+  const periodRef = useRef(null);
+  const [typeOpen, setTypeOpen] = useState(false);
+  const typeRef = useRef(null);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -285,6 +289,8 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
       if (subDropRef.current     && !subDropRef.current.contains(e.target))     setShowSubDrop(false);
       if (datePickerRef.current  && !datePickerRef.current.contains(e.target))  setShowDatePicker(false);
       if (reportSortRef.current  && !reportSortRef.current.contains(e.target))  setShowReportSortDrop(false);
+      if (periodRef.current      && !periodRef.current.contains(e.target))      setPeriodOpen(false);
+      if (typeRef.current        && !typeRef.current.contains(e.target))        setTypeOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -601,29 +607,59 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
 
       {/* ── TOP FILTER BAR ── */}
       <div style={{ ...s.card, display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap' }}>
-        <div style={{ position: 'relative', width: '160px', flex: '0 0 auto' }}>
-          <select value={reportPeriod} onChange={e => setReportPeriod(e.target.value)}
-            style={{ ...s.input, appearance: 'none', paddingRight: '28px', cursor: 'pointer' }}>
-            <option value="">Report Period</option>
-            {PERIOD_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-          <div style={{ position: 'absolute', right: '1px', top: '1px', bottom: '1px', width: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', background: '#fff', borderRadius: '0 6px 6px 0' }}>
-            <span style={{ fontSize: '10px', opacity: 0.6, color: '#64748b' }}>▼</span>
-          </div>
+        <div style={{ position: 'relative', width: '160px', flex: '0 0 auto' }} ref={periodRef}>
+          <button onClick={() => { setPeriodOpen(!periodOpen); setTypeOpen(false); }}
+            style={{ ...s.dropBtn(reportPeriod !== ''), width: '100%', boxSizing: 'border-box', justifyContent: 'space-between' }}>
+            {reportPeriod || 'Report Period'}
+            <span style={{ fontSize: '10px', opacity: 0.6, transition: 'transform 0.2s', transform: periodOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+          </button>
+          {periodOpen && (
+            <div style={s.dropMenu}>
+              <button style={s.dropItem(reportPeriod === '')}
+                onClick={() => { setReportPeriod(''); setPeriodOpen(false); }}
+                onMouseEnter={e => { if (reportPeriod !== '') e.target.style.background = '#f8fafc'; }}
+                onMouseLeave={e => { if (reportPeriod !== '') e.target.style.background = 'transparent'; }}>
+                Report Period
+              </button>
+              {PERIOD_OPTIONS.map(p => (
+                <button key={p} style={s.dropItem(reportPeriod === p)}
+                  onClick={() => { setReportPeriod(p); setPeriodOpen(false); }}
+                  onMouseEnter={e => { if (reportPeriod !== p) e.target.style.background = '#f8fafc'; }}
+                  onMouseLeave={e => { if (reportPeriod !== p) e.target.style.background = 'transparent'; }}>
+                  {p}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <input type="date" value={reportDateStart} onChange={e => setReportDateStart(e.target.value)}
           style={{ ...s.input, width: '150px', flex: '0 0 auto' }} />
         <input type="date" value={reportDateEnd} onChange={e => setReportDateEnd(e.target.value)}
           style={{ ...s.input, width: '150px', flex: '0 0 auto' }} />
-        <div style={{ position: 'relative', flex: 1, minWidth: '160px' }}>
-          <select value={reportType} onChange={e => setReportType(e.target.value)}
-            style={{ ...s.input, appearance: 'none', paddingRight: '28px', cursor: 'pointer' }}>
-            <option value="">Report Type</option>
-            {ENTITY_OPTIONS.map(e => <option key={e} value={e}>{e}</option>)}
-          </select>
-          <div style={{ position: 'absolute', right: '1px', top: '1px', bottom: '1px', width: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', background: '#fff', borderRadius: '0 6px 6px 0' }}>
-            <span style={{ fontSize: '10px', opacity: 0.6, color: '#64748b' }}>▼</span>
-          </div>
+        <div style={{ position: 'relative', flex: 1, minWidth: '160px' }} ref={typeRef}>
+          <button onClick={() => { setTypeOpen(!typeOpen); setPeriodOpen(false); }}
+            style={{ ...s.dropBtn(reportType !== ''), width: '100%', boxSizing: 'border-box', justifyContent: 'space-between' }}>
+            {reportType || 'Report Type'}
+            <span style={{ fontSize: '10px', opacity: 0.6, transition: 'transform 0.2s', transform: typeOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+          </button>
+          {typeOpen && (
+            <div style={s.dropMenu}>
+              <button style={s.dropItem(reportType === '')}
+                onClick={() => { setReportType(''); setTypeOpen(false); }}
+                onMouseEnter={e => { if (reportType !== '') e.target.style.background = '#f8fafc'; }}
+                onMouseLeave={e => { if (reportType !== '') e.target.style.background = 'transparent'; }}>
+                Report Type
+              </button>
+              {ENTITY_OPTIONS.map(e => (
+                <button key={e} style={s.dropItem(reportType === e)}
+                  onClick={() => { setReportType(e); setTypeOpen(false); }}
+                  onMouseEnter={e2 => { if (reportType !== e) e2.target.style.background = '#f8fafc'; }}
+                  onMouseLeave={e2 => { if (reportType !== e) e2.target.style.background = 'transparent'; }}>
+                  {e}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <button onClick={() => setShowGenModal(true)}
           style={{ padding: '9px 22px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '7px', fontWeight: '600', fontSize: '14px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
@@ -695,7 +731,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                 <div style={{ position: 'relative' }}>
                   <button onClick={() => setShowDownloadMenu(showDownloadMenu === file.id ? null : file.id)}
                     style={{ padding: '6px 14px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', color: '#475569', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    ⬇ Download ▼
+                    ⬇ Download <span style={{ transition: 'transform 0.2s', display: 'inline-block', transform: showDownloadMenu === file.id ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                   </button>
                   {showDownloadMenu === file.id && (
                     <div style={{ position: 'absolute', top: '110%', right: 0, background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 300, minWidth: '160px', overflow: 'hidden' }}>

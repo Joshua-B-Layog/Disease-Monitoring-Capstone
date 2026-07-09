@@ -254,6 +254,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const [inboxItems, setInboxItems] = useState([]);
   const [outboxItems, setOutboxItems] = useState([]);
   const [inboxLoading, setInboxLoading] = useState(false);
+  const [inboxSubTab, setInboxSubTab] = useState('referrals');
+  const [contactMessages, setContactMessages] = useState([]);
+  const [contactMessagesLoading, setContactMessagesLoading] = useState(false);
   const [cardPage, setCardPage] = useState(0);
   const [selectedDisease, setSelectedDisease] = useState(null);
   const [editingCase, setEditingCase] = useState(null);
@@ -343,6 +346,18 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   // Sub-disease filter dropdown
   const [subDiseaseOpen, setSubDiseaseOpen] = useState(false);
 
+  // Status filter dropdown
+  const [statusOpen, setStatusOpen] = useState(false);
+  const statusRef = useRef(null);
+
+  // Form dropdowns: gender, severity, patient status
+  const [genderOpen, setGenderOpen] = useState(false);
+  const genderRef = useRef(null);
+  const [severityOpen, setSeverityOpen] = useState(false);
+  const severityRef = useRef(null);
+  const [patientStatusOpen, setPatientStatusOpen] = useState(false);
+  const patientStatusRef = useRef(null);
+
   // Delete modal
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -430,6 +445,20 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     axios.get(`${API_URL}/api/case-inbox`, { params })
       .then(res => { setInboxItems(res.data); setInboxLoading(false); })
       .catch(() => setInboxLoading(false));
+  };
+
+  const fetchContactMessages = () => {
+    setContactMessagesLoading(true);
+    const params = {};
+    if (loginRole === 'CHO') {
+      params.choUnit = sessionContext;
+    } else if (loginRole === 'BHW' && loginBarangay) {
+      const choUnit = getChoUnitForBarangay(loginBarangay);
+      if (choUnit) params.choUnit = choUnit;
+    }
+    axios.get(`${API_URL}/api/contact-messages`, { params })
+      .then(res => { setContactMessages(res.data); setContactMessagesLoading(false); })
+      .catch(() => setContactMessagesLoading(false));
   };
 
   const getChoUnitForBarangay = (barangayName) => {
@@ -572,7 +601,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   };
 
   useEffect(() => {
-    if (view === 'inbox') fetchInbox();
+    if (view === 'inbox') { fetchInbox(); fetchContactMessages(); }
     if (view === 'outbox') fetchOutbox();
   }, [view, sessionContext]);
 
@@ -608,6 +637,18 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       if (diseaseFormRef.current && !diseaseFormRef.current.contains(e.target)) setDiseaseOpen(false);
       if (subDiseaseRef.current && !subDiseaseRef.current.contains(e.target)) {
         setSubDiseaseOpen(false);
+      }
+      if (statusRef.current && !statusRef.current.contains(e.target)) {
+        setStatusOpen(false);
+      }
+      if (genderRef.current && !genderRef.current.contains(e.target)) {
+        setGenderOpen(false);
+      }
+      if (severityRef.current && !severityRef.current.contains(e.target)) {
+        setSeverityOpen(false);
+      }
+      if (patientStatusRef.current && !patientStatusRef.current.contains(e.target)) {
+        setPatientStatusOpen(false);
       }
       if (lookupDropdownRef.current && !lookupDropdownRef.current.contains(e.target)) {
         setShowLookupDropdown(false);
@@ -1231,58 +1272,127 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             ← Back
           </button>
         </div>
-        <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
-          {inboxLoading ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading inbox...</div>
-          ) : inboxItems.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Inbox is empty.</div>
-          ) : (
-            inboxItems.map(item => (
-              <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)' }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '14.4px', color: 'var(--text-muted)', lineHeight: 1, textAlign: 'left' }}>
-                    {item.from_user_role === 'BHW'
-                      ? `From BHW (${item.from_sender_barangay_name || 'Unknown'})`
-                      : `From ${item.from_cho_unit || 'Unknown Unit'}`}
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '6px', alignItems: 'center' }}>
-                    <div className="inbox-avatar-circle">
-                      {item.from_user_role === 'BHW' && item.from_sender_barangay_name
-                        ? item.from_sender_barangay_name.slice(0, 2).toUpperCase()
-                        : (item.from_cho_unit || 'U').replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase()}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '13px', color: 'var(--text-main)' }}>
-                        {item.patient_name} · {item.disease_name} ({item.severity})
-                      </div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {item.address}
-                      </div>
-                      {item.notes && (
-                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          "{item.notes}"
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>
-                  {new Date(item.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
-                </div>
-                <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                  <button onClick={() => handleAcceptInboxItem(item)} title="Accept"
-                    style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #10b981', background: 'rgba(16,185,129,0.1)', color: '#10b981', cursor: 'pointer', fontSize: '16px' }}>
-                    ✓
-                  </button>
-                  <button onClick={() => handleRejectInboxItem(item)} title="Reject"
-                    style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #ef4444', background: 'rgba(239,68,68,0.1)', color: '#ef4444', cursor: 'pointer', fontSize: '16px' }}>
-                    ✕
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
+        {/* Sub-tabs */}
+        <div style={{ display: 'flex', gap: '0', marginBottom: '12px', borderBottom: '1px solid var(--border-color)' }}>
+          <div onClick={() => setInboxSubTab('referrals')}
+            style={{
+              padding: '8px 20px', cursor: 'pointer', fontSize: '13px', fontWeight: inboxSubTab === 'referrals' ? '700' : '500',
+              color: inboxSubTab === 'referrals' ? 'var(--text-main)' : 'var(--text-muted)',
+              borderBottom: inboxSubTab === 'referrals' ? '2px solid #10B981' : '2px solid transparent',
+              transition: 'all 0.15s',
+            }}>
+            Referrals ({inboxItems.length})
+          </div>
+          <div onClick={() => setInboxSubTab('messages')}
+            style={{
+              padding: '8px 20px', cursor: 'pointer', fontSize: '13px', fontWeight: inboxSubTab === 'messages' ? '700' : '500',
+              color: inboxSubTab === 'messages' ? 'var(--text-main)' : 'var(--text-muted)',
+              borderBottom: inboxSubTab === 'messages' ? '2px solid #10B981' : '2px solid transparent',
+              transition: 'all 0.15s',
+            }}>
+            Messages ({contactMessages.length})
+          </div>
         </div>
+
+        {inboxSubTab === 'referrals' && (
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
+            {inboxLoading ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading inbox...</div>
+            ) : inboxItems.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Inbox is empty.</div>
+            ) : (
+              inboxItems.map(item => (
+                <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '14.4px', color: 'var(--text-muted)', lineHeight: 1, textAlign: 'left' }}>
+                      {item.from_user_role === 'BHW'
+                        ? `From BHW (${item.from_sender_barangay_name || 'Unknown'})`
+                        : `From ${item.from_cho_unit || 'Unknown Unit'}`}
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '6px', alignItems: 'center' }}>
+                      <div className="inbox-avatar-circle">
+                        {item.from_user_role === 'BHW' && item.from_sender_barangay_name
+                          ? item.from_sender_barangay_name.slice(0, 2).toUpperCase()
+                          : (item.from_cho_unit || 'U').replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '13px', color: 'var(--text-main)' }}>
+                          {item.patient_name} · {item.disease_name} ({item.severity})
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {item.address}
+                        </div>
+                        {item.notes && (
+                          <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            "{item.notes}"
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>
+                    {new Date(item.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                    <button onClick={() => handleAcceptInboxItem(item)} title="Accept"
+                      style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #10b981', background: 'rgba(16,185,129,0.1)', color: '#10b981', cursor: 'pointer', fontSize: '16px' }}>
+                      ✓
+                    </button>
+                    <button onClick={() => handleRejectInboxItem(item)} title="Reject"
+                      style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #ef4444', background: 'rgba(239,68,68,0.1)', color: '#ef4444', cursor: 'pointer', fontSize: '16px' }}>
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {inboxSubTab === 'messages' && (
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
+            {contactMessagesLoading ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading messages...</div>
+            ) : contactMessages.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No messages from residents.</div>
+            ) : (
+              contactMessages.map(msg => (
+                <div key={msg.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)', background: msg.is_read ? 'transparent' : 'rgba(13,148,136,0.04)' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '14.4px', color: 'var(--text-muted)', lineHeight: 1, textAlign: 'left' }}>
+                      From Resident{msg.target_cho_unit ? ` (${msg.target_cho_unit})` : ''}
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '6px', alignItems: 'center' }}>
+                      <div className="inbox-avatar-circle" style={{ background: '#10B981' }}>
+                        {msg.name.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '13px', color: 'var(--text-main)' }}>
+                          {msg.name} · {msg.email}{msg.disease_name ? ` (${msg.disease_name})` : ''}
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {msg.message}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>
+                    {new Date(msg.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+                  </div>
+                  {!msg.is_read && (
+                    <button onClick={() => {
+                      axios.put(`${API_URL}/api/contact-messages/${msg.id}/read`)
+                        .then(() => fetchContactMessages());
+                    }} title="Mark read"
+                      style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #10B981', background: 'rgba(13,148,136,0.1)', color: '#10B981', cursor: 'pointer', fontSize: '12px' }}>
+                      ✓
+                    </button>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
     );
   }
@@ -1418,7 +1528,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                   <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
                 </svg>
-                Export ▼
+                Export <span style={{ transition: 'transform 0.2s', display: 'inline-block', transform: showExportMenu ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
               </button>
               {showExportMenu && (
                 <div style={{ position: 'absolute', top: '110%', right: 0, width: '180px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
@@ -1466,7 +1576,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               <div style={{ position: 'relative' }} ref={barangayRef}>
                 <button className="mc-custom-dropdown-btn" onClick={() => setBarangayOpen(!barangayOpen)}>
                   <span>{filterBarangay}</span>
-                  <span style={{ marginLeft: '6px', opacity: 0.6 }}>▼</span>
+                  <span style={{ marginLeft: '6px', opacity: 0.6, transition: 'transform 0.2s', display: 'inline-block', transform: barangayOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                 </button>
                 {barangayOpen && (
                   <div className="mc-custom-dropdown-panel">
@@ -1495,7 +1605,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               <div style={{ position: 'relative' }} ref={purokRef}>
                 <button className="mc-custom-dropdown-btn" onClick={() => setPurokOpen(!purokOpen)}>
                   <span>{filterPurok}</span>
-                  <span style={{ marginLeft: '6px', opacity: 0.6 }}>▼</span>
+                  <span style={{ marginLeft: '6px', opacity: 0.6, transition: 'transform 0.2s', display: 'inline-block', transform: purokOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                 </button>
                 {purokOpen && (
                   <div className="mc-custom-dropdown-panel">
@@ -1514,18 +1624,25 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             )}
 
             {/* Status filter */}
-            <div style={{ position: 'relative' }}>
-              <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setTablePage(1); }}
-                style={{ padding: '8px 12px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)', fontSize: '13px', appearance: 'none', paddingRight: '28px', cursor: 'pointer' }}>
-                <option>All Status</option>
-                <option>Active</option>
-                <option>Pending</option>
-                <option>Under Treatment</option>
-                <option>Recovered</option>
-                <option>Deceased</option>
-                <option>Draft</option>
-              </select>
-              <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '10px', pointerEvents: 'none', opacity: 0.6 }}>▼</span>
+            <div style={{ position: 'relative' }} ref={statusRef}>
+              <button type="button" onClick={() => setStatusOpen(!statusOpen)}
+                style={{ padding: '8px 12px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}>
+                {filterStatus}
+                <span style={{ fontSize: '10px', opacity: 0.6, transition: 'transform 0.2s', transform: statusOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+              </button>
+              {statusOpen && (
+                <div style={{ position: 'absolute', top: '105%', left: 0, minWidth: '180px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', zIndex: 100, overflow: 'hidden' }}>
+                  {['All Status', 'Active', 'Pending', 'Under Treatment', 'Recovered', 'Deceased', 'Draft'].map(s => (
+                    <button key={s} type="button"
+                      onClick={() => { setFilterStatus(s); setStatusOpen(false); setTablePage(1); }}
+                      style={{ display: 'block', width: '100%', padding: '10px 14px', background: filterStatus === s ? 'var(--input-bg)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: filterStatus === s ? '600' : '400' }}
+                      onMouseEnter={e => { if (filterStatus !== s) e.target.style.background = 'var(--input-bg)'; }}
+                      onMouseLeave={e => { if (filterStatus !== s) e.target.style.background = 'transparent'; }}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* ── NEW: Remaining Diseases sub-filter (only for "Other" card) ── */}
@@ -1549,7 +1666,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   }}
                 >
                   <span>{filterSubDisease === 'All Remaining Diseases' ? 'Remaining Diseases' : filterSubDisease}</span>
-                  <span style={{ opacity: 0.6 }}>▼</span>
+                  <span style={{ opacity: 0.6, transition: 'transform 0.2s', display: 'inline-block', transform: subDiseaseOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                 </button>
                 {subDiseaseOpen && (
                   <div style={{
@@ -1804,11 +1921,25 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Gender</label>
-                    <div style={{ position: 'relative' }}>
-                      <select style={{ ...inputStyle, appearance: 'none', paddingRight: '28px', cursor: 'pointer' }} value={formData.gender} onChange={e => setFormData({ ...formData, gender: e.target.value })}>
-                        <option>Male</option><option>Female</option>
-                      </select>
-                      <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '10px', pointerEvents: 'none', opacity: 0.6 }}>▼</span>
+                    <div style={{ position: 'relative' }} ref={genderRef}>
+                      <button type="button" onClick={() => setGenderOpen(!genderOpen)}
+                        style={{ ...inputStyle, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}>
+                        <span>{formData.gender}</span>
+                        <span style={{ fontSize: '10px', opacity: 0.6, transition: 'transform 0.2s', transform: genderOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                      </button>
+                      {genderOpen && (
+                        <div style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 100, overflow: 'hidden' }}>
+                          {['Male', 'Female'].map(g => (
+                            <button key={g} type="button"
+                              onClick={() => { setFormData({ ...formData, gender: g }); setGenderOpen(false); }}
+                              style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.gender === g ? '#f0fdfa' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: '#334155', cursor: 'pointer', fontWeight: formData.gender === g ? '600' : '400' }}
+                              onMouseEnter={e => { if (formData.gender !== g) e.target.style.background = '#f8fafc'; }}
+                              onMouseLeave={e => { if (formData.gender !== g) e.target.style.background = 'transparent'; }}>
+                              {g}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2221,24 +2352,48 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 )}
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Severity Level</label>
-                  <div style={{ position: 'relative' }}>
-                    <select style={{ ...inputStyle, appearance: 'none', paddingRight: '28px', cursor: 'pointer' }} value={formData.severity} onChange={e => setFormData({ ...formData, severity: e.target.value })}>
-                      <option>Mild</option><option>Moderate</option><option>Severe</option><option>Asymptomatic</option>
-                    </select>
-                    <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '10px', pointerEvents: 'none', opacity: 0.6 }}>▼</span>
+                  <div style={{ position: 'relative' }} ref={severityRef}>
+                    <button type="button" onClick={() => setSeverityOpen(!severityOpen)}
+                      style={{ ...inputStyle, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}>
+                      <span>{formData.severity}</span>
+                      <span style={{ fontSize: '10px', opacity: 0.6, transition: 'transform 0.2s', transform: severityOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                    </button>
+                    {severityOpen && (
+                      <div style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 100, overflow: 'hidden' }}>
+                        {['Mild', 'Moderate', 'Severe', 'Asymptomatic'].map(s => (
+                          <button key={s} type="button"
+                            onClick={() => { setFormData({ ...formData, severity: s }); setSeverityOpen(false); }}
+                            style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.severity === s ? '#f0fdfa' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: '#334155', cursor: 'pointer', fontWeight: formData.severity === s ? '600' : '400' }}
+                            onMouseEnter={e => { if (formData.severity !== s) e.target.style.background = '#f8fafc'; }}
+                            onMouseLeave={e => { if (formData.severity !== s) e.target.style.background = 'transparent'; }}>
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Patient Status</label>
-                  <div style={{ position: 'relative' }}>
-                    <select style={{ ...inputStyle, appearance: 'none', paddingRight: '28px', cursor: 'pointer' }} value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })}>
-                      <option>Active</option>
-                      <option>Pending</option>
-                      <option>Under Treatment</option>
-                      <option>Recovered</option>
-                      <option>Deceased</option>
-                    </select>
-                    <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '10px', pointerEvents: 'none', opacity: 0.6 }}>▼</span>
+                  <div style={{ position: 'relative' }} ref={patientStatusRef}>
+                    <button type="button" onClick={() => setPatientStatusOpen(!patientStatusOpen)}
+                      style={{ ...inputStyle, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}>
+                      <span>{formData.status}</span>
+                      <span style={{ fontSize: '10px', opacity: 0.6, transition: 'transform 0.2s', transform: patientStatusOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                    </button>
+                    {patientStatusOpen && (
+                      <div style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 100, overflow: 'hidden' }}>
+                        {['Active', 'Pending', 'Under Treatment', 'Recovered', 'Deceased'].map(s => (
+                          <button key={s} type="button"
+                            onClick={() => { setFormData({ ...formData, status: s }); setPatientStatusOpen(false); }}
+                            style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.status === s ? '#f0fdfa' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: '#334155', cursor: 'pointer', fontWeight: formData.status === s ? '600' : '400' }}
+                            onMouseEnter={e => { if (formData.status !== s) e.target.style.background = '#f8fafc'; }}
+                            onMouseLeave={e => { if (formData.status !== s) e.target.style.background = 'transparent'; }}>
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div>

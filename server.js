@@ -170,6 +170,20 @@ db.query(`CREATE TABLE IF NOT EXISTS case_inbox (
   else console.log('Case inbox table created/verified');
 });
 
+db.query(`CREATE TABLE IF NOT EXISTS contact_messages (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  target_cho_unit VARCHAR(100),
+  disease_name VARCHAR(255),
+  message TEXT NOT NULL,
+  is_read TINYINT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)`, (err) => {
+  if (err) console.error('Error creating contact_messages table:', err.message);
+  else console.log('Contact messages table created/verified');
+});
+
 function createAuditLog(userId, userName, userRole, choUnit, barangay, action, entity, details) {
   db.query(
     'INSERT INTO audit_logs (user_id, user_name, user_role, cho_unit, barangay, action, entity, details) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -2112,6 +2126,114 @@ app.delete('/api/users/:id/my-data', (req, res) => {
         message: 'Your personal data has been cleared successfully.'
       });
     });
+  });
+});
+
+// ==========================================
+// RESIDENT PORTAL ROUTES
+// ==========================================
+
+// POST /api/contact-messages — Resident contact form submission
+app.post('/api/contact-messages', (req, res) => {
+  const { name, email, targetCho, disease, message } = req.body;
+
+  if (!name || !email || !message) {
+    return res.status(400).json({ error: 'Name, email, and message are required.' });
+  }
+
+  db.query(
+    `INSERT INTO contact_messages (name, email, target_cho_unit, disease_name, message)
+     VALUES (?, ?, ?, ?, ?)`,
+    [name, email, targetCho || null, disease || null, message],
+    (err, result) => {
+      if (err) {
+        console.error('Error saving contact message:', err.message);
+        return res.status(500).json({ error: 'Failed to save message.' });
+      }
+
+      // Create notification for users in the target CHO unit
+      if (targetCho) {
+        db.query(
+          `SELECT user_id FROM users WHERE role = 'CHO' AND assigned_barangay_id IN (
+            SELECT id FROM barangays WHERE name IN (
+              SELECT covered FROM (
+                SELECT 'Sala' AS covered UNION SELECT 'Bigaa' UNION SELECT 'Butong'
+                UNION SELECT 'Marinig' UNION SELECT 'Gulod' UNION SELECT 'Niugan'
+                UNION SELECT 'Baclaran' UNION SELECT 'Barangay Uno (Poblacion)'
+                UNION SELECT 'Barangay Dos (Poblacion)' UNION SELECT 'Barangay Tres (Poblacion)'
+              ) AS t1 WHERE ? = 'CHO Unit I (Sala)'
+              UNION ALL
+              SELECT 'Pulo' AS covered UNION SELECT 'Banay-Banay' UNION SELECT 'Banlic'
+              UNION SELECT 'Mamatid' UNION SELECT 'San Isidro' UNION SELECT 'Diezmo'
+              UNION SELECT 'Pittland' UNION SELECT 'Casile'
+              FROM (SELECT 1) AS t2 WHERE ? = 'CHO Unit II (Pulo)'
+            )
+          )`,
+          [targetCho, targetCho],
+          (err2, users) => {
+            if (!err2 && users.length > 0) {
+              users.forEach(u => {
+                db.query(
+                  `INSERT INTO notifications (user_id, title, message, type, link_to)
+                   VALUES (?, ?, ?, ?, ?)`,
+                  [u.user_id, 'New Contact Message', `${name} sent a message regarding ${disease || 'general health'}.`, 'message', 'Manage Cases']
+                );
+              });
+            }
+          }
+        );
+      }
+
+      console.log(`Contact message from ${name} (${email})`);
+      res.status(200).json({ message: 'Message sent successfully!' });
+    }
+  );
+});
+
+// GET /api/contact-messages — Retrieve contact messages (for CHO/BHW inbox)
+app.get('/api/contact-messages', (req, res) => {
+  const { choUnit, limit } = req.query;
+  let sql = 'SELECT * FROM contact_messages';
+  const params = [];
+
+  if (choUnit) {
+    sql += ' WHERE target_cho_unit = ?';
+    params.push(choUnit);
+  }
+
+  sql += ' ORDER BY created_at DESC';
+
+  if (limit) {
+    sql += ' LIMIT ?';
+    params.push(parseInt(limit));
+  }
+
+  db.query(sql, params, (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(results);
+  });
+});
+
+// PUT /api/contact-messages/:id/read — Mark message as read
+app.put('/api/contact-messages/:id/read', (req, res) => {
+  db.query('UPDATE contact_messages SET is_read = 1 WHERE id = ?', [req.params.id], (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ message: 'Message marked as read.' });
+  });
+});
+
+// GET /api/disease_cases/public-summary — Public case counts per barangay
+app.get('/api/disease_cases/public-summary', (req, res) => {
+  const sql = `
+    SELECT b.name AS barangay_name, COUNT(dc.case_id) AS case_count
+    FROM barangays b
+    LEFT JOIN disease_cases dc ON dc.barangay_id = b.id
+    GROUP BY b.id, b.name
+    ORDER BY b.name
+  `;
+  db.query(sql, (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(results);
   });
 });
 

@@ -73,6 +73,11 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
   const [showAllBarangayAssign, setShowAllBarangayAssign] = useState(false);
   const barangayAssignRef = useRef(null);
 
+  const [statusOpen, setStatusOpen] = useState(false);
+  const statusRef = useRef(null);
+  const [roleOpen, setRoleOpen] = useState(false);
+  const roleRef = useRef(null);
+
   const formatDate = (d) => {
     if (!d) return '\u2014';
     const dt = new Date(d);
@@ -113,6 +118,12 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
       if (barangayAssignRef.current && !barangayAssignRef.current.contains(e.target)) {
         setBarangayAssignOpen(false);
         setShowAllBarangayAssign(false);
+      }
+      if (statusRef.current && !statusRef.current.contains(e.target)) {
+        setStatusOpen(false);
+      }
+      if (roleRef.current && !roleRef.current.contains(e.target)) {
+        setRoleOpen(false);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -322,7 +333,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
               style={{ ...inputStyle, width: '100%', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}
             >
               <span>{filterBarangay}</span>
-              <span style={{ marginLeft: '6px', opacity: 0.6 }}>▼</span>
+              <span style={{ marginLeft: '6px', opacity: 0.6, transition: 'transform 0.2s', display: 'inline-block', transform: barangayOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
             </button>
             {barangayOpen && (
               <div style={{
@@ -363,14 +374,25 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
               </div>
             )}
           </div>
-          <div style={{ position: 'relative' }}>
-            <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1); }}
-              style={{ ...inputStyle, width: '140px', appearance: 'none', paddingRight: '28px', cursor: 'pointer' }}>
-              <option>All Status</option>
-              <option>Active</option>
-              <option>Inactive</option>
-            </select>
-            <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '10px', pointerEvents: 'none', opacity: 0.6 }}>▼</span>
+          <div style={{ position: 'relative' }} ref={statusRef}>
+            <button type="button" onClick={() => setStatusOpen(!statusOpen)}
+              style={{ ...inputStyle, width: '140px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}>
+              <span>{filterStatus}</span>
+              <span style={{ fontSize: '10px', opacity: 0.6, transition: 'transform 0.2s', transform: statusOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+            </button>
+            {statusOpen && (
+              <div style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 100, overflow: 'hidden' }}>
+                {['All Status', 'Active', 'Inactive'].map(s => (
+                  <button key={s} type="button"
+                    onClick={() => { setFilterStatus(s); setStatusOpen(false); setCurrentPage(1); }}
+                    style={{ display: 'block', width: '100%', padding: '10px 14px', background: filterStatus === s ? '#f0fdfa' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: filterStatus === s ? '#0d9488' : '#334155', cursor: 'pointer', fontWeight: filterStatus === s ? '600' : '400' }}
+                    onMouseEnter={e => { if (filterStatus !== s) e.target.style.background = '#f8fafc'; }}
+                    onMouseLeave={e => { if (filterStatus !== s) e.target.style.background = 'transparent'; }}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           {selectedIds.length > 0 && (
             <>
@@ -523,15 +545,25 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                 </div>
                 <div>
                 <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Role *</label>
-                <div style={{ position: 'relative' }}>
-                  <select required style={{ ...inputStyle, appearance: 'none', paddingRight: '28px', cursor: 'pointer' }} value={formData.role}
-                    onChange={e => {
-                      setFormData({ ...formData, role: e.target.value, barangayId: '' });
-                    }}>
-                    <option value="BHW">Barangay Health Worker (BHW)</option>
-                    <option value="CHO">City Health Office (CHO)</option>
-                  </select>
-                  <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '10px', pointerEvents: 'none', opacity: 0.6 }}>▼</span>
+                <div style={{ position: 'relative' }} ref={roleRef}>
+                  <button type="button" onClick={() => setRoleOpen(!roleOpen)}
+                    style={{ ...inputStyle, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}>
+                    <span>{formData.role === 'BHW' ? 'Barangay Health Worker (BHW)' : 'City Health Office (CHO)'}</span>
+                    <span style={{ fontSize: '10px', opacity: 0.6, transition: 'transform 0.2s', transform: roleOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                  </button>
+                  {roleOpen && (
+                    <div style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 100, overflow: 'hidden' }}>
+                      {[{ value: 'BHW', label: 'Barangay Health Worker (BHW)' }, { value: 'CHO', label: 'City Health Office (CHO)' }].map(r => (
+                        <button key={r.value} type="button"
+                          onClick={() => { setFormData({ ...formData, role: r.value, barangayId: '' }); setRoleOpen(false); }}
+                          style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.role === r.value ? '#f0fdfa' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: formData.role === r.value ? '#0d9488' : '#334155', cursor: 'pointer', fontWeight: formData.role === r.value ? '600' : '400' }}
+                          onMouseEnter={e => { if (formData.role !== r.value) e.target.style.background = '#f8fafc'; }}
+                          onMouseLeave={e => { if (formData.role !== r.value) e.target.style.background = 'transparent'; }}>
+                          {r.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
                 <div>
