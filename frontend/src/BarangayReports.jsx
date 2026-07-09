@@ -398,11 +398,11 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
     if (filterUserRole === 'All Users') return 'All Users';
     if (filterUserRole === 'CHO Users') {
       if (filterUserSub === 'All') return 'CHO Users';
-      return `CHO — ${filterUserSub}`;
+      return `CHO - ${filterUserSub}`;
     }
     if (filterUserRole === 'BHW Users') {
       if (filterUserSub === 'All') return 'BHW Users';
-      return `BHW — ${filterUserSub}`;
+      return `BHW - ${filterUserSub}`;
     }
     return 'All Users';
   };
@@ -595,26 +595,36 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
       <div style={{ marginBottom: '20px' }}>
         <h2 style={{ margin: '0 0 2px 0', fontSize: '22px', fontWeight: '700', color: '#0f172a' }}>Audit Reports</h2>
         <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
-          {isBHW ? `Brgy. ${myBarangayName}` : choUnit} — Monitoring {myBarangays.length} barangay{myBarangays.length !== 1 ? 's' : ''}
+          {isBHW ? `Brgy. ${myBarangayName}` : choUnit} - Monitoring {myBarangays.length} barangay{myBarangays.length !== 1 ? 's' : ''}
         </p>
       </div>
 
       {/* ── TOP FILTER BAR ── */}
       <div style={{ ...s.card, display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap' }}>
-        <select value={reportPeriod} onChange={e => setReportPeriod(e.target.value)}
-          style={{ ...s.input, width: '160px', flex: '0 0 auto' }}>
-          <option value="">Report Period</option>
-          {PERIOD_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
-        </select>
+        <div style={{ position: 'relative', width: '160px', flex: '0 0 auto' }}>
+          <select value={reportPeriod} onChange={e => setReportPeriod(e.target.value)}
+            style={{ ...s.input, appearance: 'none', paddingRight: '28px', cursor: 'pointer' }}>
+            <option value="">Report Period</option>
+            {PERIOD_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+          <div style={{ position: 'absolute', right: '1px', top: '1px', bottom: '1px', width: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', background: '#fff', borderRadius: '0 6px 6px 0' }}>
+            <span style={{ fontSize: '10px', opacity: 0.6, color: '#64748b' }}>▼</span>
+          </div>
+        </div>
         <input type="date" value={reportDateStart} onChange={e => setReportDateStart(e.target.value)}
           style={{ ...s.input, width: '150px', flex: '0 0 auto' }} />
         <input type="date" value={reportDateEnd} onChange={e => setReportDateEnd(e.target.value)}
           style={{ ...s.input, width: '150px', flex: '0 0 auto' }} />
-        <select value={reportType} onChange={e => setReportType(e.target.value)}
-          style={{ ...s.input, flex: 1, minWidth: '160px' }}>
-          <option value="">Report Type</option>
-          {ENTITY_OPTIONS.map(e => <option key={e} value={e}>{e}</option>)}
-        </select>
+        <div style={{ position: 'relative', flex: 1, minWidth: '160px' }}>
+          <select value={reportType} onChange={e => setReportType(e.target.value)}
+            style={{ ...s.input, appearance: 'none', paddingRight: '28px', cursor: 'pointer' }}>
+            <option value="">Report Type</option>
+            {ENTITY_OPTIONS.map(e => <option key={e} value={e}>{e}</option>)}
+          </select>
+          <div style={{ position: 'absolute', right: '1px', top: '1px', bottom: '1px', width: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', background: '#fff', borderRadius: '0 6px 6px 0' }}>
+            <span style={{ fontSize: '10px', opacity: 0.6, color: '#64748b' }}>▼</span>
+          </div>
+        </div>
         <button onClick={() => setShowGenModal(true)}
           style={{ padding: '9px 22px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '7px', fontWeight: '600', fontSize: '14px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
           Generate Report
@@ -622,7 +632,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
       </div>
 
       {/* ── MIDDLE ROW ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '20px', marginBottom: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '20px', marginBottom: '20px', alignItems: 'start' }}>
 
         {/* ── Generated Reports Logs ── */}
         <div style={s.card}>
@@ -753,7 +763,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
           <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#1e293b' }}>Generated System Logs</h3>
         </div>
 
-        {/* ── TOOLBAR — Export CSV removed, two-level user filter added ── */}
+        {/* ── TOOLBAR - Export CSV removed, two-level user filter added ── */}
         <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
 
           {/* Search */}
@@ -816,7 +826,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
             )}
           </div>
 
-          {/* ── LEVEL 2: Sub-filter — only visible when a role is selected ── */}
+          {/* ── LEVEL 2: Sub-filter - only visible when a role is selected ── */}
           {filterUserRole !== 'All Users' && (
             <div style={{ position: 'relative' }} ref={subDropRef}>
               <button
@@ -850,7 +860,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
             <button onClick={() => { setShowDatePicker(!showDatePicker); setShowActionDrop(false); setShowUserDrop(false); setShowSubDrop(false); }}
               style={s.dropBtn(!!dateRange.start)}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              {dateRange.start ? `${formatDate(dateRange.start)}${dateRange.end ? ' — ' + formatDate(dateRange.end) : ''}` : 'Date Range'}
+              {dateRange.start ? `${formatDate(dateRange.start)}${dateRange.end ? ' - ' + formatDate(dateRange.end) : ''}` : 'Date Range'}
             </button>
             {showDatePicker && (
               <div style={{ position: 'absolute', top: '110%', left: 0, background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', boxShadow: '0 8px 32px rgba(0,0,0,0.14)', zIndex: 300, padding: '16px', width: '280px' }}>

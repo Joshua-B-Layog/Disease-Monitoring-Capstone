@@ -20,7 +20,7 @@ function pointInRing(lng, lat, ring) {
   return inside;
 }
 
-function pointInFeature(lng, lat, geometry) {
+export function pointInFeature(lng, lat, geometry) {
   if (!geometry) return false;
   if (geometry.type === 'Polygon') {
     return pointInRing(lng, lat, geometry.coordinates[0]);

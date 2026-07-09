@@ -189,7 +189,7 @@
             };
 
             if (data.requires2FA) {
-                // Hold off on logging in — send OTP and move to verification step
+                // Hold off on logging in - send OTP and move to verification step
                 setPendingUser(sessionPayload);
                 try {
                     await fetch(API_URL + '/api/send-login-otp', {
@@ -679,7 +679,7 @@ const handleLoginOtpSubmit = async (e) => {
             )}
 
 
-            {/* FORGOT PASSWORD SECTION — Email Only */}
+            {/* FORGOT PASSWORD SECTION - Email Only */}
             {step === 'forgot_password' && (
               <>
                 <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
@@ -918,8 +918,8 @@ const handleLoginOtpSubmit = async (e) => {
                             {signupPassword && (() => {
                                 const strength = getPasswordStrength(signupPassword);
                                 const styles = {
-                                    low: { color: '#ef4444', text: '✗ Weak — needs uppercase + number + special' },
-                                    medium: { color: '#eab308', text: '~ Medium — add uppercase, number & special for strongest' },
+                                    low: { color: '#ef4444', text: '✗ Weak - needs uppercase + number + special' },
+                                    medium: { color: '#eab308', text: '~ Medium - add uppercase, number & special for strongest' },
                                     strong: { color: '#10b981', text: '✓ Strong password' },
                                 };
                                 const s = styles[strength];

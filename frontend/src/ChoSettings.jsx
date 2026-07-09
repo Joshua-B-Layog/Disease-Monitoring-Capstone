@@ -387,7 +387,7 @@ export default function CHOSettings({
   // ── 2FA Toggle ──
   const handle2FAToggle = async () => {
     if (isTwoFactorEnabled) {
-      // Turning OFF — require a 6-digit code first, don't disable instantly
+      // Turning OFF - require a 6-digit code first, don't disable instantly
       setTwoFaLoading(true);
       setTwoFaMsg('');
       setDisableOtpError('');
@@ -404,7 +404,7 @@ export default function CHOSettings({
       return;
     }
 
-    // Turning ON — send verification email
+    // Turning ON - send verification email
     setTwoFaLoading(true);
     setTwoFaMsg('');
     try {
@@ -589,8 +589,8 @@ export default function CHOSettings({
                     <h2 style={{ fontSize: '24px', fontWeight: '600', color: 'var(--text-main)', margin: 0 }}>{displayName}</h2>
                     <p style={{ fontSize: '14px', color: 'var(--text-muted)', margin: 0 }}>
                       {activeUser?.role === 'BHW'
-                        ? `BHW — ${profile.assignment || activeUser?.context || ''}`
-                        : `${activeUser?.role || 'CHO'} Specialist — ${profile.assignment || activeUser?.context || ''}`
+                        ? `BHW - ${profile.assignment || activeUser?.context || ''}`
+                        : `${activeUser?.role || 'CHO'} Specialist - ${profile.assignment || activeUser?.context || ''}`
                       }
                     </p>
                     <button onClick={() => fileInputRef.current.click()}
@@ -633,15 +633,18 @@ export default function CHOSettings({
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <label style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text-muted)' }}>Unit Office Assignment</label>
-                    <select value={profile.assignedBarangayId || ''}
-                      onChange={e => {
-                        const selected = barangayList.find(b => b.id === parseInt(e.target.value));
-                        setProfile({ ...profile, assignedBarangayId: e.target.value ? parseInt(e.target.value) : null, assignment: selected ? selected.name : '' });
-                      }}
-                      style={{ ...fieldStyle, cursor: 'pointer' }}>
-                      <option value="">— Select Assignment —</option>
-                      {barangayList.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                    </select>
+                    <div style={{ position: 'relative' }}>
+                      <select value={profile.assignedBarangayId || ''}
+                        onChange={e => {
+                          const selected = barangayList.find(b => b.id === parseInt(e.target.value));
+                          setProfile({ ...profile, assignedBarangayId: e.target.value ? parseInt(e.target.value) : null, assignment: selected ? selected.name : '' });
+                        }}
+                        style={{ ...fieldStyle, cursor: 'pointer', appearance: 'none', paddingRight: '36px' }}>
+                        <option value="">— Select Assignment —</option>
+                        {barangayList.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                      </select>
+                      <span style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', fontSize: '10px', pointerEvents: 'none', opacity: 0.6 }}>▼</span>
+                    </div>
                   </div>
                 </div>
 
@@ -744,8 +747,8 @@ export default function CHOSettings({
                     <h3>Two-Factor Authentication</h3>
                     <span className="security-timestamp">
                       {isTwoFactorEnabled
-                        ? `✅ Active — verified via ${maskEmail(profile.email)}`
-                        : 'Currently disabled — adds an extra layer of security'}
+                        ? `✅ Active - verified via ${maskEmail(profile.email)}`
+                        : 'Currently disabled - adds an extra layer of security'}
                     </span>
                   </div>
                 </div>
@@ -906,7 +909,7 @@ export default function CHOSettings({
                     Devices currently signed in to your account.
                   </p>
 
-                  {/* Current Session — cannot be revoked */}
+                  {/* Current Session - cannot be revoked */}
                   <div style={{
                     display: 'flex', alignItems: 'center', gap: '14px',
                     padding: '14px 16px', background: '#f0fdf4', border: '1px solid #bbf7d0',
@@ -936,7 +939,7 @@ export default function CHOSettings({
                     </div>
                   </div>
 
-                  {/* Previous / Other Sessions — individually revokable */}
+                  {/* Previous / Other Sessions - individually revokable */}
                   {sessionData.previous_login && !otherSessionsCleared && !revokedSessionIds.includes('previous') && (
                     <div style={{
                       display: 'flex', alignItems: 'center', gap: '14px',
@@ -1404,7 +1407,7 @@ export default function CHOSettings({
                             @media print{.print-btn{display:none;}}
                           </style></head><body>
                           <button class="print-btn" onclick="window.print();">🖨️ Print / Save as PDF</button>
-                          <h2>Cabuyao CDMS — Full Data Export</h2>
+                          <h2>Cabuyao CDMS - Full Data Export</h2>
                           <p class="meta">Generated: ${new Date().toLocaleString()} &nbsp;|&nbsp; ${cases.length} Cases, ${users.length} Users</p>
                           <h3>Case Records (${cases.length})</h3>
                           <table><thead><tr><th>ID</th><th>Patient Name</th><th>Age</th><th>Gender</th><th>Barangay</th><th>Disease</th><th>Severity</th><th>Status</th><th>Date Reported</th></tr></thead><tbody>${caseRows}</tbody></table>

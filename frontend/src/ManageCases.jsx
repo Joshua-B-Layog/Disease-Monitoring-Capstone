@@ -139,7 +139,7 @@ const PUROK_OPTIONS = [
   'Lot 1', 'Lot 2', 'Lot 3', 'Lot 4', 'Lot 5'
 ];
 
-// Safe normalize — never crashes on non-string input
+// Safe normalize - never crashes on non-string input
 const norm = (s) => {
   if (typeof s !== 'string') return '';
   return s.toLowerCase().replace(/[\s\-().]/g, '');
@@ -310,7 +310,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const barangayRef = useRef(null);
   const subDiseaseRef = useRef(null);
 
-  // Dynamic purok options — merge PUROK_OPTIONS with values already in this BHW's barangay
+  // Dynamic purok options - merge PUROK_OPTIONS with values already in this BHW's barangay
   const dynamicPurokOptions = React.useMemo(() => {
     const uniqueFromCases = new Set();
     const targetBarangay = loginRole === 'BHW' && loginBarangay
@@ -867,7 +867,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       `<tr><td>${c.case_id}</td><td>${c.patient_name || ''}</td><td>${c.age || ''}</td><td>${c.barangay_name || ''}</td><td>${c.disease_name || ''}</td><td>${c.severity || ''}</td><td>${c.status || ''}</td></tr>`
     ).join('');
     const html = `<html><head><meta charset="utf-8"></head><body>
-      <h2>CDMS — ${selectedDisease?.name || 'Cases'} Export</h2>
+      <h2>CDMS - ${selectedDisease?.name || 'Cases'} Export</h2>
       <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:13px;">
         <thead><tr style="background:#1e3a8a;color:white;"><th>ID</th><th>Patient</th><th>Age</th><th>Barangay</th><th>Disease</th><th>Severity</th><th>Status</th></tr></thead>
         <tbody>${rows}</tbody>
@@ -1461,7 +1461,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               value={searchQuery} onChange={e => { setSearchQuery(e.target.value); setTablePage(1); }}
               style={{ padding: '8px 12px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)', fontSize: '13px', width: '180px' }} />
 
-            {/* Barangay filter — hidden for BHW */}
+            {/* Barangay filter - hidden for BHW */}
             {loginRole !== 'BHW' && (
               <div style={{ position: 'relative' }} ref={barangayRef}>
                 <button className="mc-custom-dropdown-btn" onClick={() => setBarangayOpen(!barangayOpen)}>
@@ -1490,7 +1490,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               </div>
             )}
 
-            {/* Purok/Blk/Phase filter — only for BHW */}
+            {/* Purok/Blk/Phase filter - only for BHW */}
             {loginRole === 'BHW' && (
               <div style={{ position: 'relative' }} ref={purokRef}>
                 <button className="mc-custom-dropdown-btn" onClick={() => setPurokOpen(!purokOpen)}>
@@ -1514,16 +1514,19 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             )}
 
             {/* Status filter */}
-            <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setTablePage(1); }}
-              style={{ padding: '8px 12px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)', fontSize: '13px' }}>
-              <option>All Status</option>
-              <option>Active</option>
-              <option>Pending</option>
-              <option>Under Treatment</option>
-              <option>Recovered</option>
-              <option>Deceased</option>
-              <option>Draft</option>
-            </select>
+            <div style={{ position: 'relative' }}>
+              <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setTablePage(1); }}
+                style={{ padding: '8px 12px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)', fontSize: '13px', appearance: 'none', paddingRight: '28px', cursor: 'pointer' }}>
+                <option>All Status</option>
+                <option>Active</option>
+                <option>Pending</option>
+                <option>Under Treatment</option>
+                <option>Recovered</option>
+                <option>Deceased</option>
+                <option>Draft</option>
+              </select>
+              <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '10px', pointerEvents: 'none', opacity: 0.6 }}>▼</span>
+            </div>
 
             {/* ── NEW: Remaining Diseases sub-filter (only for "Other" card) ── */}
             {isOtherCard && (
@@ -1722,7 +1725,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             </h2>
             <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>
               {isEdit
-                ? `Editing: Case #${String(editingCase?.case_id).padStart(3,'0')} — ${editingCase?.patient_name}`
+                ? `Editing: Case #${String(editingCase?.case_id).padStart(3,'0')} - ${editingCase?.patient_name}`
                 : `Encoding new case under: ${selectedDisease?.name}`}
             </p>
           </div>
@@ -1771,7 +1774,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       padding: '4px',
                     }}>
                       <div style={{ padding: '6px 12px', fontSize: '11px', color: '#64748b', fontWeight: 600, borderBottom: '1px solid #e2e8f0', marginBottom: '2px' }}>
-                        Multiple matching records — click to select
+                        Multiple matching records - click to select
                       </div>
                       {patientLookupResults.map((p, i) => (
                         <div key={i}
@@ -1784,7 +1787,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
                           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                         >
-                          <span><strong>{p.patient_name}</strong> <span style={{ color: '#64748b' }}>— {p.barangay_name || 'N/A'}</span></span>
+                          <span><strong>{p.patient_name}</strong> <span style={{ color: '#64748b' }}>- {p.barangay_name || 'N/A'}</span></span>
                           <span style={{ color: '#9ca3af', fontSize: '11px' }}>
                             {p.age || '?'}y
                           </span>
@@ -1801,9 +1804,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Gender</label>
-                    <select style={inputStyle} value={formData.gender} onChange={e => setFormData({ ...formData, gender: e.target.value })}>
-                      <option>Male</option><option>Female</option>
-                    </select>
+                    <div style={{ position: 'relative' }}>
+                      <select style={{ ...inputStyle, appearance: 'none', paddingRight: '28px', cursor: 'pointer' }} value={formData.gender} onChange={e => setFormData({ ...formData, gender: e.target.value })}>
+                        <option>Male</option><option>Female</option>
+                      </select>
+                      <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '10px', pointerEvents: 'none', opacity: 0.6 }}>▼</span>
+                    </div>
                   </div>
                 </div>
                 <div>
@@ -2215,19 +2221,25 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 )}
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Severity Level</label>
-                  <select style={inputStyle} value={formData.severity} onChange={e => setFormData({ ...formData, severity: e.target.value })}>
-                    <option>Mild</option><option>Moderate</option><option>Severe</option><option>Asymptomatic</option>
-                  </select>
+                  <div style={{ position: 'relative' }}>
+                    <select style={{ ...inputStyle, appearance: 'none', paddingRight: '28px', cursor: 'pointer' }} value={formData.severity} onChange={e => setFormData({ ...formData, severity: e.target.value })}>
+                      <option>Mild</option><option>Moderate</option><option>Severe</option><option>Asymptomatic</option>
+                    </select>
+                    <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '10px', pointerEvents: 'none', opacity: 0.6 }}>▼</span>
+                  </div>
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Patient Status</label>
-                  <select style={inputStyle} value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })}>
-                    <option>Active</option>
-                    <option>Pending</option>
-                    <option>Under Treatment</option>
-                    <option>Recovered</option>
-                    <option>Deceased</option>
-                  </select>
+                  <div style={{ position: 'relative' }}>
+                    <select style={{ ...inputStyle, appearance: 'none', paddingRight: '28px', cursor: 'pointer' }} value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })}>
+                      <option>Active</option>
+                      <option>Pending</option>
+                      <option>Under Treatment</option>
+                      <option>Recovered</option>
+                      <option>Deceased</option>
+                    </select>
+                    <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '10px', pointerEvents: 'none', opacity: 0.6 }}>▼</span>
+                  </div>
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Date of Onset</label>

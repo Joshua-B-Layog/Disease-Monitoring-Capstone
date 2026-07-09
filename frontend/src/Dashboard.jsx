@@ -206,7 +206,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         table.main tr:nth-child(even) td { background: #f9fafb; }
         .bar-section { margin: 8px 0 24px 0; }
       </style></head><body>
-      <h2>Cabuyao Disease Monitoring System — Dashboard Export</h2>
+      <h2>Cabuyao Disease Monitoring System - Dashboard Export</h2>
       <p>Generated: ${new Date().toLocaleDateString()} &nbsp;|&nbsp; Date Range: ${dateRange.start} to ${dateRange.end}</p>
 
       <h3>${eTitle}</h3>
@@ -254,7 +254,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   // --- EXPORT: PPT ---
   const handleExportPPT = () => {
     const eBars = isBhw ? diseaseBars : sortedBars;
-    const eTitle = isBhw ? 'All Diseases — Case Counts' : `${selectedDisease} Cases by Barangay`;
+    const eTitle = isBhw ? 'All Diseases - Case Counts' : `${selectedDisease} Cases by Barangay`;
     const eHighest = isBhw ? (diseaseBars.length > 0 ? diseaseBars[0].count : 1) : highestCount;
     const html = `
       <html><head><meta charset="utf-8"><title>CDMS Slide Export</title>
@@ -312,7 +312,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   // --- PRINT ---
   const handlePrint = () => {
     const eBars = isBhw ? diseaseBars : sortedBars;
-    const eTitle = isBhw ? 'All Diseases — Case Counts' : `${selectedDisease} Cases by Barangay`;
+    const eTitle = isBhw ? 'All Diseases - Case Counts' : `${selectedDisease} Cases by Barangay`;
     const eHighest = isBhw ? (diseaseBars.length > 0 ? diseaseBars[0].count : 1) : highestCount;
     const rows = displayCases.map(c =>
       `<tr>
@@ -451,7 +451,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           )}
         </div>
 
-        {/* FILTER & CONTROLS — FIX: date inputs no longer overflow */}
+        {/* FILTER & CONTROLS - FIX: date inputs no longer overflow */}
           <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <h4 style={{ color: 'var(--text-main)', margin: '0', fontSize: '15px', fontWeight: '600' }}>Filter & Controls</h4>
 
@@ -493,7 +493,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             </div>
           </div>}
 
-          {/* ── FIX: Date range — stacked so neither overflows ── */}
+          {/* ── FIX: Date range - stacked so neither overflows ── */}
           <div>
             <label style={{ color: 'var(--text-muted)', fontSize: '11px', display: 'block', marginBottom: '4px' }}>Date Range</label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>

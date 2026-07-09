@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { MapContainer, TileLayer, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import axios from 'axios';
@@ -7,7 +7,7 @@ import { API_URL } from './config';
 import { GeoJSON } from 'react-leaflet';
 import cabuyaoBoundaries from './data/cabuyao_barangays.geojson.json';
 import cabuyaoGeoJSON from './data/cabuyao_barangays.geojson';
-import { getPointInBarangay } from './data/coordinates';
+import { getPointInBarangay, pointInFeature } from './data/coordinates';
 
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -22,7 +22,7 @@ L.Icon.Default.mergeOptions({
 
 const CABUYAO_CENTER = [14.2253, 121.1254];
 const CABUYAO_BOUNDS = [
-  [14.16, 121.07],
+  [14.16, 120.98],
   [14.29, 121.18],
 ];
 
@@ -152,6 +152,71 @@ function getPolygonCentroid(geometry) {
   return [latSum / coords.length, lngSum / coords.length];
 }
 
+// Compute bounding box from GeoJSON polygon for a barangay
+const getBarangayBounds = (barangayName) => {
+  if (!barangayName) return null;
+  const n = norm(barangayName);
+  const feature = cabuyaoBoundaries.features.find(f => {
+    const props = f.properties || {};
+    const rawName = props.ADM4_EN || '';
+    const mappedName = GEOJSON_TO_DB_NAME[rawName] || rawName;
+    return norm(mappedName) === n;
+  });
+  if (!feature || !feature.geometry) return null;
+
+  let allCoords = [];
+  const geom = feature.geometry;
+  if (geom.type === 'Polygon') {
+    allCoords = geom.coordinates[0];
+  } else if (geom.type === 'MultiPolygon') {
+    geom.coordinates.forEach(poly => {
+      allCoords = allCoords.concat(poly[0]);
+    });
+  }
+  if (!allCoords.length) return null;
+
+  let minLat = Infinity, maxLat = -Infinity;
+  let minLng = Infinity, maxLng = -Infinity;
+  allCoords.forEach(([lng, lat]) => {
+    if (lat < minLat) minLat = lat;
+    if (lat > maxLat) maxLat = lat;
+    if (lng < minLng) minLng = lng;
+    if (lng > maxLng) maxLng = lng;
+  });
+  return [[minLat, minLng], [maxLat, maxLng]];
+};
+
+// Compute combined bounding box for multiple barangays (e.g. CHO unit)
+const getCombinedBounds = (barangayNames) => {
+  if (!barangayNames || !barangayNames.length) return null;
+  let minLat = Infinity, maxLat = -Infinity;
+  let minLng = Infinity, maxLng = -Infinity;
+  let found = false;
+  barangayNames.forEach(name => {
+    const bounds = getBarangayBounds(name);
+    if (bounds) {
+      found = true;
+      if (bounds[0][0] < minLat) minLat = bounds[0][0];
+      if (bounds[0][1] < minLng) minLng = bounds[0][1];
+      if (bounds[1][0] > maxLat) maxLat = bounds[1][0];
+      if (bounds[1][1] > maxLng) maxLng = bounds[1][1];
+    }
+  });
+  if (!found) return null;
+  return [[minLat, minLng], [maxLat, maxLng]];
+};
+
+// CHO unit coverage mapping
+const CHO_UNIT_BARANGAYS = {
+  'CHO Unit I (Sala)': [
+    'Barangay Uno (Poblacion)', 'Barangay Dos (Poblacion)', 'Barangay Tres (Poblacion)',
+    'Sala', 'Bigaa', 'Butong', 'Marinig', 'Gulod', 'Niugan', 'Baclaran',
+  ],
+  'CHO Unit II (Pulo)': [
+    'Pulo', 'Banay-Banay', 'Banlic', 'Mamatid', 'San Isidro', 'Diezmo', 'Pittland', 'Casile',
+  ],
+};
+
 // Maps GeoJSON ADM4_EN values to DB's barangays.name values
 const GEOJSON_TO_DB_NAME = {
   'Baclaran': 'Baclaran',
@@ -179,6 +244,18 @@ const getDbNameFromGeoJson = (admName) => {
   }
   return GEOJSON_TO_DB_NAME[admName] || admName;
 };
+
+function findBarangayAtCoords(lat, lng, geoJson) {
+  if (!geoJson || !geoJson.features) return null;
+  for (const feature of geoJson.features) {
+    if (feature.geometry && pointInFeature(lng, lat, feature.geometry)) {
+      return getDbNameFromGeoJson(feature.properties.ADM4_EN);
+    }
+  }
+  return null;
+}
+
+const PUROK_ZOOM_THRESHOLD = 15;
 
 const PUROK_OPTIONS = [
   'All Puroks', 'Purok 1', 'Purok 2', 'Purok 3', 'Purok 4', 'Purok 5', 'Purok 6',
@@ -415,17 +492,89 @@ function PulseMarkers({ barangayData, onHover, onLeave, onClick }) {
   return null;
 }
 
-function ZoomToBarangay({ barangay, loginRole, loginBarangay }) {
+function ZoomListener({ onZoom, filterBarangay, autoDetectedBrgy, setAutoDetectedBrgy, loginRole }) {
+  useMapEvents({
+    zoomend: (e) => {
+      const zoom = e.target.getZoom();
+      onZoom(zoom);
+      if (loginRole === 'BHW') return;
+      if (zoom >= PUROK_ZOOM_THRESHOLD && filterBarangay === 'All Barangays') {
+        const center = e.target.getCenter();
+        const detected = findBarangayAtCoords(center.lat, center.lng, cabuyaoBoundaries);
+        if (detected && detected !== autoDetectedBrgy) {
+          setAutoDetectedBrgy(detected);
+        }
+      } else if (zoom < PUROK_ZOOM_THRESHOLD && autoDetectedBrgy) {
+        setAutoDetectedBrgy(null);
+      }
+    },
+  });
+  return null;
+}
+
+function ZoomToBarangay({ barangay, loginRole, loginBarangay, sessionContext, cases }) {
   const map = useMap();
   const prevRef = useRef(null);
+  const casesRef = useRef([]);
+  casesRef.current = cases;
   useEffect(() => {
     const target = (loginRole === 'BHW' && loginBarangay) ? loginBarangay : barangay;
+
+    // CHO unit scope — zoom to the combined area of covered barangays
+    if (loginRole === 'CHO' && sessionContext && (!target || target === 'All Barangays')) {
+      const key = 'cho:' + sessionContext;
+      if (key === prevRef.current) return;
+      prevRef.current = key;
+      const unitBarangays = CHO_UNIT_BARANGAYS[sessionContext];
+      if (unitBarangays && unitBarangays.length > 0) {
+        const combined = getCombinedBounds(unitBarangays);
+        if (combined) {
+          map.fitBounds(combined, { padding: [40, 40], animate: true, duration: 0.8 });
+        }
+      }
+      return;
+    }
+
     if (!target || target === 'All Barangays' || target === prevRef.current) return;
     prevRef.current = target;
-    const coords = findCoords(target);
-    if (!coords) return;
-    map.setView(coords, 15, { animate: true, duration: 0.8 });
-  }, [barangay, loginRole, loginBarangay, map]);
+
+    // Try marker bounds first (tightest zoom to case dots)
+    const targetCases = (casesRef.current || []).filter(
+      c => c.barangay_name === target && c.latitude && c.longitude
+    );
+    if (targetCases.length > 0) {
+      let minLat = Infinity, maxLat = -Infinity;
+      let minLng = Infinity, maxLng = -Infinity;
+      targetCases.forEach(c => {
+        const lat = parseFloat(c.latitude);
+        const lng = parseFloat(c.longitude);
+        if (lat < minLat) minLat = lat;
+        if (lat > maxLat) maxLat = lat;
+        if (lng < minLng) minLng = lng;
+        if (lng > maxLng) maxLng = lng;
+      });
+      if (minLat !== Infinity) {
+        const latSpan = maxLat - minLat;
+        const lngSpan = maxLng - minLng;
+        if (latSpan < 0.005 && lngSpan < 0.005) {
+          map.setView([(minLat + maxLat) / 2, (minLng + maxLng) / 2], 14, { animate: true, duration: 0.8 });
+        } else {
+          map.fitBounds([[minLat, minLng], [maxLat, maxLng]], { padding: [50, 50], animate: true, duration: 0.8 });
+        }
+        return;
+      }
+    }
+
+    // Fallback: polygon bounds
+    const bounds = getBarangayBounds(target);
+    if (bounds) {
+      map.fitBounds(bounds, { padding: [40, 40], animate: true, duration: 0.8 });
+    } else {
+      const coords = findCoords(target);
+      if (!coords) return;
+      map.setView(coords, 15, { animate: true, duration: 0.8 });
+    }
+  }, [barangay, loginRole, loginBarangay, sessionContext, map]);
   return null;
 }
 
@@ -487,6 +636,8 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const [allCases, setAllCases]         = useState([]);
   const [barangayData, setBarangayData] = useState([]);
   const [purokData, setPurokData]       = useState([]);
+  const [mapZoom, setMapZoom]           = useState(14);
+  const [autoDetectedBrgy, setAutoDetectedBrgy] = useState(null);
   const [hotspotData, setHotspotData]   = useState([]);
   const [filterBarangay, setFilterBarangay] = useState('All Barangays');
   const [filterStatus,   setFilterStatus]   = useState('All Status');
@@ -507,15 +658,6 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const barangayDataRef = useRef(barangayData);
   useEffect(() => { barangayDataRef.current = barangayData; }, [barangayData]);
 
-  const CHO_UNIT_BARANGAYS = {
-    'CHO Unit I (Sala)': [
-      'Barangay Uno (Poblacion)', 'Barangay Dos (Poblacion)', 'Barangay Tres (Poblacion)',
-      'Sala', 'Bigaa', 'Butong', 'Marinig', 'Gulod', 'Niugan', 'Baclaran',
-    ],
-    'CHO Unit II (Pulo)': [
-      'Pulo', 'Banay-Banay', 'Banlic', 'Mamatid', 'San Isidro', 'Diezmo', 'Pittland', 'Casile',
-    ],
-  };
 
   const scopedGeoJson = useMemo(() => {
     let allowedBarangays = null;
@@ -657,7 +799,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     // Purok-level grouping — used when scoped to a single barangay
     const purokTarget = (loginRole === 'BHW' && loginBarangay) ? loginBarangay
       : (filterBarangay !== 'All Barangays') ? filterBarangay
-      : null;
+      : autoDetectedBrgy || null;
     if (purokTarget) {
       const canon = findCanonicalName(purokTarget);
       const purokCases = scopedFiltered.filter(c => findCanonicalName(c.barangay_name) === canon);
@@ -665,7 +807,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     } else {
       setPurokData([]);
     }
-  }, [allCases, filterBarangay, filterStatus, filterDate, filterSeverity, filterPurok]);
+  }, [allCases, filterBarangay, filterStatus, filterDate, filterSeverity, filterPurok, autoDetectedBrgy]);
 
   const getTop5 = (diseases) =>
     Object.entries(diseases).sort((a, b) => b[1] - a[1]).slice(0, 5);
@@ -687,6 +829,8 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     borderRadius: '7px', color: 'var(--text-main)',
     fontSize: '13px', boxSizing: 'border-box',
   };
+
+  const showAutoPurok = loginRole !== 'BHW' && filterBarangay === 'All Barangays' && mapZoom >= PUROK_ZOOM_THRESHOLD && autoDetectedBrgy;
 
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 64px)', fontFamily: 'system-ui, sans-serif' }}>
@@ -734,7 +878,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                   padding: '4px', textAlign: 'left',
                 }}>
                   <div
-                    onClick={() => { setFilterBarangay('All Barangays'); setBarangayOpen(false); }}
+                    onClick={() => { setFilterBarangay('All Barangays'); setAutoDetectedBrgy(null); setBarangayOpen(false); }}
                     style={{
                       padding: '8px 14px', cursor: 'pointer', fontSize: '13px',
                       display: 'flex', alignItems: 'center', gap: '8px',
@@ -754,7 +898,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                   {scopedBarangayOptions.map(b => (
                     <div
                       key={b}
-                      onClick={() => { setFilterBarangay(b); setBarangayOpen(false); }}
+                      onClick={() => { setFilterBarangay(b); setAutoDetectedBrgy(null); setBarangayOpen(false); }}
                       style={{
                         padding: '8px 14px', cursor: 'pointer', fontSize: '13px',
                         display: 'flex', alignItems: 'center', gap: '8px',
@@ -791,14 +935,17 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         {/* Status */}
         <div>
           <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Status</label>
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={SEL}>
-            <option>All Status</option>
-            <option>Active</option>
-            <option>Pending</option>
-            <option>Under Treatment</option>
-            <option>Recovered</option>
-            <option>Deceased</option>
-          </select>
+          <div style={{ position: 'relative' }}>
+            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ ...SEL, appearance: 'none', paddingRight: '28px', cursor: 'pointer' }}>
+              <option>All Status</option>
+              <option>Active</option>
+              <option>Pending</option>
+              <option>Under Treatment</option>
+              <option>Recovered</option>
+              <option>Deceased</option>
+            </select>
+            <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '10px', pointerEvents: 'none', opacity: 0.6 }}>▼</span>
+          </div>
         </div>
 
         {/* Purok / Blk / Phase */}
@@ -865,13 +1012,16 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         {/* Severity — includes Asymptomatic */}
         <div>
           <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Severity</label>
-          <select value={filterSeverity} onChange={e => setFilterSeverity(e.target.value)} style={SEL}>
-            <option>All Severities</option>
-            <option>Mild</option>
-            <option>Moderate</option>
-            <option>Severe</option>
-            <option>Asymptomatic</option>
-          </select>
+          <div style={{ position: 'relative' }}>
+            <select value={filterSeverity} onChange={e => setFilterSeverity(e.target.value)} style={{ ...SEL, appearance: 'none', paddingRight: '28px', cursor: 'pointer' }}>
+              <option>All Severities</option>
+              <option>Mild</option>
+              <option>Moderate</option>
+              <option>Severe</option>
+              <option>Asymptomatic</option>
+            </select>
+            <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '10px', pointerEvents: 'none', opacity: 0.6 }}>▼</span>
+          </div>
         </div>
 
         {/* Legend */}
@@ -910,7 +1060,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         </div>
 
         <button
-          onClick={() => { setFilterBarangay('All Barangays'); setFilterStatus('All Status'); setFilterDate(''); setFilterSeverity('All Severities'); }}
+          onClick={() => { setAutoDetectedBrgy(null); setFilterBarangay('All Barangays'); setFilterStatus('All Status'); setFilterDate(''); setFilterSeverity('All Severities'); }}
           style={{ padding: '11px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '7px', cursor: 'pointer', fontWeight: '600', fontSize: '13px', marginTop: 'auto' }}>
           Reset Filters
         </button>
@@ -938,8 +1088,9 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
             attribution='&copy; OpenStreetMap contributors &copy; CARTO'
             url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
           />
-          <ZoomToBarangay barangay={filterBarangay} loginRole={loginRole} loginBarangay={loginBarangay} />
-          {loginRole !== 'BHW' && filterBarangay === 'All Barangays' ? (
+          <ZoomToBarangay barangay={filterBarangay} loginRole={loginRole} loginBarangay={loginBarangay} sessionContext={sessionContext} cases={allCases} />
+          <ZoomListener onZoom={setMapZoom} filterBarangay={filterBarangay} autoDetectedBrgy={autoDetectedBrgy} setAutoDetectedBrgy={setAutoDetectedBrgy} loginRole={loginRole} />
+          {loginRole !== 'BHW' && (filterBarangay === 'All Barangays' && !showAutoPurok) ? (
             <GeoJSON
               ref={geoJsonLayerRef}
               data={scopedGeoJson}

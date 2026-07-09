@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
 import { API_URL } from './config';
 
@@ -69,6 +69,9 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
 
   const [barangayOpen, setBarangayOpen] = useState(false);
   const barangayRef = useRef(null);
+  const [barangayAssignOpen, setBarangayAssignOpen] = useState(false);
+  const [showAllBarangayAssign, setShowAllBarangayAssign] = useState(false);
+  const barangayAssignRef = useRef(null);
 
   const formatDate = (d) => {
     if (!d) return '\u2014';
@@ -106,6 +109,10 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
     const handler = (e) => {
       if (barangayRef.current && !barangayRef.current.contains(e.target)) {
         setBarangayOpen(false);
+      }
+      if (barangayAssignRef.current && !barangayAssignRef.current.contains(e.target)) {
+        setBarangayAssignOpen(false);
+        setShowAllBarangayAssign(false);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -280,21 +287,10 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
     }
   };
 
-  const renderBarangayOptions = () => (
-    <>
-      <option value="">— Select Barangay —</option>
-      <optgroup label="CHO Unit I">
-        {barangayList.filter(b => getChoUnit(b.name) === 'CHO Unit I').map(b => (
-          <option key={b.id} value={b.id}>{b.name}</option>
-        ))}
-      </optgroup>
-      <optgroup label="CHO Unit II">
-        {barangayList.filter(b => getChoUnit(b.name) === 'CHO Unit II').map(b => (
-          <option key={b.id} value={b.id}>{b.name}</option>
-        ))}
-      </optgroup>
-    </>
-  );
+  const unitIBarangays = useMemo(() => barangayList.filter(b => getChoUnit(b.name) === 'CHO Unit I'), [barangayList]);
+  const unitIIBarangays = useMemo(() => barangayList.filter(b => getChoUnit(b.name) === 'CHO Unit II'), [barangayList]);
+  const allBarangayAssignOptions = useMemo(() => [...unitIBarangays, ...unitIIBarangays], [unitIBarangays, unitIIBarangays]);
+  const visibleBarangayAssignOptions = showAllBarangayAssign ? allBarangayAssignOptions : allBarangayAssignOptions.slice(0, 5);
 
   const inputStyle = {
     width: '100%', padding: '10px 12px', borderRadius: '8px',
@@ -367,12 +363,15 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
               </div>
             )}
           </div>
-          <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1); }}
-            style={{ ...inputStyle, width: '140px' }}>
-            <option>All Status</option>
-            <option>Active</option>
-            <option>Inactive</option>
-          </select>
+          <div style={{ position: 'relative' }}>
+            <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1); }}
+              style={{ ...inputStyle, width: '140px', appearance: 'none', paddingRight: '28px', cursor: 'pointer' }}>
+              <option>All Status</option>
+              <option>Active</option>
+              <option>Inactive</option>
+            </select>
+            <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '10px', pointerEvents: 'none', opacity: 0.6 }}>▼</span>
+          </div>
           {selectedIds.length > 0 && (
             <>
               <button onClick={() => {
@@ -524,13 +523,16 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                 </div>
                 <div>
                 <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Role *</label>
-                <select required style={inputStyle} value={formData.role}
-                  onChange={e => {
-                    setFormData({ ...formData, role: e.target.value, barangayId: '' });
-                  }}>
-                  <option value="BHW">Barangay Health Worker (BHW)</option>
-                  <option value="CHO">City Health Office (CHO)</option>
-                </select>
+                <div style={{ position: 'relative' }}>
+                  <select required style={{ ...inputStyle, appearance: 'none', paddingRight: '28px', cursor: 'pointer' }} value={formData.role}
+                    onChange={e => {
+                      setFormData({ ...formData, role: e.target.value, barangayId: '' });
+                    }}>
+                    <option value="BHW">Barangay Health Worker (BHW)</option>
+                    <option value="CHO">City Health Office (CHO)</option>
+                  </select>
+                  <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '10px', pointerEvents: 'none', opacity: 0.6 }}>▼</span>
+                </div>
               </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Contact Number *</label>
@@ -539,10 +541,47 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Barangay Assignment *</label>
-                  <select required style={inputStyle} value={formData.barangayId}
-                    onChange={e => setFormData({ ...formData, barangayId: e.target.value })}>
-                    {renderBarangayOptions()}
-                  </select>
+                    <div style={{ position: 'relative' }} ref={barangayAssignRef}>
+                      <button type="button"
+                        onClick={() => { setBarangayAssignOpen(!barangayAssignOpen); setShowAllBarangayAssign(false); }}
+                        style={{ ...inputStyle, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}>
+                        <span>{barangayList.find(b => b.id === formData.barangayId)?.name || '— Select Barangay —'}</span>
+                        <span style={{ fontSize: '10px', opacity: 0.6, transition: 'transform 0.2s', transform: barangayAssignOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                      </button>
+                      {barangayAssignOpen && (
+                        <div style={{
+                          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
+                          maxHeight: '280px', overflowY: 'auto', marginTop: '4px',
+                          background: '#fff', border: '1px solid #e2e8f0',
+                          borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                        }}>
+                          <div onClick={() => { setFormData({ ...formData, barangayId: '' }); setBarangayAssignOpen(false); }}
+                            style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '14px', color: '#94a3b8', fontStyle: 'italic', borderBottom: '1px solid #f1f5f9' }}>
+                            — Select Barangay —
+                          </div>
+                          {visibleBarangayAssignOptions.length > 0 && <div style={{ padding: '6px 14px 2px', fontSize: '11px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>CHO Unit I</div>}
+                          {visibleBarangayAssignOptions.filter(b => unitIBarangays.includes(b)).map(b => (
+                            <div key={b.id} onClick={() => { setFormData({ ...formData, barangayId: b.id }); setBarangayAssignOpen(false); }}
+                              style={{ padding: '8px 14px 8px 18px', cursor: 'pointer', fontSize: '14px', color: formData.barangayId === b.id ? '#0d9488' : '#334155', background: formData.barangayId === b.id ? '#f0fdfa' : 'transparent', fontWeight: formData.barangayId === b.id ? '600' : '400' }}>
+                              {b.name}
+                            </div>
+                          ))}
+                          {visibleBarangayAssignOptions.filter(b => unitIIBarangays.includes(b)).length > 0 && <div style={{ padding: '8px 14px 2px', fontSize: '11px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>CHO Unit II</div>}
+                          {visibleBarangayAssignOptions.filter(b => unitIIBarangays.includes(b)).map(b => (
+                            <div key={b.id} onClick={() => { setFormData({ ...formData, barangayId: b.id }); setBarangayAssignOpen(false); }}
+                              style={{ padding: '8px 14px 8px 18px', cursor: 'pointer', fontSize: '14px', color: formData.barangayId === b.id ? '#0d9488' : '#334155', background: formData.barangayId === b.id ? '#f0fdfa' : 'transparent', fontWeight: formData.barangayId === b.id ? '600' : '400' }}>
+                              {b.name}
+                            </div>
+                          ))}
+                          {!showAllBarangayAssign && allBarangayAssignOptions.length > 5 && (
+                            <div onClick={() => setShowAllBarangayAssign(true)}
+                              style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '13px', color: '#0d9488', fontWeight: '600', borderTop: '1px solid #f1f5f9', textAlign: 'center' }}>
+                              Show all {allBarangayAssignOptions.length} barangays
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                 </div>
               </div>
 
@@ -627,7 +666,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                 {deleteTarget.full_name} (U-{String(deleteTarget.user_id).padStart(3, '0')})
               </div>
               <div style={{ color: '#6b7280', fontSize: '14px' }}>
-                {deleteTarget.role === 'BHW' ? 'Barangay Health Worker' : 'City Health Office Admin'} — {deleteTarget.barangay_name || 'No barangay assigned'}
+                {deleteTarget.role === 'BHW' ? 'Barangay Health Worker' : 'City Health Office Admin'} - {deleteTarget.barangay_name || 'No barangay assigned'}
               </div>
             </div>
             )}
