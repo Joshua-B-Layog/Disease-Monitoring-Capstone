@@ -255,7 +255,7 @@ function findBarangayAtCoords(lat, lng, geoJson) {
   return null;
 }
 
-const PUROK_ZOOM_THRESHOLD = 15;
+const PUROK_ZOOM_THRESHOLD = 17;
 
 const PUROK_OPTIONS = [
   'All Puroks', 'Purok 1', 'Purok 2', 'Purok 3', 'Purok 4', 'Purok 5', 'Purok 6',
@@ -434,6 +434,55 @@ if (!document.getElementById('cdms-pulse')) {
     100% { transform: scale(0.85); opacity: 0;   }
   }`;
   document.head.appendChild(s);
+}
+
+// Inject permanent label styles once
+if (!document.getElementById('cdms-barangay-labels')) {
+  const ls = document.createElement('style');
+  ls.id = 'cdms-barangay-labels';
+  ls.textContent = `
+    .brgy-tooltip-label {
+      background: rgba(15,23,42,0.85) !important;
+      border: none !important;
+      border-radius: 6px !important;
+      padding: 4px 7px !important;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.3) !important;
+      font-family: system-ui, -apple-system, sans-serif !important;
+      pointer-events: none !important;
+    }
+    .brgy-tooltip-label .brgy-name {
+      font-weight: 700;
+      font-size: 11px;
+      color: #fff;
+      text-align: center;
+      line-height: 1.2;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    }
+    .brgy-tooltip-label .brgy-disease {
+      font-size: 10px;
+      color: #93c5fd;
+      text-align: center;
+      line-height: 1.2;
+      margin-top: 1px;
+    }
+    .brgy-tooltip-label .brgy-empty {
+      color: #94a3b8;
+      font-style: italic;
+    }
+    .brgy-tooltip-label .brgy-risk {
+      font-size: 9px;
+      text-align: center;
+      line-height: 1.1;
+      margin-top: 1px;
+    }
+    .leaflet-tooltip-top.brgy-tooltip-label::before,
+    .leaflet-tooltip-bottom.brgy-tooltip-label::before,
+    .leaflet-tooltip-left.brgy-tooltip-label::before,
+    .leaflet-tooltip-right.brgy-tooltip-label::before {
+      border: none !important;
+    }
+  `;
+  document.head.appendChild(ls);
 }
 
 function PulseMarkers({ barangayData, onHover, onLeave, onClick }) {
@@ -741,6 +790,34 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     if (!geoJsonLayerRef.current) return;
     geoJsonLayerRef.current.eachLayer((layer) => {
       layer.setStyle(getGeoJsonStyle(layer.feature, barangayData));
+    });
+  }, [barangayData]);
+
+  // Update permanent labels when data refreshes
+  useEffect(() => {
+    if (!geoJsonLayerRef.current) return;
+    geoJsonLayerRef.current.eachLayer((layer) => {
+      const rawName = layer.feature.properties.ADM4_EN;
+      const barangayName = getDbNameFromGeoJson(rawName);
+      const match = barangayData.find(b => b.barangayName === barangayName);
+      const topDisease = match ? getTop5(match.diseases)[0] : null;
+      const risk = match ? getRisk(match.totalCases) : getRisk(0);
+
+      const html = `
+        <div class="brgy-label">
+          <div class="brgy-name">${rawName}</div>
+          <div class="brgy-disease">
+            ${match ? `${match.totalCases} case${match.totalCases !== 1 ? 's' : ''}` : '0 cases'}
+            ${topDisease ? ` | ${topDisease[0]} (${topDisease[1]})` : ''}
+          </div>
+          <div class="brgy-risk" style="color:${risk.color}">● ${risk.label}</div>
+        </div>
+      `;
+      if (layer.getTooltip()) {
+        layer.setTooltipContent(html);
+      } else {
+        layer.bindTooltip(html, { permanent: true, direction: 'center', className: 'brgy-tooltip-label' });
+      }
     });
   }, [barangayData]);
 
@@ -1122,6 +1199,20 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               style={(feature) => getGeoJsonStyle(feature, barangayData)}
               onEachFeature={(feature, layer) => {
                 const barangayName = getDbNameFromGeoJson(feature.properties.ADM4_EN);
+                const rawName = feature.properties.ADM4_EN;
+                const match = barangayDataRef.current.find(b => b.barangayName === barangayName);
+                const topDisease = match ? getTop5(match.diseases)[0] : null;
+                const risk = match ? getRisk(match.totalCases) : getRisk(0);
+                layer.bindTooltip(`
+                  <div class="brgy-label">
+                    <div class="brgy-name">${rawName}</div>
+                    <div class="brgy-disease">
+                      ${match ? `${match.totalCases} case${match.totalCases !== 1 ? 's' : ''}` : '0 cases'}
+                      ${topDisease ? ` | ${topDisease[0]} (${topDisease[1]})` : ''}
+                    </div>
+                    <div class="brgy-risk" style="color:${risk.color}">● ${risk.label}</div>
+                  </div>
+                `, { permanent: true, direction: 'center', className: 'brgy-tooltip-label' });
                 layer.on({
                   mouseover: function (e) {
                     e.target.setStyle({ fillOpacity: 0.75, weight: 2.5 });
