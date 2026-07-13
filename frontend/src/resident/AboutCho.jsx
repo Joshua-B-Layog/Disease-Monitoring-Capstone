@@ -18,7 +18,7 @@ const CHO_UNITS = [
     phone: '(049) 502-1234',
     email: 'chounit1@cabuyao.gov.ph',
     residentCount: '~45,000',
-    accreditation: 'DOH Licensed Primary Care Facility — Level 1',
+    accreditation: 'DOH Licensed Primary Care Facility, Level 1',
     latitude: 14.2690,
     longitude: 121.1350,
     coveredBarangays: ['Barangay Uno (Poblacion)', 'Barangay Dos (Poblacion)', 'Barangay Tres (Poblacion)', 'Sala', 'Bigaa', 'Butong', 'Marinig', 'Gulod', 'Niugan', 'Baclaran'],
@@ -40,7 +40,7 @@ const CHO_UNITS = [
     phone: '(049) 502-5678',
     email: 'chounit2@cabuyao.gov.ph',
     residentCount: '~38,000',
-    accreditation: 'DOH Accredited Primary Care Facility — Level 2',
+    accreditation: 'DOH Accredited Primary Care Facility, Level 2',
     latitude: 14.2480,
     longitude: 121.1390,
     coveredBarangays: ['Pulo', 'Banay-Banay', 'Banlic', 'Mamatid', 'San Isidro', 'Diezmo', 'Pittland', 'Casile'],
@@ -96,7 +96,7 @@ export default function AboutCho() {
         <div style={{ padding: '24px' }}>
           {/* Mission & Vision */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
-            <div style={{ background: '#f0fdfa', borderRadius: '8px', padding: '16px', border: '1px solid #ccfbf1' }}>
+            <div style={{ background: 'var(--input-bg)', borderRadius: '8px', padding: '16px', border: '1px solid var(--border-color)' }}>
               <div style={{ fontSize: '13px', fontWeight: '700', color: '#10B981', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Our Mission
               </div>
@@ -104,7 +104,7 @@ export default function AboutCho() {
                 {selected.mission}
               </p>
             </div>
-            <div style={{ background: '#eff6ff', borderRadius: '8px', padding: '16px', border: '1px solid #dbeafe' }}>
+            <div style={{ background: 'var(--input-bg)', borderRadius: '8px', padding: '16px', border: '1px solid var(--border-color)' }}>
               <div style={{ fontSize: '13px', fontWeight: '700', color: '#1d4ed8', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Our Vision
               </div>
@@ -119,7 +119,7 @@ export default function AboutCho() {
             <h4 style={{ margin: '0 0 12px', fontSize: '15px', fontWeight: '700', color: 'var(--text-main)' }}>
               Staff
             </h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', maxWidth: '600px', margin: '0 auto' }}>
               {selected.staff.map((s, i) => (
                 <div key={i} style={{
                   display: 'flex', alignItems: 'center', gap: '10px',

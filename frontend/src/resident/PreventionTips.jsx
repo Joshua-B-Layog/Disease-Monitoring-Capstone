@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const DISEASES = [
   {
@@ -552,10 +552,13 @@ export default function PreventionTips() {
   const [expanded, setExpanded] = useState(null);
   const [search, setSearch] = useState('');
 
+  useEffect(() => { setExpanded(null); }, [search]);
+
   const [scStep, setScStep] = useState('pick'); // pick | quiz | result
   const [scDisease, setScDisease] = useState(null);
   const [scAnswers, setScAnswers] = useState({});
   const [scResult, setScResult] = useState(null);
+  const quizRef = useRef(null);
 
   const filtered = DISEASES.filter(d =>
     d.name.toLowerCase().includes(search.toLowerCase())
@@ -565,6 +568,9 @@ export default function PreventionTips() {
     setScDisease(disease);
     setScAnswers({});
     setScStep('quiz');
+    setTimeout(() => {
+      quizRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
   const answerQuestion = (idx, answer) => {
@@ -612,14 +618,14 @@ export default function PreventionTips() {
         }}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px' }}>
-        {filtered.map(disease => (
+<div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px', alignItems: 'start' }}>
+    {filtered.map((disease, idx) => (
           <div key={disease.name} style={{
             background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px',
             overflow: 'hidden',
           }}>
             <div
-              onClick={() => setExpanded(expanded === disease.name ? null : disease.name)}
+              onClick={() => setExpanded(expanded === idx ? null : idx)}
               style={{
                 padding: '14px 18px', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: '12px',
@@ -632,10 +638,10 @@ export default function PreventionTips() {
                 </div>
               </div>
               <span style={{ color: '#94a3b8', fontSize: '16px' }}>
-                {expanded === disease.name ? '▲' : '▼'}
+                {expanded === idx ? '▲' : '▼'}
               </span>
             </div>
-            {expanded === disease.name && (
+            {expanded === idx && (
               <div style={{ padding: '0 18px 16px', borderTop: '1px solid #f1f5f9' }}>
                 <ul style={{ margin: '12px 0', paddingLeft: '18px', fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.8' }}>
                   {disease.tips.map((tip, i) => (
@@ -659,7 +665,7 @@ export default function PreventionTips() {
       </div>
 
       {/* ── SYMPTOM CHECKER ── */}
-      <div style={{
+      <div ref={quizRef} style={{
         marginTop: '40px', background: 'var(--bg-surface)',
         border: '2px solid #10B981', borderRadius: '14px',
         overflow: 'hidden',

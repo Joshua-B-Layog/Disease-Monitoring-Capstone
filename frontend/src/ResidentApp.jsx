@@ -19,6 +19,7 @@ export default function ResidentApp() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('map');
 
+  const scrollRef = useRef(null);
   const saved = localStorage.getItem('cdms_theme');
   const [theme, setTheme] = useState(saved || 'light');
 
@@ -33,8 +34,9 @@ export default function ResidentApp() {
   useEffect(() => {
     const sectionKey = location.pathname.replace('/Resident/', '') || 'map';
     const el = document.getElementById(`section-${sectionKey}`);
-    if (el) {
-      el.scrollIntoView({ behavior: 'instant' });
+    if (el && scrollRef.current) {
+      const top = el.getBoundingClientRect().top + scrollRef.current.scrollTop - 80;
+      scrollRef.current.scrollTo({ top, behavior: 'instant' });
       setActiveSection(sectionKey);
     }
   }, []);
@@ -58,8 +60,9 @@ export default function ResidentApp() {
 
   const scrollToSection = (key) => {
     const el = document.getElementById(`section-${key}`);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
+    if (el && scrollRef.current) {
+      const top = el.getBoundingClientRect().top + scrollRef.current.scrollTop - 80;
+      scrollRef.current.scrollTo({ top, behavior: 'smooth' });
       setActiveSection(key);
     }
     setMenuOpen(false);
@@ -68,7 +71,7 @@ export default function ResidentApp() {
   const isActive = (key) => activeSection === key;
 
   return (
-    <div style={{
+    <div ref={scrollRef} style={{
       height: '100vh',
       overflowY: 'auto',
       background: 'var(--bg-main)',
@@ -141,19 +144,6 @@ export default function ResidentApp() {
               title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
               {theme === 'dark' ? '☀️' : '🌙'}
             </button>
-            <button onClick={() => window.open('http://localhost:3000/CHO', '_blank')}
-              style={{
-                marginLeft: '8px',
-                padding: '7px 16px',
-                borderRadius: '8px',
-                border: '1px solid rgba(255,255,255,0.4)',
-                background: 'rgba(255,255,255,0.1)',
-                color: '#fff',
-                fontSize: '13px',
-                cursor: 'pointer',
-              }}>
-              Admin Login
-            </button>
           </nav>
 
           {/* Mobile hamburger */}
@@ -191,15 +181,6 @@ export default function ResidentApp() {
                 color: 'rgba(255,255,255,0.8)', fontSize: '13px', cursor: 'pointer',
               }}>
               {theme === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode'}
-            </button>
-            <button onClick={() => { window.open('http://localhost:3000/CHO', '_blank'); setMenuOpen(false); }}
-              style={{
-                display: 'block', width: '100%', textAlign: 'left',
-                padding: '10px 16px',
-                background: 'transparent', border: 'none',
-                color: 'rgba(255,255,255,0.8)', fontSize: '13px', cursor: 'pointer',
-              }}>
-              Admin Login →
             </button>
           </div>
         )}

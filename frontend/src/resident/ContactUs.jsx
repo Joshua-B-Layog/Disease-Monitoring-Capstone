@@ -3,6 +3,8 @@ import axios from 'axios';
 import { API_URL } from '../config';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import ChoLogoIcon from '../assets/ChoLogo';
+import ChoLogoIconII from '../assets/ChoLogoII';
 
 const DISEASE_OPTIONS = [
   'Dengue','Diarrhea','Covid-19','Leptospirosis','Tuberculosis','Typhoid Fever',
@@ -15,6 +17,14 @@ const DISEASE_OPTIONS = [
 const CHO_UNITS = [
   { value: 'CHO Unit I (Sala)', label: 'CHO Unit I (Sala)' },
   { value: 'CHO Unit II (Pulo)', label: 'CHO Unit II (Pulo)' },
+  { value: 'BHW', label: 'Barangay Health Worker (BHW)' },
+];
+
+const ALL_BARANGAYS = [
+  'Baclaran', 'Banay-Banay', 'Banlic',
+  'Barangay Dos (Poblacion)', 'Barangay Tres (Poblacion)', 'Barangay Uno (Poblacion)',
+  'Bigaa', 'Butong', 'Casile', 'Diezmo', 'Gulod',
+  'Mamatid', 'Marinig', 'Niugan', 'Pittland', 'Pulo', 'Sala', 'San Isidro',
 ];
 
 function MapCenterUpdater({ center }) {
@@ -24,20 +34,23 @@ function MapCenterUpdater({ center }) {
 }
 
 export default function ContactUs() {
-  const [form, setForm] = useState({ name: '', email: '', targetCho: '', disease: '', message: '' });
+  const [form, setForm] = useState({ name: '', email: '', targetCho: '', targetBarangay: '', disease: '', message: '' });
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
   const [locationView, setLocationView] = useState('cho1');
   const [diseaseOpen, setDiseaseOpen] = useState(false);
   const [choOpen, setChoOpen] = useState(false);
+  const [targetBarangayOpen, setTargetBarangayOpen] = useState(false);
   const diseaseRef = useRef(null);
   const choRef = useRef(null);
+  const targetBarangayRef = useRef(null);
 
   useEffect(() => {
     const handleClick = (e) => {
       if (diseaseRef.current && !diseaseRef.current.contains(e.target)) setDiseaseOpen(false);
       if (choRef.current && !choRef.current.contains(e.target)) setChoOpen(false);
+      if (targetBarangayRef.current && !targetBarangayRef.current.contains(e.target)) setTargetBarangayOpen(false);
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
@@ -54,7 +67,7 @@ export default function ContactUs() {
     try {
       await axios.post(`${API_URL}/api/contact-messages`, form);
       setSent(true);
-      setForm({ name: '', email: '', targetCho: '', disease: '', message: '' });
+      setForm({ name: '', email: '', targetCho: '', targetBarangay: '', disease: '', message: '' });
     } catch (err) {
       setError('Failed to send message. Please try again later.');
     }
@@ -155,6 +168,36 @@ export default function ContactUs() {
                     </div>
                   )}
                 </div>
+                {form.targetCho === 'BHW' && (
+                  <div ref={targetBarangayRef} style={{ position: 'relative' }}>
+                    <button type="button" onClick={() => setTargetBarangayOpen(!targetBarangayOpen)}
+                      style={{ ...inputStyle, cursor: 'pointer', textAlign: 'left', display: 'flex', gap: '8px', alignItems: 'center', width: '100%' }}>
+                      <span style={{ color: form.targetBarangay ? 'var(--text-main)' : 'var(--text-muted)', flex: 1 }}>
+                        {form.targetBarangay || '- Select Barangay * -'}
+                      </span>
+                      <span style={{ fontSize: '10px', flexShrink: 0, transition: 'transform 0.2s', transform: targetBarangayOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                    </button>
+                    {targetBarangayOpen && (
+                      <div style={{
+                        position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
+                        maxHeight: '200px', overflowY: 'auto', marginTop: '4px',
+                        background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
+                        borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                      }}>
+                        {ALL_BARANGAYS.map(b => (
+                          <div key={b} onClick={() => { setForm({...form, targetBarangay: b}); setTargetBarangayOpen(false); }}
+                            style={{
+                              padding: '10px 12px', cursor: 'pointer', fontSize: '13px',
+                              color: 'var(--text-main)',
+                              background: form.targetBarangay === b ? 'rgba(16,185,129,0.1)' : 'transparent',
+                            }}>
+                            {b}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div ref={diseaseRef} style={{ position: 'relative' }}>
                   <button type="button" onClick={() => setDiseaseOpen(!diseaseOpen)}
                     style={{ ...inputStyle, cursor: 'pointer', textAlign: 'left', display: 'flex', gap: '8px', alignItems: 'center', width: '100%' }}>
@@ -218,7 +261,8 @@ export default function ContactUs() {
                 padding: '12px 16px', background: '#1877f2', color: '#fff',
                 borderRadius: '8px', textDecoration: 'none', fontWeight: '600', fontSize: '14px',
               }}>
-              <span style={{ fontSize: '20px'}}>f</span>
+              <ChoLogoIcon size={22} />
+              <span style={{ fontSize: '18px'}}>f</span>
               CHO Unit I (Sala) Facebook
             </a>
             <a href="https://www.facebook.com/CHO2cabuyao/" target="_blank" rel="noopener noreferrer"
@@ -227,7 +271,8 @@ export default function ContactUs() {
                 padding: '12px 16px', background: '#1877f2', color: '#fff',
                 borderRadius: '8px', textDecoration: 'none', fontWeight: '600', fontSize: '14px',
               }}>
-              <span style={{ fontSize: '20px'}}>f</span>
+              <ChoLogoIconII size={22} />
+              <span style={{ fontSize: '18px'}}>f</span>
               CHO Unit II (Pulo) Facebook
             </a>
           </div>
