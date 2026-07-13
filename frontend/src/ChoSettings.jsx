@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API_URL } from './config';
 import './ChoSettings.css';
@@ -36,6 +37,7 @@ export default function CHOSettings({
   openProfileView,
   onProfileViewOpened,
 }) {
+  const navigate = useNavigate();
   const [currentView, setCurrentView] = useState('menu');
   useEffect(() => {
     if (openProfileView) {
@@ -44,6 +46,10 @@ export default function CHOSettings({
     }
   }, [openProfileView, onProfileViewOpened]);
   const fileInputRef = useRef(null);
+  const restoreInputRef = useRef(null);
+  const [restoreLoading, setRestoreLoading] = useState(false);
+  const [restoreMsg, setRestoreMsg] = useState('');
+  const [restoreError, setRestoreError] = useState('');
   const [storageStats, setStorageStats] = useState(null);
   const [storageLoading, setStorageLoading] = useState(false);
   const [lastBackupDate, setLastBackupDate] = useState(() => localStorage.getItem('cdms_last_backup') || null);
@@ -252,12 +258,16 @@ export default function CHOSettings({
     if (!userId) return;
     setClearLoading(true);
     try {
-      await axios.delete(`${API_URL}/api/users/${userId}/my-data`);
+      const res = await axios.delete(`${API_URL}/api/users/${userId}/my-data`);
       setClearSuccess('Your personal data has been cleared successfully. System data and other users are not affected.');
       setTimeout(() => {
         setShowClearModal(false);
         setClearSuccess('');
         setClearLoading(false);
+        if (res.data?.logged_out) {
+          localStorage.clear();
+          window.location.href = '/';
+        }
       }, 2500);
     } catch (err) {
       alert('Clear failed: ' + (err.response?.data?.error || err.message));
@@ -1104,6 +1114,52 @@ export default function CHOSettings({
                 }
               }}>{t('Save Preferences')}</button>
             </div>
+
+            {/* Send Maintenance Notice — only for CHO */}
+            {activeUser?.role === 'CHO' && (
+              <div className="security-section-card" style={{ marginTop: '24px', borderColor: '#fde68a' }}>
+                <div className="security-card-header">
+                  <div className="security-icon-box" style={{ background: '#fef3c7' }}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                      <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                  </div>
+                  <div className="security-header-text">
+                    <h3>Send Maintenance Notice</h3>
+                    <span className="security-timestamp">Broadcast a system maintenance alert to all users</span>
+                  </div>
+                </div>
+                <div style={{ padding: '0 0 12px 0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <input type="text" placeholder="Subject (e.g. Scheduled Maintenance)" id="maint-title"
+                    style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '14px', background: 'var(--input-bg)', color: 'var(--text-main)', outline: 'none' }} />
+                  <textarea placeholder="Message describing the maintenance..." id="maint-message" rows={3}
+                    style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '14px', background: 'var(--input-bg)', color: 'var(--text-main)', outline: 'none', resize: 'vertical' }} />
+                  <button onClick={async () => {
+                    const title = document.getElementById('maint-title').value.trim();
+                    const message = document.getElementById('maint-message').value.trim();
+                    if (!title || !message) { alert('Please enter both a subject and message.'); return; }
+                    try {
+                      const res = await fetch(`${API_URL}/api/notifications/system-maintenance`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, message }),
+                      });
+                      const data = await res.json();
+                      if (res.ok) {
+                        alert('✅ ' + data.message);
+                        document.getElementById('maint-title').value = '';
+                        document.getElementById('maint-message').value = '';
+                      } else {
+                        alert('❌ ' + (data.error || 'Failed to send.'));
+                      }
+                    } catch {
+                      alert('❌ Network error. Is the server running?');
+                    }
+                  }} style={{ padding: '10px 20px', background: '#d97706', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', alignSelf: 'flex-start' }}>
+                    Send Notice
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1499,10 +1555,60 @@ export default function CHOSettings({
                     <button onClick={() => handleCreateBackup(false)} disabled={backupLoading} style={{ flex: 1, padding: '12px', background: '#003cb4', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: backupLoading ? 'not-allowed' : 'pointer', opacity: backupLoading ? 0.7 : 1 }}>
                       {backupLoading ? 'Creating Backup...' : 'Create Backup'}
                     </button>
-                    <button onClick={() => alert('To restore: go to Settings → Data Management → select your backup .json file. Full restore coming soon.')} style={{ flex: 1, padding: '12px', background: 'var(--bg-surface)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
-                      Restore
+                    <input type="file" ref={restoreInputRef} accept=".json" style={{ display: 'none' }}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setRestoreMsg('');
+                        setRestoreError('');
+                        setRestoreLoading(true);
+                        try {
+                          const text = await file.text();
+                          const data = JSON.parse(text);
+                          const previewRes = await fetch(`${API_URL}/api/restore/preview`, {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+                          });
+                          if (!previewRes.ok) throw new Error('Invalid backup file');
+                          const preview = await previewRes.json();
+                          const confirmed = window.confirm(
+                            `Restore backup from ${new Date(preview.backup_date).toLocaleDateString('en-PH')}?\n\n` +
+                            `Will restore:\n` +
+                            `• ${preview.counts.disease_cases} disease cases\n` +
+                            `• ${preview.counts.users} users\n` +
+                            `• ${preview.counts.barangays} barangays\n` +
+                            `• ${preview.counts.diseases} diseases\n\n` +
+                            `Existing records with the same ID will be skipped. Continue?`
+                          );
+                          if (!confirmed) { setRestoreLoading(false); return; }
+                          const res = await fetch(`${API_URL}/api/restore`, {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+                          });
+                          if (!res.ok) throw new Error((await res.json()).error || 'Restore failed');
+                          setRestoreMsg('✅ Restore completed successfully!');
+                          setTimeout(() => setRestoreMsg(''), 3000);
+                        } catch (err) {
+                          setRestoreError('❌ ' + (err.message || 'Restore failed. Check the file format.'));
+                          setTimeout(() => setRestoreError(''), 4000);
+                        } finally {
+                          setRestoreLoading(false);
+                          e.target.value = '';
+                        }
+                      }} />
+                    <button onClick={() => restoreInputRef.current?.click()} disabled={restoreLoading} style={{ flex: 1, padding: '12px', background: restoreLoading ? '#94a3b8' : 'var(--bg-surface)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: restoreLoading ? 'not-allowed' : 'pointer' }}>
+                      {restoreLoading ? 'Restoring...' : 'Restore'}
                     </button>
                   </div>
+
+                  {restoreMsg && (
+                    <div style={{ marginTop: '8px', padding: '8px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: '500', background: '#d1fae5', color: '#065f46' }}>
+                      {restoreMsg}
+                    </div>
+                  )}
+                  {restoreError && (
+                    <div style={{ marginTop: '8px', padding: '8px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: '500', background: '#fee2e2', color: '#991b1b' }}>
+                      {restoreError}
+                    </div>
+                  )}
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0 0 0', marginTop: '12px', borderTop: '1px solid #f2f4f7' }}>
                     <div style={{ textAlign: 'left' }}>

@@ -8,6 +8,7 @@ const mysql = require('mysql2');
 const cors = require('cors');
 const crypto = require('crypto');
 const axios = require('axios');
+const cron = require('node-cron');
 
 async function sendBrevoEmail(to, subject, htmlContent) {
   try {
@@ -97,6 +98,16 @@ db.query('SELECT 1', (err) => {
         console.error("Database connection failed:", err.message);
     } else {
         console.log(`Connected successfully to MySQL Database: ${process.env.DB_NAME}`);
+    }
+});
+
+// Add initial_password column to users table if missing (migration for existing DBs)
+db.query("SHOW COLUMNS FROM users LIKE 'initial_password'", (err, rows) => {
+    if (!err && rows.length === 0) {
+        db.query("ALTER TABLE users ADD COLUMN initial_password VARCHAR(255) DEFAULT NULL AFTER password", (alterErr) => {
+            if (alterErr) console.error('Migration error adding initial_password:', alterErr.message);
+            else console.log('Migration: added initial_password column to users table');
+        });
     }
 });
 
@@ -1365,11 +1376,11 @@ app.post('/api/register', (req, res) => {
         }
 
     const insertQuery = `
-        INSERT INTO users (username, full_name, email, mobile_number, password, role, assigned_barangay_id, is_active) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+        INSERT INTO users (username, full_name, email, mobile_number, password, initial_password, role, assigned_barangay_id, is_active) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
     `;
 
-    db.query(insertQuery, [username, name, email, mobile || null, password, enforcedRole, assignedBarangayId], (err, result) => {
+    db.query(insertQuery, [username, name, email, mobile || null, password, password, enforcedRole, assignedBarangayId], (err, result) => {
         if (err) {
             console.error("MySQL Registration Error:", err.message);
             if (err.code === 'ER_DUP_ENTRY') {
@@ -1540,11 +1551,11 @@ app.post('/api/users', async (req, res) => {
     }
 
     const insertQuery = `
-        INSERT INTO users (username, full_name, email, mobile_number, password, role, assigned_barangay_id, is_active)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO users (username, full_name, email, mobile_number, password, initial_password, role, assigned_barangay_id, is_active)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
-    db.query(insertQuery, [username, fullName, email, mobile || null, finalPassword, role || 'BHW', barangayId, isActive ? 1 : 0], (err, result) => {
+    db.query(insertQuery, [username, fullName, email, mobile || null, finalPassword, finalPassword, role || 'BHW', barangayId, isActive ? 1 : 0], (err, result) => {
         if (err) {
             console.error("Add user error:", err.message);
             if (err.code === 'ER_DUP_ENTRY') {
@@ -2107,23 +2118,81 @@ app.get('/api/backup', (req, res) => {
   });
 });
 
-// DELETE /api/users/:id/my-data — clear current user's personal data
+// DELETE /api/users/:id/my-data — clear current user's personal data & reset account
 app.delete('/api/users/:id/my-data', (req, res) => {
   const { id } = req.params;
 
-  db.query('SELECT assigned_barangay_id FROM users WHERE user_id = ?',
+  db.query('SELECT user_id, username, full_name, email, role, assigned_barangay_id, password, initial_password FROM users WHERE user_id = ?',
     [id], (err, userResults) => {
     if (err) return res.status(500).json({ error: err.message });
     if (userResults.length === 0)
       return res.status(404).json({ error: 'User not found.' });
 
-    db.query('DELETE FROM notifications WHERE user_id = ?', [id],
-      (err) => {
-      if (err) return res.status(500).json({ error: err.message });
+    const user = userResults[0];
+    const resetPassword = user.initial_password || user.password;
 
-      console.log(`Cleared personal data for user ${id}`);
-      res.status(200).json({
-        message: 'Your personal data has been cleared successfully.'
+    // 1. Final audit log before clearing
+    createAuditLog(id, user.full_name || 'User', user.role, null, null, 'Cleared', 'Account Data', 'User cleared all personal account data and was logged out');
+
+    // 2. Delete user-scoped records
+    const queries = [
+      'DELETE FROM notifications WHERE user_id = ?',
+      'DELETE FROM notification_preferences WHERE user_id = ?',
+      'DELETE FROM audit_logs WHERE user_id = ?',
+      'DELETE FROM generated_reports WHERE created_by = ?',
+      'DELETE FROM case_inbox WHERE from_user_id = ?',
+    ];
+
+    let completed = 0;
+    queries.forEach((sql, index) => {
+      db.query(sql, [id], (delErr) => {
+        if (delErr) console.error(`Clear data query ${index} error:`, delErr.message);
+        completed++;
+        if (completed === queries.length) {
+          // 3. Reset password to initial_password
+          db.query('UPDATE users SET password = ? WHERE user_id = ?', [resetPassword, id], (updateErr) => {
+            if (updateErr) {
+              console.error('Password reset error:', updateErr.message);
+              return res.status(500).json({ error: 'Failed to reset password.' });
+            }
+
+            // 4. Send email notification with reset password
+            if (user.email) {
+              const htmlContent = `
+                <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:12px">
+                  <h2 style="color:#1e3a8a;margin:0 0 12px 0">Account Data Cleared</h2>
+                  <p style="color:#475569;font-size:15px;line-height:1.5">
+                    Your Cabuyao Health System account data has been cleared successfully.
+                  </p>
+                  <p style="color:#475569;font-size:15px;line-height:1.5">
+                    Your account has been reset to its original credentials:
+                  </p>
+                  <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin:16px 0">
+                    <p style="margin:0 0 8px 0;font-size:14px;color:#334155">
+                      <strong>Username:</strong> ${user.username}
+                    </p>
+                    <p style="margin:0;font-size:14px;color:#334155">
+                      <strong>Password:</strong> ${resetPassword}
+                    </p>
+                  </div>
+                  <p style="color:#94a3b8;font-size:12px">
+                    You have been logged out. Please sign in again with the credentials above.
+                  </p>
+                  <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0" />
+                  <p style="color:#94a3b8;font-size:11px">Cabuyao City Disease Monitoring System</p>
+                </div>
+              `;
+              sendBrevoEmail(user.email, 'Account Data Cleared — Cabuyao CDMS', htmlContent)
+                .catch(err => console.error('Clear-data email failed:', err.message));
+            }
+
+            console.log(`Cleared personal data for user ${id} (${user.username}) — password reset to original`);
+            res.status(200).json({
+              message: 'Your personal data has been cleared successfully. You have been logged out.',
+              logged_out: true,
+            });
+          });
+        }
       });
     });
   });
@@ -2238,7 +2307,285 @@ app.get('/api/disease_cases/public-summary', (req, res) => {
 });
 
 // ==========================================
-// 7. START SERVER
+// 7. SCHEDULED JOBS
+// ==========================================
+
+// Weekly Summary — every Monday at 8:00 AM
+cron.schedule('0 8 * * 1', () => {
+    console.log('⏰ Running weekly summary cron job...');
+
+    const summaryQuery = `
+        SELECT
+            COUNT(*) AS total_cases,
+            SUM(CASE WHEN date_reported >= NOW() - INTERVAL 7 DAY THEN 1 ELSE 0 END) AS new_this_week,
+            SUM(CASE WHEN status IN ('Active','Under Treatment','Pending') THEN 1 ELSE 0 END) AS active_cases,
+            SUM(CASE WHEN status = 'Recovered' THEN 1 ELSE 0 END) AS recovered,
+            SUM(CASE WHEN status = 'Deceased' THEN 1 ELSE 0 END) AS deceased
+        FROM disease_cases
+    `;
+
+    const byBarangayQuery = `
+        SELECT b.name AS barangay_name, COUNT(dc.case_id) AS count
+        FROM barangays b
+        LEFT JOIN disease_cases dc ON dc.barangay_id = b.id
+        GROUP BY b.id, b.name
+        ORDER BY count DESC
+    `;
+
+    const byDiseaseQuery = `
+        SELECT d.name AS disease_name, COUNT(dc.case_id) AS count
+        FROM diseases d
+        LEFT JOIN disease_cases dc ON dc.disease_id = d.id
+        GROUP BY d.id, d.name
+        ORDER BY count DESC
+    `;
+
+    const bySeverityQuery = `
+        SELECT severity, COUNT(*) AS count
+        FROM disease_cases
+        WHERE severity IS NOT NULL
+        GROUP BY severity
+        ORDER BY FIELD(severity,'Critical','Severe','Moderate','Mild','Asymptomatic')
+    `;
+
+    Promise.all([
+        new Promise((resolve, reject) => db.query(summaryQuery, (e, r) => e ? reject(e) : resolve(r[0]))),
+        new Promise((resolve, reject) => db.query(byBarangayQuery, (e, r) => e ? reject(e) : resolve(r))),
+        new Promise((resolve, reject) => db.query(byDiseaseQuery, (e, r) => e ? reject(e) : resolve(r))),
+        new Promise((resolve, reject) => db.query(bySeverityQuery, (e, r) => e ? reject(e) : resolve(r))),
+    ]).then(async ([summary, barangays, diseases, severities]) => {
+        // Build a rich HTML summary
+        const total = summary.total_cases || 0;
+        const newWeek = summary.new_this_week || 0;
+        const active = summary.active_cases || 0;
+        const recovered = summary.recovered || 0;
+        const deceased = summary.deceased || 0;
+
+        const topBarangay = barangays.length > 0 ? barangays.slice(0, 5).map(b =>
+            `<li>${b.barangay_name}: ${b.count} case${b.count !== 1 ? 's' : ''}</li>`
+        ).join('') : '<li>No data</li>';
+
+        const topDisease = diseases.length > 0 ? diseases.slice(0, 5).map(d =>
+            `<li>${d.disease_name}: ${d.count} case${d.count !== 1 ? 's' : ''}</li>`
+        ).join('') : '<li>No data</li>';
+
+        const sevRows = severities.length > 0 ? severities.map(s =>
+            `<tr><td>${s.severity}</td><td style="text-align:right;font-weight:600">${s.count}</td></tr>`
+        ).join('') : '<tr><td colspan="2">No data</td></tr>';
+
+        const htmlContent = `
+            <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:12px">
+                <h1 style="color:#1e3a8a;font-size:22px;margin:0 0 4px 0">Weekly Summary</h1>
+                <p style="color:#64748b;font-size:13px;margin:0 0 20px 0">${new Date().toLocaleDateString('en-PH', { month:'long', day:'numeric', year:'numeric' })}</p>
+
+                <table style="width:100%;border-collapse:collapse;margin-bottom:20px">
+                    <tr>
+                        <td style="background:#eff6ff;padding:12px;border-radius:8px 0 0 8px;text-align:center">
+                            <div style="font-size:24px;font-weight:700;color:#1e3a8a">${total}</div>
+                            <div style="font-size:11px;color:#64748b">Total Cases</div>
+                        </td>
+                        <td style="background:#fef2f2;padding:12px;text-align:center">
+                            <div style="font-size:24px;font-weight:700;color:#dc2626">${newWeek}</div>
+                            <div style="font-size:11px;color:#64748b">New This Week</div>
+                        </td>
+                        <td style="background:#f0fdf4;padding:12px;border-radius:0 8px 8px 0;text-align:center">
+                            <div style="font-size:24px;font-weight:700;color:#16a34a">${recovered}</div>
+                            <div style="font-size:11px;color:#64748b">Recovered</div>
+                        </td>
+                    </tr>
+                </table>
+
+                <h3 style="color:#1e293b;font-size:15px;margin:0 0 8px 0">Top Barangays</h3>
+                <ul style="margin:0 0 20px 0;padding-left:20px;font-size:14px;color:#334155">${topBarangay}</ul>
+
+                <h3 style="color:#1e293b;font-size:15px;margin:0 0 8px 0">Top Diseases</h3>
+                <ul style="margin:0 0 20px 0;padding-left:20px;font-size:14px;color:#334155">${topDisease}</ul>
+
+                <h3 style="color:#1e293b;font-size:15px;margin:0 0 8px 0">By Severity</h3>
+                <table style="width:100%;border-collapse:collapse;font-size:14px">
+                    <tr style="background:#f1f5f9"><th style="padding:8px 12px;text-align:left">Severity</th><th style="padding:8px 12px;text-align:right">Count</th></tr>
+                    ${sevRows}
+                </table>
+
+                <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0" />
+                <p style="color:#94a3b8;font-size:11px">Cabuyao City Disease Monitoring System</p>
+            </div>
+        `;
+
+        const plainMessage = `📊 Weekly Summary\n\nTotal: ${total} | New: ${newWeek} | Active: ${active} | Recovered: ${recovered} | Deceased: ${deceased}\n\nTop Barangay: ${barangays[0]?.barangay_name || 'N/A'} (${barangays[0]?.count || 0} cases)`;
+
+        // Find all users with weekly_summary enabled
+        db.query(
+            `SELECT u.user_id, u.full_name, u.email, u.mobile_number
+             FROM users u
+             INNER JOIN notification_preferences np ON u.user_id = np.user_id
+             WHERE u.is_active = 1 AND np.weekly_summary = 1`,
+            (err, users) => {
+                if (err) {
+                    console.error('Weekly summary: error fetching users:', err.message);
+                    return;
+                }
+                console.log(`📧 Sending weekly summary to ${users.length} user(s)`);
+                users.forEach(user => {
+                    // In-app notification
+                    db.query(
+                        'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
+                        [user.user_id, '📊 Weekly Summary', plainMessage, 'weekly_summary', 'Dashboard']
+                    );
+
+                    // Email
+                    if (user.email) {
+                        sendBrevoEmail(user.email, '📊 Weekly Summary — Cabuyao CDMS', htmlContent)
+                            .catch(err => console.error(`Weekly summary email failed for ${user.user_id}:`, err.message));
+                    }
+                });
+            }
+        );
+    }).catch(err => {
+        console.error('❌ Weekly summary cron error:', err.message);
+    });
+});
+
+// ==========================================
+// 8. SYSTEM MAINTENANCE ENDPOINT
+// ==========================================
+
+// POST /api/notifications/system-maintenance — broadcast to all users with preference
+app.post('/api/notifications/system-maintenance', (req, res) => {
+    const { title, message } = req.body;
+    if (!title || !message) {
+        return res.status(400).json({ error: 'Title and message are required.' });
+    }
+
+    db.query(
+        `SELECT u.user_id, u.email, u.mobile_number
+         FROM users u
+         INNER JOIN notification_preferences np ON u.user_id = np.user_id
+         WHERE u.is_active = 1 AND np.system_maintenance = 1`,
+        (err, users) => {
+            if (err) return res.status(500).json({ error: err.message });
+
+            let sentCount = 0;
+            users.forEach(user => {
+                db.query(
+                    'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
+                    [user.user_id, title, message, 'system_maintenance', null]
+                );
+                if (user.email) {
+                    sendBrevoEmail(user.email, title,
+                        `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:12px">
+                            <h2 style="color:#1e293b;margin:0 0 8px 0">⚠️ ${title}</h2>
+                            <p style="color:#475569;font-size:15px;line-height:1.5">${message}</p>
+                            <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0" />
+                            <p style="color:#94a3b8;font-size:12px">Cabuyao City Disease Monitoring System</p>
+                        </div>`
+                    ).catch(() => {});
+                }
+                sentCount++;
+            });
+
+            console.log(`System maintenance sent to ${sentCount} user(s)`);
+            res.json({ message: `Maintenance notice sent to ${sentCount} user(s).` });
+        }
+    );
+});
+
+// ==========================================
+// 9. RESTORE ENDPOINT
+// ==========================================
+
+// POST /api/restore — restore from a backup JSON
+app.post('/api/restore', (req, res) => {
+    const backup = req.body;
+
+    if (!backup || !backup.system || !backup.backup_date) {
+        return res.status(400).json({ error: 'Invalid backup file format. Please upload a valid CDMS backup JSON.' });
+    }
+
+    const restoreDiseaseCases = (callback) => {
+        if (!backup.disease_cases || backup.disease_cases.length === 0) return callback();
+        let done = 0;
+        backup.disease_cases.forEach(c => {
+            db.query(
+                `INSERT IGNORE INTO disease_cases (case_id, patient_name, age, gender, contact, address, symptoms, physician, onset_date, severity, status, date_reported, latitude, longitude, disease_id, barangay_id)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [c.case_id, c.patient_name, c.age, c.gender, c.contact, c.address, c.symptoms, c.physician, c.onset_date, c.severity, c.status, c.date_reported, c.latitude, c.longitude, c.disease_id, c.barangay_id],
+                (err) => { if (err) console.error('Restore case error:', err.message); done++; if (done >= backup.disease_cases.length) callback(); }
+            );
+        });
+    };
+
+    const restoreUsers = (callback) => {
+        if (!backup.users || backup.users.length === 0) return callback();
+        let done = 0;
+        backup.users.forEach(u => {
+            db.query(
+                `INSERT IGNORE INTO users (user_id, username, full_name, role, assigned_barangay_id, is_active, email, mobile_number, last_login)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [u.user_id, u.username, u.full_name, u.role, u.assigned_barangay_id, u.is_active, u.email, u.mobile_number, u.last_login],
+                (err) => { if (err) console.error('Restore user error:', err.message); done++; if (done >= backup.users.length) callback(); }
+            );
+        });
+    };
+
+    const restoreBarangays = (callback) => {
+        if (!backup.barangays || backup.barangays.length === 0) return callback();
+        let done = 0;
+        backup.barangays.forEach(b => {
+            db.query(
+                `INSERT IGNORE INTO barangays (id, name) VALUES (?, ?)`,
+                [b.id, b.name],
+                (err) => { if (err) console.error('Restore barangay error:', err.message); done++; if (done >= backup.barangays.length) callback(); }
+            );
+        });
+    };
+
+    const restoreDiseases = (callback) => {
+        if (!backup.diseases || backup.diseases.length === 0) return callback();
+        let done = 0;
+        backup.diseases.forEach(d => {
+            db.query(
+                `INSERT IGNORE INTO diseases (id, name) VALUES (?, ?)`,
+                [d.id, d.name],
+                (err) => { if (err) console.error('Restore disease error:', err.message); done++; if (done >= backup.diseases.length) callback(); }
+            );
+        });
+    };
+
+    restoreDiseases(() => {
+        restoreBarangays(() => {
+            restoreUsers(() => {
+                restoreDiseaseCases(() => {
+                    console.log('✅ Restore completed from backup dated ' + backup.backup_date);
+                    res.json({ message: 'Restore completed successfully.' });
+                });
+            });
+        });
+    });
+});
+
+// POST /api/restore/confirm — preview what will be restored before committing
+app.post('/api/restore/preview', (req, res) => {
+    const backup = req.body;
+    if (!backup || !backup.system || !backup.backup_date) {
+        return res.status(400).json({ error: 'Invalid backup file.' });
+    }
+
+    res.json({
+        backup_date: backup.backup_date,
+        system: backup.system,
+        version: backup.version,
+        counts: {
+            disease_cases: backup.disease_cases?.length || 0,
+            users: backup.users?.length || 0,
+            barangays: backup.barangays?.length || 0,
+            diseases: backup.diseases?.length || 0,
+        }
+    });
+});
+
+// ==========================================
+// 10. START SERVER
 // ==========================================
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

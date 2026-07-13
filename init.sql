@@ -155,6 +155,7 @@ CREATE TABLE `users` (
   `user_id` int(11) NOT NULL,
   `username` varchar(50) NOT NULL,
   `password` varchar(255) NOT NULL,
+  `initial_password` varchar(255) DEFAULT NULL,
   `full_name` varchar(255) NOT NULL,
   `role` enum('CHO','BHW') NOT NULL,
   `assigned_barangay_id` int(11) NOT NULL,
