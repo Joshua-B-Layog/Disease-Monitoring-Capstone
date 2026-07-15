@@ -677,10 +677,22 @@ app.post('/api/cases/route-to-barangay-inbox', (req, res) => {
                             const msg = notes
                                 ? `${submitter_name || 'A BHW'} sent you a case needing your review: ${patient_name} (${disease_name}). Note: "${notes}"`
                                 : `${submitter_name || 'A BHW'} sent you a case needing your review: ${patient_name} (${disease_name}).`;
-                            createNotificationForUsers(
-                                'New Case Reported',
-                                msg,
-                                'info', 'Inbox', targetBarangayId, 'new_case_reported'
+                            // Only notify BHWs assigned to this barangay (skip CHOs for BHW-targeted routing)
+                            db.query(
+                                `SELECT u.user_id FROM users u
+                                 INNER JOIN notification_preferences np ON u.user_id = np.user_id
+                                 WHERE u.role = 'BHW' AND u.assigned_barangay_id = ? AND np.push_notifications = 1`,
+                                [targetBarangayId],
+                                (nErr, bhwUsers) => {
+                                    if (!nErr && bhwUsers && bhwUsers.length > 0) {
+                                        bhwUsers.forEach(u => {
+                                            db.query(
+                                                'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
+                                                [u.user_id, 'New Case Reported', msg, 'info', 'Inbox']
+                                            );
+                                        });
+                                    }
+                                }
                             );
                             res.status(200).json({ message: 'Case routed to barangay inbox successfully.', case_id: caseId, inbox_id: inboxResult.insertId });
                         }
