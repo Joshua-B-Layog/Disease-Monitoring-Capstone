@@ -59,7 +59,7 @@ export default function ContactUs() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name || !form.email || !form.targetCho || !form.disease || !form.message) {
-      setError('Please fill in required fields (name, email, CHO unit, disease, and message).');
+      setError('Your message at least have full name, age, gender, contact no. and address.');
       return;
     }
     setSending(true);
