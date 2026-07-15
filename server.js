@@ -199,11 +199,28 @@ db.query(`CREATE TABLE IF NOT EXISTS contact_messages (
   target_cho_unit VARCHAR(100),
   disease_name VARCHAR(255),
   message TEXT NOT NULL,
+  age INT,
+  gender VARCHAR(10),
+  contact_no VARCHAR(50),
+  address TEXT,
   is_read TINYINT DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )`, (err) => {
   if (err) console.error('Error creating contact_messages table:', err.message);
-  else console.log('Contact messages table created/verified');
+  else {
+    console.log('Contact messages table created/verified');
+    ['age', 'gender', 'contact_no', 'address'].forEach(col => {
+      db.query("SHOW COLUMNS FROM contact_messages LIKE ?", [col], (e, r) => {
+        if (!e && r && r.length === 0) {
+          const colDef = col === 'age' ? 'INT' : col === 'gender' ? 'VARCHAR(10)' : col === 'contact_no' ? 'VARCHAR(50)' : 'TEXT';
+          db.query(`ALTER TABLE contact_messages ADD COLUMN ${col} ${colDef}`, (ae) => {
+            if (ae) console.error(`Error adding ${col} column:`, ae.message);
+            else console.log(`Added ${col} column to contact_messages`);
+          });
+        }
+      });
+    });
+  }
 });
 
 function createAuditLog(userId, userName, userRole, choUnit, barangay, action, entity, details) {
@@ -2241,16 +2258,16 @@ app.delete('/api/users/:id/my-data', (req, res) => {
 
 // POST /api/contact-messages — Resident contact form submission
 app.post('/api/contact-messages', (req, res) => {
-  const { name, email, targetCho, disease, message } = req.body;
+  const { name, targetCho, disease, message, age, gender, contact, address } = req.body;
 
-  if (!name || !email || !message) {
-    return res.status(400).json({ error: 'Name, email, and message are required.' });
+  if (!name || !message) {
+    return res.status(400).json({ error: 'Name and message are required.' });
   }
 
   db.query(
-    `INSERT INTO contact_messages (name, email, target_cho_unit, disease_name, message)
-     VALUES (?, ?, ?, ?, ?)`,
-    [name, email, targetCho || null, disease || null, message],
+    `INSERT INTO contact_messages (name, email, target_cho_unit, disease_name, message, age, gender, contact_no, address)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [name, null, targetCho || null, disease || null, message, age || null, gender || null, contact || null, address || null],
     (err, result) => {
       if (err) {
         console.error('Error saving contact message:', err.message);

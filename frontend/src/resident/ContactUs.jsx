@@ -34,7 +34,7 @@ function MapCenterUpdater({ center }) {
 }
 
 export default function ContactUs() {
-  const [form, setForm] = useState({ name: '', email: '', targetCho: '', targetBarangay: '', disease: '', message: '' });
+  const [form, setForm] = useState({ name: '', age: '', gender: '', contact: '', address: '', targetCho: '', targetBarangay: '', disease: '', message: '' });
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
@@ -58,8 +58,8 @@ export default function ContactUs() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name || !form.email || !form.targetCho || !form.disease || !form.message) {
-      setError('Your message at least have full name, age, gender, contact no. and address.');
+    if (!form.name || !form.age || !form.gender || !form.contact || !form.address || !form.targetCho || !form.disease || !form.message) {
+      setError('Please fill in all required fields.');
       return;
     }
     setSending(true);
@@ -67,7 +67,7 @@ export default function ContactUs() {
     try {
       await axios.post(`${API_URL}/api/contact-messages`, form);
       setSent(true);
-      setForm({ name: '', email: '', targetCho: '', targetBarangay: '', disease: '', message: '' });
+      setForm({ name: '', age: '', gender: '', contact: '', address: '', targetCho: '', targetBarangay: '', disease: '', message: '' });
     } catch (err) {
       setError('Failed to send message. Please try again later.');
     }
@@ -134,17 +134,30 @@ export default function ContactUs() {
           ) : (
             <form onSubmit={handleSubmit}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <input required placeholder="Your Name *"
+                <input required placeholder="Your Name"
                   value={form.name} onChange={e => setForm({...form, name: e.target.value})}
                   style={inputStyle} />
-                <input required type="email" placeholder="Your Email *"
-                  value={form.email} onChange={e => setForm({...form, email: e.target.value})}
+                <input required type="number" placeholder="Age"
+                  value={form.age} onChange={e => setForm({...form, age: e.target.value})}
+                  style={inputStyle} min="0" max="150" />
+                <select required value={form.gender} onChange={e => setForm({...form, gender: e.target.value})}
+                  style={{ ...inputStyle, cursor: 'pointer' }}>
+                  <option value="" disabled>- Select Gender -</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+                <input required type="tel" placeholder="Contact Number"
+                  value={form.contact} onChange={e => setForm({...form, contact: e.target.value})}
+                  style={inputStyle} />
+                <input required placeholder="Your Address"
+                  value={form.address} onChange={e => setForm({...form, address: e.target.value})}
                   style={inputStyle} />
                 <div ref={choRef} style={{ position: 'relative' }}>
                   <button type="button" onClick={() => setChoOpen(!choOpen)}
                     style={{ ...inputStyle, cursor: 'pointer', textAlign: 'left', display: 'flex', gap: '8px', alignItems: 'center', width: '100%' }}>
                     <span style={{ color: form.targetCho ? 'var(--text-main)' : 'var(--text-muted)', flex: 1 }}>
-                      {form.targetCho || '- Select CHO Unit * -'}
+                      {form.targetCho || '- Select CHO Unit -'}
                     </span>
                     <span style={{ fontSize: '10px', flexShrink: 0, transition: 'transform 0.2s', transform: choOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                   </button>
@@ -173,7 +186,7 @@ export default function ContactUs() {
                     <button type="button" onClick={() => setTargetBarangayOpen(!targetBarangayOpen)}
                       style={{ ...inputStyle, cursor: 'pointer', textAlign: 'left', display: 'flex', gap: '8px', alignItems: 'center', width: '100%' }}>
                       <span style={{ color: form.targetBarangay ? 'var(--text-main)' : 'var(--text-muted)', flex: 1 }}>
-                        {form.targetBarangay || '- Select Barangay * -'}
+                        {form.targetBarangay || '- Select Barangay -'}
                       </span>
                       <span style={{ fontSize: '10px', flexShrink: 0, transition: 'transform 0.2s', transform: targetBarangayOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                     </button>
@@ -226,7 +239,7 @@ export default function ContactUs() {
                     </div>
                   )}
                 </div>
-                <textarea required placeholder="Your Message *"
+                <textarea required placeholder="Your Message"
                   value={form.message} onChange={e => setForm({...form, message: e.target.value})}
                   rows={4} style={{...inputStyle, resize: 'vertical'}} />
                 {error && <div style={{ color: '#ef4444', fontSize: '13px' }}>{error}</div>}

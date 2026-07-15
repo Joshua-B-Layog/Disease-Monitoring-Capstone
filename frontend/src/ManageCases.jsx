@@ -1368,7 +1368,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: '13px', color: 'var(--text-main)' }}>
-                          {msg.name} · {msg.email}{msg.disease_name ? ` (${msg.disease_name})` : ''}
+                          {msg.name}{msg.disease_name ? ` (${msg.disease_name})` : ''}
                         </div>
                         <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {msg.message}
