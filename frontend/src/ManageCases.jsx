@@ -519,6 +519,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         const diseaseCard = findCardForDisease(msg.disease_name);
         if (diseaseCard) setSelectedDisease(diseaseCard);
         fetchCases();
+        fetchContactMessages();
         openEdit({
           case_id: caseId,
           patient_name: msg.name,
@@ -1318,7 +1319,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               borderBottom: inboxSubTab === 'messages' ? '2px solid #10B981' : '2px solid transparent',
               transition: 'all 0.15s',
             }}>
-            Messages ({contactMessages.length})
+            Messages ({contactMessages.filter(m => !m.is_read).length})
           </div>
         </div>
 
@@ -1381,11 +1382,11 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
             {contactMessagesLoading ? (
               <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading messages...</div>
-            ) : contactMessages.length === 0 ? (
+            ) : contactMessages.filter(m => !m.is_read).length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No messages from residents.</div>
             ) : (
-              contactMessages.map(msg => (
-                <div key={msg.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)', background: msg.is_read ? 'transparent' : 'rgba(13,148,136,0.04)' }}>
+              contactMessages.filter(m => !m.is_read).map(msg => (
+                <div key={msg.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)', background: 'rgba(13,148,136,0.04)' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '14.4px', color: 'var(--text-muted)', lineHeight: 1, textAlign: 'left' }}>
                       From Resident{msg.target_cho_unit ? ` (${msg.target_cho_unit})` : ''}
