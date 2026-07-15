@@ -2542,8 +2542,7 @@ app.post('/api/notifications/system-maintenance', (req, res) => {
     db.query(
         `SELECT u.user_id, u.email, u.mobile_number
          FROM users u
-         INNER JOIN notification_preferences np ON u.user_id = np.user_id
-         WHERE u.is_active = 1 AND np.system_maintenance = 1`,
+         WHERE u.is_active = 1`,
         (err, users) => {
             if (err) return res.status(500).json({ error: err.message });
 

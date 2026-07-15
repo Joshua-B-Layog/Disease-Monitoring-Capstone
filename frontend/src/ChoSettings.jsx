@@ -1116,7 +1116,7 @@ export default function CHOSettings({
             </div>
 
             {/* Send Maintenance Notice — only for CHO */}
-            {activeUser?.role === 'CHO' && (
+            {activeUser?.role === 'CHO' && notifications.systemMaintenance && (
               <div className="security-section-card" style={{ marginTop: '24px', borderColor: '#fde68a' }}>
                 <div className="security-card-header">
                   <div className="security-icon-box" style={{ background: '#fef3c7' }}>

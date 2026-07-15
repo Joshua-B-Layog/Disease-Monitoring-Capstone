@@ -249,7 +249,7 @@ const formatDateStr = (dateStr, fmt) => {
   return `${m}/${day}/${shortY}`;
 };
 
-export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, autoSave, confirmDelete, keyboardShortcuts, fontScale, compactMode, loggedUserId, loginRole, loginBarangay, sessionContext, initialView, onInitialViewConsumed }) {
+export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, autoSave, confirmDelete, keyboardShortcuts, fontScale, compactMode, loggedUserId, loggedUser, loginRole, loginBarangay, sessionContext, initialView, onInitialViewConsumed }) {
   const [view, setView] = useState('categories');
   const [inboxItems, setInboxItems] = useState([]);
   const [outboxItems, setOutboxItems] = useState([]);
@@ -549,7 +549,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       await axios.post(`${API_URL}/api/cases/route-to-barangay-inbox`, {
         ...payload,
         submitter_user_id: loggedUserId || null,
-        submitter_name: loggedUserId ? String(loggedUserId) : 'Unknown',
+        submitter_name: loggedUser || 'Unknown',
         from_cho_unit: (loginRole === 'BHW' && loginBarangay ? getChoUnitForBarangay(loginBarangay) : sessionContext) || null,
         target_barangay_name: targetBarangay,
         notes: routingDescription || null,
@@ -575,7 +575,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       await axios.post(`${API_URL}/api/cases/route-to-inbox`, {
         ...payload,
         submitter_user_id: loggedUserId || null,
-        submitter_name: loggedUserId ? String(loggedUserId) : 'Unknown',
+        submitter_name: loggedUser || 'Unknown',
         from_cho_unit: (loginRole === 'BHW' && loginBarangay ? getChoUnitForBarangay(loginBarangay) : sessionContext) || null,
         to_cho_unit: targetUnit,
         notes: routingDescription || null,
@@ -1106,7 +1106,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             await axios.post(`${API_URL}/api/cases/route-to-barangay-inbox`, {
               ...payload,
               submitter_user_id: loggedUserId || null,
-              submitter_name: loggedUserId ? String(loggedUserId) : 'Unknown',
+              submitter_name: loggedUser || 'Unknown',
               from_cho_unit: (loginRole === 'BHW' && loginBarangay ? getChoUnitForBarangay(loginBarangay) : sessionContext) || null,
               target_barangay_name: detectedBarangay,
             });
