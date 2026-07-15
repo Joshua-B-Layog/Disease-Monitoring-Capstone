@@ -2330,7 +2330,7 @@ app.post('/api/contact-messages', (req, res) => {
         );
       }
 
-      console.log(`Contact message from ${name} (${email})`);
+      console.log(`Contact message from ${name}`);
       res.status(200).json({ message: 'Message sent successfully!' });
     }
   );
