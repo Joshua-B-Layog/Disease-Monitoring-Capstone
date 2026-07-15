@@ -512,6 +512,34 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       .catch(err => alert('Accept failed: ' + (err.response?.data?.error || err.message)));
   };
 
+  const handleMessageToCase = (msg) => {
+    axios.put(`${API_URL}/api/contact-messages/${msg.id}/accept`)
+      .then(res => {
+        const caseId = res.data.case_id;
+        const diseaseCard = findCardForDisease(msg.disease_name);
+        if (diseaseCard) setSelectedDisease(diseaseCard);
+        fetchCases();
+        openEdit({
+          case_id: caseId,
+          patient_name: msg.name,
+          disease_name: msg.disease_name || '',
+          age: msg.age || '',
+          severity: 'Mild',
+          gender: msg.gender || 'Male',
+          status: 'Active',
+          contact: msg.contact_no || '',
+          onset_date: null,
+          address: msg.address || '',
+          barangay_name: '',
+          symptoms: msg.message || '',
+          physician: '',
+          latitude: null,
+          longitude: null,
+        });
+      })
+      .catch(err => alert('Failed to add case: ' + (err.response?.data?.error || err.message)));
+  };
+
   const handleRoutingDelete = () => {
     setRoutingStep(null);
     setRoutingData(null);
@@ -1379,15 +1407,10 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>
                     {new Date(msg.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
                   </div>
-                  {!msg.is_read && (
-                    <button onClick={() => {
-                      axios.put(`${API_URL}/api/contact-messages/${msg.id}/read`)
-                        .then(() => fetchContactMessages());
-                    }} title="Mark read"
-                      style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #10B981', background: 'rgba(13,148,136,0.1)', color: '#10B981', cursor: 'pointer', fontSize: '12px' }}>
-                      ✓
-                    </button>
-                  )}
+                  <button onClick={() => handleMessageToCase(msg)} title="Add as Case"
+                    style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #10b981', background: 'rgba(16,185,129,0.1)', color: '#10b981', cursor: 'pointer', fontSize: '16px', flexShrink: 0 }}>
+                    ✓
+                  </button>
                 </div>
               ))
             )}

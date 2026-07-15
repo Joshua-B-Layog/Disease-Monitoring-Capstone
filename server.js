@@ -2368,6 +2368,40 @@ app.put('/api/contact-messages/:id/read', (req, res) => {
   });
 });
 
+// PUT /api/contact-messages/:id/accept — Convert contact message to a disease case
+app.put('/api/contact-messages/:id/accept', (req, res) => {
+  const { id } = req.params;
+  db.query('SELECT * FROM contact_messages WHERE id = ?', [id], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (rows.length === 0) return res.status(404).json({ error: 'Message not found.' });
+    const msg = rows[0];
+
+    db.query('SELECT id FROM diseases WHERE LOWER(name) = LOWER(?)', [msg.disease_name || ''], (dErr, dRes) => {
+      const diseaseId = dRes && dRes.length > 0 ? dRes[0].id : null;
+      db.query(
+        `INSERT INTO disease_cases
+         (patient_name, disease_id, age, severity, gender, status, contact, onset_date, address, symptoms, date_reported)
+         VALUES (?, ?, ?, 'Mild', ?, 'Active', ?, NULL, ?, ?, NOW())`,
+        [msg.name, diseaseId, msg.age || 0, msg.gender || 'Male', msg.contact_no || null, msg.address || null, msg.message || ''],
+        (insertErr, result) => {
+          if (insertErr) {
+            console.error('Contact message accept insert error:', insertErr.message);
+            return res.status(500).json({ error: insertErr.message });
+          }
+          const caseId = result.insertId;
+          db.query('UPDATE contact_messages SET is_read = 1 WHERE id = ?', [id], (updateErr) => {
+            if (updateErr) {
+              console.error('Contact message accept update error:', updateErr.message);
+              return res.status(500).json({ error: updateErr.message });
+            }
+            res.json({ message: 'Message accepted as case.', case_id: caseId });
+          });
+        }
+      );
+    });
+  });
+});
+
 // GET /api/disease_cases/public-summary — Public case counts per barangay
 app.get('/api/disease_cases/public-summary', (req, res) => {
   const sql = `
