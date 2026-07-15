@@ -40,6 +40,17 @@ const CHO_UNIT_BARANGAYS = {
   ],
 };
 
+// Precompute barangayName -> choUnit for fast lookup
+const BARANGAY_CHO_UNIT = {};
+for (const [unit, barangays] of Object.entries(CHO_UNIT_BARANGAYS)) {
+  barangays.forEach(b => { BARANGAY_CHO_UNIT[b.toLowerCase()] = unit; });
+}
+
+function getChoUnitForBarangay(barangayName) {
+  if (!barangayName) return null;
+  return BARANGAY_CHO_UNIT[barangayName.toLowerCase()] || null;
+}
+
 function detectBarangayFromAddress(address) {
   if (!address) return null;
   const addrLower = address.toLowerCase().replace(/[-\s]/g, '');
@@ -1752,94 +1763,120 @@ function formatPhone(phone) {
 
 // Helper function to create notification for active users with scope + preferences
 function createNotificationForUsers(title, message, type, link_to, barangayId = null, eventType = null, choUnit = null) {
-    db.query(
-        `SELECT u.user_id, u.role, u.assigned_barangay_id, u.email, u.mobile_number, b.name AS barangay_name
-         FROM users u
-         LEFT JOIN barangays b ON u.assigned_barangay_id = b.id
-         WHERE u.is_active = 1`,
-        (err, users) => {
-        if (err) {
-            console.error('Error fetching active users for notifications:', err.message);
-            return;
-        }
 
-        users.forEach(user => {
-            // If choUnit is provided, only notify users whose barangay belongs to that unit
-            if (choUnit) {
-                const unitBarangays = CHO_UNIT_BARANGAYS[choUnit] || [];
-                const userBelongsToUnit = user.barangay_name && unitBarangays.some(b => b.toLowerCase() === user.barangay_name.toLowerCase());
-                if (!userBelongsToUnit) return;
+    // Pre-fetch the CHO unit for the case barangay (for unit-level CHO matching)
+    const proceed = (caseBarangayUnit) => {
+        db.query(
+            `SELECT u.user_id, u.role, u.assigned_barangay_id, u.email, u.mobile_number, b.name AS barangay_name
+             FROM users u
+             LEFT JOIN barangays b ON u.assigned_barangay_id = b.id
+             WHERE u.is_active = 1`,
+            (err, users) => {
+            if (err) {
+                console.error('Error fetching active users for notifications:', err.message);
+                return;
             }
 
-            // When choUnit is provided and no specific barangay, only notify CHO (skip BHW)
-            // When both choUnit and barangayId are provided, BHW assigned to that barangay also get notified
-            if (choUnit && user.role === 'BHW' && barangayId === null) return;
-
-            // Scope: CHO must match barangay (same as BHW now)
-            const isCho = user.role === 'CHO' && (barangayId === null || Number(user.assigned_barangay_id) === Number(barangayId));
-            const isAssignedBhw = user.role === 'BHW' && (barangayId === null || Number(user.assigned_barangay_id) === Number(barangayId));
-
-            if (!isCho && !isAssignedBhw) return;
-
-            // Fetch this user's notification preferences
-            const prefQuery = 'SELECT * FROM notification_preferences WHERE user_id = ?';
-            db.query(prefQuery, [user.user_id], (prefErr, prefRows) => {
-                let prefs = {
-                    push_notifications: false, email_notifications: false, sms_notifications: false,
-                    new_case_reported: false, case_status_updated: false, high_risk_alert: false,
-                    weekly_summary: false, system_maintenance: false,
-                };
-                if (!prefErr && prefRows.length > 0) {
-                    prefs = { ...prefs, ...prefRows[0] };
+            users.forEach(user => {
+                // If choUnit is provided, only notify users whose barangay belongs to that unit
+                if (choUnit) {
+                    const unitBarangays = CHO_UNIT_BARANGAYS[choUnit] || [];
+                    const userBelongsToUnit = user.barangay_name && unitBarangays.some(b => b.toLowerCase() === user.barangay_name.toLowerCase());
+                    if (!userBelongsToUnit) return;
                 }
 
-                // Determine if this event is allowed by user preferences
-                const eventAllowed = !eventType || eventType === 'delete' || prefs[eventType] == true;
+                // When choUnit is provided and no specific barangay, only notify CHO (skip BHW)
+                // When both choUnit and barangayId are provided, BHW assigned to that barangay also get notified
+                if (choUnit && user.role === 'BHW' && barangayId === null) return;
 
-                // 1. In-app notification (Push) — only if push_notifications is ON
-                if (prefs.push_notifications && eventAllowed) {
-                    db.query(
-                        'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
-                        [user.user_id, title, message, type, link_to],
-                        (insertErr) => {
-                            if (insertErr) console.error(`Failed to insert notification for user ${user.user_id}:`, insertErr.message);
-                        }
-                    );
+                // ── UNIT-AWARE CHO MATCHING ──
+                // For BHW: still exact barangay match
+                const isAssignedBhw = user.role === 'BHW' && (barangayId === null || Number(user.assigned_barangay_id) === Number(barangayId));
+
+                // For CHO: exact match OR unit-level match (any CHOs in the same CHO unit get notified)
+                let isCho = false;
+                if (user.role === 'CHO') {
+                    if (barangayId === null) {
+                        isCho = true; // broadcast — all CHOs see it
+                    } else {
+                        const exactMatch = Number(user.assigned_barangay_id) === Number(barangayId);
+                        const userUnit = getChoUnitForBarangay(user.barangay_name);
+                        isCho = exactMatch || (caseBarangayUnit && userUnit && caseBarangayUnit === userUnit);
+                    }
                 }
 
-                // 2. Email notification
-                if (prefs.email_notifications && eventAllowed && user.email) {
-                    const mailOptions = {
-                        from: `"Cabuyao Health System" <${process.env.BREVO_FROM}>`,
-                        to: user.email,
-                        subject: title,
-                        html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:12px">
-                            <h2 style="color:#1e293b;margin:0 0 8px 0">${title}</h2>
-                            <p style="color:#475569;font-size:15px;line-height:1.5">${message}</p>
-                            <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0" />
-                            <p style="color:#94a3b8;font-size:12px">Cabuyao City Disease Monitoring System</p>
-                        </div>`
+                if (!isCho && !isAssignedBhw) return;
+
+                // Fetch this user's notification preferences
+                const prefQuery = 'SELECT * FROM notification_preferences WHERE user_id = ?';
+                db.query(prefQuery, [user.user_id], (prefErr, prefRows) => {
+                    let prefs = {
+                        push_notifications: false, email_notifications: false, sms_notifications: false,
+                        new_case_reported: false, case_status_updated: false, high_risk_alert: false,
+                        weekly_summary: false, system_maintenance: false,
                     };
-                    sendBrevoEmail(user.email, title, `
-                        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:12px">
-                            <h2 style="color:#1e293b;margin:0 0 8px 0">${title}</h2>
-                            <p style="color:#475569;font-size:15px;line-height:1.5">${message}</p>
-                            <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0" />
-                            <p style="color:#94a3b8;font-size:12px">Cabuyao City Disease Monitoring System</p>
-                        </div>`
-                    ).catch(err => console.error(`Email notification failed for user ${user.user_id}:`, err.message));
-                }
+                    if (!prefErr && prefRows.length > 0) {
+                        prefs = { ...prefs, ...prefRows[0] };
+                    }
 
-                // 3. SMS notification
-                if (prefs.sms_notifications && eventAllowed && user.mobile_number) {
-                    const smsText = `${title}: ${message}`;
-                    sendSMS(formatPhone(user.mobile_number), smsText).catch(err => {
-                        console.error(`SMS notification failed for user ${user.user_id}:`, err.message);
-                    });
-                }
+                    // Determine if this event is allowed by user preferences
+                    const eventAllowed = !eventType || eventType === 'delete' || prefs[eventType] == true;
+
+                    // 1. In-app notification (Push) — only if push_notifications is ON
+                    if (prefs.push_notifications && eventAllowed) {
+                        db.query(
+                            'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
+                            [user.user_id, title, message, type, link_to],
+                            (insertErr) => {
+                                if (insertErr) console.error(`Failed to insert notification for user ${user.user_id}:`, insertErr.message);
+                            }
+                        );
+                    }
+
+                    // 2. Email notification
+                    if (prefs.email_notifications && eventAllowed && user.email) {
+                        const mailOptions = {
+                            from: `"Cabuyao Health System" <${process.env.BREVO_FROM}>`,
+                            to: user.email,
+                            subject: title,
+                            html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:12px">
+                                <h2 style="color:#1e293b;margin:0 0 8px 0">${title}</h2>
+                                <p style="color:#475569;font-size:15px;line-height:1.5">${message}</p>
+                                <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0" />
+                                <p style="color:#94a3b8;font-size:12px">Cabuyao City Disease Monitoring System</p>
+                            </div>`
+                        };
+                        sendBrevoEmail(user.email, title, `
+                            <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:12px">
+                                <h2 style="color:#1e293b;margin:0 0 8px 0">${title}</h2>
+                                <p style="color:#475569;font-size:15px;line-height:1.5">${message}</p>
+                                <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0" />
+                                <p style="color:#94a3b8;font-size:12px">Cabuyao City Disease Monitoring System</p>
+                            </div>`
+                        ).catch(err => console.error(`Email notification failed for user ${user.user_id}:`, err.message));
+                    }
+
+                    // 3. SMS notification
+                    if (prefs.sms_notifications && eventAllowed && user.mobile_number) {
+                        const smsText = `${title}: ${message}`;
+                        sendSMS(formatPhone(user.mobile_number), smsText).catch(err => {
+                            console.error(`SMS notification failed for user ${user.user_id}:`, err.message);
+                        });
+                    }
+                });
             });
         });
-    });
+    };
+
+    // Look up case barangay CHO unit before proceeding
+    if (barangayId) {
+        db.query('SELECT name FROM barangays WHERE id = ?', [barangayId], (err, rows) => {
+            const caseUnit = (!err && rows.length > 0) ? getChoUnitForBarangay(rows[0].name) : null;
+            proceed(caseUnit);
+        });
+    } else {
+        proceed(null);
+    }
 }
 
 // Helper to check for high-risk status (> 20 cases)
@@ -2220,10 +2257,12 @@ app.post('/api/contact-messages', (req, res) => {
         return res.status(500).json({ error: 'Failed to save message.' });
       }
 
-      // Create notification for users in the target CHO unit
+      // Create notification for users in the target CHO unit (only if push_notifications is ON)
       if (targetCho) {
         db.query(
-          `SELECT user_id FROM users WHERE role = 'CHO' AND assigned_barangay_id IN (
+          `SELECT u.user_id FROM users u
+           INNER JOIN notification_preferences np ON u.user_id = np.user_id
+           WHERE u.role = 'CHO' AND np.push_notifications = 1 AND u.assigned_barangay_id IN (
             SELECT id FROM barangays WHERE name IN (
               SELECT covered FROM (
                 SELECT 'Sala' AS covered UNION SELECT 'Bigaa' UNION SELECT 'Butong'
@@ -2310,51 +2349,64 @@ app.get('/api/disease_cases/public-summary', (req, res) => {
 // 7. SCHEDULED JOBS
 // ==========================================
 
-// Weekly Summary — every Monday at 8:00 AM
+// Weekly Summary — every Monday at 8:00 AM (scoped per user / CHO unit / BHW barangay)
 cron.schedule('0 8 * * 1', () => {
     console.log('⏰ Running weekly summary cron job...');
 
-    const summaryQuery = `
-        SELECT
-            COUNT(*) AS total_cases,
-            SUM(CASE WHEN date_reported >= NOW() - INTERVAL 7 DAY THEN 1 ELSE 0 END) AS new_this_week,
-            SUM(CASE WHEN status IN ('Active','Under Treatment','Pending') THEN 1 ELSE 0 END) AS active_cases,
-            SUM(CASE WHEN status = 'Recovered' THEN 1 ELSE 0 END) AS recovered,
-            SUM(CASE WHEN status = 'Deceased' THEN 1 ELSE 0 END) AS deceased
-        FROM disease_cases
-    `;
+    // Helper: run scoped queries for a given set of barangay names, returns [summary, barangays, diseases, severities]
+    function runScopedQueries(barangayNames) {
+        if (!barangayNames || barangayNames.length === 0) return Promise.resolve(null);
+        const ph = barangayNames.map(() => '?').join(',');
 
-    const byBarangayQuery = `
-        SELECT b.name AS barangay_name, COUNT(dc.case_id) AS count
-        FROM barangays b
-        LEFT JOIN disease_cases dc ON dc.barangay_id = b.id
-        GROUP BY b.id, b.name
-        ORDER BY count DESC
-    `;
+        const doQuery = (sql, params) => new Promise((resolve, reject) =>
+            db.query(sql, params, (e, r) => e ? reject(e) : resolve(r))
+        );
 
-    const byDiseaseQuery = `
-        SELECT d.name AS disease_name, COUNT(dc.case_id) AS count
-        FROM diseases d
-        LEFT JOIN disease_cases dc ON dc.disease_id = d.id
-        GROUP BY d.id, d.name
-        ORDER BY count DESC
-    `;
+        const summarySQL = `
+            SELECT
+                COUNT(*) AS total_cases,
+                SUM(CASE WHEN dc.date_reported >= NOW() - INTERVAL 7 DAY THEN 1 ELSE 0 END) AS new_this_week,
+                SUM(CASE WHEN dc.status IN ('Active','Under Treatment','Pending') THEN 1 ELSE 0 END) AS active_cases,
+                SUM(CASE WHEN dc.status = 'Recovered' THEN 1 ELSE 0 END) AS recovered,
+                SUM(CASE WHEN dc.status = 'Deceased' THEN 1 ELSE 0 END) AS deceased
+            FROM disease_cases dc
+            JOIN barangays b ON dc.barangay_id = b.id
+            WHERE b.name IN (${ph})`;
 
-    const bySeverityQuery = `
-        SELECT severity, COUNT(*) AS count
-        FROM disease_cases
-        WHERE severity IS NOT NULL
-        GROUP BY severity
-        ORDER BY FIELD(severity,'Critical','Severe','Moderate','Mild','Asymptomatic')
-    `;
+        const barangaySQL = `
+            SELECT b.name AS barangay_name, COUNT(dc.case_id) AS count
+            FROM barangays b
+            LEFT JOIN disease_cases dc ON dc.barangay_id = b.id
+            WHERE b.name IN (${ph})
+            GROUP BY b.id, b.name
+            ORDER BY count DESC`;
 
-    Promise.all([
-        new Promise((resolve, reject) => db.query(summaryQuery, (e, r) => e ? reject(e) : resolve(r[0]))),
-        new Promise((resolve, reject) => db.query(byBarangayQuery, (e, r) => e ? reject(e) : resolve(r))),
-        new Promise((resolve, reject) => db.query(byDiseaseQuery, (e, r) => e ? reject(e) : resolve(r))),
-        new Promise((resolve, reject) => db.query(bySeverityQuery, (e, r) => e ? reject(e) : resolve(r))),
-    ]).then(async ([summary, barangays, diseases, severities]) => {
-        // Build a rich HTML summary
+        const diseaseSQL = `
+            SELECT d.name AS disease_name, COUNT(dc.case_id) AS count
+            FROM diseases d
+            LEFT JOIN disease_cases dc ON dc.disease_id = d.id
+            JOIN barangays b ON dc.barangay_id = b.id
+            WHERE b.name IN (${ph})
+            GROUP BY d.id, d.name
+            ORDER BY count DESC`;
+
+        const severitySQL = `
+            SELECT dc.severity, COUNT(*) AS count
+            FROM disease_cases dc
+            JOIN barangays b ON dc.barangay_id = b.id
+            WHERE b.name IN (${ph}) AND dc.severity IS NOT NULL
+            GROUP BY dc.severity
+            ORDER BY FIELD(dc.severity,'Critical','Severe','Moderate','Mild','Asymptomatic')`;
+
+        return Promise.all([
+            doQuery(summarySQL, barangayNames).then(r => r[0]),
+            doQuery(barangaySQL, barangayNames),
+            doQuery(diseaseSQL, barangayNames),
+            doQuery(severitySQL, barangayNames),
+        ]);
+    }
+
+    function buildHtmlAndPlain(summary, barangays, diseases, severities, scopeLabel) {
         const total = summary.total_cases || 0;
         const newWeek = summary.new_this_week || 0;
         const active = summary.active_cases || 0;
@@ -2373,11 +2425,12 @@ cron.schedule('0 8 * * 1', () => {
             `<tr><td>${s.severity}</td><td style="text-align:right;font-weight:600">${s.count}</td></tr>`
         ).join('') : '<tr><td colspan="2">No data</td></tr>';
 
-        const htmlContent = `
-            <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:12px">
-                <h1 style="color:#1e3a8a;font-size:22px;margin:0 0 4px 0">Weekly Summary</h1>
-                <p style="color:#64748b;font-size:13px;margin:0 0 20px 0">${new Date().toLocaleDateString('en-PH', { month:'long', day:'numeric', year:'numeric' })}</p>
+        const scopeTitle = scopeLabel ? ` — ${scopeLabel}` : '';
 
+        const html = `
+            <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:12px">
+                <h1 style="color:#1e3a8a;font-size:22px;margin:0 0 4px 0">Weekly Summary${scopeTitle}</h1>
+                <p style="color:#64748b;font-size:13px;margin:0 0 20px 0">${new Date().toLocaleDateString('en-PH', { month:'long', day:'numeric', year:'numeric' })}</p>
                 <table style="width:100%;border-collapse:collapse;margin-bottom:20px">
                     <tr>
                         <td style="background:#eff6ff;padding:12px;border-radius:8px 0 0 8px;text-align:center">
@@ -2394,56 +2447,85 @@ cron.schedule('0 8 * * 1', () => {
                         </td>
                     </tr>
                 </table>
-
                 <h3 style="color:#1e293b;font-size:15px;margin:0 0 8px 0">Top Barangays</h3>
                 <ul style="margin:0 0 20px 0;padding-left:20px;font-size:14px;color:#334155">${topBarangay}</ul>
-
                 <h3 style="color:#1e293b;font-size:15px;margin:0 0 8px 0">Top Diseases</h3>
                 <ul style="margin:0 0 20px 0;padding-left:20px;font-size:14px;color:#334155">${topDisease}</ul>
-
                 <h3 style="color:#1e293b;font-size:15px;margin:0 0 8px 0">By Severity</h3>
                 <table style="width:100%;border-collapse:collapse;font-size:14px">
                     <tr style="background:#f1f5f9"><th style="padding:8px 12px;text-align:left">Severity</th><th style="padding:8px 12px;text-align:right">Count</th></tr>
                     ${sevRows}
                 </table>
-
                 <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0" />
                 <p style="color:#94a3b8;font-size:11px">Cabuyao City Disease Monitoring System</p>
-            </div>
-        `;
+            </div>`;
 
-        const plainMessage = `📊 Weekly Summary\n\nTotal: ${total} | New: ${newWeek} | Active: ${active} | Recovered: ${recovered} | Deceased: ${deceased}\n\nTop Barangay: ${barangays[0]?.barangay_name || 'N/A'} (${barangays[0]?.count || 0} cases)`;
+        const plain = `📊 Weekly Summary${scopeTitle}\n\nTotal: ${total} | New: ${newWeek} | Active: ${active} | Recovered: ${recovered} | Deceased: ${deceased}\n\nTop Barangay: ${barangays[0]?.barangay_name || 'N/A'} (${barangays[0]?.count || 0} cases)`;
 
-        // Find all users with weekly_summary enabled
-        db.query(
-            `SELECT u.user_id, u.full_name, u.email, u.mobile_number
-             FROM users u
-             INNER JOIN notification_preferences np ON u.user_id = np.user_id
-             WHERE u.is_active = 1 AND np.weekly_summary = 1`,
-            (err, users) => {
-                if (err) {
-                    console.error('Weekly summary: error fetching users:', err.message);
+        return { html, plain };
+    }
+
+    function sendToUsers(users, html, plain) {
+        users.forEach(user => {
+            db.query(
+                'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
+                [user.user_id, '📊 Weekly Summary', plain, 'weekly_summary', 'Dashboard']
+            );
+            if (user.email) {
+                sendBrevoEmail(user.email, '📊 Weekly Summary — Cabuyao CDMS', html)
+                    .catch(err => console.error(`Weekly summary email failed for ${user.user_id}:`, err.message));
+            }
+        });
+    }
+
+    // 1. Fetch all eligible users with scope info
+    db.query(
+        `SELECT u.user_id, u.role, u.assigned_barangay_id, b.name AS barangay_name, u.email, u.full_name, u.mobile_number
+         FROM users u
+         LEFT JOIN barangays b ON u.assigned_barangay_id = b.id
+         INNER JOIN notification_preferences np ON u.user_id = np.user_id
+         WHERE u.is_active = 1 AND np.weekly_summary = 1`,
+        (err, users) => {
+            if (err) { console.error('Weekly summary: error fetching users:', err.message); return; }
+            if (users.length === 0) { console.log('No users subscribed to weekly summary.'); return; }
+
+            // 2. Group users by scope
+            const groups = {};
+            users.forEach(user => {
+                let scopeKey, scopeBarangays;
+                if (user.role === 'CHO') {
+                    const unit = getChoUnitForBarangay(user.barangay_name);
+                    if (!unit) return;
+                    scopeKey = unit;
+                    scopeBarangays = CHO_UNIT_BARANGAYS[unit];
+                } else if (user.role === 'BHW' && user.barangay_name) {
+                    scopeKey = `BHW:${user.barangay_name}`;
+                    scopeBarangays = [user.barangay_name];
+                } else {
                     return;
                 }
-                console.log(`📧 Sending weekly summary to ${users.length} user(s)`);
-                users.forEach(user => {
-                    // In-app notification
-                    db.query(
-                        'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
-                        [user.user_id, '📊 Weekly Summary', plainMessage, 'weekly_summary', 'Dashboard']
-                    );
+                if (!groups[scopeKey]) {
+                    groups[scopeKey] = { scopeLabel: scopeKey, barangayNames: scopeBarangays, users: [] };
+                }
+                groups[scopeKey].users.push(user);
+            });
 
-                    // Email
-                    if (user.email) {
-                        sendBrevoEmail(user.email, '📊 Weekly Summary — Cabuyao CDMS', htmlContent)
-                            .catch(err => console.error(`Weekly summary email failed for ${user.user_id}:`, err.message));
-                    }
+            const groupList = Object.values(groups);
+            if (groupList.length === 0) return;
+            console.log(`📧 Weekly summary: ${groupList.length} scope group(s), ${users.length} total user(s)`);
+
+            // 3. Run queries for each group and send
+            groupList.forEach(group => {
+                runScopedQueries(group.barangayNames).then(results => {
+                    if (!results) return;
+                    const { html, plain } = buildHtmlAndPlain(...results, group.scopeLabel);
+                    sendToUsers(group.users, html, plain);
+                }).catch(err => {
+                    console.error(`Weekly summary error for group ${group.scopeLabel}:`, err.message);
                 });
-            }
-        );
-    }).catch(err => {
-        console.error('❌ Weekly summary cron error:', err.message);
-    });
+            });
+        }
+    );
 });
 
 // ==========================================
