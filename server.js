@@ -195,7 +195,6 @@ db.query(`CREATE TABLE IF NOT EXISTS case_inbox (
 db.query(`CREATE TABLE IF NOT EXISTS contact_messages (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
-  email VARCHAR(255) NOT NULL,
   target_cho_unit VARCHAR(100),
   disease_name VARCHAR(255),
   message TEXT NOT NULL,
@@ -209,6 +208,7 @@ db.query(`CREATE TABLE IF NOT EXISTS contact_messages (
   if (err) console.error('Error creating contact_messages table:', err.message);
   else {
     console.log('Contact messages table created/verified');
+    // Migration: ensure new columns exist on existing tables
     ['age', 'gender', 'contact_no', 'address'].forEach(col => {
       db.query("SHOW COLUMNS FROM contact_messages LIKE ?", [col], (e, r) => {
         if (!e && r && r.length === 0) {
@@ -219,6 +219,15 @@ db.query(`CREATE TABLE IF NOT EXISTS contact_messages (
           });
         }
       });
+    });
+    // Migration: drop email column if it exists (resident contact form no longer uses it)
+    db.query("SHOW COLUMNS FROM contact_messages LIKE 'email'", (e, r) => {
+      if (!e && r && r.length > 0) {
+        db.query('ALTER TABLE contact_messages DROP COLUMN email', (de) => {
+          if (de) console.error('Error dropping email column:', de.message);
+          else console.log('Dropped email column from contact_messages');
+        });
+      }
     });
   }
 });
@@ -2277,9 +2286,9 @@ app.post('/api/contact-messages', (req, res) => {
   }
 
   db.query(
-    `INSERT INTO contact_messages (name, email, target_cho_unit, disease_name, message, age, gender, contact_no, address)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [name, null, targetCho || null, disease || null, message, age || null, gender || null, contact || null, address || null],
+    `INSERT INTO contact_messages (name, target_cho_unit, disease_name, message, age, gender, contact_no, address)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [name, targetCho || null, disease || null, message, age || null, gender || null, contact || null, address || null],
     (err, result) => {
       if (err) {
         console.error('Error saving contact message:', err.message);
