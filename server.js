@@ -2284,7 +2284,7 @@ app.post('/api/contact-messages', (req, res) => {
                 db.query(
                   `INSERT INTO notifications (user_id, title, message, type, link_to)
                    VALUES (?, ?, ?, ?, ?)`,
-                  [u.user_id, 'New Contact Message', `${name} sent a message regarding ${disease || 'general health'}.`, 'message', 'Manage Cases']
+                  [u.user_id, 'New Contact Message', `A resident sent a message regarding ${disease || 'general health'}.`, 'message', 'Manage Cases']
                 );
               });
             }
