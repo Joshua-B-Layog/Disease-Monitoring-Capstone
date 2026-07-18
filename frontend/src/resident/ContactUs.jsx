@@ -14,12 +14,6 @@ const DISEASE_OPTIONS = [
   'Leprosy','Malaria','Meningococcemia','Pertussis','Poliomyelitis','SARS','Sore Eyes',
 ];
 
-const CHO_UNITS = [
-  { value: 'CHO Unit I (Sala)', label: 'CHO Unit I (Sala)' },
-  { value: 'CHO Unit II (Pulo)', label: 'CHO Unit II (Pulo)' },
-  { value: 'BHW', label: 'Barangay Health Worker (BHW)' },
-];
-
 const ALL_BARANGAYS = [
   'Baclaran', 'Banay-Banay', 'Banlic',
   'Barangay Dos (Poblacion)', 'Barangay Tres (Poblacion)', 'Barangay Uno (Poblacion)',
@@ -34,22 +28,19 @@ function MapCenterUpdater({ center }) {
 }
 
 export default function ContactUs() {
-  const [form, setForm] = useState({ name: '', age: '', gender: '', contact: '', address: '', targetCho: '', targetBarangay: '', disease: '', message: '' });
+  const [form, setForm] = useState({ name: '', age: '', gender: '', contact: '', address: '', targetCho: 'BHW', targetBarangay: '', disease: '', message: '' });
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
   const [locationView, setLocationView] = useState('cho1');
   const [diseaseOpen, setDiseaseOpen] = useState(false);
-  const [choOpen, setChoOpen] = useState(false);
   const [targetBarangayOpen, setTargetBarangayOpen] = useState(false);
   const diseaseRef = useRef(null);
-  const choRef = useRef(null);
   const targetBarangayRef = useRef(null);
 
   useEffect(() => {
     const handleClick = (e) => {
       if (diseaseRef.current && !diseaseRef.current.contains(e.target)) setDiseaseOpen(false);
-      if (choRef.current && !choRef.current.contains(e.target)) setChoOpen(false);
       if (targetBarangayRef.current && !targetBarangayRef.current.contains(e.target)) setTargetBarangayOpen(false);
     };
     document.addEventListener('mousedown', handleClick);
@@ -58,7 +49,7 @@ export default function ContactUs() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name || !form.age || !form.gender || !form.contact || !form.address || !form.targetCho || !form.disease || !form.message) {
+    if (!form.name || !form.age || !form.gender || !form.contact || !form.address || !form.disease || !form.message) {
       setError('Please fill in all required fields.');
       return;
     }
@@ -67,7 +58,7 @@ export default function ContactUs() {
     try {
       await axios.post(`${API_URL}/api/contact-messages`, form);
       setSent(true);
-      setForm({ name: '', age: '', gender: '', contact: '', address: '', targetCho: '', targetBarangay: '', disease: '', message: '' });
+      setForm({ name: '', age: '', gender: '', contact: '', address: '', targetCho: 'BHW', targetBarangay: '', disease: '', message: '' });
     } catch (err) {
       setError('Failed to send message. Please try again later.');
     }
@@ -105,6 +96,7 @@ export default function ContactUs() {
       <div style={{
         display: 'grid', gridTemplateColumns: '1fr 1fr 1fr',
         gap: '24px',
+        alignItems: 'start',
         '@media (max-width: 900px)': { gridTemplateColumns: '1fr' },
       }}>
 
@@ -153,36 +145,7 @@ export default function ContactUs() {
                 <input required placeholder="Your Address"
                   value={form.address} onChange={e => setForm({...form, address: e.target.value})}
                   style={inputStyle} />
-                <div ref={choRef} style={{ position: 'relative' }}>
-                  <button type="button" onClick={() => setChoOpen(!choOpen)}
-                    style={{ ...inputStyle, cursor: 'pointer', textAlign: 'left', display: 'flex', gap: '8px', alignItems: 'center', width: '100%' }}>
-                    <span style={{ color: form.targetCho ? 'var(--text-main)' : 'var(--text-muted)', flex: 1 }}>
-                      {form.targetCho || '- Select CHO Unit -'}
-                    </span>
-                    <span style={{ fontSize: '10px', flexShrink: 0, transition: 'transform 0.2s', transform: choOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
-                  </button>
-                  {choOpen && (
-                    <div style={{
-                      position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
-                      maxHeight: '200px', overflowY: 'auto', marginTop: '4px',
-                      background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
-                      borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                    }}>
-                      {CHO_UNITS.map(u => (
-                        <div key={u.value} onClick={() => { setForm({...form, targetCho: u.value}); setChoOpen(false); }}
-                          style={{
-                            padding: '10px 12px', cursor: 'pointer', fontSize: '14px',
-                            color: 'var(--text-main)',
-                            background: form.targetCho === u.value ? 'rgba(16,185,129,0.1)' : 'transparent',
-                          }}>
-                          {u.label}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                {form.targetCho === 'BHW' && (
-                  <div ref={targetBarangayRef} style={{ position: 'relative' }}>
+                <div ref={targetBarangayRef} style={{ position: 'relative' }}>
                     <button type="button" onClick={() => setTargetBarangayOpen(!targetBarangayOpen)}
                       style={{ ...inputStyle, cursor: 'pointer', textAlign: 'left', display: 'flex', gap: '8px', alignItems: 'center', width: '100%' }}>
                       <span style={{ color: form.targetBarangay ? 'var(--text-main)' : 'var(--text-muted)', flex: 1 }}>
@@ -210,7 +173,6 @@ export default function ContactUs() {
                       </div>
                     )}
                   </div>
-                )}
                 <div ref={diseaseRef} style={{ position: 'relative' }}>
                   <button type="button" onClick={() => setDiseaseOpen(!diseaseOpen)}
                     style={{ ...inputStyle, cursor: 'pointer', textAlign: 'left', display: 'flex', gap: '8px', alignItems: 'center', width: '100%' }}>

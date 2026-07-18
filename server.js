@@ -122,9 +122,20 @@ db.query("SHOW COLUMNS FROM users LIKE 'initial_password'", (err, rows) => {
     }
 });
 
-db.query('CREATE TABLE IF NOT EXISTS notifications (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT, title VARCHAR(255), message TEXT, type VARCHAR(50), is_read TINYINT DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, link_to VARCHAR(100), FOREIGN KEY (user_id) REFERENCES users(user_id))', (err) => {
+db.query('CREATE TABLE IF NOT EXISTS notifications (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT, title VARCHAR(255), message TEXT, type VARCHAR(50), is_read TINYINT DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, link_to VARCHAR(100), reference_id INT NULL, FOREIGN KEY (user_id) REFERENCES users(user_id))', (err) => {
     if (err) console.error('Error creating notifications table:', err.message);
-    else console.log('Notifications table created/verified');
+    else {
+        console.log('Notifications table created/verified');
+        // Migration: add reference_id column if missing
+        db.query("SHOW COLUMNS FROM notifications LIKE 'reference_id'", (e, r) => {
+            if (!e && r && r.length === 0) {
+                db.query('ALTER TABLE notifications ADD COLUMN reference_id INT NULL', (ae) => {
+                    if (ae) console.error('Error adding reference_id column:', ae.message);
+                    else console.log('Added reference_id column to notifications');
+                });
+            }
+        });
+    }
 });
 
 db.query(`CREATE TABLE IF NOT EXISTS notification_preferences (
@@ -138,10 +149,22 @@ db.query(`CREATE TABLE IF NOT EXISTS notification_preferences (
     high_risk_alert BOOLEAN DEFAULT FALSE,
     weekly_summary BOOLEAN DEFAULT FALSE,
     system_maintenance BOOLEAN DEFAULT FALSE,
+    updated_case_reported BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 )`, (err) => {
     if (err) console.error('Error creating notification_preferences table:', err.message);
-    else console.log('Notification preferences table created/verified');
+    else {
+        console.log('Notification preferences table created/verified');
+        // Migration: add updated_case_reported column if missing
+        db.query("SHOW COLUMNS FROM notification_preferences LIKE 'updated_case_reported'", (e, r) => {
+            if (!e && r && r.length === 0) {
+                db.query('ALTER TABLE notification_preferences ADD COLUMN updated_case_reported BOOLEAN DEFAULT FALSE', (ae) => {
+                    if (ae) console.error('Error adding updated_case_reported column:', ae.message);
+                    else console.log('Added updated_case_reported column to notification_preferences');
+                });
+            }
+        });
+    }
 });
 
 db.query(`CREATE TABLE IF NOT EXISTS audit_logs (
@@ -229,7 +252,52 @@ db.query(`CREATE TABLE IF NOT EXISTS contact_messages (
         });
       }
     });
+    // Migration: add status column to contact_messages
+    db.query("SHOW COLUMNS FROM contact_messages LIKE 'status'", (e, r) => {
+      if (!e && r && r.length === 0) {
+        db.query("ALTER TABLE contact_messages ADD COLUMN status VARCHAR(20) DEFAULT 'new'", (ae) => {
+          if (ae) console.error('Error adding status column:', ae.message);
+          else console.log('Added status column to contact_messages');
+        });
+      }
+    });
+    // Migration: add barangay column to contact_messages
+    db.query("SHOW COLUMNS FROM contact_messages LIKE 'barangay'", (e, r) => {
+      if (!e && r && r.length === 0) {
+        db.query("ALTER TABLE contact_messages ADD COLUMN barangay VARCHAR(100)", (ae) => {
+          if (ae) console.error('Error adding barangay column:', ae.message);
+          else console.log('Added barangay column to contact_messages');
+        });
+      }
+    });
   }
+});
+
+db.query(`CREATE TABLE IF NOT EXISTS case_edit_requests (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  case_id INT NOT NULL,
+  requested_by INT NOT NULL,
+  requested_by_name VARCHAR(255),
+  from_barangay_name VARCHAR(100),
+  target_cho_unit VARCHAR(100),
+  note TEXT,
+  status ENUM('pending','accepted','rejected') DEFAULT 'pending',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  resolved_at TIMESTAMP NULL,
+  FOREIGN KEY (case_id) REFERENCES disease_cases(case_id) ON DELETE CASCADE,
+  FOREIGN KEY (requested_by) REFERENCES users(user_id)
+)`, (err) => {
+  if (err) console.error('Error creating case_edit_requests table:', err.message);
+  else console.log('Case edit requests table created/verified');
+  // Migration: add is_read column to case_edit_requests
+  db.query("SHOW COLUMNS FROM case_edit_requests LIKE 'is_read'", (e, r) => {
+    if (!e && r && r.length === 0) {
+      db.query("ALTER TABLE case_edit_requests ADD COLUMN is_read TINYINT(1) DEFAULT 0", (ae) => {
+        if (ae) console.error('Error adding is_read column to case_edit_requests:', ae.message);
+        else console.log('Added is_read column to case_edit_requests');
+      });
+    }
+  });
 });
 
 function createAuditLog(userId, userName, userRole, choUnit, barangay, action, entity, details) {
@@ -574,7 +642,7 @@ app.post('/api/cases', (req, res) => {
                         const caseInfo = caseResults[0];
                         const title = 'New Case Reported';
                         const message = `A new case of ${caseInfo.disease_name} (${caseInfo.severity}) has been reported for ${caseInfo.patient_name} in Barangay ${caseInfo.barangay_name || 'N/A'}.`;
-                        createNotificationForUsers(title, message, 'info', 'ManageCases', caseInfo.barangay_id, 'new_case_reported');
+                        createNotificationForUsers(title, message, 'info', 'ManageCases', caseInfo.barangay_id, 'new_case_reported', null, result.insertId);
                         
                         // Check for high risk
                         checkAndAlertHighRisk(caseInfo.barangay_id, caseInfo.barangay_name);
@@ -696,8 +764,8 @@ app.post('/api/cases/route-to-barangay-inbox', (req, res) => {
                                     if (!nErr && bhwUsers && bhwUsers.length > 0) {
                                         bhwUsers.forEach(u => {
                                             db.query(
-                                                'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
-                                                [u.user_id, 'New Case Reported', msg, 'info', 'Inbox']
+                                                'INSERT INTO notifications (user_id, title, message, type, link_to, reference_id) VALUES (?, ?, ?, ?, ?, ?)',
+                                                [u.user_id, 'New Case Reported', msg, 'info', 'Inbox', caseId]
                                             );
                                         });
                                     }
@@ -757,86 +825,134 @@ app.get('/api/case-inbox', (req, res) => {
     });
 });
 
-// GET outbox items sent BY a CHO unit
+// GET unified outbox — merges referrals + resident messages + edit requests
 app.get('/api/case-outbox', (req, res) => {
-    const { cho_unit, barangay, user_id } = req.query;
-    if (!cho_unit) return res.status(400).json({ error: 'cho_unit is required.' });
-    const unitBarangays = CHO_UNIT_BARANGAYS[cho_unit] || [];
-    let sql;
-    let params;
-    if (barangay && user_id) {
-        // BHW: match by from_user_id (sent) or target barangay (received)
-        sql = `
-        SELECT ci.*,
-          COALESCE(ci.patient_name, dc.patient_name) AS patient_name,
-          COALESCE(ci.disease_name, d.name) AS disease_name,
-          COALESCE(ci.severity, dc.severity) AS severity,
-          COALESCE(ci.age, dc.age) AS age,
-          COALESCE(ci.gender, dc.gender) AS gender,
-          COALESCE(ci.contact, dc.contact) AS contact,
-          COALESCE(ci.onset_date, dc.onset_date) AS onset_date,
-          COALESCE(ci.address, dc.address) AS address,
-          COALESCE(ci.symptoms, dc.symptoms) AS symptoms,
-          COALESCE(ci.physician, dc.physician) AS physician,
-          COALESCE(ci.latitude, dc.latitude) AS latitude,
-          COALESCE(ci.longitude, dc.longitude) AS longitude,
-          dc.status AS case_status, dc.date_reported, dc.barangay_id,
-          b.name AS barangay_name,
-          tb.name AS to_barangay_name,
-          ub.name AS from_barangay_name,
-          CASE WHEN ci.from_user_id = ? THEN 'sent' ELSE 'received' END AS direction
-        FROM case_inbox ci
-        LEFT JOIN disease_cases dc ON ci.case_id = dc.case_id
-        LEFT JOIN diseases d ON dc.disease_id = d.id
-        LEFT JOIN barangays b ON dc.barangay_id = b.id
-        LEFT JOIN barangays tb ON ci.to_barangay_id = tb.id
-        LEFT JOIN users u ON ci.from_user_id = u.user_id
-        LEFT JOIN barangays ub ON u.assigned_barangay_id = ub.id
-        WHERE (ci.from_user_id = ? OR tb.name = ?)
-        `;
-        params = [user_id, user_id, barangay];
-    } else {
-        // CHO: match by from_cho_unit, to_cho_unit, or unit barangays
-        sql = `
-        SELECT ci.*,
-          COALESCE(ci.patient_name, dc.patient_name) AS patient_name,
-          COALESCE(ci.disease_name, d.name) AS disease_name,
-          COALESCE(ci.severity, dc.severity) AS severity,
-          COALESCE(ci.age, dc.age) AS age,
-          COALESCE(ci.gender, dc.gender) AS gender,
-          COALESCE(ci.contact, dc.contact) AS contact,
-          COALESCE(ci.onset_date, dc.onset_date) AS onset_date,
-          COALESCE(ci.address, dc.address) AS address,
-          COALESCE(ci.symptoms, dc.symptoms) AS symptoms,
-          COALESCE(ci.physician, dc.physician) AS physician,
-          COALESCE(ci.latitude, dc.latitude) AS latitude,
-          COALESCE(ci.longitude, dc.longitude) AS longitude,
-          dc.status AS case_status, dc.date_reported, dc.barangay_id,
-          b.name AS barangay_name,
-          tb.name AS to_barangay_name,
-          ub.name AS from_barangay_name,
-          CASE WHEN ci.from_cho_unit = ? THEN 'sent' ELSE 'received' END AS direction
-        FROM case_inbox ci
-        LEFT JOIN disease_cases dc ON ci.case_id = dc.case_id
-        LEFT JOIN diseases d ON dc.disease_id = d.id
-        LEFT JOIN barangays b ON dc.barangay_id = b.id
-        LEFT JOIN barangays tb ON ci.to_barangay_id = tb.id
-        LEFT JOIN users u ON ci.from_user_id = u.user_id
-        LEFT JOIN barangays ub ON u.assigned_barangay_id = ub.id
-        WHERE (ci.from_cho_unit = ? OR ci.to_cho_unit = ?)
-        `;
-        params = [cho_unit, cho_unit, cho_unit];
-        if (unitBarangays.length > 0) {
-            const placeholders = unitBarangays.map(() => '?').join(',');
-            sql += ` OR tb.name IN (${placeholders})`;
-            params.push(...unitBarangays);
-        }
-    }
-    sql += ' ORDER BY ci.created_at DESC';
+  const { cho_unit, barangay, user_id } = req.query;
+  if (!cho_unit) return res.status(400).json({ error: 'cho_unit is required.' });
+  const unitBarangays = CHO_UNIT_BARANGAYS[cho_unit] || [];
+
+  const runQuery = (sql, params) => new Promise((resolve, reject) => {
     db.query(sql, params, (err, results) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json(results);
+      if (err) return reject(err);
+      resolve(results);
     });
+  });
+
+  (async () => {
+    try {
+      let referrals, residents, editRequests;
+
+      if (barangay && user_id) {
+        // ── BHW scope ──
+        referrals = await runQuery(`
+          SELECT CONCAT('ref-', ci.id) AS id, 'referral' AS item_type,
+            COALESCE(ci.patient_name, dc.patient_name) AS patient_name,
+            COALESCE(ci.disease_name, d.name) AS disease_name,
+            ci.status, b.name AS barangay_name,
+            tb.name AS to_barangay_name, ub.name AS from_barangay_name,
+            ci.to_cho_unit, ci.from_cho_unit,
+            CASE WHEN ci.from_user_id = ? THEN 'sent' ELSE 'received' END AS direction,
+            ci.created_at
+          FROM case_inbox ci
+          LEFT JOIN disease_cases dc ON ci.case_id = dc.case_id
+          LEFT JOIN diseases d ON dc.disease_id = d.id
+          LEFT JOIN barangays b ON dc.barangay_id = b.id
+          LEFT JOIN barangays tb ON ci.to_barangay_id = tb.id
+          LEFT JOIN users u ON ci.from_user_id = u.user_id
+          LEFT JOIN barangays ub ON u.assigned_barangay_id = ub.id
+          WHERE (ci.from_user_id = ? OR tb.name = ?)
+        `, [user_id, user_id, barangay]);
+
+        residents = await runQuery(`
+          SELECT CONCAT('res-', cm.id) AS id, 'resident' AS item_type,
+            cm.name AS patient_name, cm.disease_name,
+            CASE WHEN cm.status = 'accepted' THEN 'accepted' WHEN cm.status = 'rejected' THEN 'rejected' ELSE 'pending' END AS status,
+            cm.barangay AS barangay_name,
+            NULL AS to_barangay_name, NULL AS from_barangay_name,
+            cm.target_cho_unit AS to_cho_unit, NULL AS from_cho_unit,
+            'received' AS direction, cm.created_at
+          FROM contact_messages cm
+          WHERE cm.status IS NOT NULL AND cm.status != 'new' AND cm.barangay = ?
+        `, [barangay]);
+
+        editRequests = await runQuery(`
+          SELECT CONCAT('er-', cer.id) AS id, 'edit_request' AS item_type,
+            dc.patient_name, d.name AS disease_name,
+            cer.status, b.name AS barangay_name,
+            NULL AS to_barangay_name, cer.from_barangay_name,
+            cer.target_cho_unit AS to_cho_unit, NULL AS from_cho_unit,
+            'sent' AS direction, cer.created_at
+          FROM case_edit_requests cer
+          LEFT JOIN disease_cases dc ON cer.case_id = dc.case_id
+          LEFT JOIN diseases d ON dc.disease_id = d.id
+          LEFT JOIN barangays b ON dc.barangay_id = b.id
+          WHERE cer.requested_by = ?
+        `, [user_id]);
+      } else {
+        // ── CHO scope ──
+        let referralWhere = '(ci.from_cho_unit = ? OR ci.to_cho_unit = ?)';
+        let referralParams = [cho_unit, cho_unit, cho_unit];
+        if (unitBarangays.length > 0) {
+          const placeholders = unitBarangays.map(() => '?').join(',');
+          referralWhere += ` OR tb.name IN (${placeholders})`;
+          referralParams.push(...unitBarangays);
+        }
+
+        referrals = await runQuery(`
+          SELECT CONCAT('ref-', ci.id) AS id, 'referral' AS item_type,
+            COALESCE(ci.patient_name, dc.patient_name) AS patient_name,
+            COALESCE(ci.disease_name, d.name) AS disease_name,
+            ci.status, b.name AS barangay_name,
+            tb.name AS to_barangay_name, ub.name AS from_barangay_name,
+            ci.to_cho_unit, ci.from_cho_unit,
+            CASE WHEN ci.from_cho_unit = ? THEN 'sent' ELSE 'received' END AS direction,
+            ci.created_at
+          FROM case_inbox ci
+          LEFT JOIN disease_cases dc ON ci.case_id = dc.case_id
+          LEFT JOIN diseases d ON dc.disease_id = d.id
+          LEFT JOIN barangays b ON dc.barangay_id = b.id
+          LEFT JOIN barangays tb ON ci.to_barangay_id = tb.id
+          LEFT JOIN users u ON ci.from_user_id = u.user_id
+          LEFT JOIN barangays ub ON u.assigned_barangay_id = ub.id
+          WHERE ${referralWhere}
+        `, referralParams);
+
+        residents = await runQuery(`
+          SELECT CONCAT('res-', cm.id) AS id, 'resident' AS item_type,
+            cm.name AS patient_name, cm.disease_name,
+            CASE WHEN cm.status = 'accepted' THEN 'accepted' WHEN cm.status = 'rejected' THEN 'rejected' ELSE 'pending' END AS status,
+            cm.barangay AS barangay_name,
+            NULL AS to_barangay_name, NULL AS from_barangay_name,
+            cm.target_cho_unit AS to_cho_unit, NULL AS from_cho_unit,
+            'received' AS direction, cm.created_at
+          FROM contact_messages cm
+          WHERE cm.status IS NOT NULL AND cm.status != 'new' AND cm.target_cho_unit = ?
+        `, [cho_unit]);
+
+        editRequests = await runQuery(`
+          SELECT CONCAT('er-', cer.id) AS id, 'edit_request' AS item_type,
+            dc.patient_name, d.name AS disease_name,
+            cer.status, b.name AS barangay_name,
+            NULL AS to_barangay_name, cer.from_barangay_name,
+            cer.target_cho_unit AS to_cho_unit, NULL AS from_cho_unit,
+            'sent' AS direction, cer.created_at
+          FROM case_edit_requests cer
+          LEFT JOIN disease_cases dc ON cer.case_id = dc.case_id
+          LEFT JOIN diseases d ON dc.disease_id = d.id
+          LEFT JOIN barangays b ON dc.barangay_id = b.id
+          WHERE cer.target_cho_unit = ?
+        `, [cho_unit]);
+      }
+
+      // Merge and sort by created_at desc
+      const all = [...referrals, ...residents, ...editRequests];
+      all.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      res.json(all);
+    } catch (err) {
+      console.error('Unified outbox error:', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  })();
 });
 
 // Accept: create disease_cases entry from inbox data, then mark accepted
@@ -897,6 +1013,125 @@ app.put('/api/case-inbox/:id/reject', (req, res) => {
             res.json({ message: 'Case rejected.' });
         }
     );
+});
+
+// ── CASE EDIT REQUESTS (BHW → CHO) ──
+
+// POST /api/cases/:id/request-edit — BHW requests CHO to edit a case
+app.post('/api/cases/:id/request-edit', (req, res) => {
+  const caseId = req.params.id;
+  const { requested_by, requested_by_name, from_barangay_name, target_cho_unit, note } = req.body;
+  if (!requested_by || !note) {
+    return res.status(400).json({ error: 'requested_by and note are required.' });
+  }
+  db.query(
+    'INSERT INTO case_edit_requests (case_id, requested_by, requested_by_name, from_barangay_name, target_cho_unit, note) VALUES (?, ?, ?, ?, ?, ?)',
+    [caseId, requested_by, requested_by_name || 'Unknown', from_barangay_name || null, target_cho_unit || null, note],
+    (err, result) => {
+      if (err) return res.status(500).json({ error: err.message });
+      // Notify CHOs in the target unit (direct BHW→CHO request, bypasses user preferences)
+      if (target_cho_unit) {
+        const unitBarangays = CHO_UNIT_BARANGAYS[target_cho_unit] || [];
+        if (unitBarangays.length > 0) {
+          db.query(
+            `SELECT u.user_id FROM users u
+             LEFT JOIN barangays b ON u.assigned_barangay_id = b.id
+             WHERE u.role = 'CHO' AND u.is_active = 1
+               AND (LOWER(b.name) IN (?) OR u.assigned_barangay_id IS NULL)`,
+            [unitBarangays.map(b => b.toLowerCase())],
+            (nErr, users) => {
+              if (!nErr && users && users.length > 0) {
+                const msg = `${requested_by_name || 'A BHW'} from ${from_barangay_name || 'your area'} requested an update for this case. Note: "${note}"`;
+                users.forEach(u => {
+                  db.query(
+                    'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
+                    [u.user_id, 'A BHW needs your help', msg, 'info', 'Inbox']
+                  );
+                });
+              }
+            }
+          );
+        }
+      }
+      res.json({ message: 'Edit request sent to your CHO.', request_id: result.insertId });
+    }
+  );
+});
+
+// GET /api/case-edit-requests — Fetch edit requests (CHO: pending by unit, BHW: all by user)
+app.get('/api/case-edit-requests', (req, res) => {
+  const { cho_unit, requested_by, unread_only } = req.query;
+  let sql = `SELECT cer.*, dc.patient_name, d.name AS disease_name, d.name AS disease_name_full
+    FROM case_edit_requests cer
+    LEFT JOIN disease_cases dc ON cer.case_id = dc.case_id
+    LEFT JOIN diseases d ON dc.disease_id = d.id
+    WHERE 1=1`;
+  const params = [];
+  if (cho_unit) {
+    sql += ' AND cer.target_cho_unit = ? AND cer.status = ?';
+    params.push(cho_unit, 'pending');
+  }
+  if (requested_by) {
+    sql += ' AND cer.requested_by = ?';
+    params.push(requested_by);
+  }
+  if (unread_only === 'true') {
+    sql += ' AND cer.is_read = 0';
+  }
+  sql += ' ORDER BY cer.created_at DESC';
+  db.query(sql, params, (err, results) => {
+    if (err) {
+      console.error('case-edit-requests query error:', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+    res.json(results);
+  });
+});
+
+// PUT /api/case-edit-requests/:id/accept — CHO accepts edit request
+app.put('/api/case-edit-requests/:id/accept', (req, res) => {
+  const { id } = req.params;
+  db.query(
+    "UPDATE case_edit_requests SET status = 'accepted', resolved_at = NOW() WHERE id = ? AND status = 'pending'",
+    [id],
+    (err, result) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (result.affectedRows === 0) return res.status(404).json({ error: 'Edit request not found or already resolved.' });
+      // Return case_id so frontend can open edit mode
+      db.query('SELECT case_id FROM case_edit_requests WHERE id = ?', [id], (sErr, rows) => {
+        if (sErr || rows.length === 0) return res.json({ message: 'Request accepted.' });
+        res.json({ message: 'Edit request accepted.', case_id: rows[0].case_id });
+      });
+    }
+  );
+});
+
+// PUT /api/case-edit-requests/:id/reject — CHO rejects edit request
+app.put('/api/case-edit-requests/:id/reject', (req, res) => {
+  const { id } = req.params;
+  db.query(
+    "UPDATE case_edit_requests SET status = 'rejected', resolved_at = NOW() WHERE id = ? AND status = 'pending'",
+    [id],
+    (err, result) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (result.affectedRows === 0) return res.status(404).json({ error: 'Edit request not found or already resolved.' });
+      res.json({ message: 'Edit request rejected.' });
+    }
+  );
+});
+
+// PUT /api/case-edit-requests/:id/read — BHW marks edit request as read
+app.put('/api/case-edit-requests/:id/read', (req, res) => {
+  const { id } = req.params;
+  db.query(
+    'UPDATE case_edit_requests SET is_read = 1 WHERE id = ?',
+    [id],
+    (err, result) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (result.affectedRows === 0) return res.status(404).json({ error: 'Edit request not found.' });
+      res.json({ message: 'Marked as read.' });
+    }
+  );
 });
 
 // ROUTE: Update existing case
@@ -974,10 +1209,40 @@ app.put('/api/cases/:id', (req, res) => {
                         const caseInfo = caseResults[0];
                         const title = 'Case Status Updated';
                         const message = `The case status for ${caseInfo.patient_name} (${caseInfo.disease_name}) in Barangay ${caseInfo.barangay_name || 'N/A'} has been changed to ${caseInfo.status}.`;
-                        createNotificationForUsers(title, message, 'info', 'ManageCases', caseInfo.barangay_id, 'case_status_updated');
+                        createNotificationForUsers(title, message, 'info', 'ManageCases', caseInfo.barangay_id, 'case_status_updated', null, id);
                         
                         // Check for high risk
                         checkAndAlertHighRisk(caseInfo.barangay_id, caseInfo.barangay_name);
+
+                        // Notify BHW if this edit was from an accepted edit request
+                        db.query(
+                          `SELECT cer.requested_by, cer.requested_by_name, cer.from_barangay_name
+                           FROM case_edit_requests cer
+                           WHERE cer.case_id = ? AND cer.status = 'accepted'
+                           ORDER BY cer.resolved_at DESC LIMIT 1`,
+                          [id],
+                          (erErr, erRows) => {
+                            if (!erErr && erRows && erRows.length > 0) {
+                              const er = erRows[0];
+                              const erTitle = 'Updated Case Reported';
+                              const erMsg = `A CHO has updated the case of ${caseInfo.patient_name} (${caseInfo.disease_name}).`;
+                              db.query(
+                                `SELECT np.push_notifications, np.updated_case_reported
+                                 FROM notification_preferences np WHERE np.user_id = ?`,
+                                [er.requested_by],
+                                (pErr, pRows) => {
+                                  const prefs = (!pErr && pRows.length > 0) ? pRows[0] : {};
+                                  if (prefs.push_notifications && prefs.updated_case_reported) {
+                                    db.query(
+                                      'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
+                                      [er.requested_by, erTitle, erMsg, 'info', 'Outbox']
+                                    );
+                                  }
+                                }
+                              );
+                            }
+                          }
+                        );
                     }
                 });
 
@@ -1800,7 +2065,7 @@ function formatPhone(phone) {
 // ==========================================
 
 // Helper function to create notification for active users with scope + preferences
-function createNotificationForUsers(title, message, type, link_to, barangayId = null, eventType = null, choUnit = null) {
+function createNotificationForUsers(title, message, type, link_to, barangayId = null, eventType = null, choUnit = null, referenceId = null) {
 
     // Pre-fetch the CHO unit for the case barangay (for unit-level CHO matching)
     const proceed = (caseBarangayUnit) => {
@@ -1851,7 +2116,7 @@ function createNotificationForUsers(title, message, type, link_to, barangayId = 
                     let prefs = {
                         push_notifications: false, email_notifications: false, sms_notifications: false,
                         new_case_reported: false, case_status_updated: false, high_risk_alert: false,
-                        weekly_summary: false, system_maintenance: false,
+                        weekly_summary: false, system_maintenance: false, updated_case_reported: false,
                     };
                     if (!prefErr && prefRows.length > 0) {
                         prefs = { ...prefs, ...prefRows[0] };
@@ -1863,8 +2128,8 @@ function createNotificationForUsers(title, message, type, link_to, barangayId = 
                     // 1. In-app notification (Push) — only if push_notifications is ON
                     if (prefs.push_notifications && eventAllowed) {
                         db.query(
-                            'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
-                            [user.user_id, title, message, type, link_to],
+                            'INSERT INTO notifications (user_id, title, message, type, link_to, reference_id) VALUES (?, ?, ?, ?, ?, ?)',
+                            [user.user_id, title, message, type, link_to, referenceId],
                             (insertErr) => {
                                 if (insertErr) console.error(`Failed to insert notification for user ${user.user_id}:`, insertErr.message);
                             }
@@ -2030,7 +2295,7 @@ app.get('/api/notification-preferences/:userId', (req, res) => {
             return res.json({
                 push_notifications: false, email_notifications: false, sms_notifications: false,
                 new_case_reported: false, case_status_updated: false, high_risk_alert: false,
-                weekly_summary: false, system_maintenance: false,
+                weekly_summary: false, system_maintenance: false, updated_case_reported: false,
             });
         }
         return res.json(results[0]);
@@ -2043,15 +2308,15 @@ app.put('/api/notification-preferences/:userId', (req, res) => {
     const {
         push_notifications, email_notifications, sms_notifications,
         new_case_reported, case_status_updated, high_risk_alert,
-        weekly_summary, system_maintenance,
+        weekly_summary, system_maintenance, updated_case_reported,
     } = req.body;
 
     db.query(
         `INSERT INTO notification_preferences 
         (user_id, push_notifications, email_notifications, sms_notifications, 
          new_case_reported, case_status_updated, high_risk_alert, 
-         weekly_summary, system_maintenance)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         weekly_summary, system_maintenance, updated_case_reported)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
         push_notifications = VALUES(push_notifications),
         email_notifications = VALUES(email_notifications),
@@ -2060,11 +2325,12 @@ app.put('/api/notification-preferences/:userId', (req, res) => {
         case_status_updated = VALUES(case_status_updated),
         high_risk_alert = VALUES(high_risk_alert),
         weekly_summary = VALUES(weekly_summary),
-        system_maintenance = VALUES(system_maintenance)`,
+        system_maintenance = VALUES(system_maintenance),
+        updated_case_reported = VALUES(updated_case_reported)`,
         [userId,
          push_notifications ? 1 : 0, email_notifications ? 1 : 0, sms_notifications ? 1 : 0,
          new_case_reported ? 1 : 0, case_status_updated ? 1 : 0, high_risk_alert ? 1 : 0,
-         weekly_summary ? 1 : 0, system_maintenance ? 1 : 0],
+         weekly_summary ? 1 : 0, system_maintenance ? 1 : 0, updated_case_reported ? 1 : 0],
         (err, result) => {
             if (err) return res.status(500).json({ error: err.message });
             return res.json({ message: 'Preferences saved successfully' });
@@ -2285,10 +2551,11 @@ app.post('/api/contact-messages', (req, res) => {
     return res.status(400).json({ error: 'Name and message are required.' });
   }
 
+  const detectedBarangay = detectBarangayFromAddress(address);
   db.query(
-    `INSERT INTO contact_messages (name, target_cho_unit, disease_name, message, age, gender, contact_no, address)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [name, targetCho || null, disease || null, message, age || null, gender || null, contact || null, address || null],
+    `INSERT INTO contact_messages (name, target_cho_unit, disease_name, message, age, gender, contact_no, address, barangay)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [name, targetCho || null, disease || null, message, age || null, gender || null, contact || null, address || null, detectedBarangay],
     (err, result) => {
       if (err) {
         console.error('Error saving contact message:', err.message);
@@ -2338,13 +2605,23 @@ app.post('/api/contact-messages', (req, res) => {
 
 // GET /api/contact-messages — Retrieve contact messages (for CHO/BHW inbox)
 app.get('/api/contact-messages', (req, res) => {
-  const { choUnit, limit } = req.query;
+  const { choUnit, barangay, limit } = req.query;
   let sql = 'SELECT * FROM contact_messages';
   const params = [];
+  const conditions = [];
 
   if (choUnit) {
-    sql += ' WHERE target_cho_unit = ?';
+    conditions.push('target_cho_unit = ?');
     params.push(choUnit);
+  }
+
+  if (barangay) {
+    conditions.push('barangay = ?');
+    params.push(barangay);
+  }
+
+  if (conditions.length > 0) {
+    sql += ' WHERE ' + conditions.join(' AND ');
   }
 
   sql += ' ORDER BY created_at DESC';
@@ -2365,6 +2642,22 @@ app.put('/api/contact-messages/:id/read', (req, res) => {
   db.query('UPDATE contact_messages SET is_read = 1 WHERE id = ?', [req.params.id], (err) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ message: 'Message marked as read.' });
+  });
+});
+
+// PUT /api/contact-messages/:id/pending — Mark message as pending (BHW reviewing)
+app.put('/api/contact-messages/:id/pending', (req, res) => {
+  db.query("UPDATE contact_messages SET status = 'pending' WHERE id = ?", [req.params.id], (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ message: 'Message marked as pending.' });
+  });
+});
+
+// PUT /api/contact-messages/:id/reject — Reject a resident message
+app.put('/api/contact-messages/:id/reject', (req, res) => {
+  db.query("UPDATE contact_messages SET status = 'rejected', is_read = 1 WHERE id = ?", [req.params.id], (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ message: 'Message rejected.' });
   });
 });
 
@@ -2389,7 +2682,7 @@ app.put('/api/contact-messages/:id/accept', (req, res) => {
             return res.status(500).json({ error: insertErr.message });
           }
           const caseId = result.insertId;
-          db.query('UPDATE contact_messages SET is_read = 1 WHERE id = ?', [id], (updateErr) => {
+          db.query("UPDATE contact_messages SET status = 'accepted', is_read = 1 WHERE id = ?", [id], (updateErr) => {
             if (updateErr) {
               console.error('Contact message accept update error:', updateErr.message);
               return res.status(500).json({ error: updateErr.message });

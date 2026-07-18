@@ -478,8 +478,21 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                               {n.link_to && (
                                 <button onClick={() => {
                                   handleMarkRead(n.id);
-                                  if (n.link_to === 'Inbox') setPendingInboxView('inbox');
-                                  setActiveTab(n.link_to === 'Inbox' ? 'Manage Cases' : n.link_to);
+                                  if (n.link_to === 'Inbox') {
+                                    const isEditReq = n.title === 'A BHW needs your help';
+                                    setPendingInboxView(isEditReq ? 'inbox:edit-requests' : 'inbox');
+                                    setActiveTab('Manage Cases');
+                                  } else if (n.link_to === 'Outbox') {
+                                    setPendingInboxView('outbox');
+                                    setActiveTab('Manage Cases');
+                                  } else if (n.link_to === 'ManageCases') {
+                                    const match = n.message.match(/case of (.+?) \(/);
+                                    const diseaseName = match ? match[1].trim() : '';
+                                    setCaseFilter({ disease: diseaseName, barangay: '', purok: '' });
+                                    setActiveTab('Manage Cases');
+                                  } else {
+                                    setActiveTab(n.link_to);
+                                  }
                                   setShowNotifications(false);
                                 }} style={{
                                   background: 'none', border: 'none', color: '#10b981',

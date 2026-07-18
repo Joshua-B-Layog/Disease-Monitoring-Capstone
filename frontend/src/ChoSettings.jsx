@@ -110,13 +110,17 @@ export default function CHOSettings({
   const [notifications, setNotifications] = useState({
     emailNotifications: false, pushNotifications: false, smsNotifications: false,
     newCaseReported: false, caseStatusUpdated: false, highRiskAlert: false,
+    updatedCaseReported: false,
     weeklySummary: false, systemMaintenance: false,
   });
   const [notifLoading, setNotifLoading] = useState(false);
   const [notifSaveMsg, setNotifSaveMsg] = useState('');
+  const [systemPrefsSaveMsg, setSystemPrefsSaveMsg] = useState('');
 
   useEffect(() => {
     if (currentView !== 'notifications' || !userId) return;
+    setNotifSaveMsg('');
+    setSystemPrefsSaveMsg('');
     setNotifLoading(true);
     fetch(`${API_URL}/api/notification-preferences/${userId}`)
       .then(r => r.json())
@@ -128,6 +132,7 @@ export default function CHOSettings({
           newCaseReported: !!data.new_case_reported,
           caseStatusUpdated: !!data.case_status_updated,
           highRiskAlert: !!data.high_risk_alert,
+          updatedCaseReported: !!data.updated_case_reported,
           weeklySummary: !!data.weekly_summary,
           systemMaintenance: !!data.system_maintenance,
         });
@@ -135,6 +140,10 @@ export default function CHOSettings({
       .catch(() => {})
       .finally(() => setNotifLoading(false));
   }, [currentView, userId]);
+
+  useEffect(() => {
+    setSystemPrefsSaveMsg('');
+  }, [currentView]);
 
   // ── System Prefs ──
   const scaleToLabel = (scale) => {
@@ -506,6 +515,7 @@ export default function CHOSettings({
       newCaseReported: false,
       caseStatusUpdated: false,
       highRiskAlert: false,
+      updatedCaseReported: false,
       weeklySummary: false,
       systemMaintenance: false,
     }));
@@ -1038,6 +1048,7 @@ export default function CHOSettings({
                 title: 'Case Notifications', subtitle: 'Get notified about case activities',
                 rows: [
                   { key: 'newCaseReported', label: 'New Case Reported', sub: 'When a new case is reported in your barangay' },
+                  { key: 'updatedCaseReported', label: 'Updated Case Reported', sub: 'When a BHW requests an edit or a CHO updates a case' },
                   { key: 'caseStatusUpdated', label: 'Case Status Updated', sub: 'When a case status changes' },
                   { key: 'highRiskAlert', label: 'High Risk Alert', sub: 'When a high-risk area is identified' },
                 ],
@@ -1099,6 +1110,7 @@ export default function CHOSettings({
                       new_case_reported: notifications.newCaseReported,
                       case_status_updated: notifications.caseStatusUpdated,
                       high_risk_alert: notifications.highRiskAlert,
+                      updated_case_reported: notifications.updatedCaseReported,
                       weekly_summary: notifications.weeklySummary,
                       system_maintenance: notifications.systemMaintenance,
                     }),
@@ -1341,9 +1353,11 @@ export default function CHOSettings({
             </div>
 
             <div className="notifications-action-container">
+              {systemPrefsSaveMsg && <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginRight: '12px' }}>{systemPrefsSaveMsg}</span>}
               <button className="notifications-save-btn" onClick={() => {
                 setSystemPrefsSnapshot(takeSystemSnapshot());
-                setCurrentView('menu');
+                setSystemPrefsSaveMsg('Preferences saved!');
+                setTimeout(() => setCurrentView('menu'), 1200);
               }}>{t('Save Preferences')}</button>
             </div>
           </div>

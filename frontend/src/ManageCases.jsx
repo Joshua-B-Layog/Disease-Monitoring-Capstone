@@ -257,6 +257,15 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const [inboxSubTab, setInboxSubTab] = useState('referrals');
   const [contactMessages, setContactMessages] = useState([]);
   const [contactMessagesLoading, setContactMessagesLoading] = useState(false);
+  const [editRequests, setEditRequests] = useState([]);
+  const [editRequestsLoading, setEditRequestsLoading] = useState(false);
+  const [myEditRequests, setMyEditRequests] = useState([]);
+  const [myEditRequestsLoading, setMyEditRequestsLoading] = useState(false);
+  const [showEditRequestForm, setShowEditRequestForm] = useState(false);
+  const [editRequestNote, setEditRequestNote] = useState('');
+  const [editRequestSuccess, setEditRequestSuccess] = useState(null);
+  const [isBhwReadOnly, setIsBhwReadOnly] = useState(false);
+  const [pendingContactMessageId, setPendingContactMessageId] = useState(null);
   const [cardPage, setCardPage] = useState(0);
   const [selectedDisease, setSelectedDisease] = useState(null);
   const [editingCase, setEditingCase] = useState(null);
@@ -410,11 +419,28 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   }, [caseFilter]);
 
   useEffect(() => {
-    if (initialView === 'inbox') {
+    if (initialView === 'outbox') {
+      setView('outbox');
+      if (onInitialViewConsumed) onInitialViewConsumed();
+    } else if (initialView && initialView.startsWith('inbox')) {
       setView('inbox');
+      const parts = initialView.split(':');
+      if (parts[1]) setInboxSubTab(parts[1]);
       if (onInitialViewConsumed) onInitialViewConsumed();
     }
   }, [initialView]);
+
+  useEffect(() => {
+    if (editRequestSuccess) {
+      const t = setTimeout(() => {
+        setView('list');
+        setFilterPurok('All Puroks');
+        setIsBhwReadOnly(false);
+        setEditRequestSuccess(null);
+      }, 2500);
+      return () => clearTimeout(t);
+    }
+  }, [editRequestSuccess]);
 
   // Fetch all cases
   const fetchCases = () => {
@@ -453,8 +479,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     if (loginRole === 'CHO') {
       params.choUnit = sessionContext;
     } else if (loginRole === 'BHW' && loginBarangay) {
-      const choUnit = getChoUnitForBarangay(loginBarangay);
-      if (choUnit) params.choUnit = choUnit;
+      params.barangay = loginBarangay;
     }
     axios.get(`${API_URL}/api/contact-messages`, { params })
       .then(res => { setContactMessages(res.data); setContactMessagesLoading(false); })
@@ -512,6 +537,44 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       .catch(err => alert('Accept failed: ' + (err.response?.data?.error || err.message)));
   };
 
+  const handlePendingContactMessage = (msg) => {
+    axios.put(`${API_URL}/api/contact-messages/${msg.id}/pending`)
+      .then(() => {
+        setPendingContactMessageId(msg.id);
+        setFormData({
+          patientName: msg.name,
+          diseaseType: msg.disease_name || '',
+          age: msg.age || '',
+          severity: 'Mild',
+          gender: msg.gender || 'Male',
+          contact: msg.contact_no || '',
+          onsetDate: '',
+          address: msg.address || '',
+          barangayId: '',
+          barangayName: '',
+          symptoms: msg.message || '',
+          physician: '',
+          lat: '',
+          lng: '',
+          purok: '',
+          status: 'Active',
+          specificDisease: '',
+        });
+        setView('add');
+      })
+      .catch(err => alert('Failed to mark message pending: ' + (err.response?.data?.error || err.message)));
+  };
+
+  const handleRejectContactMessage = (msg) => {
+    if (!window.confirm(`Reject message from ${msg.name}?`)) return;
+    axios.put(`${API_URL}/api/contact-messages/${msg.id}/reject`)
+      .then(() => {
+        fetchContactMessages();
+        fetchOutbox();
+      })
+      .catch(err => alert('Failed to reject message: ' + (err.response?.data?.error || err.message)));
+  };
+
   const handleMessageToCase = (msg) => {
     axios.put(`${API_URL}/api/contact-messages/${msg.id}/accept`)
       .then(res => {
@@ -541,6 +604,92 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       .catch(err => alert('Failed to add case: ' + (err.response?.data?.error || err.message)));
   };
 
+  // ── BHW's OWN EDIT REQUESTS (for BHW Referrals tab) ──
+  const fetchMyEditRequests = () => {
+    if (loginRole !== 'BHW' || !loggedUserId) return;
+    setMyEditRequestsLoading(true);
+    axios.get(`${API_URL}/api/case-edit-requests?requested_by=${loggedUserId}&unread_only=true`)
+      .then(res => { setMyEditRequests(res.data); setMyEditRequestsLoading(false); })
+      .catch(() => setMyEditRequestsLoading(false));
+  };
+
+  // ── EDIT REQUESTS (BHW → CHO) ──
+  const fetchEditRequests = () => {
+    setEditRequestsLoading(true);
+    const params = {};
+    if (loginRole === 'CHO' && sessionContext) {
+      params.cho_unit = sessionContext;
+    }
+    console.log('[fetchEditRequests] loginRole:', loginRole, 'sessionContext:', sessionContext, 'params:', params);
+    axios.get(`${API_URL}/api/case-edit-requests`, { params })
+      .then(res => { 
+        console.log('[fetchEditRequests] response:', res.data);
+        setEditRequests(res.data); 
+        setEditRequestsLoading(false); 
+      })
+      .catch(err => { 
+        console.error('[fetchEditRequests] error:', err);
+        setEditRequestsLoading(false); 
+      });
+  };
+
+  const handleSendEditRequest = async () => {
+    if (!editRequestNote.trim() || !editingCase) return;
+    const targetCho = loginBarangay ? getChoUnitForBarangay(loginBarangay) : sessionContext;
+    try {
+      await axios.post(`${API_URL}/api/cases/${editingCase.case_id}/request-edit`, {
+        requested_by: loggedUserId,
+        requested_by_name: loggedUser,
+        from_barangay_name: loginBarangay,
+        target_cho_unit: targetCho,
+        note: editRequestNote.trim(),
+      });
+      setEditRequestSuccess(loggedUser);
+      setShowEditRequestForm(false);
+      setEditRequestNote('');
+    } catch (err) {
+      alert('Failed to send edit request: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  const handleAcceptEditRequest = (req) => {
+    axios.put(`${API_URL}/api/case-edit-requests/${req.id}/accept`)
+      .then(res => {
+        const caseId = res.data.case_id;
+        fetchEditRequests();
+        fetchCases();
+        const c = allCases.find(x => x.case_id === caseId);
+        if (c) {
+          openEdit({
+            case_id: c.case_id,
+            patient_name: c.patient_name,
+            disease_name: c.disease_name,
+            age: c.age,
+            severity: c.severity,
+            gender: c.gender,
+            status: c.status,
+            contact: c.contact,
+            onset_date: c.onset_date,
+            address: c.address,
+            barangay_name: c.barangay_name || '',
+            symptoms: c.symptoms,
+            physician: c.physician,
+            latitude: c.latitude,
+            longitude: c.longitude,
+          });
+        } else {
+          alert('Case found, but data not loaded yet. Please refresh.');
+        }
+      })
+      .catch(err => alert('Failed to accept edit request: ' + (err.response?.data?.error || err.message)));
+  };
+
+  const handleRejectEditRequest = (req) => {
+    axios.put(`${API_URL}/api/case-edit-requests/${req.id}/reject`)
+      .then(() => fetchEditRequests())
+      .catch(err => alert('Failed to reject edit request: ' + (err.response?.data?.error || err.message)));
+  };
+
   const handleRoutingDelete = () => {
     setRoutingStep(null);
     setRoutingData(null);
@@ -555,45 +704,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     setRoutingStep('description');
   };
 
-  const handleRoutingShowBhwStep = () => {
-    setRoutingTargetType('barangay');
-    setRoutingTargetBarangay(routingData?.detectedBarangay || '');
-    setRoutingStep('target-bhw');
-  };
-
   const handleRoutingCancelDescription = () => {
     setRoutingStep('confirm');
-  };
-
-  const handleRoutingSendToBhw = async () => {
-    if (!routingData) return;
-    const { payload, detectedBarangay } = routingData;
-    const targetBarangay = routingTargetBarangay || detectedBarangay;
-    if (!targetBarangay) {
-      setSubmitMsg('Please select a target barangay.');
-      return;
-    }
-    setSubmitLoading(true);
-    try {
-      await axios.post(`${API_URL}/api/cases/route-to-barangay-inbox`, {
-        ...payload,
-        submitter_user_id: loggedUserId || null,
-        submitter_name: loggedUser || 'Unknown',
-        from_cho_unit: (loginRole === 'BHW' && loginBarangay ? getChoUnitForBarangay(loginBarangay) : sessionContext) || null,
-        target_barangay_name: targetBarangay,
-        notes: routingDescription || null,
-      });
-      setSubmitMsg('Case sent to ' + targetBarangay + ' BHW inbox successfully!');
-      setRoutingStep(null);
-      setRoutingData(null);
-      setRoutingDescription('');
-      setRoutingTargetType(null);
-      await fetchCases();
-      setTimeout(() => { setView('list'); setSubmitMsg(''); setSubmitLoading(false); }, 1200);
-    } catch (routeErr) {
-      setSubmitMsg('Error: ' + (routeErr.response?.data?.error || routeErr.message));
-      setSubmitLoading(false);
-    }
   };
 
   const handleRoutingSend = async () => {
@@ -630,7 +742,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   };
 
   useEffect(() => {
-    if (view === 'inbox') { fetchInbox(); fetchContactMessages(); }
+    if (view === 'inbox') {
+      fetchInbox();
+      fetchContactMessages();
+      fetchEditRequests();
+      if (loginRole === 'BHW') fetchMyEditRequests();
+    }
     if (view === 'outbox') fetchOutbox();
   }, [view, sessionContext]);
 
@@ -966,6 +1083,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
   // ── OPEN EDIT ──
   const openEdit = (caseItem) => {
+    setIsBhwReadOnly(loginRole === 'BHW');
+    setShowEditRequestForm(false);
+    setEditRequestNote('');
     const brgy = barangayList.find(b => b.name === caseItem.barangay_name);
     let parsedAddress = caseItem.address || '';
     let parsedPurok = '';
@@ -1114,12 +1234,18 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         await axios.put(`${API_URL}/api/cases/${editingCase.case_id}`, payload);
         setSubmitMsg('Case updated successfully!');
       } else {
-        await axios.post(API_URL + '/api/cases', {
+        const newCaseRes = await axios.post(API_URL + '/api/cases', {
           ...payload,
           submitter_cho_unit: sessionContext || null,
           submitter_role: loginRole || null,
           submitter_own_barangay: loginBarangay || null,
         });
+        // If this case was created from a pending contact message, mark it accepted
+        if (pendingContactMessageId) {
+          await axios.put(`${API_URL}/api/contact-messages/${pendingContactMessageId}/accept`);
+          setPendingContactMessageId(null);
+          fetchOutbox();
+        }
         setSubmitMsg(isDraft ? 'Case saved as draft!' : 'Case added successfully!');
       }
       await fetchCases();
@@ -1197,7 +1323,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '12px' }}>
             <div style={{ display: 'flex', gap: '10px' }}>
-              <div onClick={() => { setView('inbox'); }}
+              <div onClick={() => { setView('inbox'); setInboxSubTab('referrals'); }}
                 style={{ padding: '6px 14px', borderRadius: '20px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '13px', fontWeight: '500', color: 'var(--text-main)', whiteSpace: 'nowrap', textAlign: 'center', minWidth: '70px' }}>
                 Inbox
               </div>
@@ -1310,20 +1436,73 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               borderBottom: inboxSubTab === 'referrals' ? '2px solid #10B981' : '2px solid transparent',
               transition: 'all 0.15s',
             }}>
-            Referrals ({inboxItems.length})
+            {loginRole === 'BHW' ? 'My Requests' : 'Referrals'} ({loginRole === 'BHW' ? myEditRequests.length : inboxItems.length})
           </div>
-          <div onClick={() => setInboxSubTab('messages')}
-            style={{
-              padding: '8px 20px', cursor: 'pointer', fontSize: '13px', fontWeight: inboxSubTab === 'messages' ? '700' : '500',
-              color: inboxSubTab === 'messages' ? 'var(--text-main)' : 'var(--text-muted)',
-              borderBottom: inboxSubTab === 'messages' ? '2px solid #10B981' : '2px solid transparent',
-              transition: 'all 0.15s',
-            }}>
-            Messages ({contactMessages.filter(m => !m.is_read).length})
-          </div>
+          {loginRole === 'BHW' && (
+            <div onClick={() => setInboxSubTab('messages')}
+              style={{
+                padding: '8px 20px', cursor: 'pointer', fontSize: '13px', fontWeight: inboxSubTab === 'messages' ? '700' : '500',
+                color: inboxSubTab === 'messages' ? 'var(--text-main)' : 'var(--text-muted)',
+                borderBottom: inboxSubTab === 'messages' ? '2px solid #10B981' : '2px solid transparent',
+                transition: 'all 0.15s',
+              }}>
+              Messages ({contactMessages.filter(m => m.status === 'new' || m.status === 'pending').length})
+            </div>
+          )}
+          {loginRole === 'CHO' && (
+            <div onClick={() => setInboxSubTab('edit-requests')}
+              style={{
+                padding: '8px 20px', cursor: 'pointer', fontSize: '13px', fontWeight: inboxSubTab === 'edit-requests' ? '700' : '500',
+                color: inboxSubTab === 'edit-requests' ? 'var(--text-main)' : 'var(--text-muted)',
+                borderBottom: inboxSubTab === 'edit-requests' ? '2px solid #8B5CF6' : '2px solid transparent',
+                transition: 'all 0.15s',
+              }}>
+              Edit Requests ({editRequests.length})
+            </div>
+          )}
         </div>
 
-        {inboxSubTab === 'referrals' && (
+        {inboxSubTab === 'referrals' && loginRole === 'BHW' && (
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
+            {myEditRequestsLoading ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading edit requests...</div>
+            ) : myEditRequests.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No edit requests.</div>
+            ) : (
+              myEditRequests.map(req => (
+                <div key={req.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)' }}>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: req.status === 'accepted' ? '#10b981' : req.status === 'rejected' ? '#ef4444' : '#f59e0b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '14px', flexShrink: 0 }}>
+                    {req.status === 'accepted' ? '✓' : req.status === 'rejected' ? '✕' : '…'}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '13px', color: 'var(--text-main)' }}>
+                      {req.patient_name || 'Unknown'} · {req.disease_name || req.disease_name_full || 'Unknown'}
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                      From {req.from_barangay_name || 'your barangay'} · <span style={{ textTransform: 'capitalize', fontWeight: '600', color: req.status === 'accepted' ? '#10b981' : req.status === 'rejected' ? '#ef4444' : '#f59e0b' }}>{req.status}</span>
+                    </div>
+                    {req.note && (
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '2px' }}>"{req.note}"</div>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>
+                    {new Date(req.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+                  </div>
+                  <button onClick={() => {
+                    axios.put(`${API_URL}/api/case-edit-requests/${req.id}/read`);
+                    setMyEditRequests(prev => prev.filter(r => r.id !== req.id));
+                    setView('outbox');
+                  }} title="View in Outbox"
+                    style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #3b82f6', background: 'rgba(59,130,246,0.1)', color: '#3b82f6', cursor: 'pointer', fontSize: '16px', flexShrink: 0 }}>
+                    →
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {inboxSubTab === 'referrals' && loginRole !== 'BHW' && (
           <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
             {inboxLoading ? (
               <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading inbox...</div>
@@ -1378,18 +1557,67 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           </div>
         )}
 
-        {inboxSubTab === 'messages' && (
+        {inboxSubTab === 'edit-requests' && loginRole === 'CHO' && (
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
+            {editRequestsLoading ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading edit requests...</div>
+            ) : editRequests.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No edit requests from BHWs.</div>
+            ) : (
+              editRequests.map(req => (
+                <div key={req.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '14.4px', color: 'var(--text-muted)', lineHeight: 1, textAlign: 'left' }}>
+                      From BHW ({req.from_barangay_name || 'Unknown Barangay'})
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '6px', alignItems: 'center' }}>
+                      <div className="inbox-avatar-circle" style={{ background: '#8B5CF6' }}>
+                        {(req.from_barangay_name || 'U').slice(0, 2).toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '13px', color: 'var(--text-main)' }}>
+                          {req.patient_name || 'Unknown'} · {req.disease_name || req.disease_name_full || 'Unknown Disease'}
+                        </div>
+                        {req.note && (
+                          <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            "{req.note}"
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>
+                    {new Date(req.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                    <button onClick={() => handleAcceptEditRequest(req)} title="Accept"
+                      style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #10b981', background: 'rgba(16,185,129,0.1)', color: '#10b981', cursor: 'pointer', fontSize: '16px' }}>
+                      ✓
+                    </button>
+                    <button onClick={() => handleRejectEditRequest(req)} title="Reject"
+                      style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #ef4444', background: 'rgba(239,68,68,0.1)', color: '#ef4444', cursor: 'pointer', fontSize: '16px' }}>
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {loginRole === 'BHW' && inboxSubTab === 'messages' && (
           <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
             {contactMessagesLoading ? (
               <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading messages...</div>
-            ) : contactMessages.filter(m => !m.is_read).length === 0 ? (
+            ) : contactMessages.filter(m => m.status === 'new' || m.status === 'pending').length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No messages from residents.</div>
             ) : (
-              contactMessages.filter(m => !m.is_read).map(msg => (
-                <div key={msg.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)', background: 'rgba(13,148,136,0.04)' }}>
+              contactMessages.filter(m => m.status === 'new' || m.status === 'pending').map(msg => (
+                <div key={msg.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)', background: msg.status === 'pending' ? 'rgba(245,158,11,0.06)' : 'rgba(13,148,136,0.04)' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '14.4px', color: 'var(--text-muted)', lineHeight: 1, textAlign: 'left' }}>
-                      From Resident{msg.target_cho_unit ? ` (${msg.target_cho_unit})` : ''}
+                      From Resident{msg.barangay ? ` (${msg.barangay})` : msg.target_cho_unit ? ` (${msg.target_cho_unit})` : ''}
+                      {msg.status === 'pending' && <span style={{ marginLeft: '8px', color: '#f59e0b', fontWeight: '600' }}>· Pending review</span>}
                     </div>
                     <div style={{ display: 'flex', gap: '8px', marginTop: '6px', alignItems: 'center' }}>
                       <div className="inbox-avatar-circle" style={{ background: '#10B981' }}>
@@ -1408,10 +1636,45 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>
                     {new Date(msg.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
                   </div>
-                  <button onClick={() => handleMessageToCase(msg)} title="Add as Case"
-                    style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #10b981', background: 'rgba(16,185,129,0.1)', color: '#10b981', cursor: 'pointer', fontSize: '16px', flexShrink: 0 }}>
-                    ✓
-                  </button>
+                  {msg.status === 'new' ? (
+                    <>
+                      <button onClick={() => handlePendingContactMessage(msg)} title="Review"
+                        style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #10b981', background: 'rgba(16,185,129,0.1)', color: '#10b981', cursor: 'pointer', fontSize: '16px', flexShrink: 0 }}>
+                        ✓
+                      </button>
+                      <button onClick={() => handleRejectContactMessage(msg)} title="Reject"
+                        style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #ef4444', background: 'rgba(239,68,68,0.1)', color: '#ef4444', cursor: 'pointer', fontSize: '16px', flexShrink: 0 }}>
+                        ✕
+                      </button>
+                    </>
+                  ) : (
+                    <button onClick={() => {
+                      setPendingContactMessageId(msg.id);
+                      setFormData({
+                        patientName: msg.name,
+                        diseaseType: msg.disease_name || '',
+                        age: msg.age || '',
+                        severity: 'Mild',
+                        gender: msg.gender || 'Male',
+                        contact: msg.contact_no || '',
+                        onsetDate: '',
+                        address: msg.address || '',
+                        barangayId: '',
+                        barangayName: '',
+                        symptoms: msg.message || '',
+                        physician: '',
+                        lat: '',
+                        lng: '',
+                        purok: '',
+                        status: 'Active',
+                        specificDisease: '',
+                      });
+                      setView('add');
+                    }} title="Complete Case"
+                      style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #f59e0b', background: 'rgba(245,158,11,0.1)', color: '#f59e0b', cursor: 'pointer', fontSize: '12px', fontWeight: '600', flexShrink: 0 }}>
+                      Complete →
+                    </button>
+                  )}
                 </div>
               ))
             )}
@@ -1448,12 +1711,22 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: '14px', fontWeight: '600' }}>
-                    {item.patient_name} · {item.disease_name}
+                    {item.patient_name || 'Unknown'} · {item.disease_name || 'Unknown'}
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '10px' }}>
-                    {item.direction === 'sent' ? 'Sent to' : 'Received from'} {item.direction === 'sent' ? (item.to_cho_unit || item.to_barangay_name || '—') : (item.from_barangay_name ? `BHW (${item.from_barangay_name})` : item.from_cho_unit || '—')}
-                    {item.direction === 'sent' && <span> · Status: <span style={{ textTransform: 'capitalize', fontWeight: '600', color: item.status === 'accepted' ? '#10b981' : item.status === 'rejected' ? '#ef4444' : '#f59e0b' }}>{item.status}</span></span>}
-                    {item.barangay_name && <span> · Assigned to {item.barangay_name}</span>}
+                    {item.item_type === 'referral' ? (
+                      <>
+                        {item.direction === 'sent' ? 'Sent to' : 'Received from'} {item.direction === 'sent' ? (item.to_cho_unit || item.to_barangay_name || '—') : (item.from_barangay_name ? `BHW (${item.from_barangay_name})` : item.from_cho_unit || '—')}
+                      </>
+                    ) : item.item_type === 'resident' ? (
+                      <>Resident message from {item.barangay_name || '—'} · {item.to_cho_unit || '—'}</>
+                    ) : item.item_type === 'edit_request' ? (
+                      <>Edit request from BHW ({item.from_barangay_name || '—'})</>
+                    ) : (
+                      <>{item.direction === 'sent' ? 'Sent to' : 'Received from'} {item.direction === 'sent' ? (item.to_cho_unit || item.to_barangay_name || '—') : (item.from_barangay_name ? `BHW (${item.from_barangay_name})` : item.from_cho_unit || '—')}</>
+                    )}
+                    <span> · Status: <span style={{ textTransform: 'capitalize', fontWeight: '600', color: item.status === 'accepted' ? '#10b981' : item.status === 'rejected' ? '#ef4444' : '#f59e0b' }}>{item.status}</span></span>
+                    {item.barangay_name && <span> · {item.item_type === 'edit_request' ? 'Barangay' : 'Assigned to'} {item.barangay_name}</span>}
                   </div>
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>
@@ -1576,10 +1849,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               style={{ padding: '8px 18px', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', fontSize: '13px' }}>
               ← Back
             </button>
-            <button onClick={openAdd}
-              style={{ padding: '8px 18px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
-              + Add Case
-            </button>
+            {loginRole !== 'CHO' && (
+              <button onClick={openAdd}
+                style={{ padding: '8px 18px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
+                + Add Case
+              </button>
+            )}
           </div>
         </div>
 
@@ -1883,6 +2158,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             </div>
           )}
 
+          {editRequestSuccess && (
+            <div style={{ background: '#d1fae5', color: '#065f46', padding: '12px', borderRadius: '8px', marginBottom: '20px', textAlign: 'center', fontSize: '14px', fontWeight: '500' }}>
+              ✅ {editRequestSuccess} - It has been sent to the CHO for editing
+            </div>
+          )}
+
           <form onSubmit={(e) => handleSave(e, false)}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', marginBottom: '24px' }}>
 
@@ -1901,7 +2182,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   <div style={{ position: 'relative' }}>
                     <input type="text" required placeholder="e.g. Juan Dela Cruz" style={{ ...inputStyle, border: formErrors.patientName ? '2px solid #ef4444' : '1px solid #d1d5db', background: formErrors.patientName ? '#fff5f5' : '#f9fafb' }}
                       value={formData.patientName} onChange={e => { setFormData({ ...formData, patientName: e.target.value }); setFormErrors(prev => ({ ...prev, patientName: false })); }}
-                      onFocus={() => { if (patientLookupResults.length > 0) setShowLookupDropdown(true); }} />
+                      onFocus={() => { if (patientLookupResults.length > 0) setShowLookupDropdown(true); }}
+                      readOnly={isBhwReadOnly} />
                     {lookupLoading && (
                       <span style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', fontSize: '12px' }}>⌛</span>
                     )}
@@ -1941,10 +2223,16 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   <div>
                     <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Age</label>
                     <input type="number" min="0" max="120" placeholder="25" style={{ ...inputStyle, border: formErrors.age ? '2px solid #ef4444' : '1px solid #d1d5db', background: formErrors.age ? '#fff5f5' : '#f9fafb' }}
-                      value={formData.age} onChange={e => setFormData({ ...formData, age: e.target.value })} />
+                      value={formData.age} onChange={e => setFormData({ ...formData, age: e.target.value })}
+                      readOnly={isBhwReadOnly} />
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Gender</label>
+                    {isBhwReadOnly ? (
+                      <div style={{ padding: '8px 12px', background: 'var(--input-bg, #f1f5f9)', borderRadius: '6px', fontSize: '14px', color: 'var(--text-main)' }}>
+                        {formData.gender || 'Not set'}
+                      </div>
+                    ) : (
                     <div style={{ position: 'relative' }} ref={genderRef}>
                       <button type="button" onClick={() => setGenderOpen(!genderOpen)}
                         style={{ ...inputStyle, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}>
@@ -1965,17 +2253,20 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         </div>
                       )}
                     </div>
+                    )}
                   </div>
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Contact No.</label>
                   <input type="text" placeholder="0918-234-2331" style={{ ...inputStyle, border: formErrors.contact ? '2px solid #ef4444' : '1px solid #d1d5db', background: formErrors.contact ? '#fff5f5' : '#f9fafb' }}
-                    value={formData.contact} onChange={e => setFormData({ ...formData, contact: e.target.value })} />
+                    value={formData.contact} onChange={e => setFormData({ ...formData, contact: e.target.value })}
+                    readOnly={isBhwReadOnly} />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Address</label>
                   <input type="text" placeholder="123 Rizal St, San Isidro Cabuyao" style={inputStyle}
                     value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })}
+                    readOnly={isBhwReadOnly}
                     onBlur={async (e) => {
                       const addr = e.target.value.trim();
                       if (!addr) return;
@@ -2178,6 +2469,11 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 {loginRole === 'BHW' ? (
                   <div>
                     <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Assigned Purok / Blk / Phase / Lot</label>
+                    {isBhwReadOnly ? (
+                      <div style={{ padding: '8px 12px', background: 'var(--input-bg, #f1f5f9)', borderRadius: '6px', fontSize: '14px', color: 'var(--text-main)' }}>
+                        {formData.purok || 'Not set'}
+                      </div>
+                    ) : (
                     <div style={{ position: 'relative' }} ref={purokRef}>
                       <button
                         type="button"
@@ -2236,10 +2532,16 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         </div>
                       )}
                     </div>
+                    )}
                   </div>
                 ) : (
                   <div>
                     <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Assigned Barangay</label>
+                    {isBhwReadOnly ? (
+                      <div style={{ padding: '8px 12px', background: 'var(--input-bg, #f1f5f9)', borderRadius: '6px', fontSize: '14px', color: 'var(--text-main)' }}>
+                        {scopedBarangayList.find(b => String(b.id) === String(formData.barangayId))?.name || 'Not set'}
+                      </div>
+                    ) : (
                     <div style={{ position: 'relative' }} ref={barangayFormRef}>
                       <button
                         type="button"
@@ -2302,6 +2604,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         </div>
                       )}
                     </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -2313,6 +2616,11 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 </h4>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Disease Type</label>
+                  {isBhwReadOnly ? (
+                    <div style={{ padding: '8px 12px', background: 'var(--input-bg, #f1f5f9)', borderRadius: '6px', fontSize: '14px', color: 'var(--text-main)' }}>
+                      {formData.diseaseType || 'Not set'}
+                    </div>
+                  ) : (
                   <div style={{ position: 'relative', outline: formErrors.diseaseType ? '2px solid #ef4444' : 'none', borderRadius: '6px' }} ref={diseaseFormRef}>
                     <button
                       type="button"
@@ -2366,16 +2674,23 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       </div>
                     )}
                   </div>
+                  )}
                 </div>
                 {isOther && (
                   <div>
                     <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Specify Disease *</label>
                     <input type="text" required placeholder="Enter disease name..." style={inputStyle}
-                      value={formData.specificDisease} onChange={e => setFormData({ ...formData, specificDisease: e.target.value })} />
+                      value={formData.specificDisease} onChange={e => setFormData({ ...formData, specificDisease: e.target.value })}
+                      readOnly={isBhwReadOnly} />
                   </div>
                 )}
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Severity Level</label>
+                  {isBhwReadOnly ? (
+                    <div style={{ padding: '8px 12px', background: 'var(--input-bg, #f1f5f9)', borderRadius: '6px', fontSize: '14px', color: 'var(--text-main)' }}>
+                      {formData.severity || 'Not set'}
+                    </div>
+                  ) : (
                   <div style={{ position: 'relative' }} ref={severityRef}>
                     <button type="button" onClick={() => setSeverityOpen(!severityOpen)}
                       style={{ ...inputStyle, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}>
@@ -2396,9 +2711,15 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       </div>
                     )}
                   </div>
+                  )}
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Patient Status</label>
+                  {isBhwReadOnly ? (
+                    <div style={{ padding: '8px 12px', background: 'var(--input-bg, #f1f5f9)', borderRadius: '6px', fontSize: '14px', color: 'var(--text-main)' }}>
+                      {formData.status || 'Not set'}
+                    </div>
+                  ) : (
                   <div style={{ position: 'relative' }} ref={patientStatusRef}>
                     <button type="button" onClick={() => setPatientStatusOpen(!patientStatusOpen)}
                       style={{ ...inputStyle, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}>
@@ -2419,6 +2740,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       </div>
                     )}
                   </div>
+                  )}
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Date of Onset</label>
@@ -2434,7 +2756,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       }
                     }}>
                     <input id="onset-date-input" type="date" style={{ ...inputStyle, paddingRight: '36px', cursor: 'pointer', border: formErrors.onsetDate ? '2px solid #ef4444' : '1px solid #d1d5db', background: formErrors.onsetDate ? '#fff5f5' : '#f9fafb' }} value={formData.onsetDate}
-                      onChange={e => { setFormData({ ...formData, onsetDate: e.target.value }); setFormErrors(prev => ({ ...prev, onsetDate: false })); }} />
+                      onChange={e => { setFormData({ ...formData, onsetDate: e.target.value }); setFormErrors(prev => ({ ...prev, onsetDate: false })); }}
+                      readOnly={isBhwReadOnly} />
                     <span style={{
                       position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
                       pointerEvents: 'none', color: '#64748b', display: 'flex', alignItems: 'center',
@@ -2450,7 +2773,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Attending Physician</label>
                   <input type="text" placeholder="Dr. Jose Reyes, MD" style={{ ...inputStyle, border: formErrors.physician ? '2px solid #ef4444' : '1px solid #d1d5db', background: formErrors.physician ? '#fff5f5' : '#f9fafb' }}
-                    value={formData.physician} onChange={e => setFormData({ ...formData, physician: e.target.value })} />
+                    value={formData.physician} onChange={e => setFormData({ ...formData, physician: e.target.value })}
+                    readOnly={isBhwReadOnly} />
                 </div>
               </div>
             </div>
@@ -2460,7 +2784,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Symptoms & Observations</label>
               <textarea placeholder="e.g. Fever (39.5°C), Severe Headache, Muscle and Joint Pain..." rows="3"
                 style={{ ...inputStyle, resize: 'vertical', border: formErrors.symptoms ? '2px solid #ef4444' : '1px solid #d1d5db', background: formErrors.symptoms ? '#fff5f5' : '#f9fafb' }}
-                value={formData.symptoms} onChange={e => setFormData({ ...formData, symptoms: e.target.value })} />
+                value={formData.symptoms} onChange={e => setFormData({ ...formData, symptoms: e.target.value })}
+                readOnly={isBhwReadOnly} />
             </div>
 
             {/* Location & Coordinates + map preview */}
@@ -2480,12 +2805,14 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     <div style={{ flex: 1 }}>
                       <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', marginBottom: '4px' }}>Latitude (N)</label>
                       <input type="text" placeholder="e.g. 14.2253" style={{ ...inputStyle, border: formErrors.location ? '2px solid #ef4444' : '1px solid #d1d5db', background: formErrors.location ? '#fff5f5' : '#f9fafb' }}
-                        value={formData.lat} onChange={e => setFormData({ ...formData, lat: e.target.value })} />
+                        value={formData.lat} onChange={e => setFormData({ ...formData, lat: e.target.value })}
+                        readOnly={isBhwReadOnly} />
                     </div>
                     <div style={{ flex: 1 }}>
                       <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', marginBottom: '4px' }}>Longitude (E)</label>
                       <input type="text" placeholder="e.g. 121.3025" style={{ ...inputStyle, border: formErrors.location ? '2px solid #ef4444' : '1px solid #d1d5db', background: formErrors.location ? '#fff5f5' : '#f9fafb' }}
-                        value={formData.lng} onChange={e => setFormData({ ...formData, lng: e.target.value })} />
+                        value={formData.lng} onChange={e => setFormData({ ...formData, lng: e.target.value })}
+                        readOnly={isBhwReadOnly} />
                     </div>
                   </div>
                   {!hasCoords && (
@@ -2506,20 +2833,52 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
             {/* Action buttons */}
             <div style={{ display: 'flex', justifyContent: 'center', gap: '14px', paddingTop: '24px', borderTop: '1px solid #e2e8f0' }}>
-              <button type="button" onClick={() => { setView('list'); setFilterPurok('All Puroks'); }}
+              <button type="button" onClick={() => { setView('list'); setFilterPurok('All Puroks'); setIsBhwReadOnly(false); }}
                 style={{ padding: '10px 32px', borderRadius: '6px', border: 'none', background: '#e2e8f0', color: '#475569', cursor: 'pointer', fontWeight: '500' }}>
                 Cancel
               </button>
-              {!isEdit && (
-                <button type="button" onClick={(e) => handleSave(e, true)} disabled={submitLoading}
-                  style={{ padding: '10px 28px', borderRadius: '6px', border: '1px solid #d1d5db', background: '#f3f4f6', color: '#374151', cursor: submitLoading ? 'not-allowed' : 'pointer', fontWeight: '500' }}>
-                  Save As Draft
-                </button>
+              {isBhwReadOnly ? (
+                <>
+                  {!showEditRequestForm ? (
+                    <button type="button" onClick={() => setShowEditRequestForm(true)}
+                      style={{ padding: '10px 28px', borderRadius: '6px', border: '1px solid #0d9488', background: 'rgba(13,148,136,0.1)', color: '#0d9488', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
+                      Edit Case to CHO
+                    </button>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                      <textarea
+                        placeholder="Describe what needs to be changed..."
+                        value={editRequestNote}
+                        onChange={e => setEditRequestNote(e.target.value)}
+                        rows={2}
+                        style={{ width: '300px', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '13px', resize: 'vertical' }}
+                      />
+                      <button type="button" onClick={() => handleSendEditRequest()}
+                        disabled={!editRequestNote.trim()}
+                        style={{ padding: '10px 28px', borderRadius: '6px', border: 'none', background: editRequestNote.trim() ? '#0d9488' : '#94a3b8', color: 'white', cursor: editRequestNote.trim() ? 'pointer' : 'not-allowed', fontWeight: '600', fontSize: '15px' }}>
+                        Send
+                      </button>
+                      <button type="button" onClick={() => setShowEditRequestForm(false)}
+                        style={{ padding: '10px 20px', borderRadius: '6px', border: '1px solid #d1d5db', background: '#f3f4f6', color: '#374151', cursor: 'pointer', fontWeight: '500' }}>
+                        Back
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  {!isEdit && (
+                    <button type="button" onClick={(e) => handleSave(e, true)} disabled={submitLoading}
+                      style={{ padding: '10px 28px', borderRadius: '6px', border: '1px solid #d1d5db', background: '#f3f4f6', color: '#374151', cursor: submitLoading ? 'not-allowed' : 'pointer', fontWeight: '500' }}>
+                      Save As Draft
+                    </button>
+                  )}
+                  <button type="submit" disabled={submitLoading}
+                    style={{ padding: '10px 40px', borderRadius: '6px', border: 'none', background: submitLoading ? '#6ee7b7' : '#10b981', color: 'white', cursor: submitLoading ? 'not-allowed' : 'pointer', fontWeight: '600', fontSize: '15px' }}>
+                    {submitLoading ? 'Saving...' : (isEdit ? 'Update Case' : 'Save Case')}
+                  </button>
+                </>
               )}
-              <button type="submit" disabled={submitLoading}
-                style={{ padding: '10px 40px', borderRadius: '6px', border: 'none', background: submitLoading ? '#6ee7b7' : '#10b981', color: 'white', cursor: submitLoading ? 'not-allowed' : 'pointer', fontWeight: '600', fontSize: '15px' }}>
-                {submitLoading ? 'Saving...' : (isEdit ? 'Update Case' : 'Save Case')}
-              </button>
             </div>
           </form>
         </div>
@@ -2533,7 +2892,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', color: 'var(--text-main)' }}>
                     This address is not within our covered barangays, do you want to give it to {routingData?.targetUnit}?
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
                     <button onClick={handleRoutingDelete}
                       style={{ padding: '10px 24px', borderRadius: '6px', border: '1px solid #ef4444', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}>
                       ✕ Delete
@@ -2542,11 +2901,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       <>
                         <button onClick={handleRoutingSendToDescription}
                           style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#3b82f6', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}>
-                          → Send to CHO I
-                        </button>
-                        <button onClick={handleRoutingShowBhwStep}
-                          style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#10b981', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}>
-                          → Send to BHW
+                          → Send to {routingData?.targetUnit || 'CHO'}
                         </button>
                       </>
                     ) : (
@@ -2577,50 +2932,6 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     </button>
                     <button onClick={handleRoutingSend}
                       style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#3b82f6', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}>
-                      Send
-                    </button>
-                  </div>
-                </>
-              )}
-              {routingStep === 'target-bhw' && (
-                <>
-                  <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', color: 'var(--text-main)' }}>
-                    Select target barangay
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px', maxHeight: '200px', overflowY: 'auto' }}>
-                    {scopedBarangayOptions.map(b => (
-                      <div
-                        key={b}
-                        onClick={() => setRoutingTargetBarangay(b)}
-                        style={{
-                          padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px',
-                          background: routingTargetBarangay === b ? '#3b82f6' : 'var(--input-bg)',
-                          color: routingTargetBarangay === b ? '#fff' : 'var(--text-main)',
-                          border: routingTargetBarangay === b ? 'none' : '1px solid var(--border-color)',
-                          transition: 'all 0.15s',
-                        }}
-                      >
-                        {b}
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ fontSize: '13px', fontWeight: '500', marginBottom: '6px', color: 'var(--text-muted)' }}>
-                    Add a note (optional)
-                  </div>
-                  <textarea
-                    value={routingDescription}
-                    onChange={e => setRoutingDescription(e.target.value)}
-                    placeholder="Describe the issue or any additional information..."
-                    rows={3}
-                    style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '14px', resize: 'vertical', boxSizing: 'border-box', outline: 'none', marginBottom: '12px' }}
-                  />
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                    <button onClick={() => { setRoutingStep('confirm'); setRoutingTargetBarangay(''); }}
-                      style={{ padding: '10px 24px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-main)', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}>
-                      ← Back
-                    </button>
-                    <button onClick={handleRoutingSendToBhw}
-                      style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#10b981', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}>
                       Send
                     </button>
                   </div>
