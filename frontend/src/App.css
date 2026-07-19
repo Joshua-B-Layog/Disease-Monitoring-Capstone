@@ -134,7 +134,7 @@ html, body, #root {
 }
 
 .form-input:focus { 
-  border-color: #3B82F6; 
+  border-color: #1E3A8A; 
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
@@ -197,7 +197,7 @@ html, body, #root {
 .menu-item.active { 
   background-color: #1E3A8A; 
   color: #FFFFFF; 
-  border-right: 4px solid #3B82F6; 
+  border-right: 4px solid #1E3A8A; 
 }
 
 .menu-item:hover:not(.active) { 
@@ -429,7 +429,7 @@ html, body, #root {
 /* The Filled Colored Part */
 .chart-bar-fill {
   height: 100%;
-  background: #3b82f6; /* Your primary theme blue */
+  background: #1E3A8A; /* Your primary theme blue */
   border-radius: 6px;
   transition: width 0.5s ease-in-out; /* Smooth animation */
 }

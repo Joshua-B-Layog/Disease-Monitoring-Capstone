@@ -2,7 +2,7 @@ import React from 'react';
 import ChoLogoIcon from './assets/ChoLogo';
 import ChoLogoIconII from './assets/ChoLogoII';
 
-const DashboardIcon = ({ color = '#3b82f6', size = 18 }) => (
+const DashboardIcon = ({ color = '#1E3A8A', size = 18 }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} style={{ verticalAlign: 'middle', marginRight: '6px' }}>
     <path fill={color} d="M19,3H5C2.239,3,0,5.239,0,8v8c0,2.761,2.239,5,5,5h14c2.761,0,5-2.239,5-5V8c0-2.761-2.239-5-5-5ZM6.802,17.359c-1.909-.449-3.404-2.058-3.729-3.992-.469-2.791,1.377-5.249,3.927-5.767v4.485c0,.53,.211,1.039,.586,1.414l3.169,3.169c-1.093,.724-2.482,1.036-3.952,.691Zm5.366-2.105l-2.876-2.876c-.188-.188-.293-.442-.293-.707V7.601c2.282,.463,4,2.48,4,4.899,0,1.019-.308,1.964-.832,2.754Zm7.832,1.746h-3c-.552,0-1-.448-1-1h0c0-.552,.448-1,1-1h3c.552,0,1,.448,1,1h0c0,.552-.448,1-1,1Zm0-4h-3c-.552,0-1-.448-1-1h0c0-.552,.448-1,1-1h3c.552,0,1,.448,1,1h0c0,.552-.448,1-1,1Zm0-4h-3c-.552,0-1-.448-1-1h0c0-.552,.448-1,1-1h3c.552,0,1,.448,1,1h0c0,.552-.448,1-1,1Z"/>
   </svg>
@@ -51,7 +51,7 @@ const Sidebar = ({ role, activeTab, setActiveTab, language, choUnit }) => {
   // Define menu configurations
   const menuConfig = {
     CHO: [
-      { name: 'Dashboard', icon: <DashboardIcon color="#3b82f6" /> },
+      { name: 'Dashboard', icon: <DashboardIcon color="#1E3A8A" /> },
       { name: 'Manage Cases', icon: <CaseMgmtIcon color="#f59e0b" /> },
       { name: 'Audit Reports', icon: <AuditIcon color="#8b5cf6" /> },
       { name: 'Map View', icon: <MapIcon color="#10b981" /> },
@@ -59,7 +59,7 @@ const Sidebar = ({ role, activeTab, setActiveTab, language, choUnit }) => {
       { name: 'Settings', icon: <SettingsIcon color="#64748b" /> }
     ],
     BHW: [
-      { name: 'Dashboard', icon: <DashboardIcon color="#3b82f6" /> },
+      { name: 'Dashboard', icon: <DashboardIcon color="#1E3A8A" /> },
       { name: 'Manage Cases', icon: <CaseMgmtIcon color="#f59e0b" /> },
       { name: 'Audit Reports', icon: <AuditIcon color="#8b5cf6" /> },
       { name: 'Map View', icon: <MapIcon color="#10b981" /> },

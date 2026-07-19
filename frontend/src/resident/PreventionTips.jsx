@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 
 const DISEASES = [
   {
-    name: 'Dengue', icon: '🦟', color: '#ef4444',
+    name: 'Dengue', icon: '🦟', color: '#ef4444', videoId: 'AxjL9T57svI',
     tips: [
       'Eliminate stagnant water where mosquitoes breed (flower pots, tires, cans).',
       'Use mosquito repellent and mosquito nets while sleeping.',
@@ -24,7 +24,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'Diarrhea', icon: '💧', color: '#0ea5e9',
+    name: 'Diarrhea', icon: '💧', color: '#0ea5e9', videoId: 'OGIUigzPuew',
     tips: [
       'Wash hands thoroughly with soap and water before eating and after using the toilet.',
       'Drink only boiled or properly treated water.',
@@ -43,7 +43,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'Covid-19', icon: '🛡️', color: '#3b82f6',
+    name: 'Covid-19', icon: '🛡️', color: '#3b82f6', videoId: '7tgm8KBlCtE',
     tips: [
       'Wear a mask in crowded or enclosed spaces.',
       'Wash hands frequently with soap and water or use alcohol-based sanitizer.',
@@ -64,7 +64,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'Leptospirosis', icon: '🐀', color: '#10b981',
+    name: 'Leptospirosis', icon: '🐀', color: '#10b981', videoId: 'aqnpyMsvMbk',
     tips: [
       'Avoid wading or swimming in floodwaters.',
       'Wear protective boots and gloves when cleaning flood-damaged areas.',
@@ -85,7 +85,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'Tuberculosis', icon: '🫁', color: '#f97316',
+    name: 'Tuberculosis', icon: '🫁', color: '#f97316', videoId: 'vn44uL7qpUA',
     tips: [
       'Cover your mouth when coughing or sneezing.',
       'Ensure good ventilation in living and working spaces.',
@@ -106,7 +106,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'Typhoid Fever', icon: '🌡️', color: '#8b5cf6',
+    name: 'Typhoid Fever', icon: '🌡️', color: '#8b5cf6', videoId: 'kfmYf8u8U8A',
     tips: [
       'Drink only boiled or bottled water.',
       'Eat well-cooked food while it is still hot.',
@@ -126,7 +126,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'Cholera', icon: '🌊', color: '#0ea5e9',
+    name: 'Cholera', icon: '🌊', color: '#0ea5e9', videoId: 'areQVuj_48w',
     tips: [
       'Drink only boiled or chemically treated water.',
       'Wash hands with soap and water after using the toilet.',
@@ -146,7 +146,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'Measles', icon: '🔴', color: '#dc2626',
+    name: 'Measles', icon: '🔴', color: '#dc2626', videoId: 'KUn530zyhCA',
     tips: [
       'Get vaccinated with the MMR vaccine (2 doses).',
       'Isolate infected individuals to prevent spread.',
@@ -166,7 +166,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'Hepatitis A', icon: '🫀', color: '#ca8a04',
+    name: 'Hepatitis A', icon: '🫀', color: '#ca8a04', videoId: '1KXEmwmM_xs',
     tips: [
       'Wash hands thoroughly after using the toilet and before preparing food.',
       'Drink only clean, boiled water.',
@@ -185,7 +185,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'Hepatitis B', icon: '🩸', color: '#b45309',
+    name: 'Hepatitis B', icon: '🩸', color: '#b45309', videoId: 'a8-5mQG57Vc',
     tips: [
       'Get vaccinated with the Hepatitis B vaccine (3 doses).',
       'Avoid sharing needles, syringes, or personal grooming items.',
@@ -204,7 +204,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'Rabies', icon: '🐾', color: '#7c3aed',
+    name: 'Rabies', icon: '🐾', color: '#7c3aed', videoId: '', videoUrl: 'https://www.facebook.com/watch/?v=1058377798571868',
     tips: [
       'Vaccinate your pets against rabies annually.',
       'Avoid approaching or handling stray animals.',
@@ -223,7 +223,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'Acute Respiratory Infection', icon: '🤧', color: '#6366f1',
+    name: 'Acute Respiratory Infection', icon: '🤧', color: '#6366f1', videoId: 'rDNE48wCbYU',
     tips: [
       'Wash hands frequently with soap and water.',
       'Avoid close contact with people who have cold or flu symptoms.',
@@ -243,7 +243,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'Avian Influenza', icon: '🐔', color: '#f59e0b',
+    name: 'Avian Influenza', icon: '🐔', color: '#f59e0b', videoId: 'iAusO1XxhnQ',
     tips: [
       'Avoid contact with sick or dead birds.',
       'Cook poultry and eggs thoroughly before eating.',
@@ -263,7 +263,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'Chickenpox', icon: '🟠', color: '#f97316',
+    name: 'Chickenpox', icon: '🟠', color: '#f97316', videoId: 'jvNHpVB1JpY',
     tips: [
       'Get vaccinated with the varicella vaccine.',
       'Isolate infected individuals until all blisters have crusted over.',
@@ -282,7 +282,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'Diphtheria', icon: '🔵', color: '#2563eb',
+    name: 'Diphtheria', icon: '🔵', color: '#2563eb', videoId: '', videoUrl: 'https://www.facebook.com/watch/?v=554657040414969',
     tips: [
       'Get vaccinated with the DPT vaccine (5 doses by age 6).',
       'Ensure children complete their vaccination schedule.',
@@ -300,7 +300,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'Ebola', icon: '🦠', color: '#991b1b',
+    name: 'Ebola', icon: '🦠', color: '#991b1b', videoId: '', videoUrl: 'https://www.facebook.com/reel/944081381802905',
     tips: [
       'Avoid contact with blood and bodily fluids of infected individuals.',
       'Practice strict hand hygiene.',
@@ -319,7 +319,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'Hand Foot and Mouth Disease', icon: '🖐️', color: '#ec4899',
+    name: 'Hand Foot and Mouth Disease', icon: '🖐️', color: '#ec4899', videoId: '14bA-jTc9jQ',
     tips: [
       'Wash hands frequently, especially after changing diapers.',
       'Clean and disinfect toys, doorknobs, and surfaces.',
@@ -338,7 +338,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'Hepatitis C', icon: '🩺', color: '#92400e',
+    name: 'Hepatitis C', icon: '🩺', color: '#92400e', videoId: 'x0WND-EVrTI',
     tips: [
       'Avoid sharing needles, syringes, or drug paraphernalia.',
       'Ensure blood products are screened before transfusion.',
@@ -357,7 +357,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'HIV/AIDS', icon: '🎗️', color: '#dc2626',
+    name: 'HIV/AIDS', icon: '🎗️', color: '#dc2626', videoId: 'pLUIkgvpy_U',
     tips: [
       'Practice safe sex: use condoms correctly every time.',
       'Get tested regularly for HIV.',
@@ -376,7 +376,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'Influenza', icon: '🤒', color: '#f59e0b',
+    name: 'Influenza', icon: '🤒', color: '#f59e0b', videoId: 'wMUk5zSlzqY',
     tips: [
       'Get the annual flu vaccine.',
       'Wash hands frequently with soap and water.',
@@ -396,7 +396,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'Influenza A', icon: '🦠', color: '#d97706',
+    name: 'Influenza A', icon: '🦠', color: '#d97706', videoId: '', videoUrl: 'https://www.tiktok.com/@doc.emil/video/7070837730183269658',
     tips: [
       'Get vaccinated annually (flu vaccine covers Influenza A).',
       'Practice good respiratory hygiene.',
@@ -415,7 +415,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'Leprosy', icon: '🟤', color: '#78716c',
+    name: 'Leprosy', icon: '🟤', color: '#78716c', videoId: 'LnS3mBfcPrE',
     tips: [
       'Early diagnosis and treatment prevent disability.',
       'Complete the full course of MDT (Multi-Drug Therapy).',
@@ -433,7 +433,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'Malaria', icon: '🦟', color: '#059669',
+    name: 'Malaria', icon: '🦟', color: '#059669', videoId: '', videoUrl: 'https://www.facebook.com/CalambaMedicalCenter/videos/1006334831743202/',
     tips: [
       'Use mosquito nets while sleeping, especially in high-risk areas.',
       'Apply mosquito repellent on exposed skin.',
@@ -452,7 +452,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'Meningococcemia', icon: '🔴', color: '#b91c1c',
+    name: 'Meningococcemia', icon: '🔴', color: '#b91c1c', videoId: 'xTKpfNk5fP8',
     tips: [
       'Get vaccinated against meningococcal disease.',
       'Avoid close contact with infected individuals.',
@@ -471,7 +471,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'Pertussis', icon: '🤧', color: '#7c3aed',
+    name: 'Pertussis', icon: '🤧', color: '#7c3aed', videoId: 'riCFyEf2QNw',
     tips: [
       'Get vaccinated with the DPT vaccine.',
       'Ensure children complete their vaccination schedule.',
@@ -490,7 +490,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'Poliomyelitis', icon: '🦵', color: '#ea580c',
+    name: 'Poliomyelitis', icon: '🦵', color: '#ea580c', videoId: 'kmgf1LU00xY',
     tips: [
       'Ensure children complete the polio vaccination series.',
       'Practice good hand hygiene.',
@@ -509,7 +509,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'SARS', icon: '😷', color: '#6366f1',
+    name: 'SARS', icon: '😷', color: '#6366f1', videoId: 'mhQVariR390',
     tips: [
       'Wear a mask in public places during outbreaks.',
       'Wash hands frequently and thoroughly.',
@@ -528,7 +528,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'Sore Eyes', icon: '👁️', color: '#0ea5e9',
+    name: 'Sore Eyes', icon: '👁️', color: '#0ea5e9', videoId: 'jMJLweTwPZk',
     tips: [
       'Wash hands frequently, especially before touching your eyes.',
       'Avoid sharing towels, pillows, or eye makeup.',
@@ -623,6 +623,7 @@ export default function PreventionTips() {
           <div key={disease.name} style={{
             background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px',
             overflow: 'hidden',
+            gridColumn: expanded === idx ? '1 / -1' : 'auto',
           }}>
             <div
               onClick={() => setExpanded(expanded === idx ? null : idx)}
@@ -648,12 +649,47 @@ export default function PreventionTips() {
                     <li key={i}>{tip}</li>
                   ))}
                 </ul>
+                {disease.videoId && (
+                  <div style={{ margin: '20px auto 16px', borderRadius: '10px', overflow: 'hidden', aspectRatio: '16 / 9', maxWidth: '600px' }}>
+                    <iframe
+                      width="100%"
+                      height="100%"
+                      src={`https://www.youtube.com/embed/${disease.videoId}`}
+                      title={`${disease.name} prevention video`}
+                      frameBorder="0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  </div>
+                )}
+                {!disease.videoId && disease.videoUrl && (
+                  <a
+                    href={disease.videoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      margin: '12px 0',
+                      padding: '10px 14px',
+                      borderRadius: '8px',
+                      background: '#1E3A8A',
+                      color: '#fff',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      textDecoration: 'none'
+                    }}
+                  >
+                    ▶ Watch prevention video →
+                  </a>
+                )}
                 <div style={{ marginTop: '8px', textAlign: 'right' }}>
                   <button onClick={(e) => { e.stopPropagation(); startQuiz(disease.name); }}
                     style={{
                       padding: '6px 16px', background: '#10B981', color: '#fff',
                       border: 'none', borderRadius: '6px', cursor: 'pointer',
-                      fontSize: '12px', fontWeight: '600',
+                      fontSize: '17px', fontWeight: '600',
                     }}>
                     Symptom Checker
                   </button>

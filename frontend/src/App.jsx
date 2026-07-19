@@ -469,7 +469,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                               </span>
                               {n.is_read === 0 && (
                                 <button onClick={() => handleMarkRead(n.id)} style={{
-                                  background: 'none', border: 'none', color: '#3b82f6',
+                                  background: 'none', border: 'none', color: '#1E3A8A',
                                   cursor: 'pointer', fontSize: '11px', fontWeight: '600', padding: 0
                                 }}>
                                   Mark read

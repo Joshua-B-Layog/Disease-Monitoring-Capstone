@@ -377,7 +377,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       {/* ── STAT CARDS ── */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: compactMode ? '10px' : '16px' }}>
         {[
-          { label: 'Total Cases', value: totalCases, color: '#3b82f6' },
+          { label: 'Total Cases', value: totalCases, color: '#1E3A8A' },
           { label: 'Active', value: activeCases, color: '#f59e0b' },
           { label: 'Recovered', value: recoveredCases, color: '#10b981' },
           { label: 'Deaths', value: deathCases, color: '#ef4444' },

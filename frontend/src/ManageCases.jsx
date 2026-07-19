@@ -1393,7 +1393,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   </div>
                 </div>
                 <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.55' }}>{disease.desc}</p>
-                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#3b82f6', fontSize: '13px', fontWeight: '600' }}>
+                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#1E3A8A', fontSize: '13px', fontWeight: '600' }}>
                   View Cases <span style={{ fontSize: '16px' }}>›</span>
                 </div>
               </div>
@@ -1404,7 +1404,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '24px' }}>
           {DISEASE_PAGES.map((_, i) => (
             <div key={i} onClick={() => setCardPage(i)}
-              style={{ width: '10px', height: '10px', borderRadius: '50%', cursor: 'pointer', background: cardPage === i ? '#3b82f6' : 'var(--border-color)', transition: 'background 0.2s' }} />
+              style={{ width: '10px', height: '10px', borderRadius: '50%', cursor: 'pointer', background: cardPage === i ? '#1E3A8A' : 'var(--border-color)', transition: 'background 0.2s' }} />
           ))}
         </div>
       </div>
@@ -1493,7 +1493,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     setMyEditRequests(prev => prev.filter(r => r.id !== req.id));
                     setView('outbox');
                   }} title="View in Outbox"
-                    style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #3b82f6', background: 'rgba(59,130,246,0.1)', color: '#3b82f6', cursor: 'pointer', fontSize: '16px', flexShrink: 0 }}>
+                    style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #1E3A8A', background: 'rgba(30,58,138,0.1)', color: '#1E3A8A', cursor: 'pointer', fontSize: '16px', flexShrink: 0 }}>
                     →
                   </button>
                 </div>
@@ -2482,7 +2482,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           ...inputStyle,
                           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                           cursor: 'pointer', textAlign: 'left',
-                          border: `1px solid ${purokOpen ? '#3b82f6' : '#d1d5db'}`,
+                          border: `1px solid ${purokOpen ? '#1E3A8A' : '#d1d5db'}`,
                         }}
                       >
                           <span>{formData.purok || '— Select Location —'}</span>
@@ -2550,7 +2550,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           ...inputStyle,
                           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                           cursor: 'pointer', textAlign: 'left',
-                          border: formErrors.barangayId ? '2px solid #ef4444' : `1px solid ${barangayFormOpen ? '#3b82f6' : '#d1d5db'}`,
+                          border: formErrors.barangayId ? '2px solid #ef4444' : `1px solid ${barangayFormOpen ? '#1E3A8A' : '#d1d5db'}`,
                           background: formErrors.barangayId ? '#fff5f5' : '#f9fafb',
                         }}
                       >
@@ -2629,7 +2629,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         ...inputStyle,
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                         cursor: 'pointer', textAlign: 'left',
-                        border: `1px solid ${diseaseOpen ? '#3b82f6' : '#d1d5db'}`,
+                        border: `1px solid ${diseaseOpen ? '#1E3A8A' : '#d1d5db'}`,
                       }}
                     >
                       <span>{formData.diseaseType || '— Select Disease —'}</span>
@@ -2900,13 +2900,13 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     {loginRole === 'BHW' ? (
                       <>
                         <button onClick={handleRoutingSendToDescription}
-                          style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#3b82f6', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}>
+                          style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#1E3A8A', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}>
                           → Send to {routingData?.targetUnit || 'CHO'}
                         </button>
                       </>
                     ) : (
                       <button onClick={handleRoutingSendToDescription}
-                        style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#3b82f6', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}>
+                        style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#1E3A8A', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}>
                         → Send
                       </button>
                     )}
@@ -2931,7 +2931,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       ← Cancel
                     </button>
                     <button onClick={handleRoutingSend}
-                      style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#3b82f6', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}>
+                      style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#1E3A8A', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}>
                       Send
                     </button>
                   </div>
