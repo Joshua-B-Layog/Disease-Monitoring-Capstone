@@ -119,7 +119,9 @@ export default function ContactUs() {
                 style={{
                   marginTop: '12px', padding: '8px 20px', background: '#10B981',
                   color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px',
-                }}>
+                }}
+                onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+                onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
                 Send Another
               </button>
             </div>
@@ -165,7 +167,7 @@ export default function ContactUs() {
                             style={{
                               padding: '10px 12px', cursor: 'pointer', fontSize: '13px',
                               color: 'var(--text-main)',
-                              background: form.targetBarangay === b ? 'rgba(16,185,129,0.1)' : 'transparent',
+                              background: form.targetBarangay === b ? 'rgba(16,185,129,0.18)' : 'transparent',
                             }}>
                             {b}
                           </div>
@@ -193,7 +195,7 @@ export default function ContactUs() {
                           style={{
                             padding: '10px 12px', cursor: 'pointer', fontSize: '13px',
                             color: 'var(--text-main)',
-                            background: form.disease === d ? 'rgba(16,185,129,0.1)' : 'transparent',
+                            background: form.disease === d ? 'rgba(16,185,129,0.18)' : 'transparent',
                           }}>
                           {d}
                         </div>
@@ -210,7 +212,9 @@ export default function ContactUs() {
                     padding: '12px', background: '#10B981', color: '#fff',
                     border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600',
                     cursor: sending ? 'not-allowed' : 'pointer', opacity: sending ? 0.7 : 1,
-                  }}>
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+                  onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
                   {sending ? 'Sending...' : 'Send Message'}
                 </button>
               </div>
@@ -266,8 +270,8 @@ export default function ContactUs() {
               style={{
                 flex: 1, padding: '8px 12px', borderRadius: '6px', border: '1px solid',
                 borderColor: locationView === 'cho1' ? '#10B981' : 'var(--border-color)',
-                background: locationView === 'cho1' ? '#f0fdfa' : 'var(--bg-surface)',
-                color: locationView === 'cho1' ? '#10B981' : 'var(--text-muted)',
+                background: locationView === 'cho1' ? 'rgba(16,185,129,0.18)' : 'var(--bg-surface)',
+                color: locationView === 'cho1' ? '#34d399' : 'var(--text-muted)',
                 fontWeight: locationView === 'cho1' ? '600' : '400',
                 cursor: 'pointer', fontSize: '13px',
               }}>
@@ -277,8 +281,8 @@ export default function ContactUs() {
               style={{
                 flex: 1, padding: '8px 12px', borderRadius: '6px', border: '1px solid',
                 borderColor: locationView === 'cho2' ? '#10B981' : 'var(--border-color)',
-                background: locationView === 'cho2' ? '#f0fdfa' : 'var(--bg-surface)',
-                color: locationView === 'cho2' ? '#10B981' : 'var(--text-muted)',
+                background: locationView === 'cho2' ? 'rgba(16,185,129,0.18)' : 'var(--bg-surface)',
+                color: locationView === 'cho2' ? '#34d399' : 'var(--text-muted)',
                 fontWeight: locationView === 'cho2' ? '600' : '400',
                 cursor: 'pointer', fontSize: '13px',
               }}>
@@ -321,13 +325,13 @@ export default function ContactUs() {
       {/* National hotline */}
       <div style={{
         marginTop: '24px', textAlign: 'center',
-        padding: '16px', background: '#fef2f2', border: '1px solid #fecaca',
+        padding: '16px', background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.35)',
         borderRadius: '10px',
       }}>
-        <div style={{ fontSize: '14px', color: '#991b1b', fontWeight: '600' }}>
+        <div style={{ fontSize: '14px', color: '#fca5a5', fontWeight: '600' }}>
           National Emergency Hotline: <strong style={{ fontSize: '20px' }}>911</strong>
         </div>
-        <div style={{ fontSize: '13px', color: '#b91c1c', marginTop: '4px' }}>
+        <div style={{ fontSize: '13px', color: '#f87171', marginTop: '4px' }}>
           DOH: 1555 | Red Cross: 143 | PNP: 117
         </div>
       </div>

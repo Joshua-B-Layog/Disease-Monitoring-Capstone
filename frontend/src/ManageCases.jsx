@@ -301,6 +301,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   // ── NEW: sub-disease filter for the "Other" card ──
   const [filterSubDisease, setFilterSubDisease] = useState('All Remaining Diseases');
   const [tablePage, setTablePage] = useState(1);
+  const [tableEllipsisOpen, setTableEllipsisOpen] = useState(false);
+  const [tableEllipsisInput, setTableEllipsisInput] = useState('');
+  const tableEllipsisRef = useRef(null);
 
   // Auto-save toast state
   const [autoSaveToast, setAutoSaveToast] = useState('');
@@ -1013,14 +1016,32 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     tablePage * CASES_PER_PAGE
   );
 
+  const getVisiblePages = (cur, total) => {
+    if (total <= 9) return Array.from({ length: total }, (_, i) => i + 1);
+    let start = 1 + 9 * Math.floor((cur - 1) / 9);
+    start = Math.max(1, Math.min(start, total - 8));
+    const end = Math.min(total, start + 8);
+    const pages = [];
+    for (let i = start; i <= end; i++) pages.push(i);
+    if (end < total) pages.push('...');
+    return pages;
+  };
+
+  useEffect(() => {
+    if (!tableEllipsisOpen) return;
+    const handler = (e) => { if (tableEllipsisRef.current && !tableEllipsisRef.current.contains(e.target)) setTableEllipsisOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [tableEllipsisOpen]);
+
   const getStatusStyle = (status) => {
-    if (status === 'Active') return { background: '#fef3c7', color: '#d97706' };
-    if (status === 'Pending') return { background: '#dbeafe', color: '#2563eb' };
-    if (status === 'Under Treatment') return { background: '#ede9fe', color: '#7c3aed' };
-    if (status === 'Recovered') return { background: '#d1fae5', color: '#059669' };
-    if (status === 'Deceased') return { background: '#fee2e2', color: '#dc2626' };
-    if (status === 'Draft') return { background: '#e2e8f0', color: '#64748b' };
-    return { background: '#e2e8f0', color: '#64748b' };
+    if (status === 'Active') return { background: 'rgba(245,158,11,0.15)', color: '#fbbf24' };
+    if (status === 'Pending') return { background: 'rgba(37,99,235,0.15)', color: '#60A5FA' };
+    if (status === 'Under Treatment') return { background: 'rgba(124,58,237,0.15)', color: '#a78bfa' };
+    if (status === 'Recovered') return { background: 'rgba(5,150,105,0.15)', color: '#34d399' };
+    if (status === 'Deceased') return { background: 'rgba(220,38,38,0.15)', color: '#f87171' };
+    if (status === 'Draft') return { background: 'var(--input-bg)', color: 'var(--text-muted)' };
+    return { background: 'var(--input-bg)', color: 'var(--text-muted)' };
   };
 
   // ── EXPORT helpers ──
@@ -1296,9 +1317,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     width: '100%',
     padding: '10px 12px',
     borderRadius: '6px',
-    border: '1px solid #d1d5db',
-    background: '#f9fafb',
-    color: '#1f2937',
+    border: '1px solid var(--border-color)',
+    background: 'var(--input-bg)',
+    color: 'var(--text-main)',
     fontSize: '14px',
     boxSizing: 'border-box',
     outline: 'none',
@@ -1393,7 +1414,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   </div>
                 </div>
                 <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.55' }}>{disease.desc}</p>
-                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#1E3A8A', fontSize: '13px', fontWeight: '600' }}>
+                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#60A5FA', fontSize: '13px', fontWeight: '600' }}>
                   View Cases <span style={{ fontSize: '16px' }}>›</span>
                 </div>
               </div>
@@ -1493,7 +1514,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     setMyEditRequests(prev => prev.filter(r => r.id !== req.id));
                     setView('outbox');
                   }} title="View in Outbox"
-                    style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #1E3A8A', background: 'rgba(30,58,138,0.1)', color: '#1E3A8A', cursor: 'pointer', fontSize: '16px', flexShrink: 0 }}>
+                    style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #60A5FA', background: 'rgba(96,165,250,0.15)', color: '#60A5FA', cursor: 'pointer', fontSize: '16px', flexShrink: 0 }}>
                     →
                   </button>
                 </div>
@@ -1752,31 +1773,31 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         {/* DELETE MODAL */}
         {deleteTarget && (
           <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-            <div style={{ background: '#fff', borderRadius: '16px', padding: '40px 32px', width: '420px', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+            <div style={{ background: 'var(--bg-surface)', borderRadius: '16px', padding: '40px 32px', width: '420px', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
               <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px auto' }}>
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
                   <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
                 </svg>
               </div>
-              <h3 style={{ margin: '0 0 8px 0', fontSize: '22px', fontWeight: '700', color: '#111827' }}>Are you sure?</h3>
-              <p style={{ margin: '0 0 20px 0', color: '#6b7280', fontSize: '14px', lineHeight: '1.6' }}>
+              <h3 style={{ margin: '0 0 8px 0', fontSize: '22px', fontWeight: '700', color: 'var(--text-main)' }}>Are you sure?</h3>
+              <p style={{ margin: '0 0 20px 0', color: 'var(--text-muted)', fontSize: '14px', lineHeight: '1.6' }}>
                 This action cannot be undone.<br />This will permanently delete the case record of:
               </p>
-              <div style={{ background: '#f9fafb', border: 'none', borderLeft: '4px solid #ef4444', borderRadius: '6px', padding: '14px 18px', marginBottom: '20px', textAlign: 'left' }}>
-                <div style={{ fontWeight: '700', color: '#111827', fontSize: '15px', marginBottom: '4px' }}>
+              <div style={{ background: 'var(--input-bg)', border: 'none', borderLeft: '4px solid #ef4444', borderRadius: '6px', padding: '14px 18px', marginBottom: '20px', textAlign: 'left' }}>
+                <div style={{ fontWeight: '700', color: 'var(--text-main)', fontSize: '15px', marginBottom: '4px' }}>
                   Case ID: D-{String(deleteTarget.case_id).padStart(4, '0')}
                 </div>
-                <div style={{ color: '#6b7280', fontSize: '14px' }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
                   {deleteTarget.patient_name || 'Unknown'} – {deleteTarget.barangay_name || 'Unknown Barangay'}.
                 </div>
               </div>
-              <p style={{ color: '#6b7280', fontSize: '13px', margin: '0 0 28px 0' }}>
+              <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: '0 0 28px 0' }}>
                 All associated case records will remain but show as "System" for audit purposes.
               </p>
-              <div style={{ display: 'flex', borderTop: '1px solid #e5e7eb', paddingTop: '20px', gap: '0' }}>
+              <div style={{ display: 'flex', borderTop: '1px solid var(--border-color)', paddingTop: '20px', gap: '0' }}>
                 <button onClick={() => setDeleteTarget(null)} disabled={deleteLoading}
-                  style={{ flex: 1, padding: '14px', background: 'transparent', border: 'none', borderRight: '1px solid #e5e7eb', cursor: 'pointer', fontSize: '16px', fontWeight: '500', color: '#374151', borderRadius: '0 0 0 16px' }}>
+                  style={{ flex: 1, padding: '14px', background: 'transparent', border: 'none', borderRight: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '16px', fontWeight: '500', color: 'var(--text-main)', borderRadius: '0 0 0 16px' }}>
                   Cancel
                 </button>
                 <button onClick={executeDelete} disabled={deleteLoading}
@@ -2090,20 +2111,48 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
                 Showing {(tablePage - 1) * CASES_PER_PAGE + 1}–{Math.min(tablePage * CASES_PER_PAGE, filteredCases.length)} of {filteredCases.length}
               </span>
-              <div style={{ display: 'flex', gap: '6px' }}>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <button onClick={() => setTablePage(1)} disabled={tablePage === 1}
+                  style={{ padding: '5px 8px', background: tablePage === 1 ? 'var(--input-bg)' : '#1E3A8A', color: tablePage === 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: tablePage === 1 ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: '700' }}>
+                  {'<<'}
+                </button>
                 <button onClick={() => setTablePage(p => Math.max(1, p - 1))} disabled={tablePage === 1}
                   style={{ padding: '5px 12px', background: tablePage === 1 ? 'var(--input-bg)' : '#1E3A8A', color: tablePage === 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: tablePage === 1 ? 'not-allowed' : 'pointer', fontSize: '13px' }}>
                   ← Prev
                 </button>
-                {Array.from({ length: totalTablePages }, (_, i) => i + 1).map(p => (
-                  <button key={p} onClick={() => setTablePage(p)}
-                    style={{ padding: '5px 10px', background: p === tablePage ? '#1E3A8A' : 'transparent', color: p === tablePage ? 'white' : 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', minWidth: '32px' }}>
-                    {p}
-                  </button>
-                ))}
+                {getVisiblePages(tablePage, totalTablePages).map((p, i) =>
+                  p === '...' ? (
+                    <div key={`te${i}`} ref={tableEllipsisRef} style={{ position: 'relative', display: 'inline-flex' }}>
+                      <button onClick={() => setTableEllipsisOpen(o => !o)}
+                        style={{ padding: '5px 8px', background: tableEllipsisOpen ? 'rgba(30,58,138,0.15)' : 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '700', letterSpacing: '2px' }}>...</button>
+                      {tableEllipsisOpen && (
+                        <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px', width: '160px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 100 }}>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px' }}>Go to page (1–{totalTablePages})</div>
+                          <div style={{ display: 'flex', gap: '4px' }}>
+                            <input type="number" min="1" max={totalTablePages} value={tableEllipsisInput} placeholder="#"
+                              onChange={e => setTableEllipsisInput(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(tableEllipsisInput); if (v >= 1 && v <= totalTablePages) { setTablePage(v); setTableEllipsisOpen(false); setTableEllipsisInput(''); } } }}
+                              style={{ flex: 1, padding: '5px 6px', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '12px', outline: 'none', width: '100%' }} />
+                            <button onClick={() => { const v = parseInt(tableEllipsisInput); if (v >= 1 && v <= totalTablePages) { setTablePage(v); setTableEllipsisOpen(false); setTableEllipsisInput(''); } }}
+                              style={{ padding: '5px 8px', border: '1px solid #1E3A8A', borderRadius: '4px', background: '#1E3A8A', color: 'white', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>Go</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <button key={p} onClick={() => setTablePage(p)}
+                      style={{ padding: '5px 10px', background: p === tablePage ? '#1E3A8A' : 'transparent', color: p === tablePage ? 'white' : 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', minWidth: '32px' }}>
+                      {p}
+                    </button>
+                  )
+                )}
                 <button onClick={() => setTablePage(p => Math.min(totalTablePages, p + 1))} disabled={tablePage === totalTablePages}
                   style={{ padding: '5px 12px', background: tablePage === totalTablePages ? 'var(--input-bg)' : '#1E3A8A', color: tablePage === totalTablePages ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: tablePage === totalTablePages ? 'not-allowed' : 'pointer', fontSize: '13px' }}>
                   Next →
+                </button>
+                <button onClick={() => setTablePage(totalTablePages)} disabled={tablePage === totalTablePages}
+                  style={{ padding: '5px 8px', background: tablePage === totalTablePages ? 'var(--input-bg)' : '#1E3A8A', color: tablePage === totalTablePages ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: tablePage === totalTablePages ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: '700' }}>
+                  {'>>'}
                 </button>
               </div>
             </div>
@@ -2134,12 +2183,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           ← Back to {selectedDisease?.name} Cases
         </button>
 
-        <div style={{ background: 'white', borderRadius: '12px', padding: '40px', color: '#1e293b', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', maxWidth: '900px', margin: '0 auto' }}>
+        <div style={{ background: 'var(--bg-surface)', borderRadius: '12px', padding: '40px', color: 'var(--text-main)', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', maxWidth: '900px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-            <h2 style={{ margin: '0 0 6px 0', fontSize: '24px', color: '#0f172a' }}>
+            <h2 style={{ margin: '0 0 6px 0', fontSize: '24px', color: 'var(--text-main)' }}>
               {isEdit ? 'Edit Case Report' : 'New Case Report'}
             </h2>
-            <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>
+            <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '14px' }}>
               {isEdit
                 ? `Editing: Case #${String(editingCase?.case_id).padStart(3,'0')} - ${editingCase?.patient_name}`
                 : `Encoding new case under: ${selectedDisease?.name}`}
@@ -2159,7 +2208,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           )}
 
           {editRequestSuccess && (
-            <div style={{ background: '#d1fae5', color: '#065f46', padding: '12px', borderRadius: '8px', marginBottom: '20px', textAlign: 'center', fontSize: '14px', fontWeight: '500' }}>
+            <div style={{ background: 'rgba(16,185,129,0.1)', color: '#34d399', padding: '12px', borderRadius: '8px', marginBottom: '20px', textAlign: 'center', fontSize: '14px', fontWeight: '500' }}>
               ✅ {editRequestSuccess} - It has been sent to the CHO for editing
             </div>
           )}
@@ -2169,34 +2218,34 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
               {/* LEFT: Patient Info */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <h4 style={{ margin: 0, color: '#334155', fontSize: '14px', fontWeight: '700', paddingBottom: '8px', borderBottom: '1px solid #e2e8f0' }}>
+                <h4 style={{ margin: 0, color: 'var(--text-main)', fontSize: '14px', fontWeight: '700', paddingBottom: '8px', borderBottom: '1px solid var(--border-color)' }}>
                   Patient Information
                 </h4>
                 <div style={{ position: 'relative' }}>
-                  <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>
-                    Patient Full Name *
-                    <span style={{ color: '#9ca3af', fontWeight: 400, fontSize: '11px', marginLeft: '6px' }}>
-                      (type surname to auto-fill past records)
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>
+                    Patient Full Name
+                      <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '11px', marginLeft: '6px' }}>
+                      (Type surname to auto-fill past records)
                     </span>
                   </label>
                   <div style={{ position: 'relative' }}>
-                    <input type="text" required placeholder="e.g. Juan Dela Cruz" style={{ ...inputStyle, border: formErrors.patientName ? '2px solid #ef4444' : '1px solid #d1d5db', background: formErrors.patientName ? '#fff5f5' : '#f9fafb' }}
+                    <input type="text" required placeholder="e.g. Juan Dela Cruz" style={{ ...inputStyle, border: formErrors.patientName ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.patientName ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                       value={formData.patientName} onChange={e => { setFormData({ ...formData, patientName: e.target.value }); setFormErrors(prev => ({ ...prev, patientName: false })); }}
                       onFocus={() => { if (patientLookupResults.length > 0) setShowLookupDropdown(true); }}
                       readOnly={isBhwReadOnly} />
                     {lookupLoading && (
-                      <span style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', fontSize: '12px' }}>⌛</span>
+                      <span style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '12px' }}>⌛</span>
                     )}
                   </div>
                   {showLookupDropdown && patientLookupResults.length > 0 && (
                     <div ref={lookupDropdownRef} style={{
                       position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 300,
                       maxHeight: '220px', overflowY: 'auto', marginTop: '2px',
-                      background: '#ffffff', border: '1px solid #d1d5db',
+                      background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
                       borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
                       padding: '4px',
                     }}>
-                      <div style={{ padding: '6px 12px', fontSize: '11px', color: '#64748b', fontWeight: 600, borderBottom: '1px solid #e2e8f0', marginBottom: '2px' }}>
+                      <div style={{ padding: '6px 12px', fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-color)', marginBottom: '2px' }}>
                         Multiple matching records - click to select
                       </div>
                       {patientLookupResults.map((p, i) => (
@@ -2204,14 +2253,14 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           onClick={() => applyPatientAutoFill(p)}
                           style={{
                             padding: '8px 12px', cursor: 'pointer', fontSize: '13px',
-                            borderRadius: '6px', color: '#1f2937',
+                            borderRadius: '6px', color: 'var(--text-main)',
                             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                           }}
-                          onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--input-bg)'}
                           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                         >
-                          <span><strong>{p.patient_name}</strong> <span style={{ color: '#64748b' }}>- {p.barangay_name || 'N/A'}</span></span>
-                          <span style={{ color: '#9ca3af', fontSize: '11px' }}>
+                          <span><strong>{p.patient_name}</strong> <span style={{ color: 'var(--text-muted)' }}>- {p.barangay_name || 'N/A'}</span></span>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
                             {p.age || '?'}y
                           </span>
                         </div>
@@ -2221,13 +2270,13 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Age</label>
-                    <input type="number" min="0" max="120" placeholder="25" style={{ ...inputStyle, border: formErrors.age ? '2px solid #ef4444' : '1px solid #d1d5db', background: formErrors.age ? '#fff5f5' : '#f9fafb' }}
+                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Age</label>
+                    <input type="number" min="0" max="120" placeholder="25" style={{ ...inputStyle, border: formErrors.age ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.age ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                       value={formData.age} onChange={e => setFormData({ ...formData, age: e.target.value })}
                       readOnly={isBhwReadOnly} />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Gender</label>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Gender</label>
                     {isBhwReadOnly ? (
                       <div style={{ padding: '8px 12px', background: 'var(--input-bg, #f1f5f9)', borderRadius: '6px', fontSize: '14px', color: 'var(--text-main)' }}>
                         {formData.gender || 'Not set'}
@@ -2240,12 +2289,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         <span style={{ fontSize: '10px', opacity: 0.6, transition: 'transform 0.2s', transform: genderOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                       </button>
                       {genderOpen && (
-                        <div style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 100, overflow: 'hidden' }}>
+                        <div style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 100, overflow: 'hidden' }}>
                           {['Male', 'Female'].map(g => (
                             <button key={g} type="button"
                               onClick={() => { setFormData({ ...formData, gender: g }); setGenderOpen(false); }}
-                              style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.gender === g ? '#f0fdfa' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: '#334155', cursor: 'pointer', fontWeight: formData.gender === g ? '600' : '400' }}
-                              onMouseEnter={e => { if (formData.gender !== g) e.target.style.background = '#f8fafc'; }}
+                              style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.gender === g ? 'rgba(16,185,129,0.12)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: formData.gender === g ? '600' : '400' }}
+                              onMouseEnter={e => { if (formData.gender !== g) e.target.style.background = 'var(--input-bg)'; }}
                               onMouseLeave={e => { if (formData.gender !== g) e.target.style.background = 'transparent'; }}>
                               {g}
                             </button>
@@ -2257,13 +2306,13 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   </div>
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Contact No.</label>
-                  <input type="text" placeholder="0918-234-2331" style={{ ...inputStyle, border: formErrors.contact ? '2px solid #ef4444' : '1px solid #d1d5db', background: formErrors.contact ? '#fff5f5' : '#f9fafb' }}
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Contact No.</label>
+                  <input type="text" placeholder="0918-234-2331" style={{ ...inputStyle, border: formErrors.contact ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.contact ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                     value={formData.contact} onChange={e => setFormData({ ...formData, contact: e.target.value })}
                     readOnly={isBhwReadOnly} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Address</label>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Address</label>
                   <input type="text" placeholder="123 Rizal St, San Isidro Cabuyao" style={inputStyle}
                     value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })}
                     readOnly={isBhwReadOnly}
@@ -2468,7 +2517,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 </div>
                 {loginRole === 'BHW' ? (
                   <div>
-                    <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Assigned Purok / Blk / Phase / Lot</label>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Assigned Purok / Blk / Phase / Lot</label>
                     {isBhwReadOnly ? (
                       <div style={{ padding: '8px 12px', background: 'var(--input-bg, #f1f5f9)', borderRadius: '6px', fontSize: '14px', color: 'var(--text-main)' }}>
                         {formData.purok || 'Not set'}
@@ -2482,7 +2531,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           ...inputStyle,
                           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                           cursor: 'pointer', textAlign: 'left',
-                          border: `1px solid ${purokOpen ? '#1E3A8A' : '#d1d5db'}`,
+                          border: `1px solid ${purokOpen ? '#60A5FA' : 'var(--border-color)'}`,
                         }}
                       >
                           <span>{formData.purok || '— Select Location —'}</span>
@@ -2496,7 +2545,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         <div style={{
                           position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200,
                           maxHeight: '200px', overflowY: 'auto', marginTop: '4px',
-                          background: '#ffffff', border: '1px solid #d1d5db',
+                          background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
                           borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
                           padding: '4px',
                         }}>
@@ -2504,11 +2553,11 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                             onClick={() => { setFormData({ ...formData, purok: '' }); setPurokOpen(false); }}
                             style={{
                               padding: '8px 12px', cursor: 'pointer', fontSize: '13px',
-                              borderRadius: '6px', color: '#64748b',
-                              background: !formData.purok ? '#eff6ff' : 'transparent',
+                              borderRadius: '6px', color: 'var(--text-muted)',
+                              background: !formData.purok ? 'rgba(37,99,235,0.12)' : 'transparent',
                             }}
-                            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-                            onMouseLeave={e => { e.currentTarget.style.background = !formData.purok ? '#eff6ff' : 'transparent'; }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'var(--input-bg)'}
+                            onMouseLeave={e => { e.currentTarget.style.background = !formData.purok ? 'rgba(37,99,235,0.12)' : 'transparent'; }}
                           >
                             — Select Location —
                           </div>
@@ -2519,12 +2568,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                               style={{
                                 padding: '8px 12px', cursor: 'pointer', fontSize: '13px',
                                 borderRadius: '6px',
-                                background: formData.purok === p ? '#eff6ff' : 'transparent',
-                                color: formData.purok === p ? '#2563eb' : '#1f2937',
+                                background: formData.purok === p ? 'rgba(37,99,235,0.12)' : 'transparent',
+                                color: formData.purok === p ? '#60A5FA' : 'var(--text-main)',
                                 fontWeight: formData.purok === p ? '600' : '400',
                               }}
-                              onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-                              onMouseLeave={e => { e.currentTarget.style.background = formData.purok === p ? '#eff6ff' : 'transparent'; }}
+                              onMouseEnter={e => e.currentTarget.style.background = 'var(--input-bg)'}
+                              onMouseLeave={e => { e.currentTarget.style.background = formData.purok === p ? 'rgba(37,99,235,0.12)' : 'transparent'; }}
                             >
                               {p}
                             </div>
@@ -2536,7 +2585,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   </div>
                 ) : (
                   <div>
-                    <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Assigned Barangay</label>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Assigned Barangay</label>
                     {isBhwReadOnly ? (
                       <div style={{ padding: '8px 12px', background: 'var(--input-bg, #f1f5f9)', borderRadius: '6px', fontSize: '14px', color: 'var(--text-main)' }}>
                         {scopedBarangayList.find(b => String(b.id) === String(formData.barangayId))?.name || 'Not set'}
@@ -2550,8 +2599,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           ...inputStyle,
                           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                           cursor: 'pointer', textAlign: 'left',
-                          border: formErrors.barangayId ? '2px solid #ef4444' : `1px solid ${barangayFormOpen ? '#1E3A8A' : '#d1d5db'}`,
-                          background: formErrors.barangayId ? '#fff5f5' : '#f9fafb',
+                          border: formErrors.barangayId ? '2px solid #ef4444' : `1px solid ${barangayFormOpen ? '#60A5FA' : 'var(--border-color)'}`,
+                          background: formErrors.barangayId ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)',
                         }}
                       >
                         <span>{scopedBarangayList.find(b => String(b.id) === String(formData.barangayId))?.name || '— Select Barangay —'}</span>
@@ -2565,14 +2614,14 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         <div style={{
                           position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200,
                           maxHeight: '200px', overflowY: 'auto', marginTop: '4px',
-                          background: '#ffffff', border: '1px solid #d1d5db',
+                          background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
                           borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
                           padding: '4px',
                         }}>
                           <div
                             onClick={() => { setFormData({ ...formData, barangayId: '' }); setBarangayFormOpen(false); setFormErrors(prev => ({ ...prev, barangayId: false })); }}
-                            style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '13px', borderRadius: '6px', color: '#64748b' }}
-                            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                            style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '13px', borderRadius: '6px', color: 'var(--text-muted)' }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'var(--input-bg)'}
                             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                           >
                             — Select Barangay —
@@ -2591,12 +2640,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                               }}
                               style={{
                                 padding: '8px 12px', cursor: 'pointer', fontSize: '13px', borderRadius: '6px',
-                                background: String(formData.barangayId) === String(b.id) ? '#eff6ff' : 'transparent',
-                                color: String(formData.barangayId) === String(b.id) ? '#2563eb' : '#1f2937',
+                                background: String(formData.barangayId) === String(b.id) ? 'rgba(37,99,235,0.12)' : 'transparent',
+                                color: String(formData.barangayId) === String(b.id) ? '#60A5FA' : 'var(--text-main)',
                                 fontWeight: String(formData.barangayId) === String(b.id) ? '600' : '400',
                               }}
-                              onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-                              onMouseLeave={e => { e.currentTarget.style.background = String(formData.barangayId) === String(b.id) ? '#eff6ff' : 'transparent'; }}
+                              onMouseEnter={e => e.currentTarget.style.background = 'var(--input-bg)'}
+                              onMouseLeave={e => { e.currentTarget.style.background = String(formData.barangayId) === String(b.id) ? 'rgba(37,99,235,0.12)' : 'transparent'; }}
                             >
                               {b.name}
                             </div>
@@ -2611,11 +2660,11 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
               {/* RIGHT: Clinical Info */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <h4 style={{ margin: 0, color: '#334155', fontSize: '14px', fontWeight: '700', paddingBottom: '8px', borderBottom: '1px solid #e2e8f0' }}>
+                <h4 style={{ margin: 0, color: 'var(--text-main)', fontSize: '14px', fontWeight: '700', paddingBottom: '8px', borderBottom: '1px solid var(--border-color)' }}>
                   Clinical Information
                 </h4>
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Disease Type</label>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Disease Type</label>
                   {isBhwReadOnly ? (
                     <div style={{ padding: '8px 12px', background: 'var(--input-bg, #f1f5f9)', borderRadius: '6px', fontSize: '14px', color: 'var(--text-main)' }}>
                       {formData.diseaseType || 'Not set'}
@@ -2629,7 +2678,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         ...inputStyle,
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                         cursor: 'pointer', textAlign: 'left',
-                        border: `1px solid ${diseaseOpen ? '#1E3A8A' : '#d1d5db'}`,
+                          border: `1px solid ${diseaseOpen ? '#60A5FA' : 'var(--border-color)'}`,
                       }}
                     >
                       <span>{formData.diseaseType || '— Select Disease —'}</span>
@@ -2643,14 +2692,14 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       <div style={{
                         position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200,
                         maxHeight: '200px', overflowY: 'auto', marginTop: '4px',
-                        background: '#ffffff', border: '1px solid #d1d5db',
-                        borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                        padding: '4px',
-                      }}>
+                        background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
+                          borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                          padding: '4px',
+                        }}>
                         <div
                           onClick={() => { setFormData({ ...formData, diseaseType: '' }); setDiseaseOpen(false); setFormErrors(prev => ({ ...prev, diseaseType: false })); }}
-                          style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '13px', borderRadius: '6px', color: '#64748b' }}
-                          onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                          style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '13px', borderRadius: '6px', color: 'var(--text-muted)' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--input-bg)'}
                           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                         >
                           — Select Disease —
@@ -2661,12 +2710,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                             onClick={() => { setFormData({ ...formData, diseaseType: d }); setDiseaseOpen(false); setFormErrors(prev => ({ ...prev, diseaseType: false })); }}
                             style={{
                               padding: '8px 12px', cursor: 'pointer', fontSize: '13px', borderRadius: '6px',
-                              background: formData.diseaseType === d ? '#eff6ff' : 'transparent',
-                              color: formData.diseaseType === d ? '#2563eb' : '#1f2937',
+                              background: formData.diseaseType === d ? 'rgba(37,99,235,0.12)' : 'transparent',
+                              color: formData.diseaseType === d ? '#60A5FA' : 'var(--text-main)',
                               fontWeight: formData.diseaseType === d ? '600' : '400',
                             }}
-                            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-                            onMouseLeave={e => { e.currentTarget.style.background = formData.diseaseType === d ? '#eff6ff' : 'transparent'; }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'var(--input-bg)'}
+                            onMouseLeave={e => { e.currentTarget.style.background = formData.diseaseType === d ? 'rgba(37,99,235,0.12)' : 'transparent'; }}
                           >
                             {d}
                           </div>
@@ -2678,14 +2727,14 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 </div>
                 {isOther && (
                   <div>
-                    <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Specify Disease *</label>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Specify Disease *</label>
                     <input type="text" required placeholder="Enter disease name..." style={inputStyle}
                       value={formData.specificDisease} onChange={e => setFormData({ ...formData, specificDisease: e.target.value })}
                       readOnly={isBhwReadOnly} />
                   </div>
                 )}
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Severity Level</label>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Severity Level</label>
                   {isBhwReadOnly ? (
                     <div style={{ padding: '8px 12px', background: 'var(--input-bg, #f1f5f9)', borderRadius: '6px', fontSize: '14px', color: 'var(--text-main)' }}>
                       {formData.severity || 'Not set'}
@@ -2698,12 +2747,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       <span style={{ fontSize: '10px', opacity: 0.6, transition: 'transform 0.2s', transform: severityOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                     </button>
                     {severityOpen && (
-                      <div style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 100, overflow: 'hidden' }}>
+                      <div style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 100, overflow: 'hidden' }}>
                         {['Mild', 'Moderate', 'Severe', 'Asymptomatic'].map(s => (
                           <button key={s} type="button"
                             onClick={() => { setFormData({ ...formData, severity: s }); setSeverityOpen(false); }}
-                            style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.severity === s ? '#f0fdfa' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: '#334155', cursor: 'pointer', fontWeight: formData.severity === s ? '600' : '400' }}
-                            onMouseEnter={e => { if (formData.severity !== s) e.target.style.background = '#f8fafc'; }}
+                            style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.severity === s ? 'rgba(16,185,129,0.12)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: formData.severity === s ? '600' : '400' }}
+                            onMouseEnter={e => { if (formData.severity !== s) e.target.style.background = 'var(--input-bg)'; }}
                             onMouseLeave={e => { if (formData.severity !== s) e.target.style.background = 'transparent'; }}>
                             {s}
                           </button>
@@ -2714,7 +2763,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   )}
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Patient Status</label>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Patient Status</label>
                   {isBhwReadOnly ? (
                     <div style={{ padding: '8px 12px', background: 'var(--input-bg, #f1f5f9)', borderRadius: '6px', fontSize: '14px', color: 'var(--text-main)' }}>
                       {formData.status || 'Not set'}
@@ -2727,12 +2776,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       <span style={{ fontSize: '10px', opacity: 0.6, transition: 'transform 0.2s', transform: patientStatusOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                     </button>
                     {patientStatusOpen && (
-                      <div style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 100, overflow: 'hidden' }}>
+                      <div style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 100, overflow: 'hidden' }}>
                         {['Active', 'Pending', 'Under Treatment', 'Recovered', 'Deceased'].map(s => (
                           <button key={s} type="button"
                             onClick={() => { setFormData({ ...formData, status: s }); setPatientStatusOpen(false); }}
-                            style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.status === s ? '#f0fdfa' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: '#334155', cursor: 'pointer', fontWeight: formData.status === s ? '600' : '400' }}
-                            onMouseEnter={e => { if (formData.status !== s) e.target.style.background = '#f8fafc'; }}
+                            style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.status === s ? 'rgba(16,185,129,0.12)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: formData.status === s ? '600' : '400' }}
+                            onMouseEnter={e => { if (formData.status !== s) e.target.style.background = 'var(--input-bg)'; }}
                             onMouseLeave={e => { if (formData.status !== s) e.target.style.background = 'transparent'; }}>
                             {s}
                           </button>
@@ -2743,7 +2792,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   )}
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Date of Onset</label>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Date of Onset</label>
                   <div style={{ position: 'relative', cursor: 'pointer' }}
                     onClick={() => {
                       const el = document.getElementById('onset-date-input');
@@ -2755,12 +2804,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         }
                       }
                     }}>
-                    <input id="onset-date-input" type="date" style={{ ...inputStyle, paddingRight: '36px', cursor: 'pointer', border: formErrors.onsetDate ? '2px solid #ef4444' : '1px solid #d1d5db', background: formErrors.onsetDate ? '#fff5f5' : '#f9fafb' }} value={formData.onsetDate}
+                    <input id="onset-date-input" type="date" style={{ ...inputStyle, paddingRight: '36px', cursor: 'pointer', border: formErrors.onsetDate ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.onsetDate ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }} value={formData.onsetDate}
                       onChange={e => { setFormData({ ...formData, onsetDate: e.target.value }); setFormErrors(prev => ({ ...prev, onsetDate: false })); }}
                       readOnly={isBhwReadOnly} />
                     <span style={{
                       position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
-                      pointerEvents: 'none', color: '#64748b', display: 'flex', alignItems: 'center',
+                      pointerEvents: 'none', color: 'var(--text-muted)', display: 'flex', alignItems: 'center',
                     }}>
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
@@ -2771,8 +2820,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   </div>
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Attending Physician</label>
-                  <input type="text" placeholder="Dr. Jose Reyes, MD" style={{ ...inputStyle, border: formErrors.physician ? '2px solid #ef4444' : '1px solid #d1d5db', background: formErrors.physician ? '#fff5f5' : '#f9fafb' }}
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Attending Physician</label>
+                  <input type="text" placeholder="Dr. Jose Reyes, MD" style={{ ...inputStyle, border: formErrors.physician ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.physician ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                     value={formData.physician} onChange={e => setFormData({ ...formData, physician: e.target.value })}
                     readOnly={isBhwReadOnly} />
                 </div>
@@ -2781,49 +2830,49 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
             {/* Symptoms full width */}
             <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px', fontWeight: '500' }}>Symptoms & Observations</label>
+              <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Symptoms & Observations</label>
               <textarea placeholder="e.g. Fever (39.5°C), Severe Headache, Muscle and Joint Pain..." rows="3"
-                style={{ ...inputStyle, resize: 'vertical', border: formErrors.symptoms ? '2px solid #ef4444' : '1px solid #d1d5db', background: formErrors.symptoms ? '#fff5f5' : '#f9fafb' }}
+                style={{ ...inputStyle, resize: 'vertical', border: formErrors.symptoms ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.symptoms ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                 value={formData.symptoms} onChange={e => setFormData({ ...formData, symptoms: e.target.value })}
                 readOnly={isBhwReadOnly} />
             </div>
 
             {/* Location & Coordinates + map preview */}
             <div style={{ marginBottom: '28px' }}>
-              <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '10px', fontWeight: '600' }}>
+              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '10px', fontWeight: '600' }}>
                 Location & Coordinates
               </label>
 
               <div style={{ display: 'grid', gridTemplateColumns: hasCoords ? '1fr 1fr' : '1fr', gap: '20px', alignItems: 'start' }}>
                 <div>
                   {hasCoords && (
-                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '10px 14px', marginBottom: '12px', fontSize: '14px', color: '#334155', fontWeight: '500' }}>
+                    <div style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px 14px', marginBottom: '12px', fontSize: '14px', color: 'var(--text-main)', fontWeight: '500' }}>
                       {parseFloat(latVal).toFixed(4)}° N, {parseFloat(lngVal).toFixed(4)}° E
                     </div>
                   )}
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <div style={{ flex: 1 }}>
-                      <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', marginBottom: '4px' }}>Latitude (N)</label>
-                      <input type="text" placeholder="e.g. 14.2253" style={{ ...inputStyle, border: formErrors.location ? '2px solid #ef4444' : '1px solid #d1d5db', background: formErrors.location ? '#fff5f5' : '#f9fafb' }}
+                      <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-h)', marginBottom: '4px' }}>Latitude (N)</label>
+                      <input type="text" placeholder="e.g. 14.2253" style={{ ...inputStyle, border: formErrors.location ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.location ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                         value={formData.lat} onChange={e => setFormData({ ...formData, lat: e.target.value })}
                         readOnly={isBhwReadOnly} />
                     </div>
                     <div style={{ flex: 1 }}>
-                      <label style={{ display: 'block', fontSize: '11px', color: '#94a3b8', marginBottom: '4px' }}>Longitude (E)</label>
-                      <input type="text" placeholder="e.g. 121.3025" style={{ ...inputStyle, border: formErrors.location ? '2px solid #ef4444' : '1px solid #d1d5db', background: formErrors.location ? '#fff5f5' : '#f9fafb' }}
+                      <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-h)', marginBottom: '4px' }}>Longitude (E)</label>
+                      <input type="text" placeholder="e.g. 121.3025" style={{ ...inputStyle, border: formErrors.location ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.location ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                         value={formData.lng} onChange={e => setFormData({ ...formData, lng: e.target.value })}
                         readOnly={isBhwReadOnly} />
                     </div>
                   </div>
                   {!hasCoords && (
-                    <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#9ca3af' }}>
+                    <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>
                       Enter coordinates above to see a map preview.
                     </p>
                   )}
                 </div>
 
                 {hasCoords && (
-                  <div style={{ height: '140px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                    <div style={{ height: '140px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-color)', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
                     <iframe title="location-preview" src={mapSrc} width="100%" height="100%"
                       style={{ border: 'none', display: 'block' }} loading="lazy" />
                   </div>
@@ -2832,9 +2881,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             </div>
 
             {/* Action buttons */}
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '14px', paddingTop: '24px', borderTop: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '14px', paddingTop: '24px', borderTop: '1px solid var(--border-color)' }}>
               <button type="button" onClick={() => { setView('list'); setFilterPurok('All Puroks'); setIsBhwReadOnly(false); }}
-                style={{ padding: '10px 32px', borderRadius: '6px', border: 'none', background: '#e2e8f0', color: '#475569', cursor: 'pointer', fontWeight: '500' }}>
+                style={{ padding: '10px 32px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-muted)', cursor: 'pointer', fontWeight: '500' }}>
                 Cancel
               </button>
               {isBhwReadOnly ? (
@@ -2851,7 +2900,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         value={editRequestNote}
                         onChange={e => setEditRequestNote(e.target.value)}
                         rows={2}
-                        style={{ width: '300px', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '13px', resize: 'vertical' }}
+                        style={{ width: '300px', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '13px', resize: 'vertical' }}
                       />
                       <button type="button" onClick={() => handleSendEditRequest()}
                         disabled={!editRequestNote.trim()}
@@ -2859,7 +2908,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         Send
                       </button>
                       <button type="button" onClick={() => setShowEditRequestForm(false)}
-                        style={{ padding: '10px 20px', borderRadius: '6px', border: '1px solid #d1d5db', background: '#f3f4f6', color: '#374151', cursor: 'pointer', fontWeight: '500' }}>
+                        style={{ padding: '10px 20px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', cursor: 'pointer', fontWeight: '500' }}>
                         Back
                       </button>
                     </div>
@@ -2869,7 +2918,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 <>
                   {!isEdit && (
                     <button type="button" onClick={(e) => handleSave(e, true)} disabled={submitLoading}
-                      style={{ padding: '10px 28px', borderRadius: '6px', border: '1px solid #d1d5db', background: '#f3f4f6', color: '#374151', cursor: submitLoading ? 'not-allowed' : 'pointer', fontWeight: '500' }}>
+                      style={{ padding: '10px 28px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', cursor: submitLoading ? 'not-allowed' : 'pointer', fontWeight: '500' }}>
                       Save As Draft
                     </button>
                   )}

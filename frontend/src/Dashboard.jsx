@@ -44,6 +44,9 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState({ start: '2026-01-01', end: '2026-12-31' });
   const [currentPage, setCurrentPage] = useState(1);
+  const [ellipsisOpen, setEllipsisOpen] = useState(false);
+  const [ellipsisPageInput, setEllipsisPageInput] = useState('');
+  const ellipsisRef = useRef(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const exportRef = useRef(null);
 
@@ -92,6 +95,13 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  useEffect(() => {
+    if (!ellipsisOpen) return;
+    const handler = (e) => { if (ellipsisRef.current && !ellipsisRef.current.contains(e.target)) setEllipsisOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [ellipsisOpen]);
 
   const choUnitBarangays = sessionContext ? CHO_UNIT_BARANGAYS[sessionContext] || [] : [];
 
@@ -148,6 +158,17 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     (currentPage - 1) * CASES_PER_PAGE,
     currentPage * CASES_PER_PAGE
   );
+
+  const getVisiblePages = (cur, total) => {
+    if (total <= 9) return Array.from({ length: total }, (_, i) => i + 1);
+    let start = 1 + 9 * Math.floor((cur - 1) / 9);
+    start = Math.max(1, Math.min(start, total - 8));
+    const end = Math.min(total, start + 8);
+    const pages = [];
+    for (let i = start; i <= end; i++) pages.push(i);
+    if (end < total) pages.push('...');
+    return pages;
+  };
 
   // ─── SHARED: build bar chart HTML block for exports ───
   const buildBarChartHTML = (bars = sortedBars, title = `${selectedDisease} Cases by Barangay`, highest = highestCount) => {
@@ -362,13 +383,13 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
   // --- STATUS BADGE STYLE ---
   const getStatusStyle = (status) => {
-    if (status === 'Active') return { background: '#1E3A8A', color: '#60A5FA' };
+    if (status === 'Active') return { background: '#1E3A8A', color: '#93c5fd' };
     if (status === 'Pending') return { background: '#1e3a8a', color: '#93c5fd' };
     if (status === 'Under Treatment') return { background: '#3b0764', color: '#c4b5fd' };
     if (status === 'Recovered') return { background: '#064E3B', color: '#34D399' };
     if (status === 'Deceased') return { background: '#7f1d1d', color: '#fca5a5' };
-    if (status === 'Draft') return { background: '#374151', color: '#9ca3af' };
-    return { background: '#374151', color: '#9ca3af' };
+    if (status === 'Draft') return { background: '#374151', color: '#d1d5db' };
+    return { background: '#374151', color: '#d1d5db' };
 };
 
   return (
@@ -377,7 +398,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       {/* ── STAT CARDS ── */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: compactMode ? '10px' : '16px' }}>
         {[
-          { label: 'Total Cases', value: totalCases, color: '#1E3A8A' },
+          { label: 'Total Cases', value: totalCases, color: '#60A5FA' },
           { label: 'Active', value: activeCases, color: '#f59e0b' },
           { label: 'Recovered', value: recoveredCases, color: '#10b981' },
           { label: 'Deaths', value: deathCases, color: '#ef4444' },
@@ -517,6 +538,8 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             <button
               onClick={() => setShowExportMenu(!showExportMenu)}
               style={{ width: '100%', padding: '8px', background: '#1E3A8A', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '500', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+              onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+              onMouseLeave={e => e.currentTarget.style.opacity = '1'}
             >
               📤 Export Data <span style={{ transition: 'transform 0.2s', display: 'inline-block', transform: showExportMenu ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
             </button>
@@ -546,6 +569,8 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           <button
             onClick={handlePrint}
             style={{ width: '100%', padding: '8px', background: '#065f46', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}
+            onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+            onMouseLeave={e => e.currentTarget.style.opacity = '1'}
           >
             🖨️ Print Report
           </button>
@@ -568,6 +593,8 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           <button
             onClick={() => setActiveTab('Manage Cases')}
             style={{ padding: '6px 14px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}
+            onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+            onMouseLeave={e => e.currentTarget.style.opacity = '1'}
           >
             View All →
           </button>
@@ -615,27 +642,71 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           </span>
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
             <button
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+              style={{ padding: '5px 8px', background: currentPage === 1 ? 'var(--input-bg)' : '#1E3A8A', color: currentPage === 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: '700' }}
+              onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+              onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+            >
+              {'<<'}
+            </button>
+            <button
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
               style={{ padding: '5px 12px', background: currentPage === 1 ? 'var(--input-bg)' : '#1E3A8A', color: currentPage === 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontSize: '13px' }}
+              onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+              onMouseLeave={e => e.currentTarget.style.opacity = '1'}
             >
               ← Prev
             </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-              <button
-                key={page}
-                onClick={() => setCurrentPage(page)}
-                style={{ padding: '5px 10px', background: page === currentPage ? '#1E3A8A' : 'transparent', color: page === currentPage ? 'white' : 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', minWidth: '32px' }}
-              >
-                {page}
-              </button>
-            ))}
+            {getVisiblePages(currentPage, totalPages).map((p, i) =>
+              p === '...' ? (
+                <div key={`e${i}`} ref={ellipsisRef} style={{ position: 'relative', display: 'inline-flex' }}>
+                  <button onClick={() => setEllipsisOpen(o => !o)}
+                    style={{ padding: '5px 8px', background: ellipsisOpen ? 'rgba(30,58,138,0.15)' : 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '700', letterSpacing: '2px' }}>...</button>
+                  {ellipsisOpen && (
+                    <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px', width: '160px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 100 }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px' }}>Go to page (1–{totalPages})</div>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <input type="number" min="1" max={totalPages} value={ellipsisPageInput} placeholder="#"
+                          onChange={e => setEllipsisPageInput(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(ellipsisPageInput); if (v >= 1 && v <= totalPages) { setCurrentPage(v); setEllipsisOpen(false); setEllipsisPageInput(''); } } }}
+                          style={{ flex: 1, padding: '5px 6px', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '12px', outline: 'none', width: '100%' }} />
+                        <button onClick={() => { const v = parseInt(ellipsisPageInput); if (v >= 1 && v <= totalPages) { setCurrentPage(v); setEllipsisOpen(false); setEllipsisPageInput(''); } }}
+                          style={{ padding: '5px 8px', border: '1px solid #1E3A8A', borderRadius: '4px', background: '#1E3A8A', color: 'white', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>Go</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <button
+                  key={p}
+                  onClick={() => setCurrentPage(p)}
+                  style={{ padding: '5px 10px', background: p === currentPage ? '#1E3A8A' : 'transparent', color: p === currentPage ? 'white' : 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', minWidth: '32px' }}
+                  onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+                  onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                >
+                  {p}
+                </button>
+              )
+            )}
             <button
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
               style={{ padding: '5px 12px', background: currentPage === totalPages ? 'var(--input-bg)' : '#1E3A8A', color: currentPage === totalPages ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontSize: '13px' }}
+              onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+              onMouseLeave={e => e.currentTarget.style.opacity = '1'}
             >
               Next →
+            </button>
+            <button
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+              style={{ padding: '5px 8px', background: currentPage === totalPages ? 'var(--input-bg)' : '#1E3A8A', color: currentPage === totalPages ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: '700' }}
+              onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+              onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+            >
+              {'>>'}
             </button>
           </div>
         </div>

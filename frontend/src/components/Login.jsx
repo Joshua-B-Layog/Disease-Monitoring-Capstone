@@ -460,7 +460,7 @@ const handleLoginOtpSubmit = async (e) => {
                 </div>
 
                 {loginError && (
-                  <div style={{ backgroundColor: '#fee2e2', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid #fca5a5' }}>
+                  <div style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(239,68,68,0.35)' }}>
                     {loginError}
                   </div>
                 )}
@@ -496,7 +496,7 @@ const handleLoginOtpSubmit = async (e) => {
 
                 <form onSubmit={handleFormSubmit}>
                   {loginError && (
-                    <div style={{ backgroundColor: '#fee2e2', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid #fca5a5' }}>
+                    <div style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(239,68,68,0.35)' }}>
                       {loginError}
                     </div>
                   )}
@@ -583,7 +583,7 @@ const handleLoginOtpSubmit = async (e) => {
     </div>
     <form onSubmit={handleLoginOtpSubmit}>
       {otpError && (
-        <div style={{ backgroundColor: '#fee2e2', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid #fca5a5' }}>
+        <div style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(239,68,68,0.35)' }}>
           {otpError}
         </div>
       )}
@@ -690,12 +690,12 @@ const handleLoginOtpSubmit = async (e) => {
 
                 <form onSubmit={handleRecoverySubmit}>
                   {loginError && (
-                    <div style={{ backgroundColor: '#fee2e2', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid #fca5a5', textAlign: 'left' }}>
+                    <div style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(239,68,68,0.35)', textAlign: 'left' }}>
                       {loginError}
                     </div>
                   )}
                   {recoverySuccess && (
-                    <div style={{ backgroundColor: '#e0f2fe', color: '#0369a1', padding: '12px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid #bae6fd', textAlign: 'left' }}>
+                    <div style={{ backgroundColor: 'var(--input-bg)', color: '#0369a1', padding: '12px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(14,165,233,0.35)', textAlign: 'left' }}>
                       {recoverySuccess}
                     </div>
                   )}
@@ -732,12 +732,12 @@ const handleLoginOtpSubmit = async (e) => {
 
                     <form onSubmit={handleSignupSubmit}>
                         {signupError && (
-                            <div style={{ backgroundColor: '#fee2e2', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid #fca5a5', textAlign: 'left' }}>
+                            <div style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(239,68,68,0.35)', textAlign: 'left' }}>
                                 {signupError}
                             </div>
                         )}
                         {signupSuccess && (
-                            <div style={{ backgroundColor: '#d1fae5', color: '#065f46', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid #6ee7b7', textAlign: 'left' }}>
+                            <div style={{ backgroundColor: 'var(--input-bg)', color: '#065f46', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(16,185,129,0.35)', textAlign: 'left' }}>
                                 {signupSuccess}
                             </div>
                         )}

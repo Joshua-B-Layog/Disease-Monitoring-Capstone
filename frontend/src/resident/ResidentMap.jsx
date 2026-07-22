@@ -959,8 +959,8 @@ export default function ResidentMap() {
                     <div key={disease} style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                       padding: '10px 12px', marginBottom: '7px', borderRadius: '8px',
-                      background: isTop ? 'rgba(30,58,138,0.1)' : 'rgba(255,255,255,0.04)',
-                      border: `1px solid ${isTop ? 'rgba(30,58,138,0.25)' : 'var(--border-color)'}`,
+                      background: isTop ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.06)',
+                      border: `1px solid ${isTop ? 'rgba(96,165,250,0.3)' : 'var(--border-color)'}`,
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '9px', flex: 1, minWidth: 0 }}>
                         {isTop && (

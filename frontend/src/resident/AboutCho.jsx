@@ -66,7 +66,7 @@ export default function AboutCho() {
             style={{
               flex: 1, padding: '14px 20px', border: '2px solid',
               borderColor: selected.id === u.id ? '#10B981' : 'var(--border-color)',
-              borderRadius: '10px', background: selected.id === u.id ? '#f0fdfa' : 'var(--bg-surface)',
+              borderRadius: '10px', background: selected.id === u.id ? 'rgba(16,185,129,0.15)' : 'var(--bg-surface)',
               color: selected.id === u.id ? '#10B981' : 'var(--text-muted)',
               fontWeight: selected.id === u.id ? '700' : '500',
               fontSize: '15px', cursor: 'pointer', textAlign: 'center',

@@ -71,25 +71,25 @@ export default function Help() {
         {/* Section 3: Severe Diseases Warning */}
         <Section title="Warning Signs of Severe Diseases" icon="⚠️" danger>
           <div style={{
-            background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px',
+            background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px',
             padding: '16px 20px', marginBottom: '12px',
           }}>
             <p style={{
-              margin: '0 0 12px', fontSize: '14px', fontWeight: '600', color: '#991b1b',
+              margin: '0 0 12px', fontSize: '14px', fontWeight: '600', color: '#fca5a5',
             }}>
               Seek immediate medical care if you experience:
             </p>
-            <ul style={{ margin: 0, paddingLeft: '20px', color: '#b91c1c', fontSize: '14px', lineHeight: '2' }}>
+            <ul style={{ margin: 0, paddingLeft: '20px', color: '#f87171', fontSize: '14px', lineHeight: '2' }}>
               {SEVERE_WARNINGS.map((w, i) => (
                 <li key={i}><strong>{w}</strong></li>
               ))}
             </ul>
           </div>
           <div style={{
-            textAlign: 'center', padding: '12px', background: '#f0fdf4',
-            borderRadius: '8px', border: '1px solid #bbf7d0',
+            textAlign: 'center', padding: '12px', background: 'rgba(16,185,129,0.12)',
+            borderRadius: '8px', border: '1px solid rgba(16,185,129,0.3)',
           }}>
-            <div style={{ fontSize: '14px', fontWeight: '700', color: '#166534' }}>
+            <div style={{ fontSize: '14px', fontWeight: '700', color: '#34d399' }}>
               🚑 If you have any of these symptoms, GO TO THE HOSPITAL IMMEDIATELY.
             </div>
             <div style={{ fontSize: '13px', color: '#15803d', marginTop: '4px' }}>

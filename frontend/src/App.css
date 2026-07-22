@@ -7,19 +7,19 @@
 }
 
 :root {
-  /* DARK MODE VARIABLES (This is now your default!) */
+  /* DARK MODE VARIABLES */
   --bg-main: #0B1120;       
   --bg-surface: #1E293B;    
-  --text-main: #FFFFFF;
-  --text-muted: #9CA3AF;
-  --text-h: #e5e7eb;
+  --text-main: #F8FAFC;
+  --text-muted: #94A3B8;
+  --text-h: #E2E8F0;
   --input-bg: #0F172A;
   --input-border: #334155;
   --border-color: #334155;
 }
 
 [data-theme='light'] {
-  /* LIGHT MODE VARIABLES (Only triggers when admin clicks the toggle) */
+  /* LIGHT MODE VARIABLES  */
   --bg-main: #F3F4F6;
   --bg-surface: #FFFFFF;
   --text-main: #111827;
@@ -56,7 +56,6 @@ html, body, #root {
   display: flex; 
   align-items: center; 
   justify-content: center; 
-  /* Retains your specific Figma dark blue gradient */
   background: linear-gradient(135deg, #1E3A8A 0%, var(--bg-main) 100%); 
 }
 
@@ -72,7 +71,7 @@ html, body, #root {
 
 .login-form-container {
   width: 100%;
-  max-width: 500px; /* Wider readable width */
+  max-width: 500px; 
   padding: 40px;
   background-color: var(--bg-surface);
   border-radius: 12px;
@@ -221,7 +220,7 @@ html, body, #root {
   align-items: center; 
   justify-content: space-between; 
   padding: 0 30px; 
-  flex-shrink: 0; /* Prevents nav from squishing */
+  flex-shrink: 0;
 }
 
 .nav-title h2 { font-size: 20px; color: var(--text-main); margin: 0; }
@@ -324,7 +323,7 @@ html, body, #root {
 .user-role { color: var(--text-muted); font-size: 12px; }
 
 .avatar {
-  width: 35px; height: 35px; background: #3B82F6; border-radius: 50%;
+  width: 35px; height: 35px;   background: #1E3A8A; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   color: white; font-weight: bold; font-size: 12px;
 }
@@ -341,7 +340,7 @@ html, body, #root {
 
 /* Status Badges */
 .status-pill { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; display: inline-flex; align-items: center; gap: 5px; }
-.status-active { background: #1E3A8A; color: #60A5FA; }
+.status-active { background: #1E3A8A; color: #93c5fd; }
 .status-recovered { background: #064E3B; color: #34D399; }
 .status-pending { background: #78350F; color: #FBBF24; }
 
@@ -398,7 +397,7 @@ html, body, #root {
 .bar-chart-container {
   display: flex;
   flex-direction: column;
-  gap: 16px; /* Space between rows */
+  gap: 16px;
   margin-top: 20px;
 }
 
@@ -411,7 +410,7 @@ html, body, #root {
 
 /* Barangay Label */
 .chart-bar-label {
-  width: 130px; /* Fixed width so labels align perfectly */
+  width: 130px; 
   font-size: 14px;
   color: var(--text-main);
   white-space: nowrap;
@@ -419,9 +418,9 @@ html, body, #root {
 
 /* The Background Track of the bar */
 .chart-bar-track {
-  flex-grow: 1; /* Takes up all available space */
+  flex-grow: 1;
   height: 12px;
-  background: var(--input-border); /* Dark/Light mode border color */
+  background: var(--input-border); 
   border-radius: 6px;
   overflow: hidden;
 }
@@ -429,9 +428,9 @@ html, body, #root {
 /* The Filled Colored Part */
 .chart-bar-fill {
   height: 100%;
-  background: #1E3A8A; /* Your primary theme blue */
+  background: #1E3A8A;
   border-radius: 6px;
-  transition: width 0.5s ease-in-out; /* Smooth animation */
+  transition: width 0.5s ease-in-out; 
 }
 
 /* The Numerical Value at the end */
@@ -447,7 +446,7 @@ html, body, #root {
   width: 50px;
   height: 50px;
   border-radius: 50%;
-  background: #3b82f6;
+  background: #1E3A8A;
   color: #fff;
   display: flex;
   align-items: center;

@@ -595,9 +595,9 @@ export default function PreventionTips() {
   };
 
   const getResultLevel = (pct) => {
-    if (pct < 25) return { label: 'Low Likelihood', color: '#22c55e', bg: '#f0fdf4', text: 'Your symptoms do not strongly match this disease. Stay observant and practice prevention measures.' };
-    if (pct < 50) return { label: 'Moderate Risk', color: '#f59e0b', bg: '#fffbeb', text: 'Your symptoms partially match this disease. Consider visiting a health center for a check-up.' };
-    return { label: 'High Risk', color: '#ef4444', bg: '#fef2f2', text: 'Your symptoms strongly match this disease. Please go to the hospital immediately for evaluation.' };
+    if (pct < 25) return { label: 'Low Likelihood', color: '#22c55e', bg: 'rgba(34,197,94,0.12)', text: 'Your symptoms do not strongly match this disease. Stay observant and practice prevention measures.' };
+    if (pct < 50) return { label: 'Moderate Risk', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', text: 'Your symptoms partially match this disease. Consider visiting a health center for a check-up.' };
+    return { label: 'High Risk', color: '#ef4444', bg: 'rgba(239,68,68,0.12)', text: 'Your symptoms strongly match this disease. Please go to the hospital immediately for evaluation.' };
   };
 
   return (
@@ -643,7 +643,7 @@ export default function PreventionTips() {
               </span>
             </div>
             {expanded === idx && (
-              <div style={{ padding: '0 18px 16px', borderTop: '1px solid #f1f5f9' }}>
+              <div style={{ padding: '0 18px 16px', borderTop: '1px solid var(--border-color)' }}>
                 <ul style={{ margin: '12px 0', paddingLeft: '18px', fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.8' }}>
                   {disease.tips.map((tip, i) => (
                     <li key={i}>{tip}</li>
@@ -761,7 +761,7 @@ export default function PreventionTips() {
                   {disease.symptoms.map((q, idx) => (
                     <div key={idx} style={{
                       padding: '12px 16px', background: 'var(--bg-main)', borderRadius: '8px',
-                      border: scAnswers[idx] !== undefined ? '1px solid #10B981' : '1px solid #f1f5f9',
+                      border: scAnswers[idx] !== undefined ? '1px solid #10B981' : '1px solid var(--border-color)',
                     }}>
                       <div style={{ fontSize: '14px', color: 'var(--text-main)', marginBottom: '8px' }}>
                         {idx + 1}. {q}
@@ -771,7 +771,7 @@ export default function PreventionTips() {
                           style={{
                             padding: '6px 20px', borderRadius: '6px', border: '1px solid',
                             borderColor: scAnswers[idx] === true ? '#22c55e' : 'var(--border-color)',
-                            background: scAnswers[idx] === true ? '#f0fdf4' : '#fff',
+                            background: scAnswers[idx] === true ? 'rgba(34,197,94,0.12)' : 'var(--bg-surface)',
                             color: scAnswers[idx] === true ? '#16a34a' : 'var(--text-muted)',
                             fontWeight: scAnswers[idx] === true ? '600' : '400',
                             cursor: 'pointer', fontSize: '13px',
@@ -782,7 +782,7 @@ export default function PreventionTips() {
                           style={{
                             padding: '6px 20px', borderRadius: '6px', border: '1px solid',
                             borderColor: scAnswers[idx] === false ? '#ef4444' : 'var(--border-color)',
-                            background: scAnswers[idx] === false ? '#fef2f2' : '#fff',
+                            background: scAnswers[idx] === false ? 'rgba(239,68,68,0.12)' : 'var(--bg-surface)',
                             color: scAnswers[idx] === false ? '#dc2626' : 'var(--text-muted)',
                             fontWeight: scAnswers[idx] === false ? '600' : '400',
                             cursor: 'pointer', fontSize: '13px',
