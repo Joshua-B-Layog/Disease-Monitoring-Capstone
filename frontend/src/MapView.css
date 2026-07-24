@@ -106,7 +106,7 @@
   border-radius: 50%;
   display: inline-block;
 }
-.dot-high { background-color: #ef4444; }
+.dot-high { background-color: #DC2626; }
 .dot-med { background-color: #f59e0b; }
 .dot-low { background-color: #10b981; }
 
@@ -258,7 +258,7 @@
 .btn-apply-filters:hover { background-color: #009665; }
 
 .btn-reset-filters {
-  background-color: #ef4444;
+  background-color: #DC2626;
   color: white;
   border: none;
   padding: 12px;

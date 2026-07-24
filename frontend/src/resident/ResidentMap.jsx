@@ -378,7 +378,7 @@ const findCanonicalName = (rawName) => {
 };
 
 const getRisk = (count) => {
-  if (count > 20) return { color: '#ef4444', ring: 'rgba(239,68,68,0.3)', label: 'High Risk' };
+  if (count >= 20) return { color: '#DC2626', ring: 'rgba(220,38,38,0.3)', label: 'High Risk' };
   if (count >= 10) return { color: '#f59e0b', ring: 'rgba(245,158,11,0.3)', label: 'Medium Risk' };
   return { color: '#10b981', ring: 'rgba(16,185,129,0.3)', label: 'Low Risk' };
 };
@@ -988,7 +988,7 @@ export default function ResidentMap() {
         <div>
           <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Risk Levels</div>
           <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-            <LegendItem color="#ef4444" label="High Risk (>20)" />
+            <LegendItem color="#DC2626" label="High Risk (20+)" />
             <LegendItem color="#f59e0b" label="Medium (10-20)" />
             <LegendItem color="#10b981" label="Low (<10)" />
             <LegendItem color="#374151" label="No cases" />

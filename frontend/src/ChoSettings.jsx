@@ -674,7 +674,7 @@ export default function CHOSettings({
                           setProfile({ ...profile, assignedBarangayId: e.target.value ? parseInt(e.target.value) : null, assignment: selected ? selected.name : '' });
                         }}
                         style={{ ...fieldStyle, cursor: 'pointer', appearance: 'none', paddingRight: '36px' }}>
-                        <option value="">— Select Assignment —</option>
+                        <option value="">- Select Assignment -</option>
                         {barangayList.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                       </select>
                       <span style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', fontSize: '10px', pointerEvents: 'none', opacity: 0.6 }}>▼</span>

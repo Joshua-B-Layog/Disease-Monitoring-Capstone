@@ -1754,7 +1754,7 @@ app.post('/api/forgot-password', (req, res) => {
             const mailOptions = {
                 from: `"Cabuyao Health System" <${process.env.BREVO_FROM}>`,
                 to: userFound.email,
-                subject: 'Cabuyao Health — Password Reset Request',
+                subject: 'Cabuyao Health - Password Reset Request',
                 html: `
                 <div style="max-width:600px;margin:0 auto;font-family:system-ui,sans-serif;background:#16171d;border:1px solid #2e303a;border-radius:8px;overflow:hidden;">
                     <div style="background:#0d9488;padding:24px;text-align:center;">
@@ -1913,7 +1913,7 @@ app.post('/api/send-2fa-email', (req, res) => {
             const verifyLink = `http://localhost:3000/verify-2fa?token=${token}&userId=${userId}`;
 
             try {
-                await sendBrevoEmail(user.email, 'Cabuyao Health — Verify Your Email for 2FA', `
+                await sendBrevoEmail(user.email, 'Cabuyao Health - Verify Your Email for 2FA', `
                 <div style="max-width:600px;margin:0 auto;font-family:system-ui,sans-serif;background:#16171d;border:1px solid #2e303a;border-radius:8px;overflow:hidden;">
                     <div style="background:#0d9488;padding:24px;text-align:center;">
                         <h1 style="color:#fff;margin:0;font-size:28px;">CABUYAO HEALTH</h1>
@@ -1986,7 +1986,7 @@ app.post('/api/send-login-otp', (req, res) => {
             if (updateErr) return res.status(500).json({ error: 'Failed to generate code.' });
 
             try {
-                await sendBrevoEmail(user.email, 'Cabuyao Health — Your Login Verification Code', `
+                await sendBrevoEmail(user.email, 'Cabuyao Health - Your Login Verification Code', `
                 <div style="max-width:600px;margin:0 auto;font-family:system-ui,sans-serif;background:#16171d;border:1px solid #2e303a;border-radius:8px;overflow:hidden;">
                     <div style="background:#0d9488;padding:24px;text-align:center;">
                         <h1 style="color:#fff;margin:0;font-size:28px;">CABUYAO HEALTH</h1>
@@ -2196,7 +2196,7 @@ function checkAndAlertHighRisk(barangay_id, barangay_name) {
         if (err || results.length === 0) return;
         const activeCount = results[0].count;
         
-        if (activeCount > 20) {
+        if (activeCount >= 20) {
             const title = '🚨 High Risk Barangay Alert';
             const message = `Barangay ${barangay_name} is now designated as High Risk with ${activeCount} active cases!`;
             
@@ -2523,11 +2523,11 @@ app.delete('/api/users/:id/my-data', (req, res) => {
                   <p style="color:#94a3b8;font-size:11px">Cabuyao City Disease Monitoring System</p>
                 </div>
               `;
-              sendBrevoEmail(user.email, 'Account Data Cleared — Cabuyao CDMS', htmlContent)
+              sendBrevoEmail(user.email, 'Account Data Cleared - Cabuyao CDMS', htmlContent)
                 .catch(err => console.error('Clear-data email failed:', err.message));
             }
 
-            console.log(`Cleared personal data for user ${id} (${user.username}) — password reset to original`);
+            console.log(`Cleared personal data for user ${id} (${user.username}) - password reset to original`);
             res.status(200).json({
               message: 'Your personal data has been cleared successfully. You have been logged out.',
               logged_out: true,
@@ -2714,9 +2714,198 @@ app.get('/api/disease_cases/public-summary', (req, res) => {
 // 7. SCHEDULED JOBS
 // ==========================================
 
+// ==========================================
+// 7b. WEEKLY SUMMARY REPORT ENDPOINT
+// ==========================================
+
+// GET /api/weekly-summary?user_id=...&start_date=...&end_date=...
+app.get('/api/weekly-summary', (req, res) => {
+    const { user_id, start_date, end_date } = req.query;
+    if (!user_id) return res.status(400).json({ error: 'user_id is required' });
+
+    const sd = start_date || new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+    const ed = end_date || new Date().toISOString().slice(0, 10);
+
+    // 1. Determine user scope
+    db.query(
+        `SELECT u.user_id, u.role, u.full_name, u.assigned_barangay_id, b.name AS barangay_name
+         FROM users u LEFT JOIN barangays b ON u.assigned_barangay_id = b.id
+         WHERE u.user_id = ?`, [user_id],
+        (err, rows) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
+
+            const user = rows[0];
+            let barangayNames, scopeLabel;
+            if (user.role === 'CHO') {
+                const unit = getChoUnitForBarangay(user.barangay_name);
+                if (!unit) return res.status(400).json({ error: 'CHO unit not found' });
+                barangayNames = CHO_UNIT_BARANGAYS[unit];
+                scopeLabel = unit;
+            } else if (user.role === 'BHW' && user.barangay_name) {
+                barangayNames = [user.barangay_name];
+                scopeLabel = user.barangay_name;
+            } else {
+                return res.status(400).json({ error: 'Cannot determine user scope' });
+            }
+
+            const ph = barangayNames.map(() => '?').join(',');
+
+            const doQuery = (sql, params) => new Promise((resolve, reject) =>
+                db.query(sql, params, (e, r) => e ? reject(e) : resolve(r))
+            );
+
+            // 2. Run all queries in parallel
+            const summarySQL = `
+                SELECT
+                    COUNT(*) AS total_cases,
+                    SUM(CASE WHEN dc.date_reported >= ? THEN 1 ELSE 0 END) AS new_this_week,
+                    SUM(CASE WHEN dc.status IN ('Active','Under Treatment','Pending') THEN 1 ELSE 0 END) AS active_cases,
+                    SUM(CASE WHEN dc.status = 'Recovered' THEN 1 ELSE 0 END) AS recovered,
+                    SUM(CASE WHEN dc.status = 'Deceased' THEN 1 ELSE 0 END) AS deceased
+                FROM disease_cases dc
+                JOIN barangays b ON dc.barangay_id = b.id
+                WHERE b.name IN (${ph})`;
+
+            const barangaySQL = `
+                SELECT b.name AS barangay_name, COUNT(dc.case_id) AS count
+                FROM barangays b
+                LEFT JOIN disease_cases dc ON dc.barangay_id = b.id
+                WHERE b.name IN (${ph})
+                GROUP BY b.id, b.name
+                ORDER BY count DESC`;
+
+            const diseaseSQL = `
+                SELECT d.name AS disease_name, COUNT(dc.case_id) AS count
+                FROM diseases d
+                LEFT JOIN disease_cases dc ON dc.disease_id = d.id
+                JOIN barangays b ON dc.barangay_id = b.id
+                WHERE b.name IN (${ph})
+                GROUP BY d.id, d.name
+                ORDER BY count DESC`;
+
+            const severitySQL = `
+                SELECT dc.severity, COUNT(*) AS count
+                FROM disease_cases dc
+                JOIN barangays b ON dc.barangay_id = b.id
+                WHERE b.name IN (${ph}) AND dc.severity IS NOT NULL
+                GROUP BY dc.severity
+                ORDER BY FIELD(dc.severity,'Critical','Severe','Moderate','Mild','Asymptomatic')`;
+
+            const newCasesSQL = `
+                SELECT dc.case_id, dc.patient_name, dc.age, dc.gender, dc.severity, dc.status,
+                       dc.date_reported, d.name AS disease_name, b.name AS barangay_name
+                FROM disease_cases dc
+                JOIN barangays b ON dc.barangay_id = b.id
+                JOIN diseases d ON dc.disease_id = d.id
+                WHERE b.name IN (${ph}) AND dc.date_reported >= ?
+                ORDER BY dc.date_reported DESC`;
+
+            const auditSQL = `
+                SELECT al.*, u.full_name AS user_full_name
+                FROM audit_logs al
+                LEFT JOIN users u ON al.user_id = u.user_id
+                WHERE (al.barangay IN (${ph}) OR al.cho_unit = ?)
+                  AND al.created_at >= ? AND al.created_at <= DATE_ADD(?, INTERVAL 1 DAY)
+                ORDER BY al.created_at DESC
+                LIMIT 50`;
+
+            const params = [...barangayNames];
+
+            Promise.all([
+                doQuery(summarySQL, [sd, ...params]).then(r => r[0]),
+                doQuery(barangaySQL, params),
+                doQuery(diseaseSQL, params),
+                doQuery(severitySQL, params),
+                doQuery(newCasesSQL, [...params, sd]),
+                doQuery(auditSQL, [...params, scopeLabel, sd, ed]),
+            ]).then(([summary, barangays, diseases, severities, newCases, auditLogs]) => {
+                res.json({
+                    scopeLabel,
+                    dateRange: { start: sd, end: ed },
+                    summary: {
+                        total_cases: summary.total_cases || 0,
+                        new_this_week: summary.new_this_week || 0,
+                        active_cases: summary.active_cases || 0,
+                        recovered: summary.recovered || 0,
+                        deceased: summary.deceased || 0,
+                    },
+                    byBarangay: barangays,
+                    byDisease: diseases,
+                    bySeverity: severities,
+                    newCases,
+                    auditLogs,
+                    generatedBy: user.full_name,
+                    generatedAt: new Date().toISOString(),
+                });
+            }).catch(err => res.status(500).json({ error: err.message }));
+        }
+    );
+});
+
+// ── Shared weekly summary helpers (used by cron + trigger endpoint) ──
+function buildWeeklyHtmlAndPlain(summary, barangays, diseases, severities, scopeLabel) {
+    const total = summary.total_cases || 0;
+    const newWeek = summary.new_this_week || 0;
+    const active = summary.active_cases || 0;
+    const recovered = summary.recovered || 0;
+    const deceased = summary.deceased || 0;
+
+    const topBarangay = barangays.length > 0 ? barangays.slice(0, 5).map(b =>
+        `<li>${b.barangay_name}: ${b.count} case${b.count !== 1 ? 's' : ''}</li>`
+    ).join('') : '<li>No data</li>';
+
+    const topDisease = diseases.length > 0 ? diseases.slice(0, 5).map(d =>
+        `<li>${d.disease_name}: ${d.count} case${d.count !== 1 ? 's' : ''}</li>`
+    ).join('') : '<li>No data</li>';
+
+    const sevRows = severities.length > 0 ? severities.map(s =>
+        `<tr><td>${s.severity}</td><td style="text-align:right;font-weight:600">${s.count}</td></tr>`
+    ).join('') : '<tr><td colspan="2">No data</td></tr>';
+
+    const scopeTitle = scopeLabel ? ` — ${scopeLabel}` : '';
+
+    const html = `
+        <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:12px">
+            <h1 style="color:#1e3a8a;font-size:22px;margin:0 0 4px 0">Weekly Summary${scopeTitle}</h1>
+            <p style="color:#64748b;font-size:13px;margin:0 0 20px 0">${new Date().toLocaleDateString('en-PH', { month:'long', day:'numeric', year:'numeric' })}</p>
+            <table style="width:100%;border-collapse:collapse;margin-bottom:20px">
+                <tr>
+                    <td style="background:#eff6ff;padding:12px;border-radius:8px 0 0 8px;text-align:center">
+                        <div style="font-size:24px;font-weight:700;color:#1e3a8a">${total}</div>
+                        <div style="font-size:11px;color:#64748b">Total Cases</div>
+                    </td>
+                    <td style="background:#fef2f2;padding:12px;text-align:center">
+                        <div style="font-size:24px;font-weight:700;color:#dc2626">${newWeek}</div>
+                        <div style="font-size:11px;color:#64748b">New This Week</div>
+                    </td>
+                    <td style="background:#f0fdf4;padding:12px;border-radius:0 8px 8px 0;text-align:center">
+                        <div style="font-size:24px;font-weight:700;color:#16a34a">${recovered}</div>
+                        <div style="font-size:11px;color:#64748b">Recovered</div>
+                    </td>
+                </tr>
+            </table>
+            <h3 style="color:#1e293b;font-size:15px;margin:0 0 8px 0">Top Barangays</h3>
+            <ul style="margin:0 0 20px 0;padding-left:20px;font-size:14px;color:#334155">${topBarangay}</ul>
+            <h3 style="color:#1e293b;font-size:15px;margin:0 0 8px 0">Top Diseases</h3>
+            <ul style="margin:0 0 20px 0;padding-left:20px;font-size:14px;color:#334155">${topDisease}</ul>
+            <h3 style="color:#1e293b;font-size:15px;margin:0 0 8px 0">By Severity</h3>
+            <table style="width:100%;border-collapse:collapse;font-size:14px">
+                <tr style="background:#f1f5f9"><th style="padding:8px 12px;text-align:left">Severity</th><th style="padding:8px 12px;text-align:right">Count</th></tr>
+                ${sevRows}
+            </table>
+            <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0" />
+            <p style="color:#94a3b8;font-size:11px">Cabuyao City Disease Monitoring System</p>
+        </div>`;
+
+    const plain = `📊 Weekly Summary${scopeTitle}\n\nTotal: ${total} | New: ${newWeek} | Active: ${active} | Recovered: ${recovered} | Deceased: ${deceased}\n\nTop Barangay: ${barangays[0]?.barangay_name || 'N/A'} (${barangays[0]?.count || 0} cases)`;
+
+    return { html, plain };
+}
+
 // Weekly Summary — every Monday at 8:00 AM (scoped per user / CHO unit / BHW barangay)
-cron.schedule('0 8 * * 1', () => {
-    console.log('⏰ Running weekly summary cron job...');
+cron.schedule('0 17 * * 5', () => {
+    console.log('⏰ Running weekly summary cron job (Friday 5PM)...');
 
     // Helper: run scoped queries for a given set of barangay names, returns [summary, barangays, diseases, severities]
     function runScopedQueries(barangayNames) {
@@ -2771,73 +2960,14 @@ cron.schedule('0 8 * * 1', () => {
         ]);
     }
 
-    function buildHtmlAndPlain(summary, barangays, diseases, severities, scopeLabel) {
-        const total = summary.total_cases || 0;
-        const newWeek = summary.new_this_week || 0;
-        const active = summary.active_cases || 0;
-        const recovered = summary.recovered || 0;
-        const deceased = summary.deceased || 0;
-
-        const topBarangay = barangays.length > 0 ? barangays.slice(0, 5).map(b =>
-            `<li>${b.barangay_name}: ${b.count} case${b.count !== 1 ? 's' : ''}</li>`
-        ).join('') : '<li>No data</li>';
-
-        const topDisease = diseases.length > 0 ? diseases.slice(0, 5).map(d =>
-            `<li>${d.disease_name}: ${d.count} case${d.count !== 1 ? 's' : ''}</li>`
-        ).join('') : '<li>No data</li>';
-
-        const sevRows = severities.length > 0 ? severities.map(s =>
-            `<tr><td>${s.severity}</td><td style="text-align:right;font-weight:600">${s.count}</td></tr>`
-        ).join('') : '<tr><td colspan="2">No data</td></tr>';
-
-        const scopeTitle = scopeLabel ? ` — ${scopeLabel}` : '';
-
-        const html = `
-            <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:12px">
-                <h1 style="color:#1e3a8a;font-size:22px;margin:0 0 4px 0">Weekly Summary${scopeTitle}</h1>
-                <p style="color:#64748b;font-size:13px;margin:0 0 20px 0">${new Date().toLocaleDateString('en-PH', { month:'long', day:'numeric', year:'numeric' })}</p>
-                <table style="width:100%;border-collapse:collapse;margin-bottom:20px">
-                    <tr>
-                        <td style="background:#eff6ff;padding:12px;border-radius:8px 0 0 8px;text-align:center">
-                            <div style="font-size:24px;font-weight:700;color:#1e3a8a">${total}</div>
-                            <div style="font-size:11px;color:#64748b">Total Cases</div>
-                        </td>
-                        <td style="background:#fef2f2;padding:12px;text-align:center">
-                            <div style="font-size:24px;font-weight:700;color:#dc2626">${newWeek}</div>
-                            <div style="font-size:11px;color:#64748b">New This Week</div>
-                        </td>
-                        <td style="background:#f0fdf4;padding:12px;border-radius:0 8px 8px 0;text-align:center">
-                            <div style="font-size:24px;font-weight:700;color:#16a34a">${recovered}</div>
-                            <div style="font-size:11px;color:#64748b">Recovered</div>
-                        </td>
-                    </tr>
-                </table>
-                <h3 style="color:#1e293b;font-size:15px;margin:0 0 8px 0">Top Barangays</h3>
-                <ul style="margin:0 0 20px 0;padding-left:20px;font-size:14px;color:#334155">${topBarangay}</ul>
-                <h3 style="color:#1e293b;font-size:15px;margin:0 0 8px 0">Top Diseases</h3>
-                <ul style="margin:0 0 20px 0;padding-left:20px;font-size:14px;color:#334155">${topDisease}</ul>
-                <h3 style="color:#1e293b;font-size:15px;margin:0 0 8px 0">By Severity</h3>
-                <table style="width:100%;border-collapse:collapse;font-size:14px">
-                    <tr style="background:#f1f5f9"><th style="padding:8px 12px;text-align:left">Severity</th><th style="padding:8px 12px;text-align:right">Count</th></tr>
-                    ${sevRows}
-                </table>
-                <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0" />
-                <p style="color:#94a3b8;font-size:11px">Cabuyao City Disease Monitoring System</p>
-            </div>`;
-
-        const plain = `📊 Weekly Summary${scopeTitle}\n\nTotal: ${total} | New: ${newWeek} | Active: ${active} | Recovered: ${recovered} | Deceased: ${deceased}\n\nTop Barangay: ${barangays[0]?.barangay_name || 'N/A'} (${barangays[0]?.count || 0} cases)`;
-
-        return { html, plain };
-    }
-
     function sendToUsers(users, html, plain) {
         users.forEach(user => {
             db.query(
                 'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
-                [user.user_id, '📊 Weekly Summary', plain, 'weekly_summary', 'Dashboard']
+                [user.user_id, '📊 Weekly Summary', plain, 'weekly_summary', 'Weekly Summary']
             );
             if (user.email) {
-                sendBrevoEmail(user.email, '📊 Weekly Summary — Cabuyao CDMS', html)
+                sendBrevoEmail(user.email, '📊 Weekly Summary - Cabuyao CDMS', html)
                     .catch(err => console.error(`Weekly summary email failed for ${user.user_id}:`, err.message));
             }
         });
@@ -2883,7 +3013,7 @@ cron.schedule('0 8 * * 1', () => {
             groupList.forEach(group => {
                 runScopedQueries(group.barangayNames).then(results => {
                     if (!results) return;
-                    const { html, plain } = buildHtmlAndPlain(...results, group.scopeLabel);
+                    const { html, plain } = buildWeeklyHtmlAndPlain(...results, group.scopeLabel);
                     sendToUsers(group.users, html, plain);
                 }).catch(err => {
                     console.error(`Weekly summary error for group ${group.scopeLabel}:`, err.message);

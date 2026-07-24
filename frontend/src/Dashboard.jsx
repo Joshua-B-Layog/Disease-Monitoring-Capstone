@@ -177,7 +177,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     }
     const barRows = bars.map((bar, i) => {
       const pct = highest > 0 ? Math.round((bar.count / highest) * 100) : 0;
-      const color = i === 0 ? '#ef4444' : i === 1 ? '#f59e0b' : '#3b82f6';
+      const color = i === 0 ? '#DC2626' : i === 1 ? '#f59e0b' : '#3b82f6';
       return `
         <tr>
           <td style="padding:6px 10px 6px 0;font-size:13px;white-space:nowrap;min-width:160px;">${bar.label}</td>
@@ -457,7 +457,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                   <div style={{ flex: 1, background: 'var(--input-bg)', height: '24px', borderRadius: '6px', overflow: 'hidden', position: 'relative' }}>
                     <div style={{
                       width: `${(bar.count / highestCount) * 100}%`,
-                      background: i === 0 ? '#ef4444' : i === 1 ? '#f59e0b' : '#3b82f6',
+                      background: i === 0 ? '#DC2626' : i === 1 ? '#f59e0b' : '#3b82f6',
                       height: '100%', borderRadius: '6px', transition: 'width 0.4s ease',
                       display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
                       paddingRight: '8px', color: '#fff', fontWeight: '700', fontSize: '14px',

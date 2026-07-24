@@ -8,6 +8,7 @@ import ChoSettings from './ChoSettings';
 import Login from './components/Login'; 
 import RecoverAccount from './components/RecoverAccount';
 import MapView from './MapView';
+import WeeklySummary from './WeeklySummary';
 
 import { API_URL } from './config';
 import './App.css';
@@ -280,6 +281,8 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             onProfileViewOpened={() => setOpenProfileView(false)}
           />
         );
+      case 'Weekly Summary':
+        return <WeeklySummary userId={loggedUserId} loginRole={loginRole} compactMode={compactMode} fontScale={fontScale} onBack={() => setActiveTab('Dashboard')} />;
       default:
         return <div style={{ padding: '20px' }}>Content coming soon...</div>;
     }
@@ -441,7 +444,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                           <div style={{
                             width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
                             display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px',
-                            background: n.type === 'high_risk' ? '#fee2e2' : '#dbeafe'
+                            background: n.type === 'high_risk' ? '#fecaca' : '#dbeafe'
                           }}>
                             {n.type === 'high_risk' ? '🚨' : '📋'}
                           </div>

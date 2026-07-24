@@ -18,6 +18,7 @@ This is a Web-Based Disease Monitoring and Mapping System for the City of Cabuya
 - `frontend/src/MapView.jsx` — interactive disease map
 - `frontend/src/UserManagement.jsx` — user account management
 - `frontend/src/BarangayReports.jsx` — audit logs and reports
+- `frontend/src/WeeklySummary.jsx` — weekly disease summary report (notification-only page)
 - `frontend/src/ChoSettings.jsx` — profile and settings
 - `frontend/src/components/Login.jsx` — full login/signup/recovery flow
 
@@ -47,11 +48,14 @@ SARS, Sore Eyes, Tuberculosis, Typhoid Fever
 - `case_edit_requests` table stores BHW→CHO edit requests (auto-migrates)
 - "Edit Requests" tab (purple) in CHO inbox alongside Referrals and Messages
 - Notification "View →" parses disease name from message via regex `/case of (.+?) \(/` and calls `setCaseFilter({ disease: diseaseName, ... })` — same mechanism as MapView's "Go To →"
-- `tabMap` object maps `'ManageCases'`→`'Manage Cases'`, `'Inbox'`→`'Manage Cases'`, `'MapView'`→`'Map View'`
+- `tabMap` object maps `'ManageCases'`→`'Manage Cases'`, `'Inbox'`→`'Manage Cases'`, `'MapView'`→`'Map View'`, `'Weekly Summary'`→`'Weekly Summary'`
 - Edit request notifications bypass user preferences (direct BHW→CHO work request always delivers)
 - Routing modal for misplaced barangay cases has two centered buttons: `✕ Delete` and `→ Send to CHO I/II`
 - Inbox "Back" then re-clicking "Inbox" resets to Referrals tab, not Edit Requests
 - `notifSaveMsg` and `systemPrefsSaveMsg` cleared on view change in ChoSettings
+- Weekly Summary page is notification-only (no sidebar entry); accessible via "View →" on weekly summary notifications or via test button in ChoSettings
+- Weekly summary notification `link_to` = `'Weekly Summary'` → renders `WeeklySummary.jsx` component
+- Backend cron job: `server.js` — `cron.schedule('0 17 * * 5', ...)` — every Friday 5PM
 
 ## Important Rules When Editing
 - Never hardcode colors — always use CSS variables for themed components

@@ -419,7 +419,7 @@ const DISEASES = [
     tips: [
       'Early diagnosis and treatment prevent disability.',
       'Complete the full course of MDT (Multi-Drug Therapy).',
-      'Do not isolate — leprosy is not highly contagious.',
+      'Do not isolate - leprosy is not highly contagious.',
       'Educate your community to reduce stigma.',
       'Regular check-ups for people in close contact with patients.',
     ],
@@ -597,7 +597,7 @@ export default function PreventionTips() {
   const getResultLevel = (pct) => {
     if (pct < 25) return { label: 'Low Likelihood', color: '#22c55e', bg: 'rgba(34,197,94,0.12)', text: 'Your symptoms do not strongly match this disease. Stay observant and practice prevention measures.' };
     if (pct < 50) return { label: 'Moderate Risk', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', text: 'Your symptoms partially match this disease. Consider visiting a health center for a check-up.' };
-    return { label: 'High Risk', color: '#ef4444', bg: 'rgba(239,68,68,0.12)', text: 'Your symptoms strongly match this disease. Please go to the hospital immediately for evaluation.' };
+    return { label: 'High Risk', color: '#DC2626', bg: 'rgba(220,38,38,0.12)', text: 'Your symptoms strongly match this disease. Please go to the hospital immediately for evaluation.' };
   };
 
   return (

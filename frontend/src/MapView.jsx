@@ -342,9 +342,9 @@ const findCanonicalName = (rawName) => {
   return match || rawName;
 };
 
-// Risk thresholds: <10 = Low (green), 10-20 = Medium (amber), >20 = High (red)
+// Risk thresholds: <10 = Low (green), 10-19 = Medium (amber), >=20 = High (red)
 const getRisk = (count) => {
-  if (count > 20) return { color: '#ef4444', ring: 'rgba(239,68,68,0.3)', label: 'High Risk' };
+  if (count >= 20) return { color: '#DC2626', ring: 'rgba(220,38,38,0.3)', label: 'High Risk' };
   if (count >= 10) return { color: '#f59e0b', ring: 'rgba(245,158,11,0.3)', label: 'Medium Risk' };
   return { color: '#10b981', ring: 'rgba(16,185,129,0.3)', label: 'Low Risk' };
 };
@@ -902,8 +902,8 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   };
 
   const activeData  = (filterBarangay !== 'All Barangays' || loginRole === 'BHW') && purokData.length > 0 ? purokData : barangayData;
-  const highCount   = activeData.filter(b => b.totalCases > 20).length;
-  const mediumCount = activeData.filter(b => b.totalCases >= 10 && b.totalCases <= 20).length;
+  const highCount   = activeData.filter(b => b.totalCases >= 20).length;
+  const mediumCount = activeData.filter(b => b.totalCases >= 10 && b.totalCases < 20).length;
   const lowCount    = activeData.filter(b => b.totalCases < 10).length;
 
   const SEL = {
@@ -1130,9 +1130,9 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         <div style={{ paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
           <p style={{ margin: '0 0 10px 0', fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Legend</p>
           {[
-            { color: '#ef4444', label: 'High Risk (>20 cases)' },
-            { color: '#f59e0b', label: 'Medium Risk (10–20)' },
-            { color: '#10b981', label: 'Low Risk (<10)' },
+            { color: '#DC2626', label: 'High Risk (20+ cases)' },
+            { color: '#f59e0b', label: 'Medium Risk (10–19 cases)' },
+            { color: '#10b981', label: 'Low Risk (Below 10 cases)' },
           ].map(l => (
             <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: '9px', marginBottom: '8px' }}>
               <span style={{ width: '11px', height: '11px', borderRadius: '50%', background: l.color, flexShrink: 0, display: 'inline-block' }} />
@@ -1146,7 +1146,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           <p style={{ margin: '0 0 10px 0', fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Active Hotspots</p>
           <div style={{ display: 'flex', gap: '8px' }}>
             {[
-              { label: 'High',   count: highCount,   color: '#ef4444' },
+              { label: 'High',   count: highCount,   color: '#DC2626' },
               { label: 'Medium', count: mediumCount, color: '#f59e0b' },
               { label: 'Low',    count: lowCount,    color: '#10b981' },
             ].map(({ label, count, color }) => (
@@ -1163,7 +1163,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
 
         <button
           onClick={() => { setAutoDetectedBrgy(null); setFilterBarangay('All Barangays'); setFilterStatus('All Status'); setFilterDate(''); setFilterSeverity('All Severities'); }}
-          style={{ padding: '11px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '7px', cursor: 'pointer', fontWeight: '600', fontSize: '13px', marginTop: 'auto' }}>
+          style={{ padding: '11px', background: '#DC2626', color: 'white', border: 'none', borderRadius: '7px', cursor: 'pointer', fontWeight: '600', fontSize: '13px', marginTop: 'auto' }}>
           Reset Filters
         </button>
 
