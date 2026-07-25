@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { API_URL } from './config';
+import { cacheCases, getCachedCases, isOnline } from './offlineSync';
 
 const ALL_DISEASES = [
   'Acute Respiratory Infection','Avian Influenza','Chickenpox','Cholera','Dengue',
@@ -42,7 +43,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   const [cases, setCases] = useState([]);
   const [selectedDisease, setSelectedDisease] = useState('Dengue');
   const [loading, setLoading] = useState(true);
-  const [dateRange, setDateRange] = useState({ start: '2026-01-01', end: '2026-12-31' });
+  const [dateRange, setDateRange] = useState({ start: new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10), end: new Date().toISOString().slice(0, 10) });
   const [currentPage, setCurrentPage] = useState(1);
   const [ellipsisOpen, setEllipsisOpen] = useState(false);
   const [ellipsisPageInput, setEllipsisPageInput] = useState('');
@@ -66,10 +67,15 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   const [lastUpdated, setLastUpdated] = useState(null);
   const [now, setNow] = useState(Date.now());
 
+  const [offlineMode, setOfflineMode] = useState(!isOnline());
   const fetchCasesData = () => {
     axios.get(API_URL + '/api/disease_cases')
-      .then((res) => { setCases(res.data); setLoading(false); setLastUpdated(Date.now()); })
-      .catch(() => setLoading(false));
+      .then((res) => { setCases(res.data); setLoading(false); setLastUpdated(Date.now()); setOfflineMode(false); cacheCases(res.data).catch(() => {}); })
+      .catch(async () => {
+        const cached = await getCachedCases();
+        if (cached.length > 0) { setCases(cached); setOfflineMode(true); }
+        setLoading(false);
+      });
   };
 
   useEffect(() => {
@@ -103,13 +109,24 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     return () => document.removeEventListener('mousedown', handler);
   }, [ellipsisOpen]);
 
+  useEffect(() => { setCurrentPage(1); }, [dateRange.start, dateRange.end]);
+
   const choUnitBarangays = sessionContext ? CHO_UNIT_BARANGAYS[sessionContext] || [] : [];
 
-  const displayCases = (loginRole === 'BHW' && loginBarangay)
-    ? cases.filter(c => c.barangay_name === loginBarangay)
-    : (loginRole === 'CHO' && choUnitBarangays.length > 0)
-      ? cases.filter(c => choUnitBarangays.includes(c.barangay_name))
-      : cases;
+  const displayCases = (() => {
+    let filtered = (loginRole === 'BHW' && loginBarangay)
+      ? cases.filter(c => c.barangay_name === loginBarangay)
+      : (loginRole === 'CHO' && choUnitBarangays.length > 0)
+        ? cases.filter(c => choUnitBarangays.includes(c.barangay_name))
+        : cases;
+    if (dateRange.start) {
+      filtered = filtered.filter(c => c.date_reported && c.date_reported.slice(0, 10) >= dateRange.start);
+    }
+    if (dateRange.end) {
+      filtered = filtered.filter(c => c.date_reported && c.date_reported.slice(0, 10) <= dateRange.end);
+    }
+    return filtered;
+  })();
 
   if (loading) {
     return <div style={{ color: 'var(--text-main)', padding: '40px', textAlign: 'center' }}>Loading dashboard data...</div>;
@@ -236,7 +253,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       <h3>Case Records</h3>
       <table class="main">
         <thead><tr><th>ID</th><th>Patient</th><th>Age</th><th>Barangay</th><th>Disease</th><th>Severity</th><th>Status</th></tr></thead>
-        <tbody>${buildTableRowsHTML(cases)}</tbody>
+        <tbody>${buildTableRowsHTML(displayCases)}</tbody>
       </table>
       </body></html>`;
     const blob = new Blob(['\ufeff' + html], { type: 'application/msword' });
@@ -249,7 +266,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   // --- EXPORT: EXCEL ---
   const handleExportExcel = () => {
     const headers = 'Case ID\tPatient Name\tAge\tBarangay\tDisease\tSeverity\tStatus\tDate Reported\n';
-    const rows = cases.map(c =>
+    const rows = displayCases.map(c =>
       `${c.case_id}\t${c.patient_name || ''}\t${c.age || ''}\t${c.barangay_name || ''}\t${c.disease_name || ''}\t${c.severity || ''}\t${c.status || ''}\t${c.date_reported || ''}`
     ).join('\n');
     const blob = new Blob([headers + rows], { type: 'application/vnd.ms-excel' });
@@ -262,7 +279,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   // --- EXPORT: CSV ---
   const handleExportCSV = () => {
     const headers = 'Case ID,Patient Name,Age,Barangay,Disease,Severity,Status,Date Reported\n';
-    const rows = cases.map(c =>
+    const rows = displayCases.map(c =>
       `"${c.case_id}","${c.patient_name || ''}","${c.age || ''}","${c.barangay_name || ''}","${c.disease_name || ''}","${c.severity || ''}","${c.status || ''}","${c.date_reported || ''}"`
     ).join('\n');
     const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
@@ -394,6 +411,13 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
   return (
         <div style={{ padding: compactMode ? '14px' : '24px', display: 'flex', flexDirection: 'column', gap: compactMode ? '12px' : '20px', fontSize: `calc(14px * ${fontScale || '1'})` }}>
+
+      {offlineMode && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '13px', color: '#F59E0B' }}>
+          <span style={{ fontSize: '16px' }}>⚠</span>
+          Offline — showing cached data. Will refresh when reconnected.
+        </div>
+      )}
 
       {/* ── STAT CARDS ── */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: compactMode ? '10px' : '16px' }}>

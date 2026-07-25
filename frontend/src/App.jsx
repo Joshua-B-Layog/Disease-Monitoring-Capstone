@@ -11,6 +11,8 @@ import MapView from './MapView';
 import WeeklySummary from './WeeklySummary';
 
 import { API_URL } from './config';
+import { isOnline } from './offlineSync';
+import { getPendingCount, processSyncQueue, isSyncing } from './syncEngine';
 import './App.css';
 
 const getSavedFontScale = () => {
@@ -30,12 +32,13 @@ const translations = {
 };
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn]       = useState(false);
-  const [loginRole, setLoginRole]         = useState('CHO');
-  const [sessionContext, setSessionContext] = useState(''); 
-  const [loggedUser, setLoggedUser]       = useState('');
-  const [loggedUserId, setLoggedUserId]   = useState(null);
-  const [loggedUserBarangay, setLoggedUserBarangay] = useState(null);
+  const savedSession = (() => { try { return JSON.parse(localStorage.getItem('cdms_session')); } catch { return null; } })();
+  const [isLoggedIn, setIsLoggedIn]       = useState(!!savedSession);
+  const [loginRole, setLoginRole]         = useState(savedSession?.role || 'CHO');
+  const [sessionContext, setSessionContext] = useState(savedSession?.context || ''); 
+  const [loggedUser, setLoggedUser]       = useState(savedSession?.name || '');
+  const [loggedUserId, setLoggedUserId]   = useState(savedSession?.id || null);
+  const [loggedUserBarangay, setLoggedUserBarangay] = useState(savedSession?.barangay || null);
 
   const CHO_UNIT_BARANGAYS = {
     'CHO Unit I (Sala)': ['Barangay Uno (Poblacion)', 'Barangay Dos (Poblacion)', 'Barangay Tres (Poblacion)', 'Sala', 'Bigaa', 'Butong', 'Marinig', 'Gulod', 'Niugan', 'Baclaran'],
@@ -73,6 +76,66 @@ function App() {
   useEffect(() => { localStorage.setItem('cdms_confirm_delete', String(confirmDelete)); }, [confirmDelete]);
 
   const [authView, setAuthView]           = useState('login'); 
+
+  // ── Online/Offline status ──
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const goOnline = () => setIsOnline(true);
+    const goOffline = () => setIsOnline(false);
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    return () => { window.removeEventListener('online', goOnline); window.removeEventListener('offline', goOffline); };
+  }, []);
+
+  // ── Sync state ──
+  const [pendingSyncCount, setPendingSyncCount] = useState(0);
+  const [syncingActive, setSyncingActive] = useState(false);
+  const [syncResult, setSyncResult] = useState(null);
+
+  const refreshPendingCount = async () => {
+    try {
+      const count = await getPendingCount();
+      setPendingSyncCount(count);
+    } catch {}
+  };
+
+  const handleManualSync = async () => {
+    if (syncingActive || !navigator.onLine) return;
+    setSyncingActive(true);
+    setSyncResult(null);
+    try {
+      const result = await processSyncQueue(
+        () => {},
+        (conflict) => setSyncResult({ type: 'conflict', detail: conflict })
+      );
+      setSyncResult(result);
+      await refreshPendingCount();
+      if (result.synced > 0 && result.failed === 0) {
+        setTimeout(() => setSyncResult(null), 5000);
+      }
+    } catch (err) {
+      setSyncResult({ type: 'error', detail: err.message });
+    }
+    setSyncingActive(false);
+  };
+
+  // Auto-sync on reconnect
+  useEffect(() => {
+    const goOnline = async () => {
+      const count = await getPendingCount();
+      if (count > 0) handleManualSync();
+    };
+    window.addEventListener('online', goOnline);
+    return () => window.removeEventListener('online', goOnline);
+  }, []);
+
+  // Poll pending count every 30s
+  useEffect(() => {
+    refreshPendingCount();
+    const interval = setInterval(refreshPendingCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // ── CHO Profile modal state ──
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -295,6 +358,13 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
     setLoggedUser(sessionData.name || sessionData.username);
     setLoggedUserId(sessionData.id || null);
     setLoggedUserBarangay(sessionData.barangay || null);
+    localStorage.setItem('cdms_session', JSON.stringify({
+      id: sessionData.id,
+      name: sessionData.name || sessionData.username,
+      role: sessionData.role,
+      context: sessionData.context,
+      barangay: sessionData.barangay || null,
+    }));
   };
 
   const handleLogout = () => { 
@@ -302,6 +372,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
     setSessionContext('');
     setLoggedUser('');
     setLoggedUserId(null);
+    localStorage.removeItem('cdms_session');
     window.location.reload();
   };
 
@@ -355,7 +426,12 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             </small>
           </div>
           
-          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {/* ── ONLINE/OFFLINE INDICATOR ── */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', background: isOnline ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', color: isOnline ? '#10B981' : '#F59E0B', border: `1px solid ${isOnline ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)'}` }}>
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: isOnline ? '#10B981' : '#F59E0B' }}></span>
+              {isOnline ? 'Online' : 'Offline'}
+            </div>
             {/* ── BELL ICON + NOTIFICATION DROPDOWN ── */}
             <div style={{ position: 'relative' }} ref={notifRef}>
               <button
@@ -493,6 +569,9 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                                     const diseaseName = match ? match[1].trim() : '';
                                     setCaseFilter({ disease: diseaseName, barangay: '', purok: '' });
                                     setActiveTab('Manage Cases');
+                                  } else if (n.link_to === 'Registrations') {
+                                    setPendingInboxView('inbox:registrations');
+                                    setActiveTab('Manage Cases');
                                   } else {
                                     setActiveTab(n.link_to);
                                   }
@@ -587,6 +666,55 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
           {renderContent()}
         </div>
       </div>
+
+      {/* ── FLOATING SYNC BUTTON ── */}
+      {pendingSyncCount > 0 && (
+        <button
+          onClick={handleManualSync}
+          disabled={syncingActive || !navigator.onLine}
+          style={{
+            position: 'fixed', bottom: '24px', right: '24px', zIndex: 9000,
+            display: 'flex', alignItems: 'center', gap: '8px',
+            padding: '10px 18px', borderRadius: '24px',
+            background: syncingActive ? '#6366F1' : navigator.onLine ? '#10B981' : '#F59E0B',
+            color: '#fff', border: 'none', cursor: syncingActive ? 'wait' : 'pointer',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.25)', fontSize: '13px', fontWeight: '600',
+            transition: 'all 0.2s'
+          }}
+        >
+          {syncingActive ? (
+            <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⟳</span>
+          ) : '⟳'}
+          {syncingActive ? 'Syncing...' : `Sync ${pendingSyncCount} item${pendingSyncCount > 1 ? 's' : ''}`}
+          {pendingSyncCount > 0 && !syncingActive && (
+            <span style={{ background: '#fff', color: navigator.onLine ? '#10B981' : '#F59E0B', borderRadius: '50%', width: '20px', height: '20px', fontSize: '11px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {pendingSyncCount}
+            </span>
+          )}
+        </button>
+      )}
+
+      {/* ── SYNC RESULT TOAST ── */}
+      {syncResult && (
+        <div
+          style={{
+            position: 'fixed', bottom: '80px', right: '24px', zIndex: 9001,
+            padding: '12px 18px', borderRadius: '10px',
+            background: syncResult.type === 'error' ? '#FEF2F2' : syncResult.type === 'conflict' ? '#FFFBEB' : '#F0FDF4',
+            border: `1px solid ${syncResult.type === 'error' ? '#FECACA' : syncResult.type === 'conflict' ? '#FDE68A' : '#BBF7D0'}`,
+            color: syncResult.type === 'error' ? '#DC2626' : syncResult.type === 'conflict' ? '#D97706' : '#16A34A',
+            fontSize: '13px', fontWeight: '500', maxWidth: '340px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+          }}
+        >
+          {syncResult.synced !== undefined
+            ? `${syncResult.synced} case${syncResult.synced !== 1 ? 's' : ''} synced successfully${syncResult.failed > 0 ? `. ${syncResult.failed} failed.` : '.'}`
+            : syncResult.type === 'conflict'
+            ? `Conflict: ${syncResult.detail?.error || 'Version mismatch detected'}`
+            : `Sync error: ${syncResult.detail || 'Unknown'}`
+          }
+        </div>
+      )}
 
       {/* ── CHO PROFILE MODAL ── */}
       {showProfileModal && (

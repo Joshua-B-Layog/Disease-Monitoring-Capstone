@@ -3,6 +3,8 @@ import axios from 'axios';
 import { API_URL } from './config';
 import './ManageCases.css';
 import cabuyaoBoundaries from './data/cabuyao_barangays.geojson.json';
+import { cacheCases, getCachedCases, cacheReferenceData, getCachedBarangays, getCachedDiseases, isOnline } from './offlineSync';
+import { enqueueOperation } from './syncEngine';
 import { getPointInBarangay } from './data/coordinates';
 const FeverIcon = ({ color = '#ef4444', size = 28 }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
@@ -259,6 +261,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const [contactMessagesLoading, setContactMessagesLoading] = useState(false);
   const [editRequests, setEditRequests] = useState([]);
   const [editRequestsLoading, setEditRequestsLoading] = useState(false);
+  const [pendingRegistrations, setPendingRegistrations] = useState([]);
+  const [pendingRegistrationsLoading, setPendingRegistrationsLoading] = useState(false);
   const [myEditRequests, setMyEditRequests] = useState([]);
   const [myEditRequestsLoading, setMyEditRequestsLoading] = useState(false);
   const [showEditRequestForm, setShowEditRequestForm] = useState(false);
@@ -277,6 +281,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
   const [allCases, setAllCases] = useState([]);
   const [loadingCases, setLoadingCases] = useState(false);
+  const [offlineMode, setOfflineMode] = useState(!isOnline());
   const [barangayList, setBarangayList] = useState([]);
   const [allDiseases, setAllDiseases] = useState([]);
   const choUnitBarangays = sessionContext ? CHO_UNIT_BARANGAYS[sessionContext] || [] : [];
@@ -449,8 +454,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const fetchCases = () => {
     setLoadingCases(true);
     axios.get(API_URL + '/api/disease_cases')
-      .then(res => { setAllCases(res.data); setLoadingCases(false); setLastUpdated(Date.now()); })
-      .catch(() => setLoadingCases(false));
+      .then(res => { setAllCases(res.data); setLoadingCases(false); setLastUpdated(Date.now()); cacheCases(res.data).catch(() => {}); })
+      .catch(async () => {
+        const cached = await getCachedCases();
+        if (cached.length > 0) { setAllCases(cached); setOfflineMode(true); }
+        setLoadingCases(false);
+      });
   };
 
   useEffect(() => {
@@ -636,6 +645,30 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       });
   };
 
+  // ── PENDING REGISTRATIONS (BHW → CHO approval) ──
+  const fetchPendingRegistrations = () => {
+    setPendingRegistrationsLoading(true);
+    const params = {};
+    if (loginRole === 'CHO' && sessionContext) params.cho_unit = sessionContext;
+    axios.get(`${API_URL}/api/pending-registrations`, { params })
+      .then(res => { setPendingRegistrations(res.data); setPendingRegistrationsLoading(false); })
+      .catch(() => setPendingRegistrationsLoading(false));
+  };
+
+  const handleApproveRegistration = (reg) => {
+    axios.put(`${API_URL}/api/pending-registrations/${reg.user_id}/approve`)
+      .then(() => { fetchPendingRegistrations(); })
+      .catch(err => alert('Approve failed: ' + (err.response?.data?.error || err.message)));
+  };
+
+  const handleRejectRegistration = (reg) => {
+    const reason = window.prompt(`Reject registration for ${reg.full_name}? Enter optional reason (or leave blank):`);
+    if (reason === null) return; // user cancelled
+    axios.put(`${API_URL}/api/pending-registrations/${reg.user_id}/reject`, { reason })
+      .then(() => { fetchPendingRegistrations(); })
+      .catch(err => alert('Reject failed: ' + (err.response?.data?.error || err.message)));
+  };
+
   const handleSendEditRequest = async () => {
     if (!editRequestNote.trim() || !editingCase) return;
     const targetCho = loginBarangay ? getChoUnitForBarangay(loginBarangay) : sessionContext;
@@ -749,6 +782,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       fetchInbox();
       fetchContactMessages();
       fetchEditRequests();
+      if (loginRole === 'CHO') fetchPendingRegistrations();
       if (loginRole === 'BHW') fetchMyEditRequests();
     }
     if (view === 'outbox') fetchOutbox();
@@ -761,11 +795,17 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
   useEffect(() => {
     axios.get(API_URL + '/api/barangays')
-      .then(res => setBarangayList(res.data))
-      .catch(() => {});
+      .then(res => { setBarangayList(res.data); cacheReferenceData([], res.data).catch(() => {}); })
+      .catch(async () => {
+        const cached = await getCachedBarangays();
+        if (cached.length > 0) setBarangayList(cached);
+      });
     axios.get(API_URL + '/api/diseases')
-      .then(res => setAllDiseases(res.data))
-      .catch(() => {});
+      .then(res => { setAllDiseases(res.data); cacheReferenceData(res.data, []).catch(() => {}); })
+      .catch(async () => {
+        const cached = await getCachedDiseases();
+        if (cached.length > 0) setAllDiseases(cached);
+      });
   }, []);
 
   useEffect(() => {
@@ -1092,6 +1132,19 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     if (!deleteTarget) return;
     setDeleteLoading(true);
     try {
+      if (!isOnline()) {
+        await enqueueOperation({
+          type: 'delete',
+          endpoint: `/api/cases/${deleteTarget.case_id}`,
+          method: 'DELETE',
+          payload: { _offlineUserId: loggedUserId, _offlineUserName: loggedUser },
+          userId: loggedUserId,
+          userName: loggedUser,
+        });
+        setDeleteTarget(null);
+        setOfflineMode(true);
+        return;
+      }
       await axios.delete(`${API_URL}/api/cases/${deleteTarget.case_id}`);
       fetchCases();
       setDeleteTarget(null);
@@ -1251,6 +1304,34 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     };
 
     try {
+      if (!isOnline()) {
+        const tempId = 'temp-' + Date.now();
+        if (editingCase) {
+          await enqueueOperation({
+            type: 'edit',
+            endpoint: `/api/cases/${editingCase.case_id}`,
+            method: 'PUT',
+            payload,
+            userId: loggedUserId,
+            userName: loggedUser,
+          });
+          setSubmitMsg('Case saved offline — will sync when reconnected.');
+        } else {
+          await enqueueOperation({
+            type: 'create',
+            endpoint: '/api/cases',
+            method: 'POST',
+            payload: { ...payload, case_id: tempId },
+            userId: loggedUserId,
+            userName: loggedUser,
+          });
+          setSubmitMsg(isDraft ? 'Draft saved offline — will sync when reconnected.' : 'Case saved offline — will sync when reconnected.');
+        }
+        setOfflineMode(true);
+        setTimeout(() => { setView('list'); setSubmitMsg(''); setSubmitLoading(false); }, 1800);
+        return;
+      }
+
       if (editingCase) {
         await axios.put(`${API_URL}/api/cases/${editingCase.case_id}`, payload);
         setSubmitMsg('Case updated successfully!');
@@ -1332,6 +1413,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     const pageCards = DISEASE_PAGES[cardPage];
     return (
       <div style={{ padding: compactMode ? '24px 14px 14px' : '48px 28px 28px', color: 'var(--text-main)', fontSize: `calc(14px * ${fs})` }}>
+        {offlineMode && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '13px', color: '#F59E0B' }}>
+            <span style={{ fontSize: '16px' }}>⚠</span>
+            Offline — showing cached data. Changes will sync when reconnected.
+          </div>
+        )}
         <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>
           Dashboard / Manage Cases
         </div>
@@ -1481,6 +1568,17 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               Edit Requests ({editRequests.length})
             </div>
           )}
+          {loginRole === 'CHO' && (
+            <div onClick={() => setInboxSubTab('registrations')}
+              style={{
+                padding: '8px 20px', cursor: 'pointer', fontSize: '13px', fontWeight: inboxSubTab === 'registrations' ? '700' : '500',
+                color: inboxSubTab === 'registrations' ? 'var(--text-main)' : 'var(--text-muted)',
+                borderBottom: inboxSubTab === 'registrations' ? '2px solid #F59E0B' : '2px solid transparent',
+                transition: 'all 0.15s',
+              }}>
+              Registrations ({pendingRegistrations.length})
+            </div>
+          )}
         </div>
 
         {inboxSubTab === 'referrals' && loginRole === 'BHW' && (
@@ -1616,6 +1714,50 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       ✓
                     </button>
                     <button onClick={() => handleRejectEditRequest(req)} title="Reject"
+                      style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #ef4444', background: 'rgba(239,68,68,0.1)', color: '#ef4444', cursor: 'pointer', fontSize: '16px' }}>
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {inboxSubTab === 'registrations' && loginRole === 'CHO' && (
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
+            {pendingRegistrationsLoading ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading registrations...</div>
+            ) : pendingRegistrations.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No pending BHW registrations.</div>
+            ) : (
+              pendingRegistrations.map(reg => (
+                <div key={reg.user_id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)' }}>
+                  <div className="inbox-avatar-circle" style={{ background: '#F59E0B' }}>
+                    {(reg.full_name || 'U').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '13px', color: 'var(--text-main)', fontWeight: 600 }}>
+                      {reg.full_name}
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      {reg.email} · {reg.barangay_name || 'No barangay'}
+                    </div>
+                    {reg.mobile_number && (
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '1px' }}>
+                        {reg.mobile_number}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>
+                    {new Date(reg.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                    <button onClick={() => handleApproveRegistration(reg)} title="Approve"
+                      style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #10b981', background: 'rgba(16,185,129,0.1)', color: '#10b981', cursor: 'pointer', fontSize: '16px' }}>
+                      ✓
+                    </button>
+                    <button onClick={() => handleRejectRegistration(reg)} title="Reject"
                       style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #ef4444', background: 'rgba(239,68,68,0.1)', color: '#ef4444', cursor: 'pointer', fontSize: '16px' }}>
                       ✕
                     </button>

@@ -3,7 +3,7 @@
   import ChoLogoIcon from '../assets/ChoLogo';
 
   export default function Login({ onLoginSuccess, onForgotPassword, theme, toggleTheme }) {
-    const [step, setStep] = useState('role'); // 'role', 'cho_select', 'bhw_select', 'auth', 'forgot_password', 'signup', 'cho_contact'
+    const [step, setStep] = useState('role'); // 'role', 'cho_select', 'bhw_select', 'auth', 'forgot_password', 'signup', 'cho_contact', 'signup_role'
     const [pendingUser, setPendingUser] = useState(null); // holds session data while waiting for OTP
     const [loginOtp, setLoginOtp] = useState('');
     const [otpError, setOtpError] = useState('');
@@ -284,7 +284,7 @@ const handleLoginOtpSubmit = async (e) => {
 
         if (response.ok) {
             setSignupError('');
-            setSignupSuccess('Account registered successfully! Redirecting to login...');
+            setSignupSuccess('Registration submitted! Your account is pending CHO approval. You will receive an email once reviewed.');
 
             // Keep form fields visible as-submitted during the redirect delay,
             // then clear everything once we navigate back to role selection.
@@ -301,7 +301,7 @@ const handleLoginOtpSubmit = async (e) => {
                 setSelectedContext('');
                 setSelectedRole('CHO');
                 setStep('role'); // ← back to the very beginning
-            }, 2000);
+            }, 3000);
 
         } else {
             const errData = await response.json();
@@ -355,17 +355,21 @@ const handleLoginOtpSubmit = async (e) => {
         }
       }
       
-      if (step === 'signup' || step === 'cho_contact') {
+      if (step === 'signup_role') {
+        setStep('role');
+      } else if (step === 'signup' || step === 'cho_contact') {
         if (selectedContext) {
           setStep('auth');
         } else {
           setStep('role');
         }
+        setSignupContext('');
       } else if (step === 'cho_select' || step === 'bhw_select') {
         setStep('role');
         setSelectedContext('');
       } else if (step === 'auth') {
         setStep(selectedRole === 'CHO' ? 'cho_select' : 'bhw_select');
+        setSelectedContext('');
       } else if (step === 'forgot_password') {
         setStep('auth');
       }
@@ -679,6 +683,36 @@ const handleLoginOtpSubmit = async (e) => {
             )}
 
 
+            {/* SIGNUP ROLE SELECTION */}
+            {step === 'signup_role' && (
+              <>
+                <div className="login-header" style={{ marginBottom: '30px', textAlign: 'left' }}>
+                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#10B981', cursor: 'pointer', fontSize: '14px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back</button>
+                  <h2 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '8px' }}>Create Account</h2>
+                  <p style={{ color: 'var(--text-muted)' }}>Select your registration type to proceed.</p>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <button type="button" onClick={() => { setSignupRole('BHW'); setStep('signup'); }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid #10B981', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
+                    <div>
+                      <div style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '16px' }}>Barangay Health Worker</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '2px' }}>Community Surveillance Data Entry</div>
+                    </div>
+                    <span style={{ fontSize: '20px' }}>📍</span>
+                  </button>
+
+                  <button type="button" onClick={() => setStep('cho_contact')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px', background: 'rgba(30, 58, 138, 0.15)', border: '1px solid #1E3A8A', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
+                    <div>
+                      <div style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '16px' }}>City Health Office (CHO)</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '2px' }}>Central Systems & Analytics</div>
+                    </div>
+                    <span style={{ fontSize: '20px' }}>🏢</span>
+                  </button>
+                </div>
+              </>
+            )}
+
+
             {/* FORGOT PASSWORD SECTION - Email Only */}
             {step === 'forgot_password' && (
               <>
@@ -810,7 +844,7 @@ const handleLoginOtpSubmit = async (e) => {
                                         cursor: 'pointer', textAlign: 'left', fontSize: '14px'
                                     }}
                                 >
-                                    <span>{barangayList.find(b => String(b.id) === String(signupContext))?.name || '— Select your barangay —'}</span>
+                                    <span>{barangayList.find(b => String(b.id) === String(signupContext))?.name || '- Select your barangay -'}</span>
                                     <span style={{
                                         fontSize: '24px', opacity: 0.6, marginLeft: '8px',
                                         transition: 'transform 0.2s', display: 'inline-block',
@@ -935,9 +969,13 @@ const handleLoginOtpSubmit = async (e) => {
             )}
 
             {/* SHARED FOOTER ROUTING */}
-            {step !== 'signup' && step !== 'forgot_password' && step !== 'cho_contact' ? (
+            {step !== 'signup' && step !== 'forgot_password' && step !== 'cho_contact' && step !== 'signup_role' ? (
               <div style={{ marginTop: '30px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px' }}>
                 Don't have an account? <span onClick={() => {
+                  if (step === 'role') {
+                    setStep('signup_role');
+                    return;
+                  }
                   if (selectedRole === 'CHO') {
                     setStep('cho_contact');
                     return;

@@ -2,7 +2,69 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API_URL } from './config';
+import { getAllQueueItems, clearCompleted } from './syncEngine';
 import './ChoSettings.css';
+
+function OfflineSyncPanel() {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = async () => {
+    setLoading(true);
+    try {
+      const all = await getAllQueueItems();
+      setItems(all.reverse());
+    } catch {}
+    setLoading(false);
+  };
+
+  useEffect(() => { refresh(); }, []);
+
+  const statusColor = (s) => {
+    if (s === 'pending') return '#F59E0B';
+    if (s === 'syncing') return '#6366F1';
+    if (s === 'done') return '#10B981';
+    return '#EF4444';
+  };
+
+  const typeLabel = (t) => {
+    if (t === 'create') return '+ New Case';
+    if (t === 'edit') return '✎ Edit Case';
+    if (t === 'delete') return '✕ Delete Case';
+    if (t === 'message') return '✉ Message';
+    return t;
+  };
+
+  if (loading) return <div style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '13px' }}>Loading sync queue...</div>;
+  if (items.length === 0) return <div style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '13px' }}>No offline operations recorded.</div>;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+        <button onClick={async () => { await clearCompleted(); refresh(); }} style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '12px', fontWeight: '500' }}>
+          Clear Completed
+        </button>
+      </div>
+      <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
+        {items.slice(0, 20).map((item) => (
+          <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderBottom: '1px solid var(--border-color)', fontSize: '13px' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: statusColor(item.status), flexShrink: 0 }}></span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ fontWeight: '600', color: 'var(--text-main)' }}>{typeLabel(item.type)}</span>
+              <span style={{ color: 'var(--text-muted)', marginLeft: '8px' }}>
+                {new Date(item.timestamp).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </div>
+            <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '10px', background: statusColor(item.status) + '22', color: statusColor(item.status), fontWeight: '600', textTransform: 'capitalize' }}>
+              {item.status}
+            </span>
+            {item.error && <span style={{ fontSize: '11px', color: '#EF4444', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.error}>{item.error}</span>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 const translations = {
   en: { 'Profile Settings':'Profile Settings','Account Security':'Account Security','Notifications':'Notifications','System Preferences':'System Preferences','Data Management':'Data Management','Save Preferences':'Save Preferences','Save Changes':'Save Changes','Cancel':'Cancel' },
@@ -1657,6 +1719,21 @@ export default function CHOSettings({
                     </label>
                   </div>
                 </div>
+              </div>
+
+              {/* Sync History */}
+              <div className="security-section-card" style={{ borderColor: 'var(--border-color)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(16,185,129,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ fontSize: '18px' }}>🔄</span>
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: 'var(--text-main)' }}>Offline Sync</h3>
+                    <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>View offline operation queue and sync history</span>
+                  </div>
+                </div>
+
+                <OfflineSyncPanel />
               </div>
 
               {/* Danger Zone */}

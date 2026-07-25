@@ -300,6 +300,16 @@ db.query(`CREATE TABLE IF NOT EXISTS case_edit_requests (
   });
 });
 
+// Migration: add status column to users table for BHW registration approval
+db.query("SHOW COLUMNS FROM users LIKE 'status'", (e, r) => {
+  if (!e && r && r.length === 0) {
+    db.query("ALTER TABLE users ADD COLUMN status VARCHAR(20) DEFAULT NULL", (ae) => {
+      if (ae) console.error('Error adding status column to users:', ae.message);
+      else console.log('Added status column to users');
+    });
+  }
+});
+
 function createAuditLog(userId, userName, userRole, choUnit, barangay, action, entity, details) {
   db.query(
     'INSERT INTO audit_logs (user_id, user_name, user_role, cho_unit, barangay, action, entity, details) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -1590,6 +1600,14 @@ app.post('/api/login', (req, res) => {
 
         const user = results[0];
 
+        // Block login for pending or rejected registrations
+        if (user.status === 'pending') {
+            return res.status(403).json({ error: 'Your registration is pending approval. Please wait for a CHO administrator to review your account.' });
+        }
+        if (user.status === 'rejected') {
+            return res.status(403).json({ error: 'Your registration was not approved. Please contact your local CHO office for assistance.' });
+        }
+
         if (role === 'BHW') {
             const selectedBarangay = context.replace(/^Brgy\.\s*/i, '').trim().toLowerCase();
             const assignedBarangay = (user.assigned_barangay_name || '').trim().toLowerCase();
@@ -1672,12 +1690,24 @@ app.post('/api/register', (req, res) => {
     const username = bodyUsername || email.split('@')[0];
 
     let assignedBarangayId = null;
+    let assignedBarangayName = null;
 
     if (context) {
         const parsed = parseInt(context);
         if (!isNaN(parsed)) assignedBarangayId = parsed;
     }
 
+    // Look up barangay name for notifications
+    const lookupBarangay = assignedBarangayId
+        ? new Promise((resolve) => {
+            db.query('SELECT name FROM barangays WHERE id = ?', [assignedBarangayId], (e, rows) => {
+                assignedBarangayName = (rows && rows.length > 0) ? rows[0].name : null;
+                resolve();
+            });
+        })
+        : Promise.resolve();
+
+    lookupBarangay.then(() => {
     // Duplicate-username check
     const checkUsernameQuery = 'SELECT user_id FROM users WHERE username = ?';
     db.query(checkUsernameQuery, [username], (err, rows) => {
@@ -1689,9 +1719,10 @@ app.post('/api/register', (req, res) => {
             return res.status(409).json({ message: 'This username is already taken.' });
         }
 
+    // is_active = 0, status = 'pending' until CHO approves
     const insertQuery = `
-        INSERT INTO users (username, full_name, email, mobile_number, password, initial_password, role, assigned_barangay_id, is_active) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+        INSERT INTO users (username, full_name, email, mobile_number, password, initial_password, role, assigned_barangay_id, is_active, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'pending')
     `;
 
     db.query(insertQuery, [username, name, email, mobile || null, password, password, enforcedRole, assignedBarangayId], (err, result) => {
@@ -1702,10 +1733,269 @@ app.post('/api/register', (req, res) => {
             }
             return res.status(500).json({ message: 'Registration failed: ' + err.message });
         }
-        console.log("✅ Registered:", { username, role: enforcedRole, assignedBarangayId });
-        res.status(200).json({ message: 'Account registered successfully!' });
+
+        const newUserId = result.insertId;
+        const barangayLabel = assignedBarangayName || 'Unknown Barangay';
+
+        // Notify all active CHO users about the new registration
+        db.query(
+            `SELECT user_id FROM users WHERE role = 'CHO' AND is_active = 1`,
+            (notifErr, choUsers) => {
+                if (!notifErr && choUsers.length > 0) {
+                    const notifMsg = `${name} has requested a BHW account for ${barangayLabel}.`;
+                    choUsers.forEach(cho => {
+                        db.query(
+                            'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
+                            [cho.user_id, 'New BHW Registration Request', notifMsg, 'info', 'Registrations']
+                        );
+                    });
+                }
+            }
+        );
+
+        console.log("✅ Registered (pending approval):", { username, role: enforcedRole, assignedBarangayId });
+        res.status(200).json({ message: 'Account registered successfully! Your registration is pending CHO approval. You will receive an email once reviewed.' });
     });
 });
+    }); // end lookupBarangay
+});
+
+// ==========================================
+// OFFLINE SYNC ENDPOINT
+// ==========================================
+app.post('/api/sync', (req, res) => {
+    const { operations } = req.body;
+    if (!Array.isArray(operations) || operations.length === 0) {
+        return res.status(400).json({ error: 'No operations provided.' });
+    }
+    if (operations.length > 50) {
+        return res.status(400).json({ error: 'Too many operations. Max 50 per sync batch.' });
+    }
+
+    const results = [];
+    const conflicts = [];
+    let processed = 0;
+
+    const processNext = (index) => {
+        if (index >= operations.length) {
+            return res.json({ synced: processed, failed: operations.length - processed, conflicts, results });
+        }
+
+        const op = operations[index];
+        const { type, endpoint, method, payload } = op;
+
+        if (type === 'create' && endpoint === '/api/cases') {
+            const p = payload || {};
+            const insertQuery = `
+                INSERT INTO disease_cases
+                    (patient_name, disease_name, age, severity, gender, status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude, user_id, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `;
+            const ts = p._offlineTimestamp ? new Date(p._offlineTimestamp) : new Date();
+            db.query(insertQuery, [
+                p.patient_name, p.disease_name, p.age, p.severity || 'Moderate',
+                p.gender || 'Other', p.status || 'Active', p.contact,
+                p.onset_date, p.address, p.barangay_id, p.symptoms,
+                p.physician, p.latitude, p.longitude, p._offlineUserId || p.user_id || null, ts
+            ], (err, result) => {
+                if (err) {
+                    console.error('[Sync] Create failed:', err.message);
+                    results.push({ type, error: err.message });
+                } else {
+                    processed++;
+                    results.push({ type, newCaseId: result.insertId });
+                    if (p._offlineUserId) {
+                        createAuditLog(p._offlineUserId, p._offlineUserName || 'Offline User', null, null, null, 'Synced Case (Offline)', 'Disease Case', `Offline case synced: ${p.patient_name} — ${p.disease_name}`);
+                    }
+                }
+                processNext(index + 1);
+            });
+        } else if (type === 'edit' && endpoint && endpoint.startsWith('/api/cases/')) {
+            const caseId = endpoint.split('/').pop();
+            const p = payload || {};
+            db.query(
+                `SELECT updated_at FROM disease_cases WHERE case_id = ?`, [caseId],
+                (selErr, rows) => {
+                    if (selErr || rows.length === 0) {
+                        results.push({ type, error: 'Case not found' });
+                        return processNext(index + 1);
+                    }
+                    const serverUpdated = rows[0].updated_at ? new Date(rows[0].updated_at).getTime() : 0;
+                    const offlineTimestamp = p._offlineTimestamp || 0;
+                    if (serverUpdated > offlineTimestamp && serverUpdated > 0) {
+                        conflicts.push({ caseId, serverUpdated: new Date(serverUpdated).toISOString(), offlineTimestamp: new Date(offlineTimestamp).toISOString() });
+                        results.push({ type, conflict: true, caseId });
+                        return processNext(index + 1);
+                    }
+                    const updateQuery = `
+                        UPDATE disease_cases SET
+                            patient_name=?, disease_name=?, age=?, severity=?, gender=?, status=?,
+                            contact=?, onset_date=?, address=?, barangay_id=?, symptoms=?,
+                            physician=?, latitude=?, longitude=?, updated_at=NOW()
+                        WHERE case_id=?
+                    `;
+                    db.query(updateQuery, [
+                        p.patient_name, p.disease_name, p.age, p.severity,
+                        p.gender, p.status, p.contact, p.onset_date, p.address,
+                        p.barangay_id, p.symptoms, p.physician, p.latitude, p.longitude, caseId
+                    ], (err) => {
+                        if (err) {
+                            results.push({ type, error: err.message });
+                        } else {
+                            processed++;
+                            results.push({ type, caseId });
+                            if (p._offlineUserId) {
+                                createAuditLog(p._offlineUserId, p._offlineUserName || 'Offline User', null, null, null, 'Synced Edit (Offline)', 'Disease Case', `Offline edit synced for case #${caseId}`);
+                            }
+                        }
+                        processNext(index + 1);
+                    });
+                }
+            );
+        } else if (type === 'delete' && endpoint && endpoint.startsWith('/api/cases/')) {
+            const caseId = endpoint.split('/').pop();
+            db.query('DELETE FROM disease_cases WHERE case_id = ?', [caseId], (err) => {
+                if (err) {
+                    results.push({ type, error: err.message });
+                } else {
+                    processed++;
+                    results.push({ type, caseId });
+                    if (payload && payload._offlineUserId) {
+                        createAuditLog(payload._offlineUserId, payload._offlineUserName || 'Offline User', null, null, null, 'Synced Delete (Offline)', 'Disease Case', `Offline delete synced for case #${caseId}`);
+                    }
+                }
+                processNext(index + 1);
+            });
+        } else if (type === 'message' && endpoint === '/api/contact-messages') {
+            const p = payload || {};
+            db.query(
+                `INSERT INTO contact_messages (name, email, mobile, barangay, disease_name, message, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'new', ?)`,
+                [p.name, p.email, p.mobile, p.barangay, p.disease_name, p.message, new Date(p._offlineTimestamp || Date.now())],
+                (err) => {
+                    if (err) {
+                        results.push({ type, error: err.message });
+                    } else {
+                        processed++;
+                        results.push({ type, success: true });
+                    }
+                    processNext(index + 1);
+                }
+            );
+        } else {
+            results.push({ type, error: `Unsupported sync operation: ${type} ${endpoint}` });
+            processNext(index + 1);
+        }
+    };
+
+    processNext(0);
+});
+
+// ==========================================
+// BHW REGISTRATION APPROVAL ROUTES
+// ==========================================
+
+// GET /api/pending-registrations?cho_unit=...
+app.get('/api/pending-registrations', (req, res) => {
+    const { cho_unit } = req.query;
+    let sql = `SELECT u.user_id, u.username, u.full_name, u.email, u.mobile_number, u.status,
+                      u.assigned_barangay_id, b.name AS barangay_name, u.created_at
+               FROM users u
+               LEFT JOIN barangays b ON u.assigned_barangay_id = b.id
+               WHERE u.status = 'pending' AND u.role = 'BHW'`;
+    const params = [];
+    if (cho_unit) {
+        const unitBarangays = CHO_UNIT_BARANGAYS[cho_unit] || [];
+        if (unitBarangays.length > 0) {
+            const ph = unitBarangays.map(() => '?').join(',');
+            sql += ` AND b.name IN (${ph})`;
+            params.push(...unitBarangays);
+        }
+    }
+    sql += ' ORDER BY u.user_id DESC';
+    db.query(sql, params, (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
+    });
+});
+
+// PUT /api/pending-registrations/:id/approve
+app.put('/api/pending-registrations/:id/approve', (req, res) => {
+    const { id } = req.params;
+    db.query(
+        `SELECT user_id, full_name, email, assigned_barangay_id FROM users WHERE user_id = ? AND status = 'pending'`,
+        [id],
+        (err, rows) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (rows.length === 0) return res.status(404).json({ error: 'Registration not found or already processed.' });
+            const user = rows[0];
+
+            db.query(
+                `UPDATE users SET is_active = 1, status = 'approved' WHERE user_id = ?`,
+                [id],
+                (err2) => {
+                    if (err2) return res.status(500).json({ error: err2.message });
+
+                    // Send approval email
+                    if (user.email) {
+                        const html = `
+                            <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f0fdf4;border-radius:12px">
+                                <h2 style="color:#16a34a;margin:0 0 8px 0">Registration Approved</h2>
+                                <p style="color:#334155;font-size:14px">Hello ${user.full_name},</p>
+                                <p style="color:#334155;font-size:14px">Your BHW account has been approved. You can now log in to the Cabuyao Disease Monitoring System.</p>
+                                <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0" />
+                                <p style="color:#94a3b8;font-size:11px">Cabuyao City Disease Monitoring System</p>
+                            </div>`;
+                        sendBrevoEmail(user.email, 'BHW Registration Approved - Cabuyao CDMS', html)
+                            .catch(err => console.error(`Approval email failed for user ${id}:`, err.message));
+                    }
+
+                    res.json({ message: `Registration for ${user.full_name} approved.` });
+                }
+            );
+        }
+    );
+});
+
+// PUT /api/pending-registrations/:id/reject
+app.put('/api/pending-registrations/:id/reject', (req, res) => {
+    const { id } = req.params;
+    const { reason } = req.body || {};
+    db.query(
+        `SELECT user_id, full_name, email FROM users WHERE user_id = ? AND status = 'pending'`,
+        [id],
+        (err, rows) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (rows.length === 0) return res.status(404).json({ error: 'Registration not found or already processed.' });
+            const user = rows[0];
+
+            db.query(
+                `UPDATE users SET is_active = 0, status = 'rejected' WHERE user_id = ?`,
+                [id],
+                (err2) => {
+                    if (err2) return res.status(500).json({ error: err2.message });
+
+                    // Send rejection email
+                    if (user.email) {
+                        const reasonHtml = reason ? `<p style="color:#334155;font-size:14px"><strong>Reason:</strong> ${reason}</p>` : '';
+                        const html = `
+                            <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#fef2f2;border-radius:12px">
+                                <h2 style="color:#dc2626;margin:0 0 8px 0">Registration Not Approved</h2>
+                                <p style="color:#334155;font-size:14px">Hello ${user.full_name},</p>
+                                <p style="color:#334155;font-size:14px">Your BHW registration for the Cabuyao Disease Monitoring System was not approved at this time.</p>
+                                ${reasonHtml}
+                                <p style="color:#334155;font-size:14px">If you believe this is an error, please contact your local CHO office.</p>
+                                <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0" />
+                                <p style="color:#94a3b8;font-size:11px">Cabuyao City Disease Monitoring System</p>
+                            </div>`;
+                        sendBrevoEmail(user.email, 'BHW Registration Not Approved - Cabuyao CDMS', html)
+                            .catch(err => console.error(`Rejection email failed for user ${id}:`, err.message));
+                    }
+
+                    res.json({ message: `Registration for ${user.full_name} rejected.` });
+                }
+            );
+        }
+    );
 });
 
 // ==========================================

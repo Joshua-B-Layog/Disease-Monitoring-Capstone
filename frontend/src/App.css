@@ -455,3 +455,8 @@ html, body, #root {
   font-size: 14px;
   flex-shrink: 0;
 }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

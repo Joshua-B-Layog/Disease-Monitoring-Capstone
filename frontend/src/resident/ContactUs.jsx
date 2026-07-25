@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { API_URL } from '../config';
+import { isOnline } from '../offlineSync';
+import { enqueueOperation } from '../syncEngine';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import ChoLogoIcon from '../assets/ChoLogo';
@@ -56,6 +58,18 @@ export default function ContactUs() {
     setSending(true);
     setError('');
     try {
+      if (!isOnline()) {
+        await enqueueOperation({
+          type: 'message',
+          endpoint: '/api/contact-messages',
+          method: 'POST',
+          payload: form,
+        });
+        setSent(true);
+        setForm({ name: '', age: '', gender: '', contact: '', address: '', targetCho: 'BHW', targetBarangay: '', disease: '', message: '' });
+        setSending(false);
+        return;
+      }
       await axios.post(`${API_URL}/api/contact-messages`, form);
       setSent(true);
       setForm({ name: '', age: '', gender: '', contact: '', address: '', targetCho: 'BHW', targetBarangay: '', disease: '', message: '' });
