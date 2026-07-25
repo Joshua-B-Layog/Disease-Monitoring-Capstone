@@ -3,7 +3,7 @@ import axios from 'axios';
 import { API_URL } from './config';
 import './ManageCases.css';
 import cabuyaoBoundaries from './data/cabuyao_barangays.geojson.json';
-import { cacheCases, getCachedCases, cacheReferenceData, getCachedBarangays, getCachedDiseases, isOnline } from './offlineSync';
+import { cacheCases, getCachedCases, cacheBarangays, cacheDiseases, getCachedBarangays, getCachedDiseases, isOnline } from './offlineSync';
 import { enqueueOperation } from './syncEngine';
 import { getPointInBarangay } from './data/coordinates';
 const FeverIcon = ({ color = '#ef4444', size = 28 }) => (
@@ -796,13 +796,13 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
   useEffect(() => {
     axios.get(API_URL + '/api/barangays')
-      .then(res => { setBarangayList(res.data); cacheReferenceData([], res.data).catch(() => {}); })
+      .then(res => { setBarangayList(res.data); cacheBarangays(res.data).catch(() => {}); })
       .catch(async () => {
         const cached = await getCachedBarangays();
         if (cached.length > 0) setBarangayList(cached);
       });
     axios.get(API_URL + '/api/diseases')
-      .then(res => { setAllDiseases(res.data); cacheReferenceData(res.data, []).catch(() => {}); })
+      .then(res => { setAllDiseases(res.data); cacheDiseases(res.data).catch(() => {}); })
       .catch(async () => {
         const cached = await getCachedDiseases();
         if (cached.length > 0) setAllDiseases(cached);

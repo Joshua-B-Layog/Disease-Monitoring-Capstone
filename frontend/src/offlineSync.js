@@ -27,11 +27,10 @@ export async function getCachedCases() {
 
 // ── Diseases ──
 export async function cacheDiseases(diseases) {
+  if (!diseases || diseases.length === 0) return;
   try {
     await db.diseases.clear();
-    if (diseases && diseases.length > 0) {
-      await db.diseases.bulkPut(diseases);
-    }
+    await db.diseases.bulkPut(diseases);
     await db.referenceData.put({ key: 'diseases_cached_at', value: Date.now() });
   } catch (err) {
     console.warn('[OfflineSync] Failed to cache diseases:', err.message);
@@ -48,11 +47,10 @@ export async function getCachedDiseases() {
 
 // ── Barangays ──
 export async function cacheBarangays(barangays) {
+  if (!barangays || barangays.length === 0) return;
   try {
     await db.barangays.clear();
-    if (barangays && barangays.length > 0) {
-      await db.barangays.bulkPut(barangays);
-    }
+    await db.barangays.bulkPut(barangays);
     await db.referenceData.put({ key: 'barangays_cached_at', value: Date.now() });
   } catch (err) {
     console.warn('[OfflineSync] Failed to cache barangays:', err.message);
