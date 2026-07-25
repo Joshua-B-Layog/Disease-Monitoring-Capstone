@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API_URL } from './config';
 import { getAllQueueItems, clearCompleted } from './syncEngine';
+import { cacheUserProfile, getCachedUserProfile, getCachedBarangays } from './offlineSync';
 import './ChoSettings.css';
 
 function OfflineSyncPanel() {
@@ -391,15 +392,34 @@ export default function CHOSettings({
         });
         setIsTwoFactorEnabled(!!d.two_fa_enabled);
         setProfileLoading(false);
+        cacheUserProfile(userId, d).catch(() => {});
       })
-      .catch(() => setProfileLoading(false));
+      .catch(async () => {
+        const cached = await getCachedUserProfile(userId);
+        if (cached) {
+          const parts = (cached.full_name || '').trim().split(' ');
+          setProfile({
+            firstName: parts[0] || '',
+            lastName: parts.slice(1).join(' ') || '',
+            username: cached.username || '',
+            email: cached.email || '',
+            phone: cached.mobile_number || '',
+            assignment: cached.assigned_barangay_name || activeUser?.context || '',
+            assignedBarangayId: cached.assigned_barangay_id || null,
+          });
+        }
+        setProfileLoading(false);
+      });
   }, [userId]);
 
   // ── Load barangay list ──
   useEffect(() => {
     axios.get(API_URL + '/api/barangays')
       .then(res => setBarangayList(res.data))
-      .catch(() => {});
+      .catch(async () => {
+        const cached = await getCachedBarangays();
+        if (cached.length > 0) setBarangayList(cached);
+      });
   }, []);
 
   // ── Handle photo upload ──

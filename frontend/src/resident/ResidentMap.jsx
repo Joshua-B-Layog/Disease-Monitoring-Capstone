@@ -4,6 +4,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import axios from 'axios';
 import { API_URL } from '../config';
+import { cacheCases, getCachedCases } from '../offlineSync';
 import cabuyaoBoundaries from '../data/cabuyao_barangays.geojson.json';
 import { getPointInBarangay, pointInFeature } from '../data/coordinates';
 
@@ -578,6 +579,7 @@ export default function ResidentMap() {
   const [popup,   setPopup]   = useState(null);
   const [lastUpdated, setLastUpdated]   = useState(null);
   const [now, setNow]                   = useState(Date.now());
+  const [offlineMode, setOfflineMode]   = useState(false);
   const [selectedBrgy, setSelectedBrgy] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchMatches, setSearchMatches] = useState([]);
@@ -587,13 +589,18 @@ export default function ResidentMap() {
 
   const fetchMapData = () => {
     axios.get(API_URL + '/api/disease_cases')
-      .then(res => { setAllCases(res.data); setLastUpdated(Date.now()); })
-      .catch(err => console.error('ResidentMap fetch error:', err));
+      .then(res => { setAllCases(res.data); setLastUpdated(Date.now()); setOfflineMode(false); cacheCases(res.data).catch(() => {}); })
+      .catch(async () => {
+        const cached = await getCachedCases();
+        if (cached.length > 0) { setAllCases(cached); setOfflineMode(true); }
+      });
   };
 
   useEffect(() => {
     fetchMapData();
-    const interval = setInterval(fetchMapData, 30000);
+    const interval = setInterval(() => {
+      if (navigator.onLine) fetchMapData();
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -726,6 +733,11 @@ export default function ResidentMap() {
       <p style={{ margin: '0 0 20px', color: 'var(--text-muted)', fontSize: '14px' }}>
         Hover over a barangay for a quick summary. Click for full disease breakdown. Zoom in (≥17) to see purok-level pulse markers.
       </p>
+      {offlineMode && (
+        <div style={{ padding: '8px 14px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '13px', color: '#F59E0B' }}>
+          Offline — showing cached data. Will refresh when reconnected.
+        </div>
+      )}
 
       {/* Selected barangay banner */}
       {selectedBrgy && (

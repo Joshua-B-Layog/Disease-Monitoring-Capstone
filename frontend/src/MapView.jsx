@@ -4,6 +4,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import axios from 'axios';
 import { API_URL } from './config';
+import { cacheCases, getCachedCases } from './offlineSync';
 import { GeoJSON } from 'react-leaflet';
 import cabuyaoBoundaries from './data/cabuyao_barangays.geojson.json';
 import cabuyaoGeoJSON from './data/cabuyao_barangays.geojson';
@@ -698,6 +699,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const [popup,   setPopup]   = useState(null);
   const [lastUpdated, setLastUpdated]   = useState(null);
   const [now, setNow]                   = useState(Date.now());
+  const [offlineMode, setOfflineMode]   = useState(false);
 
   const [barangayOpen, setBarangayOpen] = useState(false);
   const barangayRef = useRef(null);
@@ -771,13 +773,18 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
 
   const fetchMapData = () => {
     axios.get(API_URL + '/api/disease_cases')
-      .then(res => { setAllCases(res.data); setLastUpdated(Date.now()); })
-      .catch(err => console.error('MapView fetch error:', err));
+      .then(res => { setAllCases(res.data); setLastUpdated(Date.now()); setOfflineMode(false); cacheCases(res.data).catch(() => {}); })
+      .catch(async () => {
+        const cached = await getCachedCases();
+        if (cached.length > 0) { setAllCases(cached); setOfflineMode(true); }
+      });
   };
 
   useEffect(() => {
     fetchMapData();
-    const interval = setInterval(fetchMapData, 30000);
+    const interval = setInterval(() => {
+      if (navigator.onLine) fetchMapData();
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -1170,6 +1177,11 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', paddingTop: '6px' }}>
           {lastUpdated ? `Updated ${Math.round((now - lastUpdated) / 1000)}s ago` : 'Refreshing...'}
         </div>
+        {offlineMode && (
+          <div style={{ fontSize: '11px', color: '#F59E0B', textAlign: 'center', padding: '6px 8px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '6px' }}>
+            Offline — showing cached data
+          </div>
+        )}
       </div>
 
       {/* ── MAP AREA ── */}

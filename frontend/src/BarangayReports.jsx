@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { API_URL } from './config';
+import { cacheCases, getCachedCases, cacheAuditLogs, getCachedAuditLogs, cacheGeneratedReports, getCachedGeneratedReports } from './offlineSync';
 
 // ── CHO Unit → Barangay mapping ──
 const CHO_BARANGAYS = {
@@ -72,13 +73,14 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
   const [auditLoading, setAuditLoading]   = useState(true);
   const [lastUpdated, setLastUpdated]     = useState(null);
   const [now, setNow]                     = useState(Date.now());
+  const [offlineMode, setOfflineMode]     = useState(false);
 
   const fetchLiveData = () => {
     axios.get(API_URL + '/api/disease_cases')
-      .then(res => setAllCases(res.data))
+      .then(res => { setAllCases(res.data); cacheCases(res.data).catch(() => {}); })
       .catch(() => {});
     axios.get(API_URL + '/api/audit-logs')
-      .then(res => { setAuditLogs(res.data); setLastUpdated(Date.now()); })
+      .then(res => { setAuditLogs(res.data); setLastUpdated(Date.now()); cacheAuditLogs(res.data).catch(() => {}); })
       .catch(() => {});
   };
 
@@ -86,12 +88,22 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
     setStatsLoading(true);
     setAuditLoading(true);
     axios.get(API_URL + '/api/disease_cases')
-      .then(res => { setAllCases(res.data); setStatsLoading(false); })
-      .catch(() => setStatsLoading(false));
+      .then(res => { setAllCases(res.data); setStatsLoading(false); cacheCases(res.data).catch(() => {}); })
+      .catch(async () => {
+        const cached = await getCachedCases();
+        if (cached.length > 0) { setAllCases(cached); setOfflineMode(true); }
+        setStatsLoading(false);
+      });
     axios.get(API_URL + '/api/audit-logs')
-      .then(res => { setAuditLogs(res.data); setAuditLoading(false); setLastUpdated(Date.now()); })
-      .catch(() => setAuditLoading(false));
-    const interval = setInterval(fetchLiveData, 30000);
+      .then(res => { setAuditLogs(res.data); setAuditLoading(false); setLastUpdated(Date.now()); cacheAuditLogs(res.data).catch(() => {}); })
+      .catch(async () => {
+        const cached = await getCachedAuditLogs();
+        if (cached.length > 0) { setAuditLogs(cached); setOfflineMode(true); }
+        setAuditLoading(false);
+      });
+    const interval = setInterval(() => {
+      if (navigator.onLine) fetchLiveData();
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -116,8 +128,13 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
         }));
         setReportLogs(mapped);
         setReportsLoading(false);
+        cacheGeneratedReports(mapped).catch(() => {});
       })
-      .catch(() => setReportsLoading(false));
+      .catch(async () => {
+        const cached = await getCachedGeneratedReports();
+        if (cached.length > 0) setReportLogs(cached);
+        setReportsLoading(false);
+      });
   };
 
   useEffect(() => {
@@ -675,7 +692,14 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
 
       {/* ── PAGE HEADER ── */}
       <div style={{ marginBottom: '20px' }}>
-        <h2 style={{ margin: '0 0 2px 0', fontSize: '22px', fontWeight: '700', color: 'var(--text-h)' }}>Audit Reports</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <h2 style={{ margin: '0 0 2px 0', fontSize: '22px', fontWeight: '700', color: 'var(--text-h)' }}>Audit Reports</h2>
+          {offlineMode && (
+            <span style={{ fontSize: '12px', color: '#F59E0B', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '6px', padding: '4px 10px' }}>
+              Offline — showing cached data
+            </span>
+          )}
+        </div>
         <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
           {isBHW ? `Brgy. ${myBarangayName}` : choUnit} - Monitoring {myBarangays.length} barangay{myBarangays.length !== 1 ? 's' : ''}
         </p>

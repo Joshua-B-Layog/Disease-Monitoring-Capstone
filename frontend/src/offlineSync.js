@@ -4,6 +4,7 @@ export function isOnline() {
   return navigator.onLine;
 }
 
+// ── Cases ──
 export async function cacheCases(cases) {
   try {
     await db.cases.clear();
@@ -24,6 +25,7 @@ export async function getCachedCases() {
   }
 }
 
+// ── Diseases ──
 export async function cacheDiseases(diseases) {
   try {
     await db.diseases.clear();
@@ -44,6 +46,7 @@ export async function getCachedDiseases() {
   }
 }
 
+// ── Barangays ──
 export async function cacheBarangays(barangays) {
   try {
     await db.barangays.clear();
@@ -64,11 +67,117 @@ export async function getCachedBarangays() {
   }
 }
 
+// ── Combined reference data ──
 export async function cacheReferenceData(diseases, barangays) {
   await cacheDiseases(diseases);
   await cacheBarangays(barangays);
 }
 
+// ── Users ──
+export async function cacheUsers(users) {
+  try {
+    await db.users.clear();
+    if (users && users.length > 0) {
+      await db.users.bulkPut(users.map(u => ({
+        ...u,
+        user_id: u.id || u.user_id
+      })));
+    }
+    await db.referenceData.put({ key: 'users_cached_at', value: Date.now() });
+  } catch (err) {
+    console.warn('[OfflineSync] Failed to cache users:', err.message);
+  }
+}
+
+export async function getCachedUsers() {
+  try {
+    return await db.users.toArray();
+  } catch {
+    return [];
+  }
+}
+
+// ── Audit Logs ──
+export async function cacheAuditLogs(logs) {
+  try {
+    await db.auditLogs.clear();
+    if (logs && logs.length > 0) {
+      await db.auditLogs.bulkPut(logs.map((l, i) => ({
+        ...l,
+        id: l.id || i + 1
+      })));
+    }
+    await db.referenceData.put({ key: 'auditLogs_cached_at', value: Date.now() });
+  } catch (err) {
+    console.warn('[OfflineSync] Failed to cache audit logs:', err.message);
+  }
+}
+
+export async function getCachedAuditLogs() {
+  try {
+    return await db.auditLogs.toArray();
+  } catch {
+    return [];
+  }
+}
+
+// ── Generated Reports ──
+export async function cacheGeneratedReports(reports) {
+  try {
+    await db.generatedReports.clear();
+    if (reports && reports.length > 0) {
+      await db.generatedReports.bulkPut(reports);
+    }
+    await db.referenceData.put({ key: 'generatedReports_cached_at', value: Date.now() });
+  } catch (err) {
+    console.warn('[OfflineSync] Failed to cache generated reports:', err.message);
+  }
+}
+
+export async function getCachedGeneratedReports() {
+  try {
+    return await db.generatedReports.toArray();
+  } catch {
+    return [];
+  }
+}
+
+// ── User Profile ──
+export async function cacheUserProfile(userId, profile) {
+  try {
+    await db.userProfiles.put({ userId, ...profile });
+    await db.referenceData.put({ key: `profile_${userId}_cached_at`, value: Date.now() });
+  } catch (err) {
+    console.warn('[OfflineSync] Failed to cache user profile:', err.message);
+  }
+}
+
+export async function getCachedUserProfile(userId) {
+  try {
+    return await db.userProfiles.get(userId);
+  } catch {
+    return null;
+  }
+}
+
+// ── Weekly Summary ──
+export async function cacheWeeklySummary(key, data) {
+  try {
+    await db.weeklySummaries.put({ key, ...data });
+  } catch (err) {
+    console.warn('[OfflineSync] Failed to cache weekly summary:', err.message);
+  }
+}
+
+export async function getCachedWeeklySummary(key) {
+  try {
+    return await db.weeklySummaries.get(key);
+  } catch {
+    return null;
+  }
+}
+
+// ── Cache timestamp helper ──
 export async function getLastCacheTime(key) {
   try {
     const entry = await db.referenceData.get(key);

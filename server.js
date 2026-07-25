@@ -322,6 +322,9 @@ function createAuditLog(userId, userName, userRole, choUnit, barangay, action, e
 // 4. API ROUTES
 // ==========================================
 
+// ROUTE: Health check / ping for offline detection
+app.get('/api/ping', (req, res) => res.sendStatus(200));
+
 // ROUTE: Get all disease cases (with disease_name join)
 app.get('/api/disease_cases', (req, res) => {
     const sql = `

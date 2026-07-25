@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
 import { API_URL } from './config';
+import { cacheUsers, getCachedUsers, getCachedBarangays } from './offlineSync';
 
 const CHO_BARANGAYS = {
   'CHO Unit I': [
@@ -49,6 +50,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [barangayList, setBarangayList] = useState([]);
+  const [offlineMode, setOfflineMode] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterBarangay, setFilterBarangay] = useState('All Barangays');
@@ -101,8 +103,12 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
   const fetchUsers = () => {
     setLoading(true);
     axios.get(API_URL + '/api/users')
-      .then(res => { setUsers(res.data); setLoading(false); })
-      .catch(() => setLoading(false));
+      .then(res => { setUsers(res.data); setLoading(false); setOfflineMode(false); cacheUsers(res.data).catch(() => {}); })
+      .catch(async () => {
+        const cached = await getCachedUsers();
+        if (cached.length > 0) { setUsers(cached); setOfflineMode(true); }
+        setLoading(false);
+      });
   };
 
   useEffect(() => { fetchUsers(); }, []);
@@ -110,7 +116,10 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
   useEffect(() => {
     axios.get(API_URL + '/api/barangays')
       .then(res => setBarangayList(res.data))
-      .catch(() => {});
+      .catch(async () => {
+        const cached = await getCachedBarangays();
+        if (cached.length > 0) setBarangayList(cached);
+      });
   }, []);
 
   useEffect(() => {
@@ -349,6 +358,11 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h2 style={{ margin: 0, fontSize: '22px', color: 'var(--text-h)', fontWeight: '700' }}>User Accounts</h2>
+        {offlineMode && (
+          <span style={{ fontSize: '12px', color: '#F59E0B', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '6px', padding: '4px 10px' }}>
+            Offline — showing cached data
+          </span>
+        )}
         <button onClick={handleExportUsers}
           onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
           onMouseLeave={e => e.currentTarget.style.opacity = '1'}

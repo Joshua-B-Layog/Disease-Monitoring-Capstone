@@ -17,7 +17,22 @@ db.version(2).stores({
   referenceData: 'key',
   syncQueue: '++id, type, endpoint, timestamp, userId, status'
 }).upgrade(async (tx) => {
-  // no data migration needed — syncQueue is ephemeral
+  // syncQueue is ephemeral
+});
+
+db.version(3).stores({
+  cases: 'case_id, disease_name, barangay_name, status, date_reported',
+  diseases: 'id, name',
+  barangays: 'id, name',
+  referenceData: 'key',
+  syncQueue: '++id, type, endpoint, timestamp, userId, status',
+  users: 'user_id, username, role, barangay_name',
+  auditLogs: '++id, action, entity_type, created_at',
+  generatedReports: 'id, cho_unit, created_at',
+  userProfiles: 'userId',
+  weeklySummaries: 'key'
+}).upgrade(async (tx) => {
+  // new stores start empty
 });
 
 export default db;

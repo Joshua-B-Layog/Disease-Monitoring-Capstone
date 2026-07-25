@@ -81,11 +81,23 @@ function App() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
-    const goOnline = () => setIsOnline(true);
-    const goOffline = () => setIsOnline(false);
-    window.addEventListener('online', goOnline);
-    window.addEventListener('offline', goOffline);
-    return () => { window.removeEventListener('online', goOnline); window.removeEventListener('offline', goOffline); };
+    const checkOnline = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/ping`, { method: 'HEAD', cache: 'no-store' });
+        setIsOnline(res.ok);
+      } catch {
+        setIsOnline(false);
+      }
+    };
+    checkOnline();
+    const interval = setInterval(checkOnline, 15000);
+    window.addEventListener('online', checkOnline);
+    window.addEventListener('offline', () => setIsOnline(false));
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('online', checkOnline);
+      window.removeEventListener('offline', () => setIsOnline(false));
+    };
   }, []);
 
   // ── Sync state ──
@@ -121,21 +133,23 @@ function App() {
   };
 
   // Auto-sync on reconnect
+  const prevOnlineRef = useRef(isOnline);
   useEffect(() => {
-    const goOnline = async () => {
-      const count = await getPendingCount();
-      if (count > 0) handleManualSync();
-    };
-    window.addEventListener('online', goOnline);
-    return () => window.removeEventListener('online', goOnline);
-  }, []);
+    if (isOnline && !prevOnlineRef.current) {
+      refreshPendingCount().then(() => {
+        getPendingCount().then(count => { if (count > 0) handleManualSync(); });
+      });
+    }
+    prevOnlineRef.current = isOnline;
+  }, [isOnline]);
 
-  // Poll pending count every 30s
+  // Poll pending count every 30s (only when online)
   useEffect(() => {
+    if (!isOnline) return;
     refreshPendingCount();
     const interval = setInterval(refreshPendingCount, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isOnline]);
 
   // ── CHO Profile modal state ──
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -207,10 +221,11 @@ useEffect(() => {
       .catch(() => {});
   };
 
+  if (!isOnline) return;
   fetchNotifications();
   const interval = setInterval(fetchNotifications, 10000);
   return () => clearInterval(interval);
-}, [loggedUserId]);
+}, [loggedUserId, isOnline]);
 
 // ── Close notification dropdown on outside click ──
 useEffect(() => {
@@ -368,6 +383,9 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
   };
 
   const handleLogout = () => { 
+    if (!navigator.onLine) {
+      if (!window.confirm('You are currently offline. Logging out will prevent you from logging back in until reconnected. Continue?')) return;
+    }
     setIsLoggedIn(false); 
     setSessionContext('');
     setLoggedUser('');

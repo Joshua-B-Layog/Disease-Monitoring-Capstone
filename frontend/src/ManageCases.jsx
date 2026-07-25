@@ -465,6 +465,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   useEffect(() => {
     fetchCases();
     const interval = setInterval(() => {
+      if (!navigator.onLine) return;
       if (view !== 'add' && view !== 'edit') fetchCases();
     }, 30000);
     return () => clearInterval(interval);

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { API_URL } from './config';
+import { cacheWeeklySummary, getCachedWeeklySummary } from './offlineSync';
 
 export default function WeeklySummary({ userId, loginRole, compactMode, fontScale, onBack }) {
   const defaultStart = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
@@ -10,17 +11,34 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [offlineMode, setOfflineMode] = useState(false);
 
   const fetchData = () => {
     setLoading(true);
     setError(null);
+    const cacheKey = `weekly_${userId}_${startDate}_${endDate}`;
     fetch(`${API_URL}/api/weekly-summary?user_id=${userId}&start_date=${startDate}&end_date=${endDate}`)
       .then(r => r.json())
-      .then(d => { if (d.error) throw new Error(d.error); setData(d); setLoading(false); })
-      .catch(e => { setError(e.message); setLoading(false); });
+      .then(d => {
+        if (d.error) throw new Error(d.error);
+        setData(d);
+        setLoading(false);
+        setOfflineMode(false);
+        cacheWeeklySummary(cacheKey, d).catch(() => {});
+      })
+      .catch(async () => {
+        const cached = await getCachedWeeklySummary(cacheKey);
+        if (cached) {
+          setData(cached);
+          setOfflineMode(true);
+        } else {
+          setError('Failed to load weekly summary');
+        }
+        setLoading(false);
+      });
   };
 
-  useEffect(() => { if (userId) fetchData(); }, [userId]);
+  useEffect(() => { if (userId) fetchData(); }, [userId, startDate, endDate]);
 
   const fmtDate = (d) => {
     if (!d) return '';
@@ -263,6 +281,11 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
             </p>
           </div>
         </div>
+        {offlineMode && (
+          <div style={{ padding: '8px 14px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '13px', color: '#F59E0B' }}>
+            Offline — showing last cached report
+          </div>
+        )}
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {/* Date Range */}
           <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
