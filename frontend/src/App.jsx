@@ -162,12 +162,13 @@ function App() {
   const notifRef = useRef(null);
 
   // ── THEME ──
-  const [theme, setTheme] = useState('dark');
+  const [theme, setTheme] = useState(() => localStorage.getItem('cdms_theme') || 'dark');
+
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('cdms_theme', theme);
   }, [theme]);
   const toggleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark');
-
   // ── Apply font-scale globally ──
   useEffect(() => {
     document.documentElement.style.setProperty('--app-font-scale', fontScale);
