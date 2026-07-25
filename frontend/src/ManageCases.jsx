@@ -1356,6 +1356,38 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       if (diseaseCard) setSelectedDisease(diseaseCard);
       setTimeout(() => { setView('list'); setSubmitMsg(''); setSubmitLoading(false); }, 1200);
     } catch (err) {
+      // Network error (no response) — queue offline instead of showing error
+      if (!err.response) {
+        const tempId = 'temp-' + Date.now();
+        try {
+          if (editingCase) {
+            await enqueueOperation({
+              type: 'edit',
+              endpoint: `/api/cases/${editingCase.case_id}`,
+              method: 'PUT',
+              payload,
+              userId: loggedUserId,
+              userName: loggedUser,
+            });
+          } else {
+            await enqueueOperation({
+              type: 'create',
+              endpoint: '/api/cases',
+              method: 'POST',
+              payload: { ...payload, case_id: tempId },
+              userId: loggedUserId,
+              userName: loggedUser,
+            });
+          }
+          setSubmitMsg('Case saved offline — will sync when reconnected.');
+          setOfflineMode(true);
+          setTimeout(() => { setView('list'); setSubmitMsg(''); setSubmitLoading(false); }, 1800);
+        } catch (queueErr) {
+          setSubmitMsg('Error saving offline: ' + queueErr.message);
+          setSubmitLoading(false);
+        }
+        return;
+      }
       if (err.response?.status === 409 && err.response?.data?.crossBarangay) {
         const { detectedBarangay, message } = err.response.data;
         const confirmed = window.confirm(message);

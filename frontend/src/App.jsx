@@ -286,7 +286,8 @@ useEffect(() => {
     fetch(`${API_URL}/api/notifications/${id}/read`, { method: 'PUT' })
       .then(() => setNotifications(prev =>
         prev.map(n => n.id === id ? { ...n, is_read: 1 } : n)
-      ));
+      ))
+      .catch(() => {});
   };
 
 const unreadCount = notifications.filter(n => n.is_read === 0).length;
