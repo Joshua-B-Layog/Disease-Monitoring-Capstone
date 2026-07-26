@@ -190,7 +190,7 @@
             };
 
             // Cache user credentials for offline login
-            upsertCachedUser({ id: data.user.id, email, password, name: data.user.name, role: data.user.role, barangay: data.user.barangay }).catch(() => {});
+            upsertCachedUser({ id: data.user.id, email, username: email, password, name: data.user.name, role: data.user.role, barangay: data.user.barangay }).catch(() => {});
 
             if (data.requires2FA) {
                 // Hold off on logging in - send OTP and move to verification step
@@ -220,6 +220,15 @@
                 u.role === selectedRole
             );
             if (match) {
+                // Validate BHW barangay assignment offline
+                if (selectedRole === 'BHW' && match.barangay) {
+                    const selectedBrgy = selectedContext.replace(/^Brgy\.\s*/i, '').trim().toLowerCase();
+                    const assignedBrgy = (match.barangay || '').trim().toLowerCase();
+                    if (assignedBrgy && selectedBrgy !== assignedBrgy) {
+                        setLoginError(`Access denied. You are assigned to Brgy. ${match.barangay}, not Brgy. ${selectedContext.replace(/^Brgy\.\s*/i, '').trim()}.`);
+                        return;
+                    }
+                }
                 onLoginSuccess({
                     id: match.id || match.user_id,
                     role: selectedRole,
