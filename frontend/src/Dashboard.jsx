@@ -415,7 +415,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       {offlineMode && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '13px', color: '#F59E0B' }}>
           <span style={{ fontSize: '16px' }}>⚠</span>
-          Offline — showing cached data. Will refresh when reconnected.
+          Offline - showing cached data. Will refresh when reconnected.
         </div>
       )}
 

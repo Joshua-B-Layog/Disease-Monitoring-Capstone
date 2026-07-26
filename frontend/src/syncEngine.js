@@ -91,7 +91,3 @@ export async function processSyncQueue(onProgress, onConflict) {
   syncing = false;
   return { synced, failed, conflicts };
 }
-
-export function isSyncing() {
-  return syncing;
-}

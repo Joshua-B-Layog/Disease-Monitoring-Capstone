@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
 import { API_URL } from './config';
-import { cacheUsers, getCachedUsers, getCachedBarangays } from './offlineSync';
+import { cacheUsers, getCachedUsers, getCachedBarangays, isOnline } from './offlineSync';
 
 const CHO_BARANGAYS = {
   'CHO Unit I': [
@@ -360,7 +360,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
         <h2 style={{ margin: 0, fontSize: '22px', color: 'var(--text-h)', fontWeight: '700' }}>User Accounts</h2>
         {offlineMode && (
           <span style={{ fontSize: '12px', color: '#F59E0B', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '6px', padding: '4px 10px' }}>
-            Offline — showing cached data
+            Offline - showing cached data
           </span>
         )}
         <button onClick={handleExportUsers}
@@ -451,26 +451,29 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                 setEditQueueIndex(0);
                 openEdit(users.find(u => u.user_id === selectedIds[0]));
               }}
+                disabled={offlineMode}
                 onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                 onMouseLeave={e => e.currentTarget.style.opacity = '1'}
-                style={{ padding: '8px 16px', background: 'transparent', border: '1px solid #3b82f6', color: '#3b82f6', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', fontSize: '13px' }}>
+                style={{ padding: '8px 16px', background: 'transparent', border: '1px solid #3b82f6', color: '#3b82f6', borderRadius: '6px', cursor: offlineMode ? 'not-allowed' : 'pointer', fontWeight: '500', fontSize: '13px', opacity: offlineMode ? 0.4 : 1 }}>
                 Edit Selected ({selectedIds.length})
               </button>
               <button onClick={() => {
                 setBulkDeleteMode(true);
                 setDeleteTarget({ user_id: null, full_name: `${selectedIds.length} accounts`, barangay_name: '' });
               }}
+                disabled={offlineMode}
                 onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                 onMouseLeave={e => e.currentTarget.style.opacity = '1'}
-                style={{ padding: '8px 16px', background: 'transparent', border: '1px solid #ef4444', color: '#ef4444', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', fontSize: '13px' }}>
+                style={{ padding: '8px 16px', background: 'transparent', border: '1px solid #ef4444', color: '#ef4444', borderRadius: '6px', cursor: offlineMode ? 'not-allowed' : 'pointer', fontWeight: '500', fontSize: '13px', opacity: offlineMode ? 0.4 : 1 }}>
                 Delete Selected ({selectedIds.length})
               </button>
             </>
           )}
           <button onClick={openAdd}
+            disabled={offlineMode}
             onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
             onMouseLeave={e => e.currentTarget.style.opacity = '1'}
-            style={{ marginLeft: selectedIds.length > 0 ? '0' : 'auto', padding: '10px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
+            style={{ marginLeft: selectedIds.length > 0 ? '0' : 'auto', padding: '10px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: offlineMode ? 'not-allowed' : 'pointer', fontWeight: '600', fontSize: '13px', opacity: offlineMode ? 0.4 : 1 }}>
             + Add User
           </button>
         </div>
@@ -523,9 +526,10 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                     <td style={{ padding: compactMode ? '8px 6px' : '15px 10px' }}>
                       <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
                         <button onClick={() => openEdit(user)} title="Edit"
+                          disabled={offlineMode}
                           onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                           onMouseLeave={e => e.currentTarget.style.opacity = '1'}
-                          style={{ padding: '6px 10px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', borderRadius: '6px', cursor: 'pointer' }}>
+                          style={{ padding: '6px 10px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', borderRadius: '6px', cursor: offlineMode ? 'not-allowed' : 'pointer', opacity: offlineMode ? 0.4 : 1 }}>
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#60A5FA" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                         </button>
                         <button onClick={() => {
@@ -537,9 +541,10 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                                   .catch(err => { setSubmitMsg('Delete failed: ' + (err.response?.data?.error || err.message)); setTimeout(() => setSubmitMsg(''), 3000); });
                               }
                             }} title="Delete"
+                          disabled={offlineMode}
                           onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                           onMouseLeave={e => e.currentTarget.style.opacity = '1'}
-                          style={{ padding: '6px 10px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', borderRadius: '6px', cursor: 'pointer' }}>
+                          style={{ padding: '6px 10px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', borderRadius: '6px', cursor: offlineMode ? 'not-allowed' : 'pointer', opacity: offlineMode ? 0.4 : 1 }}>
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
                         </button>
                       </div>

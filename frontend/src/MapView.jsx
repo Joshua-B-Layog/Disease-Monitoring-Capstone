@@ -1179,7 +1179,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         </div>
         {offlineMode && (
           <div style={{ fontSize: '11px', color: '#F59E0B', textAlign: 'center', padding: '6px 8px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '6px' }}>
-            Offline — showing cached data
+            Offline - showing cached data
           </div>
         )}
       </div>

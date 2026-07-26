@@ -735,7 +735,7 @@ export default function ResidentMap() {
       </p>
       {offlineMode && (
         <div style={{ padding: '8px 14px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '13px', color: '#F59E0B' }}>
-          Offline — showing cached data. Will refresh when reconnected.
+          Offline - showing cached data. Will refresh when reconnected.
         </div>
       )}
 

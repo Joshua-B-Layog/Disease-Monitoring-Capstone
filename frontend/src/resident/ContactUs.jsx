@@ -33,6 +33,7 @@ export default function ContactUs() {
   const [form, setForm] = useState({ name: '', age: '', gender: '', contact: '', address: '', targetCho: 'BHW', targetBarangay: '', disease: '', message: '' });
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [offlineQueued, setOfflineQueued] = useState(false);
   const [error, setError] = useState('');
   const [locationView, setLocationView] = useState('cho1');
   const [diseaseOpen, setDiseaseOpen] = useState(false);
@@ -66,6 +67,7 @@ export default function ContactUs() {
           payload: form,
         });
         setSent(true);
+        setOfflineQueued(true);
         setForm({ name: '', age: '', gender: '', contact: '', address: '', targetCho: 'BHW', targetBarangay: '', disease: '', message: '' });
         setSending(false);
         return;
@@ -127,9 +129,11 @@ export default function ContactUs() {
             <div style={{ textAlign: 'center', padding: '24px' }}>
               <div style={{ fontSize: '36px', marginBottom: '8px' }}>✅</div>
               <p style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
-                Your message has been sent successfully! The health office will respond to you soon.
+                {offlineQueued
+                  ? 'Your message has been saved and will be sent when you reconnect to the internet.'
+                  : 'Your message has been sent successfully! The health office will respond to you soon.'}
               </p>
-              <button onClick={() => setSent(false)}
+              <button onClick={() => { setSent(false); setOfflineQueued(false); }}
                 style={{
                   marginTop: '12px', padding: '8px 20px', background: '#10B981',
                   color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px',

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API_URL } from './config';
 import { getAllQueueItems, clearCompleted } from './syncEngine';
-import { cacheUserProfile, getCachedUserProfile, getCachedBarangays } from './offlineSync';
+import { cacheUserProfile, getCachedUserProfile, getCachedBarangays, isOnline } from './offlineSync';
 import './ChoSettings.css';
 
 function OfflineSyncPanel() {
@@ -124,6 +124,22 @@ export default function CHOSettings({
   const [autoBackupEnabled, setAutoBackupEnabled] = useState(() => localStorage.getItem('cdms_auto_backup') !== 'false');
   const [toastMsg, setToastMsg] = useState('');
   const [toastType, setToastType] = useState('success');
+
+  // ── Offline detection ──
+  const [offlineMode, setOfflineMode] = useState(!isOnline());
+  useEffect(() => {
+    const check = () => setOfflineMode(!isOnline());
+    window.addEventListener('online', check);
+    window.addEventListener('offline', check);
+    document.addEventListener('visibilitychange', check);
+    return () => {
+      window.removeEventListener('online', check);
+      window.removeEventListener('offline', check);
+      document.removeEventListener('visibilitychange', check);
+    };
+  }, []);
+
+  const offlineBtnStyle = offlineMode ? { opacity: 0.5, cursor: 'not-allowed', pointerEvents: 'none' } : {};
 
   // ── Profile data from DB ──
   const [profile, setProfile] = useState({
@@ -650,6 +666,12 @@ export default function CHOSettings({
         {currentView === 'menu' && (
           <div>
             <h1 className="settings-title">Settings</h1>
+            {offlineMode && (
+              <div style={{ padding: '10px 14px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '13px', color: '#F59E0B', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '16px' }}>⚠</span>
+                Offline - settings changes require an internet connection.
+              </div>
+            )}
             <p className="settings-subtitle">
               Manage your account credentials, notifications, and core configuration behaviors.
             </p>
@@ -843,8 +865,9 @@ export default function CHOSettings({
                     )}
                   </div>
                 ))}
-                <button onClick={handleChangePassword} disabled={passwordLoading} className="security-action-blue-btn"
-                  style={{ opacity: passwordLoading ? 0.7 : 1, cursor: passwordLoading ? 'not-allowed' : 'pointer' }}>
+                <button onClick={handleChangePassword} disabled={passwordLoading || offlineMode} className="security-action-blue-btn"
+                  style={{ ...offlineBtnStyle, opacity: passwordLoading ? 0.7 : offlineBtnStyle.opacity || 1, cursor: passwordLoading ? 'not-allowed' : offlineBtnStyle.cursor || 'pointer' }}
+                  title={offlineMode ? 'Unavailable offline' : ''}>
                   {passwordLoading ? 'Updating...' : 'Update Password'}
                 </button>
               </div>
@@ -868,9 +891,9 @@ export default function CHOSettings({
                     </span>
                   </div>
                 </div>
-                <label className="figma-toggle-switch" style={{ flexShrink: 0, marginLeft: '16px', marginTop: '4px' }}>
+                <label className="figma-toggle-switch" style={{ flexShrink: 0, marginLeft: '16px', marginTop: '4px', ...(offlineMode ? { opacity: 0.5, pointerEvents: 'none' } : {}) }}>
                   <input type="checkbox" checked={isTwoFactorEnabled}
-                    onChange={handle2FAToggle} disabled={twoFaLoading || twoFaStep === 'disable_otp_sent'} />
+                    onChange={handle2FAToggle} disabled={twoFaLoading || twoFaStep === 'disable_otp_sent' || offlineMode} title={offlineMode ? 'Unavailable offline' : ''} />
                   <span className="figma-slider" />
                 </label>
               </div>
@@ -1193,7 +1216,7 @@ export default function CHOSettings({
             <div className="notifications-action-container">
               {notifLoading && <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginRight: '12px' }}>Loading...</span>}
               {notifSaveMsg && <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginRight: '12px' }}>{notifSaveMsg}</span>}
-              <button className="notifications-save-btn" onClick={async () => {
+              <button className="notifications-save-btn" disabled={offlineMode} style={offlineBtnStyle} title={offlineMode ? 'Unavailable offline' : ''} onClick={async () => {
                 setNotifSaveMsg('');
                 try {
                   const res = await fetch(`${API_URL}/api/notification-preferences/${userId}`, {
@@ -1635,7 +1658,7 @@ export default function CHOSettings({
                         setToastType('error');
                         setTimeout(() => setToastMsg(''), 3000);
                       }
-                    }} style={{ padding: '8px 18px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '13px', fontWeight: '600', color: 'var(--text-main)', cursor: 'pointer' }}>
+                    }} style={{ ...offlineBtnStyle, padding: '8px 18px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '13px', fontWeight: '600', color: 'var(--text-main)', cursor: 'pointer' }} disabled={offlineMode} title={offlineMode ? 'Unavailable offline' : ''}>
                       Export
                     </button>
                   </div>
@@ -1670,7 +1693,7 @@ export default function CHOSettings({
                   </div>
 
                   <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
-                    <button onClick={() => handleCreateBackup(false)} disabled={backupLoading} style={{ flex: 1, padding: '12px', background: '#003cb4', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: backupLoading ? 'not-allowed' : 'pointer', opacity: backupLoading ? 0.7 : 1 }}>
+                    <button onClick={() => handleCreateBackup(false)} disabled={backupLoading || offlineMode} style={{ ...offlineBtnStyle, flex: 1, padding: '12px', background: '#003cb4', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: backupLoading || offlineMode ? 'not-allowed' : 'pointer', opacity: backupLoading ? 0.7 : offlineBtnStyle.opacity || 1 }} title={offlineMode ? 'Unavailable offline' : ''}>
                       {backupLoading ? 'Creating Backup...' : 'Create Backup'}
                     </button>
                     <input type="file" ref={restoreInputRef} accept=".json" style={{ display: 'none' }}
@@ -1712,7 +1735,7 @@ export default function CHOSettings({
                           e.target.value = '';
                         }
                       }} />
-                    <button onClick={() => restoreInputRef.current?.click()} disabled={restoreLoading} style={{ flex: 1, padding: '12px', background: restoreLoading ? '#94a3b8' : 'var(--bg-surface)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: restoreLoading ? 'not-allowed' : 'pointer' }}>
+                    <button onClick={() => restoreInputRef.current?.click()} disabled={restoreLoading || offlineMode} style={{ ...offlineBtnStyle, flex: 1, padding: '12px', background: restoreLoading ? '#94a3b8' : 'var(--bg-surface)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: restoreLoading || offlineMode ? 'not-allowed' : 'pointer' }} title={offlineMode ? 'Unavailable offline' : ''}>
                       {restoreLoading ? 'Restoring...' : 'Restore'}
                     </button>
                   </div>
@@ -1774,7 +1797,7 @@ export default function CHOSettings({
                     <div style={{ fontSize: '14px', fontWeight: '700', color: '#b91c1c', marginBottom: '4px' }}>Clear All Data</div>
                     <div style={{ fontSize: '13px', color: '#991b1b' }}>This will permanently delete all your data. This action cannot be undone.</div>
                   </div>
-                  <button onClick={() => setShowClearModal(true)} style={{ padding: '10px 20px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '13px', fontWeight: '600', color: '#dc2626', cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                  <button onClick={() => setShowClearModal(true)} disabled={offlineMode} style={{ ...offlineBtnStyle, padding: '10px 20px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '13px', fontWeight: '600', color: '#dc2626', cursor: offlineMode ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }} title={offlineMode ? 'Unavailable offline' : ''}>
                     🗑️ Clear Data
                   </button>
                 </div>

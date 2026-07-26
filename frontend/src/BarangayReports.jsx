@@ -602,7 +602,8 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
 
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
               <button onClick={() => handleDeleteReport(viewReport.id)}
-                style={{ padding: '10px 20px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#dc2626', cursor: 'pointer' }}
+                disabled={offlineMode}
+                style={{ padding: '10px 20px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#dc2626', cursor: offlineMode ? 'not-allowed' : 'pointer', opacity: offlineMode ? 0.4 : 1 }}
                 onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                 onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
                 🗑️ Delete Report
@@ -682,7 +683,8 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                 Cancel
               </button>
               <button onClick={handleGenerateReport}
-                style={{ padding: '10px 28px', background: '#10b981', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#fff', cursor: 'pointer' }}>
+                disabled={offlineMode}
+                style={{ padding: '10px 28px', background: '#10b981', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#fff', cursor: offlineMode ? 'not-allowed' : 'pointer', opacity: offlineMode ? 0.4 : 1 }}>
                 Generate Report
               </button>
             </div>
@@ -696,7 +698,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
           <h2 style={{ margin: '0 0 2px 0', fontSize: '22px', fontWeight: '700', color: 'var(--text-h)' }}>Audit Reports</h2>
           {offlineMode && (
             <span style={{ fontSize: '12px', color: '#F59E0B', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '6px', padding: '4px 10px' }}>
-              Offline — showing cached data
+              Offline - showing cached data
             </span>
           )}
         </div>
@@ -762,7 +764,8 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
           )}
         </div>
         <button onClick={() => setShowGenModal(true)}
-          style={{ padding: '9px 22px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '7px', fontWeight: '600', fontSize: '14px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+          disabled={offlineMode}
+          style={{ padding: '9px 22px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '7px', fontWeight: '600', fontSize: '14px', cursor: offlineMode ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', flexShrink: 0, opacity: offlineMode ? 0.4 : 1 }}
           onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
           onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
           Generate Report

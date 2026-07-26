@@ -3,7 +3,7 @@ import axios from 'axios';
 import { API_URL } from './config';
 import './ManageCases.css';
 import cabuyaoBoundaries from './data/cabuyao_barangays.geojson.json';
-import { cacheCases, getCachedCases, cacheBarangays, cacheDiseases, getCachedBarangays, getCachedDiseases, isOnline } from './offlineSync';
+import { cacheCases, getCachedCases, cacheBarangays, cacheDiseases, getCachedBarangays, getCachedDiseases, isOnline, cacheInboxItems, getCachedInboxItems, cacheContactMessages, getCachedContactMessages, cacheEditRequests, getCachedEditRequests, cacheOutboxItems, getCachedOutboxItems, cachePendingRegistrations, getCachedPendingRegistrations } from './offlineSync';
 import { enqueueOperation } from './syncEngine';
 import { getPointInBarangay } from './data/coordinates';
 const FeverIcon = ({ color = '#ef4444', size = 28 }) => (
@@ -482,8 +482,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       params.cho_unit = sessionContext;
     }
     axios.get(`${API_URL}/api/case-inbox`, { params })
-      .then(res => { setInboxItems(res.data); setInboxLoading(false); })
-      .catch(() => setInboxLoading(false));
+      .then(res => { setInboxItems(res.data); setInboxLoading(false); cacheInboxItems(res.data).catch(() => {}); })
+      .catch(async () => {
+        const cached = await getCachedInboxItems();
+        if (cached.length > 0) { setInboxItems(cached); setOfflineMode(true); }
+        setInboxLoading(false);
+      });
   };
 
   const fetchContactMessages = () => {
@@ -495,8 +499,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       params.barangay = loginBarangay;
     }
     axios.get(`${API_URL}/api/contact-messages`, { params })
-      .then(res => { setContactMessages(res.data); setContactMessagesLoading(false); })
-      .catch(() => setContactMessagesLoading(false));
+      .then(res => { setContactMessages(res.data); setContactMessagesLoading(false); cacheContactMessages(res.data).catch(() => {}); })
+      .catch(async () => {
+        const cached = await getCachedContactMessages();
+        if (cached.length > 0) { setContactMessages(cached); setOfflineMode(true); }
+        setContactMessagesLoading(false);
+      });
   };
 
   const getChoUnitForBarangay = (barangayName) => {
@@ -517,8 +525,11 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       params.user_id = loggedUserId;
     }
     axios.get(`${API_URL}/api/case-outbox`, { params })
-      .then(res => setOutboxItems(res.data))
-      .catch(() => {});
+      .then(res => { setOutboxItems(res.data); cacheOutboxItems(res.data).catch(() => {}); })
+      .catch(async () => {
+        const cached = await getCachedOutboxItems();
+        if (cached.length > 0) { setOutboxItems(cached); setOfflineMode(true); }
+      });
   };
 
   const handleAcceptInboxItem = (item) => {
@@ -622,8 +633,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     if (loginRole !== 'BHW' || !loggedUserId) return;
     setMyEditRequestsLoading(true);
     axios.get(`${API_URL}/api/case-edit-requests?requested_by=${loggedUserId}&unread_only=true`)
-      .then(res => { setMyEditRequests(res.data); setMyEditRequestsLoading(false); })
-      .catch(() => setMyEditRequestsLoading(false));
+      .then(res => { setMyEditRequests(res.data); setMyEditRequestsLoading(false); cacheEditRequests(res.data).catch(() => {}); })
+      .catch(async () => {
+        const cached = await getCachedEditRequests();
+        if (cached.length > 0) { setMyEditRequests(cached); setOfflineMode(true); }
+        setMyEditRequestsLoading(false);
+      });
   };
 
   // ── EDIT REQUESTS (BHW → CHO) ──
@@ -639,9 +654,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         console.log('[fetchEditRequests] response:', res.data);
         setEditRequests(res.data); 
         setEditRequestsLoading(false); 
+        cacheEditRequests(res.data).catch(() => {});
       })
-      .catch(err => { 
+      .catch(async (err) => { 
         console.error('[fetchEditRequests] error:', err);
+        const cached = await getCachedEditRequests();
+        if (cached.length > 0) { setEditRequests(cached); setOfflineMode(true); }
         setEditRequestsLoading(false); 
       });
   };
@@ -652,8 +670,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     const params = {};
     if (loginRole === 'CHO' && sessionContext) params.cho_unit = sessionContext;
     axios.get(`${API_URL}/api/pending-registrations`, { params })
-      .then(res => { setPendingRegistrations(res.data); setPendingRegistrationsLoading(false); })
-      .catch(() => setPendingRegistrationsLoading(false));
+      .then(res => { setPendingRegistrations(res.data); setPendingRegistrationsLoading(false); cachePendingRegistrations(res.data).catch(() => {}); })
+      .catch(async () => {
+        const cached = await getCachedPendingRegistrations();
+        if (cached.length > 0) { setPendingRegistrations(cached); setOfflineMode(true); }
+        setPendingRegistrationsLoading(false);
+      });
   };
 
   const handleApproveRegistration = (reg) => {
@@ -673,18 +695,55 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const handleSendEditRequest = async () => {
     if (!editRequestNote.trim() || !editingCase) return;
     const targetCho = loginBarangay ? getChoUnitForBarangay(loginBarangay) : sessionContext;
+    const editPayload = {
+      requested_by: loggedUserId,
+      requested_by_name: loggedUser,
+      from_barangay_name: loginBarangay,
+      target_cho_unit: targetCho,
+      note: editRequestNote.trim(),
+    };
+    if (!isOnline()) {
+      try {
+        await enqueueOperation({
+          type: 'edit-request',
+          endpoint: `/api/cases/${editingCase.case_id}/request-edit`,
+          method: 'POST',
+          payload: editPayload,
+          userId: loggedUserId,
+          userName: loggedUser,
+        });
+        setEditRequestSuccess(loggedUser);
+        setShowEditRequestForm(false);
+        setEditRequestNote('');
+      } catch (err) {
+        alert('Failed to queue edit request: ' + err.message);
+      }
+      return;
+    }
     try {
-      await axios.post(`${API_URL}/api/cases/${editingCase.case_id}/request-edit`, {
-        requested_by: loggedUserId,
-        requested_by_name: loggedUser,
-        from_barangay_name: loginBarangay,
-        target_cho_unit: targetCho,
-        note: editRequestNote.trim(),
-      });
+      await axios.post(`${API_URL}/api/cases/${editingCase.case_id}/request-edit`, editPayload);
       setEditRequestSuccess(loggedUser);
       setShowEditRequestForm(false);
       setEditRequestNote('');
     } catch (err) {
+      if (!err.response) {
+        try {
+          await enqueueOperation({
+            type: 'edit-request',
+            endpoint: `/api/cases/${editingCase.case_id}/request-edit`,
+            method: 'POST',
+            payload: editPayload,
+            userId: loggedUserId,
+            userName: loggedUser,
+          });
+          setEditRequestSuccess(loggedUser);
+          setShowEditRequestForm(false);
+          setEditRequestNote('');
+        } catch (queueErr) {
+          alert('Failed to queue edit request: ' + queueErr.message);
+        }
+        return;
+      }
       alert('Failed to send edit request: ' + (err.response?.data?.error || err.message));
     }
   };
@@ -945,9 +1004,25 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           }
           setLookupLoading(false);
         })
-        .catch(() => {
-          setPatientLookupResults([]);
-          setShowLookupDropdown(false);
+        .catch(async () => {
+          try {
+            const cached = await getCachedCases();
+            const nameLower = name.toLowerCase();
+            const results = cached.filter(c => (c.patient_name || '').toLowerCase().includes(nameLower));
+            const unique = results.filter((r, i, arr) => arr.findIndex(x => x.patient_name === r.patient_name) === i);
+            setPatientLookupResults(unique);
+            if (unique.length === 1) {
+              applyPatientAutoFill(unique[0]);
+              setShowLookupDropdown(false);
+            } else if (unique.length > 1) {
+              setShowLookupDropdown(true);
+            } else {
+              setShowLookupDropdown(false);
+            }
+          } catch {
+            setPatientLookupResults([]);
+            setShowLookupDropdown(false);
+          }
           setLookupLoading(false);
         });
     }, 300);
@@ -1449,7 +1524,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         {offlineMode && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '13px', color: '#F59E0B' }}>
             <span style={{ fontSize: '16px' }}>⚠</span>
-            Offline — showing cached data. Changes will sync when reconnected.
+            Offline - showing cached data. Changes will sync when reconnected.
           </div>
         )}
         <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>
@@ -2263,6 +2338,17 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                               if (confirmDelete) {
                                 setDeleteTarget(c);
                               } else {
+                                if (!isOnline()) {
+                                  enqueueOperation({
+                                    type: 'delete',
+                                    endpoint: `/api/cases/${c.case_id}`,
+                                    method: 'DELETE',
+                                    payload: { _offlineUserId: loggedUserId, _offlineUserName: loggedUser },
+                                    userId: loggedUserId,
+                                    userName: loggedUser,
+                                  }).then(() => { setOfflineMode(true); fetchCases(); });
+                                  return;
+                                }
                                 axios.delete(`${API_URL}/api/cases/${c.case_id}`)
                                   .then(() => fetchCases())
                                   .catch(err => alert('Delete failed: ' + (err.response?.data?.error || err.message)));

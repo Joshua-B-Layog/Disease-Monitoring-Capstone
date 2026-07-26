@@ -11,8 +11,8 @@ import MapView from './MapView';
 import WeeklySummary from './WeeklySummary';
 
 import { API_URL } from './config';
-import { isOnline } from './offlineSync';
-import { getPendingCount, processSyncQueue, isSyncing } from './syncEngine';
+import { getPendingCount, processSyncQueue } from './syncEngine';
+import { cacheNotifications, getCachedNotifications } from './offlineSync';
 import './App.css';
 
 const getSavedFontScale = () => {
@@ -218,11 +218,20 @@ useEffect(() => {
   const fetchNotifications = () => {
     fetch(`${API_URL}/api/notifications?userId=${loggedUserId}`)
       .then(res => res.json())
-      .then(data => setNotifications(Array.isArray(data) ? data : []))
+      .then(data => {
+        const arr = Array.isArray(data) ? data : [];
+        setNotifications(arr);
+        cacheNotifications(arr).catch(() => {});
+      })
       .catch(() => {});
   };
 
-  if (!isOnline) return;
+  if (!isOnline) {
+    getCachedNotifications().then(cached => {
+      if (cached.length > 0) setNotifications(cached);
+    }).catch(() => {});
+    return;
+  }
   fetchNotifications();
   const interval = setInterval(fetchNotifications, 10000);
   return () => clearInterval(interval);
