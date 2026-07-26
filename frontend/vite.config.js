@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'icons.svg'],
+      includeAssets: ['favicon.svg', 'icons.svg', 'cdms-icon.svg'],
       manifest: false,
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff,woff2}'],
@@ -17,6 +17,20 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: {
               cacheName: 'osm-tiles',
+              expiration: {
+                maxEntries: 500,
+                maxAgeSeconds: 30 * 24 * 60 * 60
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          {
+            urlPattern: /^https:\/\/.*\.basemaps\.cartocdn\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'carto-tiles',
               expiration: {
                 maxEntries: 500,
                 maxAgeSeconds: 30 * 24 * 60 * 60

@@ -1,6 +1,7 @@
   import React, { useState, useEffect, useRef } from 'react';
   import { API_URL } from '../config';
   import ChoLogoIcon from '../assets/ChoLogo';
+  import { getCachedUsers, upsertCachedUser } from '../offlineSync';
 
   export default function Login({ onLoginSuccess, onForgotPassword, theme, toggleTheme }) {
     const [step, setStep] = useState('role'); // 'role', 'cho_select', 'bhw_select', 'auth', 'forgot_password', 'signup', 'cho_contact', 'signup_role'
@@ -188,6 +189,9 @@
                 barangay: data.user.barangay
             };
 
+            // Cache user credentials for offline login
+            upsertCachedUser({ id: data.user.id, email, password, name: data.user.name, role: data.user.role, barangay: data.user.barangay }).catch(() => {});
+
             if (data.requires2FA) {
                 // Hold off on logging in - send OTP and move to verification step
                 setPendingUser(sessionPayload);
@@ -207,6 +211,26 @@
         }
     } catch (error) {
         console.error("Transmission Error:", error);
+        // Attempt offline login from cached user data
+        try {
+            const cached = await getCachedUsers();
+            const match = cached.find(u =>
+                (u.email === email || u.username === email) &&
+                u.password === password &&
+                u.role === selectedRole
+            );
+            if (match) {
+                onLoginSuccess({
+                    id: match.id || match.user_id,
+                    role: selectedRole,
+                    context: selectedContext,
+                    username: email,
+                    name: match.name,
+                    barangay: match.barangay || null
+                });
+                return;
+            }
+        } catch (_) { /* offline cache unavailable */ }
         setLoginError('Cannot connect to surveillance gateway. Confirm backend runtime.');
     }
 };

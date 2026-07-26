@@ -95,6 +95,14 @@ export async function getCachedUsers() {
   }
 }
 
+export async function upsertCachedUser(user) {
+  try {
+    await db.users.put({ ...user, user_id: user.id || user.user_id });
+  } catch (err) {
+    console.warn('[OfflineSync] Failed to upsert user:', err.message);
+  }
+}
+
 // ── Audit Logs ──
 export async function cacheAuditLogs(logs) {
   try {
