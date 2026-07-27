@@ -86,13 +86,13 @@ export default function Help() {
             </ul>
           </div>
           <div style={{
-            textAlign: 'center', padding: '12px', background: 'rgba(16,185,129,0.12)',
-            borderRadius: '8px', border: '1px solid rgba(16,185,129,0.3)',
+            textAlign: 'center', padding: '12px', background: 'rgba(18,153,104,0.12)',
+            borderRadius: '8px', border: '1px solid rgba(18,153,104,0.3)',
           }}>
-            <div style={{ fontSize: '14px', fontWeight: '700', color: '#34d399' }}>
+            <div style={{ fontSize: '14px', fontWeight: '700', color: '#3cb882' }}>
               🚑 If you have any of these symptoms, GO TO THE HOSPITAL IMMEDIATELY.
             </div>
-            <div style={{ fontSize: '13px', color: '#15803d', marginTop: '4px' }}>
+            <div style={{ fontSize: '13px', color: '#0e7d56', marginTop: '4px' }}>
               Call 911 or your local emergency hotline.
             </div>
           </div>

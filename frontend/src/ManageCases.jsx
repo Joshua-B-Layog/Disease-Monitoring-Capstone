@@ -18,7 +18,7 @@ const InfluenzaAIcon = ({ color = '#f59e0b', size = 28 }) => (
   </svg>
 );
 
-const LeptospirosisIcon = ({ color = '#10b981', size = 28 }) => (
+const LeptospirosisIcon = ({ color = '#129968', size = 28 }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
     <path d="m5.47,12.377L.244,21.337c-.689,1.181.163,2.663,1.53,2.663h10.453c1.367,0,2.218-1.483,1.53-2.663l-5.226-8.96c-.683-1.171-2.376-1.171-3.059,0Zm1.53,10.623h0c-.552,0-1-.448-1-1h0c0-.552.448-1,1-1h0c.552,0,1,.448,1,1h0c0,.552-.448,1-1,1Zm-1-4v-3c0-.552.448-1,1-1h0c.552,0,1,.448,1,1v3c0,.552-.448,1-1,1h0c-.552,0-1-.448-1-1Zm18-2.5c0,3.038-2.462,5.5-5.5,5.5-1,0-2.311-.497-2.61-.658-.085-.348-.218-.69-.406-1.013l-5.227-8.96c-.118-.201-.256-.383-.403-.556.932-.517,2.004-.813,3.146-.813,1.435,0,2.758.471,3.833,1.259.526-.167,1.086-.259,1.667-.259,3.038,0,5.5,2.462,5.5,5.5ZM7,9.498c-1.356,0-2.574.699-3.257,1.871l-1.384,2.373c-1.175-.906-2.016-2.225-2.27-3.753,0,0,0-.001,0-.002-.053-.322-.088-.651-.088-.988,0-.33.034-.651.085-.967C.49,5.217,2.623,3.157,5.424,3.009c1.126-1.847,3.15-3.009,5.326-3.009,1.444,0,2.81.488,3.919,1.39.573-.256,1.194-.39,1.831-.39,1.914,0,3.592,1.24,4.22,2.996,1.657.302,2.947,1.621,3.216,3.289.002.012.061.675.061.675,0,1.489-.701,2.258-.972,2.573-1.259-.957-2.824-1.532-4.524-1.532-.438,0-.873.038-1.303.114-1.278-.731-2.712-1.114-4.197-1.114-1.865,0-3.587.611-4.99,1.634-.323-.088-.662-.136-1.01-.136Z"/>
   </svg>
@@ -88,7 +88,7 @@ const DISEASE_PAGES = [
     { id: 1, name: 'Dengue Fever', dbName: 'Dengue', icon: <FeverIcon color="#ef4444" />, color: '#ef4444', desc: 'A viral infection transmitted by Aedes mosquitoes, causing high fever and severe body aches.' },
     { id: 2, name: 'Influenza A', dbName: 'Influenza A', icon: <InfluenzaAIcon color="#f59e0b" />, color: '#f59e0b', desc: 'A highly contagious respiratory illness caused by influenza viruses, leading to seasonal outbreaks.' },
     { id: 3, name: 'Covid-19', dbName: 'Covid-19', icon: '🛡️', color: '#3b82f6', desc: 'An infectious respiratory disease caused by the SARS-CoV-2 virus, requiring close contact tracing.' },
-    { id: 4, name: 'Leptospirosis', dbName: 'Leptospirosis', icon: <LeptospirosisIcon color="#10b981" />, color: '#10b981', desc: 'A bacterial disease spread through contaminated water, posing a high risk during flood seasons.' },
+    { id: 4, name: 'Leptospirosis', dbName: 'Leptospirosis', icon: <LeptospirosisIcon color="#129968" />, color: '#129968', desc: 'A bacterial disease spread through contaminated water, posing a high risk during flood seasons.' },
     { id: 5, name: 'Tuberculosis', dbName: 'Tuberculosis', icon: <TuberculosisIcon color="#f97316" />, color: '#f97316', desc: 'An infectious bacterial disease that primarily affects the lungs, requiring long-term treatment.' },
     { id: 6, name: 'Typhoid Fever', dbName: 'Typhoid Fever', icon: <TyphoidIcon color="#8b5cf6" />, color: '#8b5cf6', desc: 'A systemic infection caused by Salmonella Typhi, spread through contaminated food and water.' },
   ],
@@ -1154,7 +1154,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     if (status === 'Active') return { background: 'rgba(245,158,11,0.15)', color: '#fbbf24' };
     if (status === 'Pending') return { background: 'rgba(37,99,235,0.15)', color: '#60A5FA' };
     if (status === 'Under Treatment') return { background: 'rgba(124,58,237,0.15)', color: '#a78bfa' };
-    if (status === 'Recovered') return { background: 'rgba(5,150,105,0.15)', color: '#34d399' };
+    if (status === 'Recovered') return { background: 'rgba(18,153,104,0.15)', color: '#3cb882' };
     if (status === 'Deceased') return { background: 'rgba(220,38,38,0.15)', color: '#f87171' };
     if (status === 'Draft') return { background: 'var(--input-bg)', color: 'var(--text-muted)' };
     return { background: 'var(--input-bg)', color: 'var(--text-muted)' };
@@ -1569,11 +1569,11 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               )}
               <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Page {cardPage + 1} / {DISEASE_PAGES.length}</span>
               <button onClick={() => setCardPage(0)} disabled={cardPage === 0}
-                style={{ padding: '7px 16px', background: cardPage === 0 ? 'var(--input-bg)' : '#1E3A8A', color: cardPage === 0 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: cardPage === 0 ? 'not-allowed' : 'pointer', fontSize: '13px' }}>
+                style={{ padding: '7px 16px', background: cardPage === 0 ? 'var(--input-bg)' : '#121358', color: cardPage === 0 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: cardPage === 0 ? 'not-allowed' : 'pointer', fontSize: '13px' }}>
                 ← Prev
               </button>
               <button onClick={() => setCardPage(1)} disabled={cardPage === 1}
-                style={{ padding: '7px 16px', background: cardPage === 1 ? 'var(--input-bg)' : '#1E3A8A', color: cardPage === 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: cardPage === 1 ? 'not-allowed' : 'pointer', fontSize: '13px' }}>
+                style={{ padding: '7px 16px', background: cardPage === 1 ? 'var(--input-bg)' : '#121358', color: cardPage === 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: cardPage === 1 ? 'not-allowed' : 'pointer', fontSize: '13px' }}>
                 Next →
               </button>
             </div>
@@ -1620,7 +1620,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '24px' }}>
           {DISEASE_PAGES.map((_, i) => (
             <div key={i} onClick={() => setCardPage(i)}
-              style={{ width: '10px', height: '10px', borderRadius: '50%', cursor: 'pointer', background: cardPage === i ? '#1E3A8A' : 'var(--border-color)', transition: 'background 0.2s' }} />
+              style={{ width: '10px', height: '10px', borderRadius: '50%', cursor: 'pointer', background: cardPage === i ? '#121358' : 'var(--border-color)', transition: 'background 0.2s' }} />
           ))}
         </div>
       </div>
@@ -1649,7 +1649,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             style={{
               padding: '8px 20px', cursor: 'pointer', fontSize: '13px', fontWeight: inboxSubTab === 'referrals' ? '700' : '500',
               color: inboxSubTab === 'referrals' ? 'var(--text-main)' : 'var(--text-muted)',
-              borderBottom: inboxSubTab === 'referrals' ? '2px solid #10B981' : '2px solid transparent',
+              borderBottom: inboxSubTab === 'referrals' ? '2px solid #129968' : '2px solid transparent',
               transition: 'all 0.15s',
             }}>
             {loginRole === 'BHW' ? 'My Requests' : 'Referrals'} ({loginRole === 'BHW' ? myEditRequests.length : inboxItems.length})
@@ -1659,7 +1659,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               style={{
                 padding: '8px 20px', cursor: 'pointer', fontSize: '13px', fontWeight: inboxSubTab === 'messages' ? '700' : '500',
                 color: inboxSubTab === 'messages' ? 'var(--text-main)' : 'var(--text-muted)',
-                borderBottom: inboxSubTab === 'messages' ? '2px solid #10B981' : '2px solid transparent',
+                borderBottom: inboxSubTab === 'messages' ? '2px solid #129968' : '2px solid transparent',
                 transition: 'all 0.15s',
               }}>
               Messages ({contactMessages.filter(m => m.status === 'new' || m.status === 'pending').length})
@@ -1698,7 +1698,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             ) : (
               myEditRequests.map(req => (
                 <div key={req.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)' }}>
-                  <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: req.status === 'accepted' ? '#10b981' : req.status === 'rejected' ? '#ef4444' : '#f59e0b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '14px', flexShrink: 0 }}>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: req.status === 'accepted' ? '#129968' : req.status === 'rejected' ? '#ef4444' : '#f59e0b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '14px', flexShrink: 0 }}>
                     {req.status === 'accepted' ? '✓' : req.status === 'rejected' ? '✕' : '…'}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -1706,7 +1706,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       {req.patient_name || 'Unknown'} · {req.disease_name || req.disease_name_full || 'Unknown'}
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                      From {req.from_barangay_name || 'your barangay'} · <span style={{ textTransform: 'capitalize', fontWeight: '600', color: req.status === 'accepted' ? '#10b981' : req.status === 'rejected' ? '#ef4444' : '#f59e0b' }}>{req.status}</span>
+                      From {req.from_barangay_name || 'your barangay'} · <span style={{ textTransform: 'capitalize', fontWeight: '600', color: req.status === 'accepted' ? '#129968' : req.status === 'rejected' ? '#ef4444' : '#f59e0b' }}>{req.status}</span>
                     </div>
                     {req.note && (
                       <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '2px' }}>"{req.note}"</div>
@@ -1770,7 +1770,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   </div>
                   <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
                     <button onClick={() => handleAcceptInboxItem(item)} title="Accept"
-                      style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #10b981', background: 'rgba(16,185,129,0.1)', color: '#10b981', cursor: 'pointer', fontSize: '16px' }}>
+                      style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #129968', background: 'rgba(18,153,104,0.1)', color: '#129968', cursor: 'pointer', fontSize: '16px' }}>
                       ✓
                     </button>
                     <button onClick={() => handleRejectInboxItem(item)} title="Reject"
@@ -1818,7 +1818,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   </div>
                   <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
                     <button onClick={() => handleAcceptEditRequest(req)} title="Accept"
-                      style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #10b981', background: 'rgba(16,185,129,0.1)', color: '#10b981', cursor: 'pointer', fontSize: '16px' }}>
+                      style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #129968', background: 'rgba(18,153,104,0.1)', color: '#129968', cursor: 'pointer', fontSize: '16px' }}>
                       ✓
                     </button>
                     <button onClick={() => handleRejectEditRequest(req)} title="Reject"
@@ -1862,7 +1862,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   </div>
                   <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
                     <button onClick={() => handleApproveRegistration(reg)} title="Approve"
-                      style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #10b981', background: 'rgba(16,185,129,0.1)', color: '#10b981', cursor: 'pointer', fontSize: '16px' }}>
+                      style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #129968', background: 'rgba(18,153,104,0.1)', color: '#129968', cursor: 'pointer', fontSize: '16px' }}>
                       ✓
                     </button>
                     <button onClick={() => handleRejectRegistration(reg)} title="Reject"
@@ -1891,7 +1891,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       {msg.status === 'pending' && <span style={{ marginLeft: '8px', color: '#f59e0b', fontWeight: '600' }}>· Pending review</span>}
                     </div>
                     <div style={{ display: 'flex', gap: '8px', marginTop: '6px', alignItems: 'center' }}>
-                      <div className="inbox-avatar-circle" style={{ background: '#10B981' }}>
+                      <div className="inbox-avatar-circle" style={{ background: '#129968' }}>
                         {msg.name.slice(0, 2).toUpperCase()}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -1910,7 +1910,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   {msg.status === 'new' ? (
                     <>
                       <button onClick={() => handlePendingContactMessage(msg)} title="Review"
-                        style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #10b981', background: 'rgba(16,185,129,0.1)', color: '#10b981', cursor: 'pointer', fontSize: '16px', flexShrink: 0 }}>
+                        style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #129968', background: 'rgba(18,153,104,0.1)', color: '#129968', cursor: 'pointer', fontSize: '16px', flexShrink: 0 }}>
                         ✓
                       </button>
                       <button onClick={() => handleRejectContactMessage(msg)} title="Reject"
@@ -1977,7 +1977,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           ) : (
             outboxItems.map(item => (
               <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)' }}>
-                <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: item.status === 'accepted' ? '#10b981' : item.status === 'rejected' ? '#ef4444' : '#f59e0b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '11px', flexShrink: 0 }}>
+                <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: item.status === 'accepted' ? '#129968' : item.status === 'rejected' ? '#ef4444' : '#f59e0b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '11px', flexShrink: 0 }}>
                   {item.status === 'accepted' ? '✓' : item.status === 'rejected' ? '✕' : '…'}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -1996,7 +1996,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     ) : (
                       <>{item.direction === 'sent' ? 'Sent to' : 'Received from'} {item.direction === 'sent' ? (item.to_cho_unit || item.to_barangay_name || '—') : (item.from_barangay_name ? `BHW (${item.from_barangay_name})` : item.from_cho_unit || '—')}</>
                     )}
-                    <span> · Status: <span style={{ textTransform: 'capitalize', fontWeight: '600', color: item.status === 'accepted' ? '#10b981' : item.status === 'rejected' ? '#ef4444' : '#f59e0b' }}>{item.status}</span></span>
+                    <span> · Status: <span style={{ textTransform: 'capitalize', fontWeight: '600', color: item.status === 'accepted' ? '#129968' : item.status === 'rejected' ? '#ef4444' : '#f59e0b' }}>{item.status}</span></span>
                     {item.barangay_name && <span> · {item.item_type === 'edit_request' ? 'Barangay' : 'Assigned to'} {item.barangay_name}</span>}
                   </div>
                 </div>
@@ -2122,7 +2122,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             </button>
             {loginRole !== 'CHO' && (
               <button onClick={openAdd}
-                style={{ padding: '8px 18px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
+                style={{ padding: '8px 18px', background: '#129968', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
                 + Add Case
               </button>
             )}
@@ -2374,18 +2374,18 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               </span>
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 <button onClick={() => setTablePage(1)} disabled={tablePage === 1}
-                  style={{ padding: '5px 8px', background: tablePage === 1 ? 'var(--input-bg)' : '#1E3A8A', color: tablePage === 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: tablePage === 1 ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: '700' }}>
+                  style={{ padding: '5px 8px', background: tablePage === 1 ? 'var(--input-bg)' : '#121358', color: tablePage === 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: tablePage === 1 ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: '700' }}>
                   {'<<'}
                 </button>
                 <button onClick={() => setTablePage(p => Math.max(1, p - 1))} disabled={tablePage === 1}
-                  style={{ padding: '5px 12px', background: tablePage === 1 ? 'var(--input-bg)' : '#1E3A8A', color: tablePage === 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: tablePage === 1 ? 'not-allowed' : 'pointer', fontSize: '13px' }}>
+                  style={{ padding: '5px 12px', background: tablePage === 1 ? 'var(--input-bg)' : '#121358', color: tablePage === 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: tablePage === 1 ? 'not-allowed' : 'pointer', fontSize: '13px' }}>
                   ← Prev
                 </button>
                 {getVisiblePages(tablePage, totalTablePages).map((p, i) =>
                   p === '...' ? (
                     <div key={`te${i}`} ref={tableEllipsisRef} style={{ position: 'relative', display: 'inline-flex' }}>
                       <button onClick={() => setTableEllipsisOpen(o => !o)}
-                        style={{ padding: '5px 8px', background: tableEllipsisOpen ? 'rgba(30,58,138,0.15)' : 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '700', letterSpacing: '2px' }}>...</button>
+                        style={{ padding: '5px 8px', background: tableEllipsisOpen ? 'rgba(18,19,88,0.15)' : 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '700', letterSpacing: '2px' }}>...</button>
                       {tableEllipsisOpen && (
                         <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px', width: '160px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 100 }}>
                           <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px' }}>Go to page (1–{totalTablePages})</div>
@@ -2395,24 +2395,24 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                               onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(tableEllipsisInput); if (v >= 1 && v <= totalTablePages) { setTablePage(v); setTableEllipsisOpen(false); setTableEllipsisInput(''); } } }}
                               style={{ flex: 1, padding: '5px 6px', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '12px', outline: 'none', width: '100%' }} />
                             <button onClick={() => { const v = parseInt(tableEllipsisInput); if (v >= 1 && v <= totalTablePages) { setTablePage(v); setTableEllipsisOpen(false); setTableEllipsisInput(''); } }}
-                              style={{ padding: '5px 8px', border: '1px solid #1E3A8A', borderRadius: '4px', background: '#1E3A8A', color: 'white', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>Go</button>
+                              style={{ padding: '5px 8px', border: '1px solid #121358', borderRadius: '4px', background: '#121358', color: 'white', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>Go</button>
                           </div>
                         </div>
                       )}
                     </div>
                   ) : (
                     <button key={p} onClick={() => setTablePage(p)}
-                      style={{ padding: '5px 10px', background: p === tablePage ? '#1E3A8A' : 'transparent', color: p === tablePage ? 'white' : 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', minWidth: '32px' }}>
+                      style={{ padding: '5px 10px', background: p === tablePage ? '#121358' : 'transparent', color: p === tablePage ? 'white' : 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', minWidth: '32px' }}>
                       {p}
                     </button>
                   )
                 )}
                 <button onClick={() => setTablePage(p => Math.min(totalTablePages, p + 1))} disabled={tablePage === totalTablePages}
-                  style={{ padding: '5px 12px', background: tablePage === totalTablePages ? 'var(--input-bg)' : '#1E3A8A', color: tablePage === totalTablePages ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: tablePage === totalTablePages ? 'not-allowed' : 'pointer', fontSize: '13px' }}>
+                  style={{ padding: '5px 12px', background: tablePage === totalTablePages ? 'var(--input-bg)' : '#121358', color: tablePage === totalTablePages ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: tablePage === totalTablePages ? 'not-allowed' : 'pointer', fontSize: '13px' }}>
                   Next →
                 </button>
                 <button onClick={() => setTablePage(totalTablePages)} disabled={tablePage === totalTablePages}
-                  style={{ padding: '5px 8px', background: tablePage === totalTablePages ? 'var(--input-bg)' : '#1E3A8A', color: tablePage === totalTablePages ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: tablePage === totalTablePages ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: '700' }}>
+                  style={{ padding: '5px 8px', background: tablePage === totalTablePages ? 'var(--input-bg)' : '#121358', color: tablePage === totalTablePages ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: tablePage === totalTablePages ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: '700' }}>
                   {'>>'}
                 </button>
               </div>
@@ -2457,7 +2457,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           </div>
 
           {submitMsg && (
-            <div style={{ background: submitMsg.startsWith('Error') ? '#fee2e2' : '#d1fae5', color: submitMsg.startsWith('Error') ? '#991b1b' : '#065f46', padding: '12px', borderRadius: '8px', marginBottom: '20px', textAlign: 'center', fontSize: '14px', fontWeight: '500' }}>
+            <div style={{ background: submitMsg.startsWith('Error') ? '#fee2e2' : '#d1f5e9', color: submitMsg.startsWith('Error') ? '#991b1b' : '#0a5e42', padding: '12px', borderRadius: '8px', marginBottom: '20px', textAlign: 'center', fontSize: '14px', fontWeight: '500' }}>
               {submitMsg.startsWith('Error') ? '❌' : '✅'} {submitMsg}
             </div>
           )}
@@ -2469,7 +2469,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           )}
 
           {editRequestSuccess && (
-            <div style={{ background: 'rgba(16,185,129,0.1)', color: '#34d399', padding: '12px', borderRadius: '8px', marginBottom: '20px', textAlign: 'center', fontSize: '14px', fontWeight: '500' }}>
+            <div style={{ background: 'rgba(18,153,104,0.1)', color: '#3cb882', padding: '12px', borderRadius: '8px', marginBottom: '20px', textAlign: 'center', fontSize: '14px', fontWeight: '500' }}>
               ✅ {editRequestSuccess} - It has been sent to the CHO for editing
             </div>
           )}
@@ -2554,7 +2554,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           {['Male', 'Female'].map(g => (
                             <button key={g} type="button"
                               onClick={() => { setFormData({ ...formData, gender: g }); setGenderOpen(false); }}
-                              style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.gender === g ? 'rgba(16,185,129,0.12)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: formData.gender === g ? '600' : '400' }}
+                              style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.gender === g ? 'rgba(18,153,104,0.12)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: formData.gender === g ? '600' : '400' }}
                               onMouseEnter={e => { if (formData.gender !== g) e.target.style.background = 'var(--input-bg)'; }}
                               onMouseLeave={e => { if (formData.gender !== g) e.target.style.background = 'transparent'; }}>
                               {g}
@@ -3012,7 +3012,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         {['Mild', 'Moderate', 'Severe', 'Asymptomatic'].map(s => (
                           <button key={s} type="button"
                             onClick={() => { setFormData({ ...formData, severity: s }); setSeverityOpen(false); }}
-                            style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.severity === s ? 'rgba(16,185,129,0.12)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: formData.severity === s ? '600' : '400' }}
+                            style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.severity === s ? 'rgba(18,153,104,0.12)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: formData.severity === s ? '600' : '400' }}
                             onMouseEnter={e => { if (formData.severity !== s) e.target.style.background = 'var(--input-bg)'; }}
                             onMouseLeave={e => { if (formData.severity !== s) e.target.style.background = 'transparent'; }}>
                             {s}
@@ -3041,7 +3041,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         {['Active', 'Pending', 'Under Treatment', 'Recovered', 'Deceased'].map(s => (
                           <button key={s} type="button"
                             onClick={() => { setFormData({ ...formData, status: s }); setPatientStatusOpen(false); }}
-                            style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.status === s ? 'rgba(16,185,129,0.12)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: formData.status === s ? '600' : '400' }}
+                            style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.status === s ? 'rgba(18,153,104,0.12)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: formData.status === s ? '600' : '400' }}
                             onMouseEnter={e => { if (formData.status !== s) e.target.style.background = 'var(--input-bg)'; }}
                             onMouseLeave={e => { if (formData.status !== s) e.target.style.background = 'transparent'; }}>
                             {s}
@@ -3184,7 +3184,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     </button>
                   )}
                   <button type="submit" disabled={submitLoading}
-                    style={{ padding: '10px 40px', borderRadius: '6px', border: 'none', background: submitLoading ? '#6ee7b7' : '#10b981', color: 'white', cursor: submitLoading ? 'not-allowed' : 'pointer', fontWeight: '600', fontSize: '15px' }}>
+                    style={{ padding: '10px 40px', borderRadius: '6px', border: 'none', background: submitLoading ? '#6fd4a2' : '#129968', color: 'white', cursor: submitLoading ? 'not-allowed' : 'pointer', fontWeight: '600', fontSize: '15px' }}>
                     {submitLoading ? 'Saving...' : (isEdit ? 'Update Case' : 'Save Case')}
                   </button>
                 </>
@@ -3210,13 +3210,13 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     {loginRole === 'BHW' ? (
                       <>
                         <button onClick={handleRoutingSendToDescription}
-                          style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#1E3A8A', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}>
+                          style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#121358', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}>
                           → Send to {routingData?.targetUnit || 'CHO'}
                         </button>
                       </>
                     ) : (
                       <button onClick={handleRoutingSendToDescription}
-                        style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#1E3A8A', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}>
+                        style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#121358', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}>
                         → Send
                       </button>
                     )}
@@ -3241,7 +3241,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       ← Cancel
                     </button>
                     <button onClick={handleRoutingSend}
-                      style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#1E3A8A', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}>
+                      style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#121358', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}>
                       Send
                     </button>
                   </div>

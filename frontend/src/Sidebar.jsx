@@ -73,7 +73,8 @@ const Sidebar = ({ role, activeTab, setActiveTab, language, choUnit }) => {
     <div className="sidebar">
       <div className="sidebar-logo" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
         {choUnit === 'CHO Unit II (Pulo)' ? <ChoLogoIconII size={28} /> : <ChoLogoIcon size={28} />}
-        <h3 style={{ margin: 0 }}>{role === 'CHO' ? 'CHO Admin' : 'BHW Portal'}</h3>
+        <h3 style={{ margin: 0 }}>{role === 'CHO' ?
+         'CHO Admin' : 'BHW Portal'}</h3>
       </div>
       <div className="sidebar-menu">
         {menuItems.map((item) => (

@@ -39,7 +39,7 @@
 }
 
 .btn-primary-generate {
-  background-color: #10b981;
+  background-color: #129968;
   color: #fff;
   font-weight: 600;
   padding: 10px 28px;
@@ -126,13 +126,13 @@
 
 /* Styles the 'View' button with the light green theme from your design image */
 .report-log-item .action-btn-group button:last-child {
-  background-color: #e6f4ea; 
-  border: 1px solid #bbf7d0;
+  background-color: #e6f8f0; 
+  border: 1px solid #baf0d7;
   color: #137333 !important;
 }
 
 .report-log-item .action-btn-group button:last-child:hover {
-  background-color: #dcfce7;
+  background-color: #dcf7eb;
 }
 
 /* Quick Stats Grid */
@@ -250,6 +250,6 @@
   font-weight: 600;
   display: inline-block;
 }
-.badge-created { background-color: #dcfce7; color: #16a34a !important; }
+.badge-created { background-color: #dcf7eb; color: #129968 !important; }
 .badge-updated { background-color: #dbeafe; color: #2563eb !important; }
 .badge-deleted { background-color: #fee2e2; color: #dc2626 !important; }

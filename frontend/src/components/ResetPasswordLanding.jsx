@@ -71,7 +71,7 @@ export default function ResetPasswordLanding() {
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
-          <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#1E3A8A' }}></div>
+          <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#121358' }}></div>
           <span style={{ color: '#ffffff', fontSize: '20px', fontWeight: 'bold' }}>Cabuyao Health</span>
         </div>
 
@@ -81,16 +81,16 @@ export default function ResetPasswordLanding() {
         <p style={{ color: '#9CA3AF', fontSize: '14px', margin: '0 0 28px 0' }}>
           Enter your new password below for:
           <br />
-          <span style={{ color: '#10B981', fontWeight: '500' }}>{email}</span>
+          <span style={{ color: '#129968', fontWeight: '500' }}>{email}</span>
         </p>
 
         {/* Status Messages */}
         {status.msg && (
           <div style={{
             padding: '12px 16px', borderRadius: '8px', marginBottom: '20px', fontSize: '14px',
-            background: status.type === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)',
-            border: `1px solid ${status.type === 'error' ? '#ef4444' : '#10b981'}`,
-            color: status.type === 'error' ? '#ef4444' : '#10b981'
+            background: status.type === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(18,153,104,0.1)',
+            border: `1px solid ${status.type === 'error' ? '#ef4444' : '#129968'}`,
+            color: status.type === 'error' ? '#ef4444' : '#129968'
           }}>
             {status.type === 'success' ? '✅ ' : '❌ '}{status.msg}
             {done && (
@@ -191,7 +191,7 @@ export default function ResetPasswordLanding() {
               {confirmPassword && (
                 <p style={{
                   fontSize: '12px', marginTop: '6px',
-                  color: newPassword === confirmPassword ? '#10b981' : '#ef4444'
+                  color: newPassword === confirmPassword ? '#129968' : '#ef4444'
                 }}>
                   {newPassword === confirmPassword ? '✓ Passwords match' : '✗ Passwords do not match'}
                 </p>
@@ -203,7 +203,7 @@ export default function ResetPasswordLanding() {
               disabled={loading}
               style={{
                 width: '100%', padding: '14px',
-                background: loading ? '#065f46' : '#10B981',
+                background: loading ? '#0a5e42' : '#129968',
                 color: '#ffffff', border: 'none', borderRadius: '8px',
                 fontSize: '15px', fontWeight: '600',
                 cursor: loading ? 'not-allowed' : 'pointer',

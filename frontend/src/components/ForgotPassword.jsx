@@ -44,7 +44,7 @@ export default function ForgotPasswordModal({ onClose }) {
         
         <h2 style={{ color: 'var(--text-h)', marginBottom: '16px' }}>Account Recovery</h2>
         
-        {message && <div style={{ color: '#10b981', background: 'var(--accent-bg)', padding: '10px', borderRadius: '6px', marginBottom: '16px', fontSize: '14px' }}>{message}</div>}
+        {message && <div style={{ color: '#129968', background: 'var(--accent-bg)', padding: '10px', borderRadius: '6px', marginBottom: '16px', fontSize: '14px' }}>{message}</div>}
         {error && <div style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)', padding: '10px', borderRadius: '6px', marginBottom: '16px', fontSize: '14px' }}>{error}</div>}
 
         <form onSubmit={handleSubmit}>

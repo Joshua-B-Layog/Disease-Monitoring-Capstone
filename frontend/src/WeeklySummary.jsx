@@ -58,7 +58,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
   const getRiskColor = (count) => {
     if (count >= 20) return '#DC2626';
     if (count >= 10) return '#f59e0b';
-    return '#10b981';
+    return '#129968';
   };
 
   const getRiskLabel = (count) => {
@@ -69,10 +69,10 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
 
   const getStatusBadge = (status) => {
     const map = {
-      Active: { bg: '#1E3A8A', color: '#93c5fd' },
+      Active: { bg: '#121358', color: '#93c5fd' },
       Pending: { bg: '#1e3a8a', color: '#93c5fd' },
       'Under Treatment': { bg: '#3b0764', color: '#c4b5fd' },
-      Recovered: { bg: '#064E3B', color: '#34D399' },
+      Recovered: { bg: '#083d2c', color: '#3cb882' },
       Deceased: { bg: '#7f1d1d', color: '#fca5a5' },
       Draft: { bg: '#374151', color: '#d1d5db' },
     };
@@ -80,14 +80,14 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
   };
 
   const getSeverityColor = (sev) => {
-    const map = { Critical: '#DC2626', Severe: '#f59e0b', Moderate: '#3b82f6', Mild: '#10b981', Asymptomatic: '#6b7280' };
+    const map = { Critical: '#DC2626', Severe: '#f59e0b', Moderate: '#3b82f6', Mild: '#129968', Asymptomatic: '#6b7280' };
     return map[sev] || '#6b7280';
   };
 
   const getActionBadge = (action) => {
     const map = {
-      Created: { bg: '#064E3B', color: '#34D399' },
-      Updated: { bg: '#1E3A8A', color: '#93c5fd' },
+      Created: { bg: '#083d2c', color: '#3cb882' },
+      Updated: { bg: '#121358', color: '#93c5fd' },
       Deleted: { bg: '#7f1d1d', color: '#fca5a5' },
       'Logged In': { bg: '#374151', color: '#d1d5db' },
       Routed: { bg: '#4c1d95', color: '#c4b5fd' },
@@ -122,7 +122,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
         <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;font-size:13px">${d.count}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;width:40%">
           <div style="background:#e5e7eb;border-radius:4px;height:18px;overflow:hidden">
-            <div style="width:${(d.count / maxDCount) * 100}%;background:#1E3A8A;height:100%;border-radius:4px"></div>
+            <div style="width:${(d.count / maxDCount) * 100}%;background:#121358;height:100%;border-radius:4px"></div>
           </div>
         </td>
       </tr>`).join('');
@@ -169,7 +169,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
         <div class="metric-card" style="background:#eff6ff"><div class="metric-val" style="color:#1e3a8a">${summary.total_cases}</div><div class="metric-label">Total Cases</div></div>
         <div class="metric-card" style="background:#fef2f2"><div class="metric-val" style="color:#DC2626">${summary.new_this_week}</div><div class="metric-label">New This Week</div></div>
         <div class="metric-card" style="background:#fffbeb"><div class="metric-val" style="color:#f59e0b">${summary.active_cases}</div><div class="metric-label">Active</div></div>
-        <div class="metric-card" style="background:#f0fdf4"><div class="metric-val" style="color:#10b981">${summary.recovered}</div><div class="metric-label">Recovered</div></div>
+        <div class="metric-card" style="background:#f0fdf4"><div class="metric-val" style="color:#129968">${summary.recovered}</div><div class="metric-label">Recovered</div></div>
         <div class="metric-card" style="background:#fef2f2"><div class="metric-val" style="color:#991b1b">${summary.deceased}</div><div class="metric-label">Deceased</div></div>
       </div>
 
@@ -199,7 +199,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
     const maxDCount = Math.max(...byDisease.map(d => d.count), 1);
 
     const barangayRows = byBarangay.map(b => `<tr><td>${b.barangay_name}</td><td style="text-align:right;font-weight:600">${b.count}</td><td style="width:40%"><div style="background:#e5e7eb;height:16px;border-radius:3px"><div style="width:${(b.count/maxBCount)*100}%;background:${getRiskColor(b.count)};height:16px;border-radius:3px"></div></div></td><td style="text-align:center"><span style="padding:2px 8px;border-radius:10px;font-size:11px;background:${getRiskColor(b.count)}22;color:${getRiskColor(b.count)}">${getRiskLabel(b.count)}</span></td></tr>`).join('');
-    const diseaseRows = byDisease.filter(d => d.count > 0).map(d => `<tr><td>${d.disease_name}</td><td style="text-align:right;font-weight:600">${d.count}</td><td style="width:40%"><div style="background:#e5e7eb;height:16px;border-radius:3px"><div style="width:${(d.count/maxDCount)*100}%;background:#1E3A8A;height:16px;border-radius:3px"></div></div></td></tr>`).join('');
+    const diseaseRows = byDisease.filter(d => d.count > 0).map(d => `<tr><td>${d.disease_name}</td><td style="text-align:right;font-weight:600">${d.count}</td><td style="width:40%"><div style="background:#e5e7eb;height:16px;border-radius:3px"><div style="width:${(d.count/maxDCount)*100}%;background:#121358;height:16px;border-radius:3px"></div></div></td></tr>`).join('');
     const sevRows = bySeverity.map(s => `<tr><td>${s.severity}</td><td style="text-align:right;font-weight:600">${s.count}</td></tr>`).join('');
     const newCaseRows = newCases.map(c => `<tr><td>#${String(c.case_id).padStart(3,'0')}</td><td>${c.patient_name||''}</td><td>${c.age||'--'}</td><td>${c.disease_name||''}</td><td>${c.barangay_name||''}</td><td>${c.severity||'N/A'}</td><td>${c.status||''}</td></tr>`).join('');
 
@@ -211,7 +211,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
         <td style="background:#eff6ff;padding:12px;border-radius:8px 0 0 8px;text-align:center"><div style="font-size:24px;font-weight:700;color:#1e3a8a">${summary.total_cases}</div><div style="font-size:11px;color:#64748b">Total Cases</div></td>
         <td style="background:#fef2f2;padding:12px;text-align:center"><div style="font-size:24px;font-weight:700;color:#DC2626">${summary.new_this_week}</div><div style="font-size:11px;color:#64748b">New This Week</div></td>
         <td style="background:#fffbeb;padding:12px;text-align:center"><div style="font-size:24px;font-weight:700;color:#f59e0b">${summary.active_cases}</div><div style="font-size:11px;color:#64748b">Active</div></td>
-        <td style="background:#f0fdf4;padding:12px;border-radius:0 8px 8px 0;text-align:center"><div style="font-size:24px;font-weight:700;color:#10b981">${summary.recovered}</div><div style="font-size:11px;color:#64748b">Recovered</div></td>
+        <td style="background:#f0fdf4;padding:12px;border-radius:0 8px 8px 0;text-align:center"><div style="font-size:24px;font-weight:700;color:#129968">${summary.recovered}</div><div style="font-size:11px;color:#64748b">Recovered</div></td>
       </tr></table>
       <h2>Cases by Barangay</h2><table><thead><tr><th>Barangay</th><th style="text-align:right">Count</th><th>Distribution</th><th style="text-align:center">Risk</th></tr></thead><tbody>${barangayRows||'<tr><td colspan="4">No data</td></tr>'}</tbody></table>
       <h2>Cases by Disease</h2><table><thead><tr><th>Disease</th><th style="text-align:right">Count</th><th>Distribution</th></tr></thead><tbody>${diseaseRows||'<tr><td colspan="3">No data</td></tr>'}</tbody></table>
@@ -250,7 +250,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
   if (error) return (
     <div style={{ padding: '40px', textAlign: 'center' }}>
       <div style={{ fontSize: '15px', color: '#DC2626' }}>Error: {error}</div>
-      <button onClick={fetchData} style={{ marginTop: '12px', padding: '8px 20px', background: '#1E3A8A', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Retry</button>
+      <button onClick={fetchData} style={{ marginTop: '12px', padding: '8px 20px', background: '#121358', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Retry</button>
     </div>
   );
 
@@ -305,8 +305,8 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
 
       {/* ── Key Metrics ── */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
-        <div style={{ ...cardStyle, borderLeft: '3px solid #1E3A8A' }}>
-          <div style={{ fontSize: '28px', fontWeight: '700', color: '#1E3A8A' }}>{summary.total_cases}</div>
+        <div style={{ ...cardStyle, borderLeft: '3px solid #121358' }}>
+          <div style={{ fontSize: '28px', fontWeight: '700', color: '#121358' }}>{summary.total_cases}</div>
           <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>Total Cases</div>
         </div>
         <div style={{ ...cardStyle, borderLeft: '3px solid #DC2626' }}>
@@ -317,8 +317,8 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
           <div style={{ fontSize: '28px', fontWeight: '700', color: '#f59e0b' }}>{summary.active_cases}</div>
           <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>Active</div>
         </div>
-        <div style={{ ...cardStyle, borderLeft: '3px solid #10b981' }}>
-          <div style={{ fontSize: '28px', fontWeight: '700', color: '#10b981' }}>{summary.recovered}</div>
+        <div style={{ ...cardStyle, borderLeft: '3px solid #129968' }}>
+          <div style={{ fontSize: '28px', fontWeight: '700', color: '#129968' }}>{summary.recovered}</div>
           <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>Recovered</div>
         </div>
         <div style={{ ...cardStyle, borderLeft: '3px solid #991b1b' }}>
@@ -326,7 +326,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
           <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>Deceased</div>
         </div>
         <div style={{ ...cardStyle, borderLeft: '3px solid #DC2626' }}>
-          <div style={{ fontSize: '28px', fontWeight: '700', color: highRiskCount > 0 ? '#DC2626' : '#10b981' }}>{highRiskCount}</div>
+          <div style={{ fontSize: '28px', fontWeight: '700', color: highRiskCount > 0 ? '#DC2626' : '#129968' }}>{highRiskCount}</div>
           <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>High-Risk Areas</div>
         </div>
       </div>
@@ -391,7 +391,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
                 <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: '700', fontSize: '14px' }}>{d.count}</td>
                 <td style={{ padding: '10px 16px' }}>
                   <div style={{ background: 'var(--border-color)', borderRadius: '4px', height: '18px', overflow: 'hidden' }}>
-                    <div style={{ width: `${(d.count / maxDiseaseCount) * 100}%`, background: d.count / maxDiseaseCount >= 0.7 ? '#DC2626' : d.count / maxDiseaseCount >= 0.35 ? '#f59e0b' : '#10b981', height: '100%', borderRadius: '4px', transition: 'width 0.5s ease' }} />
+                    <div style={{ width: `${(d.count / maxDiseaseCount) * 100}%`, background: d.count / maxDiseaseCount >= 0.7 ? '#DC2626' : d.count / maxDiseaseCount >= 0.35 ? '#f59e0b' : '#129968', height: '100%', borderRadius: '4px', transition: 'width 0.5s ease' }} />
                   </div>
                 </td>
               </tr>
@@ -466,11 +466,11 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
             )}
             {byBarangay.filter(b => b.count < 10).length > 0 && (
               <div>
-                <div style={{ fontSize: '12px', fontWeight: '700', color: '#10b981', marginBottom: '6px' }}>LOW RISK (&lt;10 cases)</div>
+                <div style={{ fontSize: '12px', fontWeight: '700', color: '#129968', marginBottom: '6px' }}>LOW RISK (&lt;10 cases)</div>
                 {byBarangay.filter(b => b.count < 10).map(b => (
-                  <div key={b.barangay_name} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', background: '#10b98115', borderRadius: '6px', marginBottom: '4px', borderLeft: '3px solid #10b981' }}>
+                  <div key={b.barangay_name} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', background: '#12996815', borderRadius: '6px', marginBottom: '4px', borderLeft: '3px solid #129968' }}>
                     <span style={{ fontSize: '13px' }}>{b.barangay_name}</span>
-                    <span style={{ fontSize: '13px', fontWeight: '700', color: '#10b981' }}>{b.count} cases</span>
+                    <span style={{ fontSize: '13px', fontWeight: '700', color: '#129968' }}>{b.count} cases</span>
                   </div>
                 ))}
               </div>
@@ -547,7 +547,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
                   <td style={{ padding: '10px 16px', fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{fmtDateTime(log.created_at)}</td>
                   <td style={{ padding: '10px 16px', fontSize: '13px' }}>{log.user_full_name || log.user_name || 'System'}</td>
                   <td style={{ padding: '10px 16px', textAlign: 'center' }}>
-                    <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: '600', background: log.user_role === 'CHO' ? '#1E3A8A22' : log.user_role === 'BHW' ? '#7c3aed22' : '#37415122', color: log.user_role === 'CHO' ? '#1E3A8A' : log.user_role === 'BHW' ? '#7c3aed' : '#6b7280' }}>
+                    <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: '600', background: log.user_role === 'CHO' ? '#12135822' : log.user_role === 'BHW' ? '#7c3aed22' : '#37415122', color: log.user_role === 'CHO' ? '#121358' : log.user_role === 'BHW' ? '#7c3aed' : '#6b7280' }}>
                       {log.user_role || 'System'}
                     </span>
                   </td>

@@ -81,15 +81,15 @@ export default function ResidentApp() {
     }}>
       {/* ── STICKY HEADER ── */}
       <header style={{
-        background: 'linear-gradient(135deg, #1E3A8A 0%, #00308F 100%)',
-        padding: '0 24px',
+        background: 'linear-gradient(90deg, #121358 100%)',
+        padding: '0 64px',
         position: 'sticky',
         top: 0,
-        zIndex: 1000,
+        zIndex: 500,
         boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
       }}>
         <div style={{
-          maxWidth: '1200px',
+          maxWidth: '100vw',
           margin: '0 auto',
           display: 'flex',
           alignItems: 'center',
@@ -188,8 +188,8 @@ export default function ResidentApp() {
 
       {/* ── HERO ── */}
       <div style={{
-        background: 'linear-gradient(135deg, #1E3A8A 0%, #2B4593 100%)',
-        padding: '48px 24px 56px',
+        background: 'linear-gradient(0deg, #2F578A 0%, #121358 70%)',
+        padding: '28px 24px 32px',
         textAlign: 'center',
       }}>
         <h1 style={{
@@ -209,27 +209,29 @@ export default function ResidentApp() {
       </div>
 
       {/* ── SECTIONS ── */}
-      <section id="section-map" className="section-fade-in" style={{ maxWidth: '1200px', margin: '0 auto', padding: '48px 24px' }}>
+      <section id="section-map" className="section-fade-in" style={{ maxWidth: '1200px', margin: '0 auto', padding: '28px 24px' }}>
         <ResidentMap />
       </section>
-      <section id="section-about" className="section-fade-in" style={{ maxWidth: '1200px', margin: '0 auto', padding: '48px 24px' }}>
+      <section id="section-about" className="section-fade-in" style={{ maxWidth: '1200px', margin: '0 auto', padding: '28px 24px' }}>
         <AboutCho />
       </section>
-      <section id="section-contact" className="section-fade-in" style={{ maxWidth: '1200px', margin: '0 auto', padding: '48px 24px' }}>
+      <section id="section-contact" className="section-fade-in" style={{ maxWidth: '1200px', margin: '0 auto', padding: '28px 24px' }}>
         <ContactUs />
       </section>
-      <section id="section-help" className="section-fade-in" style={{ maxWidth: '1200px', margin: '0 auto', padding: '48px 24px' }}>
+      <section id="section-help" className="section-fade-in" style={{ maxWidth: '1200px', margin: '0 auto', padding: '28px 24px' }}>
         <Help />
       </section>
-      <section id="section-tips" className="section-fade-in" style={{ maxWidth: '1200px', margin: '0 auto', padding: '48px 24px' }}>
+      <section id="section-tips" className="section-fade-in" style={{ maxWidth: '1200px', margin: '0 auto', padding: '28px 24px' }}>
         <PreventionTips />
       </section>
 
       {/* ── FOOTER ── */}
       <footer style={{
-        background: '#0f172a',
-        color: 'rgba(255,255,255,0.7)',
+        background: 'linear-gradient(90deg, #121358 100%)',
         padding: '32px 24px 24px',
+        top: 0,
+        zIndex: 500,
+        boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
       }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', textAlign: 'center' }}>
           <div style={{

@@ -14,8 +14,8 @@
   --text-muted: #94A3B8;
   --text-h: #E2E8F0;
   --input-bg: #0F172A;
-  --input-border: #334155;
-  --border-color: #334155;
+  --input-border: #64748B;
+  --border-color: #64748B;
   color-scheme: dark;
 }
 
@@ -27,8 +27,8 @@
   --text-muted: #6B7280;
   --text-h: #111827;
   --input-bg: #F9FAFB;
-  --input-border: #D1D5DB;
-  --border-color: #E5E7EB;
+  --input-border: #6B7280;
+  --border-color: #9CA3AF;
   color-scheme: light;
 }
 
@@ -58,7 +58,7 @@ html, body, #root {
   display: flex; 
   align-items: center; 
   justify-content: center; 
-  background: linear-gradient(135deg, #1E3A8A 0%, var(--bg-main) 100%); 
+  background: linear-gradient(135deg, #121358 0%, var(--bg-main) 100%); 
 }
 
 .login-right { 
@@ -107,7 +107,7 @@ html, body, #root {
 
 /* Figma Active Role Color */
 .role-btn.active { 
-  background-color: #1E3A8A; 
+  background-color: #121358; 
   color: #FFFFFF; 
   box-shadow: 0 2px 4px rgba(0,0,0,0.2); 
 }
@@ -135,7 +135,7 @@ html, body, #root {
 }
 
 .form-input:focus { 
-  border-color: #1E3A8A; 
+  border-color: #121358; 
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
@@ -145,7 +145,7 @@ html, body, #root {
 .submit-btn { 
   width: 100%; 
   padding: 14px; 
-  background-color: #10B981; 
+  background-color: #129968; 
   color: #FFFFFF; 
   border: none; 
   border-radius: 8px; 
@@ -155,7 +155,7 @@ html, body, #root {
   margin-top: 10px; 
   transition: background-color 0.2s; 
 }
-.submit-btn:hover { background-color: #059669; }
+.submit-btn:hover { background-color: #0e7d56; }
 
 
 /* =========================================================
@@ -169,8 +169,8 @@ html, body, #root {
 
 .sidebar { 
   width: 260px; 
-  background-color: var(--bg-surface); 
-  border-right: 1px solid var(--border-color); 
+  background-color: #121358; 
+  border-right: 1px solid rgba(255,255,255,0.4); 
   display: flex; 
   flex-direction: column; 
   height: 100vh;
@@ -178,16 +178,16 @@ html, body, #root {
 
 .sidebar-logo { 
   padding: 30px 20px; 
-  border-bottom: 1px solid var(--border-color); 
+  border-bottom: 1px solid rgba(255,255,255,0.45); 
 }
 
-.sidebar-logo h3 { color: var(--text-main); font-size: 16px; letter-spacing: 1px; margin: 0; }
+.sidebar-logo h3 { color: #ffffff; font-size: 16px; letter-spacing: 1px; margin: 0; }
 
 .sidebar-menu { padding: 20px 0; display: flex; flex-direction: column; gap: 5px; }
 
 .menu-item { 
   padding: 12px 20px; 
-  color: var(--text-muted); 
+  color: rgba(255,255,255,0.7); 
   font-weight: 500; 
   cursor: pointer; 
   display: flex; 
@@ -196,14 +196,14 @@ html, body, #root {
 }
 
 .menu-item.active { 
-  background-color: #1E3A8A; 
+  background-color: #2F578A; 
   color: #FFFFFF; 
-  border-right: 4px solid #1E3A8A; 
+  border-right: 4px solid #2F578A; 
 }
 
 .menu-item:hover:not(.active) { 
-  background-color: var(--input-bg); 
-  color: var(--text-main); 
+  background-color: rgba(255,255,255,0.1); 
+  color: #ffffff; 
 }
 
 .main-content { 
@@ -216,8 +216,8 @@ html, body, #root {
 
 .top-nav { 
   height: 70px; 
-  background-color: var(--bg-surface); 
-  border-bottom: 1px solid var(--border-color); 
+  background-color: #121358; 
+  border-bottom: 1px solid rgba(255,255,255,0.4); 
   display: flex; 
   align-items: center; 
   justify-content: space-between; 
@@ -225,7 +225,7 @@ html, body, #root {
   flex-shrink: 0;
 }
 
-.nav-title h2 { font-size: 20px; color: var(--text-main); margin: 0; }
+.nav-title h2 { font-size: 20px; color: #ffffff; margin: 0; }
 
 .content-scroller {
   flex: 1;
@@ -321,11 +321,11 @@ html, body, #root {
   display: flex; align-items: center; gap: 15px; position: relative; cursor: pointer; flex-shrink: 0; 
 }
 .user-info { text-align: right; white-space: nowrap; }
-.user-name { color: var(--text-main); font-weight: 600; font-size: 14px; }
-.user-role { color: var(--text-muted); font-size: 12px; }
+.user-name { color: #ffffff; font-weight: 600; font-size: 14px; }
+.user-role { color: rgba(255,255,255,0.7); font-size: 12px; }
 
 .avatar {
-  width: 35px; height: 35px;   background: #1E3A8A; border-radius: 50%;
+  width: 35px; height: 35px;   background: #2F578A; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   color: white; font-weight: bold; font-size: 12px;
 }
@@ -342,8 +342,8 @@ html, body, #root {
 
 /* Status Badges */
 .status-pill { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; display: inline-flex; align-items: center; gap: 5px; }
-.status-active { background: #1E3A8A; color: #93c5fd; }
-.status-recovered { background: #064E3B; color: #34D399; }
+.status-active { background: #121358; color: #93c5fd; }
+.status-recovered { background: #083d2c; color: #3cb882; }
 .status-pending { background: #78350F; color: #FBBF24; }
 
 .cases-container { padding: 30px; }
@@ -430,7 +430,7 @@ html, body, #root {
 /* The Filled Colored Part */
 .chart-bar-fill {
   height: 100%;
-  background: #1E3A8A;
+  background: #121358;
   border-radius: 6px;
   transition: width 0.5s ease-in-out; 
 }
@@ -448,7 +448,7 @@ html, body, #root {
   width: 50px;
   height: 50px;
   border-radius: 50%;
-  background: #1E3A8A;
+  background: #121358;
   color: #fff;
   display: flex;
   align-items: center;

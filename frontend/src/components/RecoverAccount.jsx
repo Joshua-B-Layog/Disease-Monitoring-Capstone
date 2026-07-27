@@ -50,7 +50,7 @@ export default function RecoverAccount() {
             <button onClick={() => setMethod('mobile')} style={method === 'mobile' ? activeBtn : inactiveBtn}>Mobile</button>
           </div>
 
-          {status.msg && <div style={{ color: status.type === 'error' ? '#ef4444' : '#10b981', marginBottom: '15px', fontSize: '14px' }}>{status.msg}</div>}
+          {status.msg && <div style={{ color: status.type === 'error' ? '#ef4444' : '#129968', marginBottom: '15px', fontSize: '14px' }}>{status.msg}</div>}
 
           {/* STEP 1: REQUEST */}
           {step === 'request' && (
@@ -83,7 +83,7 @@ const containerStyle = { display: 'flex', height: '100vh', background: '#0B111E'
 const rightPaneStyle = { width: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#111827' };
 const cardWrapperStyle = { width: '85%' };
 const inputStyle = { width: '100%', padding: '12px', marginBottom: '15px', borderRadius: '6px', background: '#1f2937', color: 'white', border: '1px solid #374151', boxSizing: 'border-box' };
-const actionBtn = { width: '100%', padding: '12px', background: '#10B981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' };
-const activeBtn = { flex: 1, padding: '10px', background: '#10B981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' };
+const actionBtn = { width: '100%', padding: '12px', background: '#129968', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' };
+const activeBtn = { flex: 1, padding: '10px', background: '#129968', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' };
 const inactiveBtn = { flex: 1, padding: '10px', background: '#1f2937', color: '#9ca3af', border: 'none', borderRadius: '6px', cursor: 'pointer' };
-const backLink = { color: '#10B981', cursor: 'pointer', textAlign: 'center', marginTop: '20px', fontSize: '14px' };
+const backLink = { color: '#129968', cursor: 'pointer', textAlign: 'center', marginTop: '20px', fontSize: '14px' };

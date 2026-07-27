@@ -55,10 +55,24 @@ function App() {
 
   const [profilePhoto, setProfilePhoto]   = useState(null);
 
+  const getWorkWeek = () => {
+    const now = new Date();
+    const day = now.getDay();
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + diffToMonday);
+    const friday = new Date(monday);
+    friday.setDate(monday.getDate() + 4);
+    return {
+      start: monday.toISOString().slice(0, 10),
+      end: friday.toISOString().slice(0, 10),
+    };
+  };
+
   const [activeTab, setActiveTab]         = useState('Dashboard');  
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedDisease, setSelectedDisease] = useState('Dengue');
-  const [dateRange, setDateRange]         = useState({ start: '2026-01-01', end: '2026-05-28' });
+  const [dateRange, setDateRange]         = useState(getWorkWeek);
   const [caseFilter, setCaseFilter]       = useState({ disease: '', barangay: '', purok: '' });
 
   const [language, setLanguage]           = useState('en');
@@ -450,15 +464,15 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
         <div className="top-nav">
           <div className="nav-title" style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             <h2 style={{ margin: 0 }}>{activeTab}</h2>
-            <small style={{ color: '#10B981', fontSize: '12px', fontWeight: '500' }}>
+            <small style={{ color: '#129968', fontSize: '12px', fontWeight: '500' }}>
               Scope: {sessionContext} ({loginRole})
             </small>
           </div>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             {/* ── ONLINE/OFFLINE INDICATOR ── */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', background: isOnline ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', color: isOnline ? '#10B981' : '#F59E0B', border: `1px solid ${isOnline ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)'}` }}>
-              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: isOnline ? '#10B981' : '#F59E0B' }}></span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', background: isOnline ? 'rgba(18,153,104,0.1)' : 'rgba(245,158,11,0.1)', color: isOnline ? '#129968' : '#F59E0B', border: `1px solid ${isOnline ? 'rgba(18,153,104,0.3)' : 'rgba(245,158,11,0.3)'}` }}>
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: isOnline ? '#129968' : '#F59E0B' }}></span>
               {isOnline ? 'Online' : 'Offline'}
             </div>
             {/* ── BELL ICON + NOTIFICATION DROPDOWN ── */}
@@ -470,7 +484,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                 }}
                 style={{
                   position: 'relative', background: 'none', border: 'none',
-                  cursor: 'pointer', padding: '6px', color: 'var(--text-main)',
+                  cursor: 'pointer', padding: '6px', color: '#ffffff',
                   display: 'flex', alignItems: 'center', justifyContent: 'center'
                 }}
               >
@@ -577,7 +591,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                               </span>
                               {n.is_read === 0 && (
                                 <button onClick={() => handleMarkRead(n.id)} style={{
-                                  background: 'none', border: 'none', color: '#1E3A8A',
+                                  background: 'none', border: 'none', color: '#121358',
                                   cursor: 'pointer', fontSize: '11px', fontWeight: '600', padding: 0
                                 }}>
                                   Mark read
@@ -606,7 +620,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                                   }
                                   setShowNotifications(false);
                                 }} style={{
-                                  background: 'none', border: 'none', color: '#10b981',
+                                  background: 'none', border: 'none', color: '#129968',
                                   cursor: 'pointer', fontSize: '11px', fontWeight: '600', padding: 0
                                 }}>
                                   View →
@@ -633,7 +647,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
 
             {/* ── LIVE CLOCK ── */}
             <div style={{
-              fontSize: '13px', fontWeight: '500', color: 'var(--text-muted)',
+              fontSize: '13px', fontWeight: '500', color: 'rgba(255,255,255,0.7)',
               fontFamily: 'ui-monospace, Consolas, monospace', letterSpacing: '0.03em', whiteSpace: 'nowrap',
             }}>
               {clock.toLocaleTimeString('en', {
@@ -666,7 +680,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                 )}
               </div>
 
-              <span style={{ color: '#9ca3af', marginLeft: '5px' }}>
+              <span style={{ color: 'rgba(255,255,255,0.5)', marginLeft: '5px' }}>
                 {isDropdownOpen ? '▲' : '▼'}
               </span>
 
@@ -705,7 +719,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             position: 'fixed', bottom: '24px', right: '24px', zIndex: 9000,
             display: 'flex', alignItems: 'center', gap: '8px',
             padding: '10px 18px', borderRadius: '24px',
-            background: syncingActive ? '#6366F1' : navigator.onLine ? '#10B981' : '#F59E0B',
+            background: syncingActive ? '#6366F1' : navigator.onLine ? '#129968' : '#F59E0B',
             color: '#fff', border: 'none', cursor: syncingActive ? 'wait' : 'pointer',
             boxShadow: '0 4px 16px rgba(0,0,0,0.25)', fontSize: '13px', fontWeight: '600',
             transition: 'all 0.2s'
@@ -716,7 +730,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
           ) : '⟳'}
           {syncingActive ? 'Syncing...' : `Sync ${pendingSyncCount} item${pendingSyncCount > 1 ? 's' : ''}`}
           {pendingSyncCount > 0 && !syncingActive && (
-            <span style={{ background: '#fff', color: navigator.onLine ? '#10B981' : '#F59E0B', borderRadius: '50%', width: '20px', height: '20px', fontSize: '11px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ background: '#fff', color: navigator.onLine ? '#129968' : '#F59E0B', borderRadius: '50%', width: '20px', height: '20px', fontSize: '11px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {pendingSyncCount}
             </span>
           )}
@@ -730,8 +744,8 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             position: 'fixed', bottom: '80px', right: '24px', zIndex: 9001,
             padding: '12px 18px', borderRadius: '10px',
             background: syncResult.type === 'error' ? '#FEF2F2' : syncResult.type === 'conflict' ? '#FFFBEB' : '#F0FDF4',
-            border: `1px solid ${syncResult.type === 'error' ? '#FECACA' : syncResult.type === 'conflict' ? '#FDE68A' : '#BBF7D0'}`,
-            color: syncResult.type === 'error' ? '#DC2626' : syncResult.type === 'conflict' ? '#D97706' : '#16A34A',
+            border: `1px solid ${syncResult.type === 'error' ? '#FECACA' : syncResult.type === 'conflict' ? '#FDE68A' : '#baf0d7'}`,
+            color: syncResult.type === 'error' ? '#DC2626' : syncResult.type === 'conflict' ? '#D97706' : '#129968',
             fontSize: '13px', fontWeight: '500', maxWidth: '340px',
             boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
           }}
@@ -770,7 +784,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             }}>
               <div style={{
                 width: '80px', height: '80px', borderRadius: '50%',
-                background: profilePhoto ? 'transparent' : '#10b981',
+                background: profilePhoto ? 'transparent' : '#129968',
                 border: '3px solid rgba(255,255,255,0.4)',
                 overflow: 'hidden', flexShrink: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -819,7 +833,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                 <button
                   onClick={() => { setShowProfileModal(false); setActiveTab('Settings'); setOpenProfileView(true); }}
                   style={{
-                    flex: 1, padding: '12px', background: '#10b981', color: '#fff',
+                    flex: 1, padding: '12px', background: '#129968', color: '#fff',
                     border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600',
                     cursor: 'pointer',
                   }}

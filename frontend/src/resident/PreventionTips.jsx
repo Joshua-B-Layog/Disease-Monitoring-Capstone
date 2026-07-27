@@ -64,7 +64,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'Leptospirosis', icon: '🐀', color: '#10b981', videoId: 'aqnpyMsvMbk',
+    name: 'Leptospirosis', icon: '🐀', color: '#129968', videoId: 'aqnpyMsvMbk',
     tips: [
       'Avoid wading or swimming in floodwaters.',
       'Wear protective boots and gloves when cleaning flood-damaged areas.',
@@ -433,7 +433,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'Malaria', icon: '🦟', color: '#059669', videoId: '', videoUrl: 'https://www.facebook.com/CalambaMedicalCenter/videos/1006334831743202/',
+    name: 'Malaria', icon: '🦟', color: '#0e7d56', videoId: '', videoUrl: 'https://www.facebook.com/CalambaMedicalCenter/videos/1006334831743202/',
     tips: [
       'Use mosquito nets while sleeping, especially in high-risk areas.',
       'Apply mosquito repellent on exposed skin.',
@@ -595,7 +595,7 @@ export default function PreventionTips() {
   };
 
   const getResultLevel = (pct) => {
-    if (pct < 25) return { label: 'Low Likelihood', color: '#22c55e', bg: 'rgba(34,197,94,0.12)', text: 'Your symptoms do not strongly match this disease. Stay observant and practice prevention measures.' };
+    if (pct < 25) return { label: 'Low Likelihood', color: '#129968', bg: 'rgba(18,153,104,0.12)', text: 'Your symptoms do not strongly match this disease. Stay observant and practice prevention measures.' };
     if (pct < 50) return { label: 'Moderate Risk', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', text: 'Your symptoms partially match this disease. Consider visiting a health center for a check-up.' };
     return { label: 'High Risk', color: '#DC2626', bg: 'rgba(220,38,38,0.12)', text: 'Your symptoms strongly match this disease. Please go to the hospital immediately for evaluation.' };
   };
@@ -674,7 +674,7 @@ export default function PreventionTips() {
                       margin: '12px 0',
                       padding: '10px 14px',
                       borderRadius: '8px',
-                      background: '#1E3A8A',
+                      background: '#121358',
                       color: '#fff',
                       fontSize: '13px',
                       fontWeight: 600,
@@ -687,7 +687,7 @@ export default function PreventionTips() {
                 <div style={{ marginTop: '8px', textAlign: 'right' }}>
                   <button onClick={(e) => { e.stopPropagation(); startQuiz(disease.name); }}
                     style={{
-                      padding: '6px 16px', background: '#10B981', color: '#fff',
+                      padding: '6px 16px', background: '#129968', color: '#fff',
                       border: 'none', borderRadius: '6px', cursor: 'pointer',
                       fontSize: '17px', fontWeight: '600',
                     }}>
@@ -703,11 +703,11 @@ export default function PreventionTips() {
       {/* ── SYMPTOM CHECKER ── */}
       <div ref={quizRef} style={{
         marginTop: '40px', background: 'var(--bg-surface)',
-        border: '2px solid #10B981', borderRadius: '14px',
+        border: '2px solid #129968', borderRadius: '14px',
         overflow: 'hidden',
       }}>
         <div style={{
-          background: '#10B981', padding: '16px 24px', color: '#fff',
+          background: '#129968', padding: '16px 24px', color: '#fff',
         }}>
           <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>
             🩺 Symptom Checker
@@ -761,7 +761,7 @@ export default function PreventionTips() {
                   {disease.symptoms.map((q, idx) => (
                     <div key={idx} style={{
                       padding: '12px 16px', background: 'var(--bg-main)', borderRadius: '8px',
-                      border: scAnswers[idx] !== undefined ? '1px solid #10B981' : '1px solid var(--border-color)',
+                      border: scAnswers[idx] !== undefined ? '1px solid #129968' : '1px solid var(--border-color)',
                     }}>
                       <div style={{ fontSize: '14px', color: 'var(--text-main)', marginBottom: '8px' }}>
                         {idx + 1}. {q}
@@ -770,9 +770,9 @@ export default function PreventionTips() {
                         <button onClick={() => answerQuestion(idx, true)}
                           style={{
                             padding: '6px 20px', borderRadius: '6px', border: '1px solid',
-                            borderColor: scAnswers[idx] === true ? '#22c55e' : 'var(--border-color)',
-                            background: scAnswers[idx] === true ? 'rgba(34,197,94,0.12)' : 'var(--bg-surface)',
-                            color: scAnswers[idx] === true ? '#16a34a' : 'var(--text-muted)',
+                            borderColor: scAnswers[idx] === true ? '#129968' : 'var(--border-color)',
+                            background: scAnswers[idx] === true ? 'rgba(18,153,104,0.12)' : 'var(--bg-surface)',
+                            color: scAnswers[idx] === true ? '#129968' : 'var(--text-muted)',
                             fontWeight: scAnswers[idx] === true ? '600' : '400',
                             cursor: 'pointer', fontSize: '13px',
                           }}>
@@ -797,7 +797,7 @@ export default function PreventionTips() {
                   <button onClick={calculateResult}
                     disabled={answeredCount < disease.symptoms.length}
                     style={{
-                      padding: '12px 40px', background: answeredCount < disease.symptoms.length ? '#94a3b8' : '#10B981',
+                      padding: '12px 40px', background: answeredCount < disease.symptoms.length ? '#94a3b8' : '#129968',
                       color: '#fff', border: 'none', borderRadius: '8px',
                       fontSize: '15px', fontWeight: '700', cursor: answeredCount < disease.symptoms.length ? 'not-allowed' : 'pointer',
                     }}>
@@ -832,7 +832,7 @@ export default function PreventionTips() {
                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
                   <button onClick={() => { resetQuiz(); }}
                     style={{
-                      padding: '10px 24px', background: '#10B981', color: '#fff',
+                      padding: '10px 24px', background: '#129968', color: '#fff',
                       border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600',
                     }}>
                     Try Another Disease

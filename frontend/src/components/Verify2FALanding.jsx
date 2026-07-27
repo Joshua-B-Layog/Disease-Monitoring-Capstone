@@ -45,7 +45,7 @@ export default function Verify2FALanding() {
       }}>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '28px' }}>
-          <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#1E3A8A' }}></div>
+          <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#121358' }}></div>
           <span style={{ color: '#ffffff', fontSize: '20px', fontWeight: 'bold' }}>Cabuyao Health</span>
         </div>
 
@@ -76,7 +76,7 @@ export default function Verify2FALanding() {
               onClick={() => { window.location.href = '/'; }}
               style={{
                 width: '100%', padding: '14px',
-                background: '#10B981', color: '#ffffff', border: 'none',
+                background: '#129968', color: '#ffffff', border: 'none',
                 borderRadius: '8px', fontSize: '15px', fontWeight: '600', cursor: 'pointer'
               }}
             >

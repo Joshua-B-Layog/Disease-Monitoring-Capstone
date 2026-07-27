@@ -976,7 +976,7 @@ export default function ResidentMap() {
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '9px', flex: 1, minWidth: 0 }}>
                         {isTop && (
-                          <span style={{ fontSize: '9px', background: '#1E3A8A', color: 'white', padding: '2px 6px', borderRadius: '10px', fontWeight: '700', flexShrink: 0 }}>
+                          <span style={{ fontSize: '9px', background: '#121358', color: 'white', padding: '2px 6px', borderRadius: '10px', fontWeight: '700', flexShrink: 0 }}>
                             TOP {i + 1}
                           </span>
                         )}

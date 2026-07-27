@@ -473,7 +473,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
             disabled={offlineMode}
             onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
             onMouseLeave={e => e.currentTarget.style.opacity = '1'}
-            style={{ marginLeft: selectedIds.length > 0 ? '0' : 'auto', padding: '10px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: offlineMode ? 'not-allowed' : 'pointer', fontWeight: '600', fontSize: '13px', opacity: offlineMode ? 0.4 : 1 }}>
+            style={{ marginLeft: selectedIds.length > 0 ? '0' : 'auto', padding: '10px 20px', background: '#129968', color: 'white', border: 'none', borderRadius: '6px', cursor: offlineMode ? 'not-allowed' : 'pointer', fontWeight: '600', fontSize: '13px', opacity: offlineMode ? 0.4 : 1 }}>
             + Add User
           </button>
         </div>
@@ -514,7 +514,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                     <td style={{ padding: compactMode ? '8px 6px' : '15px 10px' }}>
                       <span style={{
                         padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '500',
-                        background: user.is_active ? '#1E3A8A' : 'var(--input-bg)',
+                        background: user.is_active ? '#121358' : 'var(--input-bg)',
                         color: user.is_active ? '#93c5fd' : 'var(--text-muted)'
                       }}>
                         {user.is_active ? 'Active' : 'Inactive'}
@@ -569,7 +569,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
               p === '...' ? (
                 <div key={`e${i}`} ref={ellipsisRef} style={{ position: 'relative', display: 'inline-flex' }}>
                   <button onClick={() => setEllipsisOpen(o => !o)}
-                    style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)', borderRadius: '6px', background: ellipsisOpen ? 'rgba(30,58,138,0.15)' : 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '16px', fontWeight: '700', letterSpacing: '2px' }}>...</button>
+                    style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)', borderRadius: '6px', background: ellipsisOpen ? 'rgba(18,19,88,0.15)' : 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '16px', fontWeight: '700', letterSpacing: '2px' }}>...</button>
                   {ellipsisOpen && (
                     <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px', width: '160px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 100 }}>
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px' }}>Go to page (1–{totalPages})</div>
@@ -579,14 +579,14 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                           onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(ellipsisPageInput); if (v >= 1 && v <= totalPages) { setCurrentPage(v); setEllipsisOpen(false); setEllipsisPageInput(''); } } }}
                           style={{ flex: 1, padding: '5px 6px', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '12px', outline: 'none', width: '100%' }} />
                         <button onClick={() => { const v = parseInt(ellipsisPageInput); if (v >= 1 && v <= totalPages) { setCurrentPage(v); setEllipsisOpen(false); setEllipsisPageInput(''); } }}
-                          style={{ padding: '5px 8px', border: '1px solid #1E3A8A', borderRadius: '4px', background: '#1E3A8A', color: 'white', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>Go</button>
+                          style={{ padding: '5px 8px', border: '1px solid #121358', borderRadius: '4px', background: '#121358', color: 'white', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>Go</button>
                       </div>
                     </div>
                   )}
                 </div>
               ) : (
                 <button key={p} onClick={() => setCurrentPage(p)}
-                  style={{ width: '32px', height: '32px', border: '1px solid var(--border-color)', borderRadius: '6px', background: p === currentPage ? '#1E3A8A' : 'var(--bg-surface)', color: p === currentPage ? 'white' : 'var(--text-main)', cursor: 'pointer', fontSize: '13px' }}>{p}</button>
+                  style={{ width: '32px', height: '32px', border: '1px solid var(--border-color)', borderRadius: '6px', background: p === currentPage ? '#121358' : 'var(--bg-surface)', color: p === currentPage ? 'white' : 'var(--text-main)', cursor: 'pointer', fontSize: '13px' }}>{p}</button>
               )
             )}
             <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
@@ -605,7 +605,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
             </h3>
 
             {submitMsg && (
-              <div style={{ background: submitMsg.startsWith('Error') ? '#fee2e2' : '#d1fae5', color: submitMsg.startsWith('Error') ? '#991b1b' : '#065f46', padding: '10px 14px', borderRadius: '8px', marginBottom: '18px', fontSize: '13px', fontWeight: '500' }}>
+              <div style={{ background: submitMsg.startsWith('Error') ? '#fee2e2' : '#d1f5e9', color: submitMsg.startsWith('Error') ? '#991b1b' : '#0a5e42', padding: '10px 14px', borderRadius: '8px', marginBottom: '18px', fontSize: '13px', fontWeight: '500' }}>
                 {submitMsg.startsWith('Error') ? '❌' : '✅'} {submitMsg}
               </div>
             )}
@@ -760,7 +760,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                   Cancel
                 </button>
                 <button type="submit" disabled={submitLoading}
-                  style={{ padding: '10px 28px', background: submitLoading ? '#6ee7b7' : '#10b981', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: 'white', cursor: submitLoading ? 'not-allowed' : 'pointer' }}
+                  style={{ padding: '10px 28px', background: submitLoading ? '#6fd4a2' : '#129968', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: 'white', cursor: submitLoading ? 'not-allowed' : 'pointer' }}
                   onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                   onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
                   {submitLoading ? 'Saving...' : (editingUser ? 'Update User' : 'Add User')}

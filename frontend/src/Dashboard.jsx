@@ -39,11 +39,25 @@ const formatDateStr = (dateStr, fmt) => {
   return `${m}/${day}/${shortY}`;
 };
 
+const getWorkWeek = () => {
+  const now = new Date();
+  const day = now.getDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diffToMonday);
+  const friday = new Date(monday);
+  friday.setDate(monday.getDate() + 4);
+  return {
+    start: monday.toISOString().slice(0, 10),
+    end: friday.toISOString().slice(0, 10),
+  };
+};
+
 const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMode, loginRole, loginBarangay, sessionContext }) => {
   const [cases, setCases] = useState([]);
   const [selectedDisease, setSelectedDisease] = useState('Dengue');
   const [loading, setLoading] = useState(true);
-  const [dateRange, setDateRange] = useState({ start: new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10), end: new Date().toISOString().slice(0, 10) });
+  const [dateRange, setDateRange] = useState(getWorkWeek);
   const [currentPage, setCurrentPage] = useState(1);
   const [ellipsisOpen, setEllipsisOpen] = useState(false);
   const [ellipsisPageInput, setEllipsisPageInput] = useState('');
@@ -298,12 +312,12 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       <html><head><meta charset="utf-8"><title>CDMS Slide Export</title>
       <style>
         body { font-family: Arial, sans-serif; background: #0B1120; color: white; padding: 40px; }
-        h1 { color: #10b981; margin-bottom: 4px; } 
+        h1 { color: #129968; margin-bottom: 4px; } 
         h2 { color: #60a5fa; margin-top: 36px; margin-bottom: 12px; font-size: 18px; }
         p { color: #9ca3af; margin: 0 0 24px 0; font-size: 13px; }
         .stats { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
         .stat { background: #1e293b; padding: 18px 28px; border-radius: 8px; text-align: center; min-width: 100px; }
-        .stat .num { font-size: 32px; font-weight: bold; color: #10b981; }
+        .stat .num { font-size: 32px; font-weight: bold; color: #129968; }
         .stat .lbl { font-size: 12px; color: #9ca3af; margin-top: 4px; }
         table.bars { width: 100%; border-collapse: collapse; }
         table.bars td { padding: 5px 8px; font-size: 13px; color: #e2e8f0; }
@@ -400,10 +414,10 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
   // --- STATUS BADGE STYLE ---
   const getStatusStyle = (status) => {
-    if (status === 'Active') return { background: '#1E3A8A', color: '#93c5fd' };
+    if (status === 'Active') return { background: '#121358', color: '#93c5fd' };
     if (status === 'Pending') return { background: '#1e3a8a', color: '#93c5fd' };
     if (status === 'Under Treatment') return { background: '#3b0764', color: '#c4b5fd' };
-    if (status === 'Recovered') return { background: '#064E3B', color: '#34D399' };
+    if (status === 'Recovered') return { background: '#083d2c', color: '#3cb882' };
     if (status === 'Deceased') return { background: '#7f1d1d', color: '#fca5a5' };
     if (status === 'Draft') return { background: '#374151', color: '#d1d5db' };
     return { background: '#374151', color: '#d1d5db' };
@@ -424,7 +438,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         {[
           { label: 'Total Cases', value: totalCases, color: '#60A5FA' },
           { label: 'Active', value: activeCases, color: '#f59e0b' },
-          { label: 'Recovered', value: recoveredCases, color: '#10b981' },
+          { label: 'Recovered', value: recoveredCases, color: '#129968' },
           { label: 'Deaths', value: deathCases, color: '#ef4444' },
         ].map(card => (
             <div key={card.label} style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' }}>
@@ -561,7 +575,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           <div style={{ position: 'relative' }} ref={exportRef}>
             <button
               onClick={() => setShowExportMenu(!showExportMenu)}
-              style={{ width: '100%', padding: '8px', background: '#1E3A8A', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '500', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+              style={{ width: '100%', padding: '8px', background: '#121358', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '500', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
               onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
               onMouseLeave={e => e.currentTarget.style.opacity = '1'}
             >
@@ -592,7 +606,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           {/* PRINT */}
           <button
             onClick={handlePrint}
-            style={{ width: '100%', padding: '8px', background: '#065f46', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}
+            style={{ width: '100%', padding: '8px', background: '#0a5e42', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}
             onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
             onMouseLeave={e => e.currentTarget.style.opacity = '1'}
           >
@@ -616,7 +630,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           </h4>
           <button
             onClick={() => setActiveTab('Manage Cases')}
-            style={{ padding: '6px 14px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}
+            style={{ padding: '6px 14px', background: '#129968', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}
             onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
             onMouseLeave={e => e.currentTarget.style.opacity = '1'}
           >
@@ -668,7 +682,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             <button
               onClick={() => setCurrentPage(1)}
               disabled={currentPage === 1}
-              style={{ padding: '5px 8px', background: currentPage === 1 ? 'var(--input-bg)' : '#1E3A8A', color: currentPage === 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: '700' }}
+              style={{ padding: '5px 8px', background: currentPage === 1 ? 'var(--input-bg)' : '#121358', color: currentPage === 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: '700' }}
               onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
               onMouseLeave={e => e.currentTarget.style.opacity = '1'}
             >
@@ -677,7 +691,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             <button
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              style={{ padding: '5px 12px', background: currentPage === 1 ? 'var(--input-bg)' : '#1E3A8A', color: currentPage === 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontSize: '13px' }}
+              style={{ padding: '5px 12px', background: currentPage === 1 ? 'var(--input-bg)' : '#121358', color: currentPage === 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontSize: '13px' }}
               onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
               onMouseLeave={e => e.currentTarget.style.opacity = '1'}
             >
@@ -687,7 +701,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
               p === '...' ? (
                 <div key={`e${i}`} ref={ellipsisRef} style={{ position: 'relative', display: 'inline-flex' }}>
                   <button onClick={() => setEllipsisOpen(o => !o)}
-                    style={{ padding: '5px 8px', background: ellipsisOpen ? 'rgba(30,58,138,0.15)' : 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '700', letterSpacing: '2px' }}>...</button>
+                    style={{ padding: '5px 8px', background: ellipsisOpen ? 'rgba(18,19,88,0.15)' : 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '700', letterSpacing: '2px' }}>...</button>
                   {ellipsisOpen && (
                     <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px', width: '160px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 100 }}>
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px' }}>Go to page (1–{totalPages})</div>
@@ -697,7 +711,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                           onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(ellipsisPageInput); if (v >= 1 && v <= totalPages) { setCurrentPage(v); setEllipsisOpen(false); setEllipsisPageInput(''); } } }}
                           style={{ flex: 1, padding: '5px 6px', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '12px', outline: 'none', width: '100%' }} />
                         <button onClick={() => { const v = parseInt(ellipsisPageInput); if (v >= 1 && v <= totalPages) { setCurrentPage(v); setEllipsisOpen(false); setEllipsisPageInput(''); } }}
-                          style={{ padding: '5px 8px', border: '1px solid #1E3A8A', borderRadius: '4px', background: '#1E3A8A', color: 'white', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>Go</button>
+                          style={{ padding: '5px 8px', border: '1px solid #121358', borderRadius: '4px', background: '#121358', color: 'white', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>Go</button>
                       </div>
                     </div>
                   )}
@@ -706,7 +720,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                 <button
                   key={p}
                   onClick={() => setCurrentPage(p)}
-                  style={{ padding: '5px 10px', background: p === currentPage ? '#1E3A8A' : 'transparent', color: p === currentPage ? 'white' : 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', minWidth: '32px' }}
+                  style={{ padding: '5px 10px', background: p === currentPage ? '#121358' : 'transparent', color: p === currentPage ? 'white' : 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', minWidth: '32px' }}
                   onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                   onMouseLeave={e => e.currentTarget.style.opacity = '1'}
                 >
@@ -717,7 +731,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             <button
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              style={{ padding: '5px 12px', background: currentPage === totalPages ? 'var(--input-bg)' : '#1E3A8A', color: currentPage === totalPages ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontSize: '13px' }}
+              style={{ padding: '5px 12px', background: currentPage === totalPages ? 'var(--input-bg)' : '#121358', color: currentPage === totalPages ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontSize: '13px' }}
               onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
               onMouseLeave={e => e.currentTarget.style.opacity = '1'}
             >
@@ -726,7 +740,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             <button
               onClick={() => setCurrentPage(totalPages)}
               disabled={currentPage === totalPages}
-              style={{ padding: '5px 8px', background: currentPage === totalPages ? 'var(--input-bg)' : '#1E3A8A', color: currentPage === totalPages ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: '700' }}
+              style={{ padding: '5px 8px', background: currentPage === totalPages ? 'var(--input-bg)' : '#121358', color: currentPage === totalPages ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: '700' }}
               onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
               onMouseLeave={e => e.currentTarget.style.opacity = '1'}
             >

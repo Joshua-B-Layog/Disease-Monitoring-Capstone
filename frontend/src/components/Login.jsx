@@ -420,7 +420,7 @@ const handleLoginOtpSubmit = async (e) => {
           <div className="login-form-container">
             
             <div className="brand-logo" style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '30px' }}>
-              <div className="circle-logo" style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#1E3A8A', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}><ChoLogoIcon size={32} /></div>
+              <div className="circle-logo" style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#121358', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}><ChoLogoIcon size={32} /></div>
               <div className="brand-text" style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--text-main)' }}>
                 Cabuyao Health
               </div>
@@ -435,7 +435,7 @@ const handleLoginOtpSubmit = async (e) => {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <button type="button" onClick={() => handleRoleSelection('CHO')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px', background: 'rgba(30, 58, 138, 0.15)', border: '1px solid #1E3A8A', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
+                  <button type="button" onClick={() => handleRoleSelection('CHO')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px', background: 'rgba(18, 19, 88, 0.15)', border: '1px solid #121358', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
                     <div>
                       <div style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '16px' }}>City Health Office (CHO)</div>
                       <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '2px' }}>Central Systems & Analytics</div>
@@ -443,7 +443,7 @@ const handleLoginOtpSubmit = async (e) => {
                     <span style={{ fontSize: '20px' }}>🏢</span>
                   </button>
 
-                  <button type="button" onClick={() => handleRoleSelection('BHW')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid #10B981', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
+                  <button type="button" onClick={() => handleRoleSelection('BHW')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px', background: 'rgba(18, 153, 104, 0.08)', border: '1px solid #129968', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
                     <div>
                       <div style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '16px' }}>Barangay Health Worker</div>
                       <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '2px' }}>Community Surveillance Data Entry</div>
@@ -458,7 +458,7 @@ const handleLoginOtpSubmit = async (e) => {
             {step === 'cho_select' && (
               <>
                 <div className="login-header" style={{ marginBottom: '25px', textAlign: 'left' }}>
-                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#10B981', cursor: 'pointer', fontSize: '14px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back</button>
+                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#129968', cursor: 'pointer', fontSize: '14px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back</button>
                   <h2 style={{ fontSize: '26px', color: 'var(--text-main)', marginBottom: '6px' }}>Select Health Unit</h2>
                   <p style={{ color: 'var(--text-muted)' }}>Identify your current administrative station hub.</p>
                 </div>
@@ -491,7 +491,7 @@ const handleLoginOtpSubmit = async (e) => {
             {step === 'bhw_select' && (
               <>
                 <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
-                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#10B981', cursor: 'pointer', fontSize: '14px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back</button>
+                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#129968', cursor: 'pointer', fontSize: '14px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back</button>
                   <h2 style={{ fontSize: '26px', color: 'var(--text-main)', marginBottom: '6px' }}>Assigned Locality</h2>
                   <p style={{ color: 'var(--text-muted)' }}>Select your designated community operations sector.</p>
                 </div>
@@ -506,7 +506,7 @@ const handleLoginOtpSubmit = async (e) => {
                   {cabuyaoBarangays.map((b) => (
                     <div key={b.name} onClick={() => { setSelectedContext(`Brgy. ${b.name}`); setLoginError(''); }} style={{
                       padding: '12px', cursor: 'pointer', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '2px 0',
-                      background: selectedContext === `Brgy. ${b.name}` ? '#10B981' : 'transparent', color: selectedContext === `Brgy. ${b.name}` ? '#ffffff' : 'var(--text-main)'
+                      background: selectedContext === `Brgy. ${b.name}` ? '#129968' : 'transparent', color: selectedContext === `Brgy. ${b.name}` ? '#ffffff' : 'var(--text-main)'
                     }}>
                       <span style={{ fontWeight: selectedContext === `Brgy. ${b.name}` ? '600' : '400' }}>Brgy. {b.name}</span>
                       <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '4px', background: 'rgba(0,0,0,0.2)', color: selectedContext === `Brgy. ${b.name}` ? '#fff' : 'var(--text-muted)' }}>{b.district}</span>
@@ -514,7 +514,7 @@ const handleLoginOtpSubmit = async (e) => {
                   ))}
                 </div>
 
-                <button type="button" className="submit-btn" onClick={handleBhwProceed} style={{ backgroundColor: '#10B981', color: '#FFFFFF', width: '100%' }}>
+                <button type="button" className="submit-btn" onClick={handleBhwProceed} style={{ backgroundColor: '#129968', color: '#FFFFFF', width: '100%' }}>
                   Confirm Barangay Block
                 </button>
               </>
@@ -524,7 +524,7 @@ const handleLoginOtpSubmit = async (e) => {
             {step === 'auth' && (
               <>
                 <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
-                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#10B981', cursor: 'pointer', fontSize: '14px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>
+                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#129968', cursor: 'pointer', fontSize: '14px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>
                     ← Scope: {selectedContext}
                   </button>
                   <h2 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '8px' }}>Sign-In</h2>
@@ -593,16 +593,16 @@ const handleLoginOtpSubmit = async (e) => {
                         type="checkbox" 
                         checked={rememberMe}
                         onChange={(e) => setRememberMe(e.target.checked)}
-                        style={{ accentColor: '#10B981', width: '16px', height: '16px' }} 
+                        style={{ accentColor: '#129968', width: '16px', height: '16px' }} 
                       /> 
                       Remember me
                     </label>
-                    <span onClick={() => setStep('forgot_password')} style={{ color: '#10B981', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}>
+                    <span onClick={() => setStep('forgot_password')} style={{ color: '#129968', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}>
                       Forgot password?
                     </span>
                   </div>
 
-                  <button type="submit" className="submit-btn" style={{ backgroundColor: '#10B981', color: '#FFFFFF', marginTop: '10px' }}>
+                  <button type="submit" className="submit-btn" style={{ backgroundColor: '#129968', color: '#FFFFFF', marginTop: '10px' }}>
                     Sign In as {selectedRole}
                   </button>
                 </form>
@@ -644,7 +644,7 @@ const handleLoginOtpSubmit = async (e) => {
         type="submit"
         disabled={otpLoading}
         className="submit-btn"
-        style={{ backgroundColor: '#10B981', color: '#FFFFFF', marginTop: '20px' }}
+        style={{ backgroundColor: '#129968', color: '#FFFFFF', marginTop: '20px' }}
       >
         {otpLoading ? 'Verifying...' : 'Verify & Continue'}
       </button>
@@ -664,7 +664,7 @@ const handleLoginOtpSubmit = async (e) => {
             setOtpError('Failed to resend code. Please try again.');
           }
         }}
-        style={{ color: '#10B981', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
+        style={{ color: '#129968', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
       >
         Resend Code
       </span>
@@ -676,7 +676,7 @@ const handleLoginOtpSubmit = async (e) => {
             {step === 'cho_contact' && (
               <>
                 <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
-                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#10B981', cursor: 'pointer', fontSize: '14px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back</button>
+                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#129968', cursor: 'pointer', fontSize: '14px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back</button>
                   <h2 style={{ fontSize: '26px', color: 'var(--text-main)', marginBottom: '8px' }}>CHO Account Access</h2>
                   <p style={{ color: 'var(--text-muted)', lineHeight: '1.6' }}>
                     For security purposes, City Health Office accounts cannot be created through self-registration. Please contact your CHO unit directly to request an account.
@@ -689,10 +689,10 @@ const handleLoginOtpSubmit = async (e) => {
                       CHO Unit I (Main - Sala)
                     </div>
                     <div style={{ fontSize: '14px', color: 'var(--text-main)', marginBottom: '6px' }}>
-                      📞 Contact Number: <span style={{ color: '#10B981', fontWeight: '600' }}>09478891074</span>
+                      📞 Contact Number: <span style={{ color: '#129968', fontWeight: '600' }}>09478891074</span>
                     </div>
                     <div style={{ fontSize: '14px', color: 'var(--text-main)' }}>
-                      ✉️ Email: <span style={{ color: '#10B981', fontWeight: '600' }}>idkwutishappen@gmail.com</span>
+                      ✉️ Email: <span style={{ color: '#129968', fontWeight: '600' }}>idkwutishappen@gmail.com</span>
                     </div>
                   </div>
 
@@ -701,10 +701,10 @@ const handleLoginOtpSubmit = async (e) => {
                       CHO Unit II (Extension - Pulo)
                     </div>
                     <div style={{ fontSize: '14px', color: 'var(--text-main)', marginBottom: '6px' }}>
-                      📞 Contact Number: <span style={{ color: '#10B981', fontWeight: '600' }}>09558411426</span>
+                      📞 Contact Number: <span style={{ color: '#129968', fontWeight: '600' }}>09558411426</span>
                     </div>
                     <div style={{ fontSize: '14px', color: 'var(--text-main)' }}>
-                      ✉️ Email: <span style={{ color: '#10B981', fontWeight: '600' }}>jhon@gmail.com</span>
+                      ✉️ Email: <span style={{ color: '#129968', fontWeight: '600' }}>jhon@gmail.com</span>
                     </div>
                   </div>
                 </div>
@@ -720,13 +720,13 @@ const handleLoginOtpSubmit = async (e) => {
             {step === 'signup_role' && (
               <>
                 <div className="login-header" style={{ marginBottom: '30px', textAlign: 'left' }}>
-                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#10B981', cursor: 'pointer', fontSize: '14px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back</button>
+                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#129968', cursor: 'pointer', fontSize: '14px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back</button>
                   <h2 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '8px' }}>Create Account</h2>
                   <p style={{ color: 'var(--text-muted)' }}>Select your registration type to proceed.</p>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <button type="button" onClick={() => { setSignupRole('BHW'); setStep('signup'); }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid #10B981', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
+                  <button type="button" onClick={() => { setSignupRole('BHW'); setStep('signup'); }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px', background: 'rgba(18, 153, 104, 0.08)', border: '1px solid #129968', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
                     <div>
                       <div style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '16px' }}>Barangay Health Worker</div>
                       <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '2px' }}>Community Surveillance Data Entry</div>
@@ -734,7 +734,7 @@ const handleLoginOtpSubmit = async (e) => {
                     <span style={{ fontSize: '20px' }}>📍</span>
                   </button>
 
-                  <button type="button" onClick={() => setStep('cho_contact')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px', background: 'rgba(30, 58, 138, 0.15)', border: '1px solid #1E3A8A', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
+                  <button type="button" onClick={() => setStep('cho_contact')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px', background: 'rgba(18, 19, 88, 0.15)', border: '1px solid #121358', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
                     <div>
                       <div style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '16px' }}>City Health Office (CHO)</div>
                       <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '2px' }}>Central Systems & Analytics</div>
@@ -750,7 +750,7 @@ const handleLoginOtpSubmit = async (e) => {
             {step === 'forgot_password' && (
               <>
                 <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
-                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#10B981', cursor: 'pointer', fontSize: '14px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back to Login</button>
+                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#129968', cursor: 'pointer', fontSize: '14px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back to Login</button>
                   <h2 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '8px' }}>Recover Account</h2>
                   <p style={{ color: 'var(--text-muted)' }}>Enter your email or username to receive a password reset link.</p>
                 </div>
@@ -781,7 +781,7 @@ const handleLoginOtpSubmit = async (e) => {
                     />
                   </div>
 
-                  <button type="submit" className="submit-btn" style={{ backgroundColor: '#10B981', color: '#FFFFFF', marginTop: '25px', width: '100%' }}>
+                  <button type="submit" className="submit-btn" style={{ backgroundColor: '#129968', color: '#FFFFFF', marginTop: '25px', width: '100%' }}>
                     Send Recovery Link
                   </button>
                 </form>
@@ -792,7 +792,7 @@ const handleLoginOtpSubmit = async (e) => {
             {step === 'signup' && (
                 <>
                     <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
-                        <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#10B981', cursor: 'pointer', fontSize: '14px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back</button>
+                        <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#129968', cursor: 'pointer', fontSize: '14px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back</button>
                         <h2 style={{ fontSize: '26px', color: 'var(--text-main)', marginBottom: '6px' }}>Create Account</h2>
                         <p style={{ color: 'var(--text-muted)' }}>Register a new account for surveillance database entry.</p>
                     </div>
@@ -804,7 +804,7 @@ const handleLoginOtpSubmit = async (e) => {
                             </div>
                         )}
                         {signupSuccess && (
-                            <div style={{ backgroundColor: 'var(--input-bg)', color: '#065f46', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(16,185,129,0.35)', textAlign: 'left' }}>
+                            <div style={{ backgroundColor: 'var(--input-bg)', color: '#0a5e42', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(18,153,104,0.35)', textAlign: 'left' }}>
                                 {signupSuccess}
                             </div>
                         )}
@@ -898,12 +898,12 @@ const handleLoginOtpSubmit = async (e) => {
                                                 onClick={() => { setSignupContext(String(b.id)); setSignupBarangayOpen(false); }}
                                                 style={{
                                                     padding: '9px 12px', cursor: 'pointer', fontSize: '14px', borderRadius: '6px',
-                                                    background: String(signupContext) === String(b.id) ? 'rgba(16,185,129,0.15)' : 'transparent',
-                                                    color: String(signupContext) === String(b.id) ? '#10B981' : 'var(--text-main)',
+                                                    background: String(signupContext) === String(b.id) ? 'rgba(18,153,104,0.15)' : 'transparent',
+                                                    color: String(signupContext) === String(b.id) ? '#129968' : 'var(--text-main)',
                                                     fontWeight: String(signupContext) === String(b.id) ? '600' : '400'
                                                 }}
                                                 onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
-                                                onMouseLeave={e => { e.currentTarget.style.background = String(signupContext) === String(b.id) ? 'rgba(16,185,129,0.15)' : 'transparent'; }}
+                                                onMouseLeave={e => { e.currentTarget.style.background = String(signupContext) === String(b.id) ? 'rgba(18,153,104,0.15)' : 'transparent'; }}
                                             >
                                                 {b.name}
                                             </div>
@@ -978,7 +978,7 @@ const handleLoginOtpSubmit = async (e) => {
                                 </button>
                             </div>
                             {signupConfirmPassword && (
-                                <p style={{ fontSize: '12px', marginTop: '5px', color: signupPassword === signupConfirmPassword ? '#10b981' : '#ef4444' }}>
+                                <p style={{ fontSize: '12px', marginTop: '5px', color: signupPassword === signupConfirmPassword ? '#129968' : '#ef4444' }}>
                                     {signupPassword === signupConfirmPassword ? '✓ Passwords match' : '✗ Passwords do not match'}
                                 </p>
                             )}
@@ -987,14 +987,14 @@ const handleLoginOtpSubmit = async (e) => {
                                 const styles = {
                                     low: { color: '#ef4444', text: '✗ Weak - needs uppercase + number + special' },
                                     medium: { color: '#eab308', text: '~ Medium - add uppercase, number & special for strongest' },
-                                    strong: { color: '#10b981', text: '✓ Strong password' },
+                                    strong: { color: '#129968', text: '✓ Strong password' },
                                 };
                                 const s = styles[strength];
                                 return <p style={{ fontSize: '12px', marginTop: '5px', color: s.color }}>{s.text}</p>;
                             })()}
                         </div>
 
-                        <button type="submit" className="submit-btn" style={{ backgroundColor: '#10B981', color: '#FFFFFF', marginTop: '20px', width: '100%' }}>
+                        <button type="submit" className="submit-btn" style={{ backgroundColor: '#129968', color: '#FFFFFF', marginTop: '20px', width: '100%' }}>
                             Register Account
                         </button>
                     </form>
@@ -1021,12 +1021,12 @@ const handleLoginOtpSubmit = async (e) => {
                     }
                   }
                   setStep('signup');
-                }} style={{ color: '#10B981', cursor: 'pointer', fontWeight: '500' }}>Sign up</span>
+                }} style={{ color: '#129968', cursor: 'pointer', fontWeight: '500' }}>Sign up</span>
               </div>
             ) : (
               step !== 'role' && step !== 'cho_contact' && (
                 <div style={{ marginTop: '30px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px' }}>
-                  Already registered? <span onClick={() => setStep('role')} style={{ color: '#10B981', cursor: 'pointer', fontWeight: '500' }}>Sign In here</span>
+                  Already registered? <span onClick={() => setStep('role')} style={{ color: '#129968', cursor: 'pointer', fontWeight: '500' }}>Sign In here</span>
                 </div>
               )
             )}  

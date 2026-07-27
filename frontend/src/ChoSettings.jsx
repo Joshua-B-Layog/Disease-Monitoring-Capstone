@@ -24,7 +24,7 @@ function OfflineSyncPanel() {
   const statusColor = (s) => {
     if (s === 'pending') return '#F59E0B';
     if (s === 'syncing') return '#6366F1';
-    if (s === 'done') return '#10B981';
+    if (s === 'done') return '#129968';
     return '#EF4444';
   };
 
@@ -296,6 +296,34 @@ export default function CHOSettings({
   useEffect(() => {
     if (currentView === 'system') setSystemPrefsSnapshot(takeSystemSnapshot());
   }, [currentView]);
+
+  // Revert unsaved prefs on unmount (e.g. user clicks sidebar tab without saving)
+  const snapshotRef = useRef(systemPrefsSnapshot);
+  const themeRef = useRef(theme);
+  const prefsRef = useRef(systemPrefs);
+  const toggleThemeRef = useRef(toggleTheme);
+  snapshotRef.current = systemPrefsSnapshot;
+  themeRef.current = theme;
+  prefsRef.current = systemPrefs;
+  toggleThemeRef.current = toggleTheme;
+
+  useEffect(() => {
+    return () => {
+      const snap = snapshotRef.current;
+      if (snap) {
+        if (themeRef.current !== snap.theme) toggleThemeRef.current();
+        if (prefsRef.current.fontSize !== snap.fontSize) {
+          const scale = snap.fontSize === 'Small' ? '0.9' : snap.fontSize === 'Large' ? '1.15' : '1';
+          if (onFontSizeChange) onFontSizeChange(scale);
+        }
+        if (prefsRef.current.compactView !== snap.compactView) {
+          if (onCompactChange) onCompactChange(snap.compactView);
+        }
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (currentView === 'data') {
       setStorageLoading(true);
@@ -654,7 +682,7 @@ export default function CHOSettings({
         <div style={{
           position: 'fixed', top: '20px', right: '20px', zIndex: 10000,
           padding: '12px 20px', borderRadius: '8px', fontSize: '14px', fontWeight: '500',
-          background: toastType === 'success' ? '#10B981' : '#ef4444',
+          background: toastType === 'success' ? '#129968' : '#ef4444',
           color: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
         }}>
           {toastMsg}
@@ -701,7 +729,7 @@ export default function CHOSettings({
                   <div style={{ position: 'relative', width: '110px', height: '110px', flexShrink: 0 }}>
                     <div style={{
                       width: '100%', height: '100%', borderRadius: '50%',
-                      background: profilePhoto ? 'transparent' : '#10b981',
+                      background: profilePhoto ? 'transparent' : '#129968',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
                     }}>
@@ -748,7 +776,7 @@ export default function CHOSettings({
                 <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '24px 0' }} />
 
                 {saveMsg && (
-                  <div style={{ background: 'var(--input-bg)', color: saveMsg.startsWith('✅') ? '#065f46' : '#991b1b', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px', fontSize: '14px', fontWeight: '500' }}>
+                  <div style={{ background: 'var(--input-bg)', color: saveMsg.startsWith('✅') ? '#0a5e42' : '#991b1b', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px', fontSize: '14px', fontWeight: '500' }}>
                     {saveMsg}
                   </div>
                 )}
@@ -792,7 +820,7 @@ export default function CHOSettings({
                     {t('Cancel')}
                   </button>
                   <button onClick={handleSaveProfile} disabled={saving}
-                    style={{ background: saving ? '#6ee7b7' : '#10b981', border: 'none', color: '#ffffff', borderRadius: '12px', padding: '12px', fontSize: '15px', fontWeight: '500', cursor: saving ? 'not-allowed' : 'pointer', flexGrow: 1 }}>
+                    style={{ background: saving ? '#6fd4a2' : '#129968', border: 'none', color: '#ffffff', borderRadius: '12px', padding: '12px', fontSize: '15px', fontWeight: '500', cursor: saving ? 'not-allowed' : 'pointer', flexGrow: 1 }}>
                     {saving ? 'Saving...' : t('Save Changes')}
                   </button>
                 </div>
@@ -826,7 +854,7 @@ export default function CHOSettings({
                 <div style={{
                   margin: '0 0 16px 0', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: '500',
                   background: 'var(--input-bg)',
-                  color: passwordMsg.startsWith('✅') ? '#065f46' : '#991b1b',
+                  color: passwordMsg.startsWith('✅') ? '#0a5e42' : '#991b1b',
                 }}>
                   {passwordMsg}
                 </div>
@@ -859,7 +887,7 @@ export default function CHOSettings({
                       </button>
                     </div>
                     {field === 'confirmPassword' && security.confirmPassword && (
-                      <p style={{ fontSize: '12px', marginTop: '5px', color: security.newPassword === security.confirmPassword ? '#10b981' : '#ef4444' }}>
+                      <p style={{ fontSize: '12px', marginTop: '5px', color: security.newPassword === security.confirmPassword ? '#129968' : '#ef4444' }}>
                         {security.newPassword === security.confirmPassword ? '✓ Passwords match' : '✗ Passwords do not match'}
                       </p>
                     )}
@@ -902,7 +930,7 @@ export default function CHOSettings({
                 <div style={{
                   padding: '12px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: '500', marginTop: '12px',
                   background: 'var(--input-bg)',
-                  color: twoFaMsg.startsWith('✅') ? '#065f46' : twoFaMsg.startsWith('📧') ? '#1e40af' : '#991b1b',
+                  color: twoFaMsg.startsWith('✅') ? '#0a5e42' : twoFaMsg.startsWith('📧') ? '#1e40af' : '#991b1b',
                 }}>
                   {twoFaMsg}
                 </div>
@@ -965,7 +993,7 @@ export default function CHOSettings({
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <div className="security-card-header" style={{ marginBottom: 0 }}>
                   <div className="security-icon-box" style={{ background: 'var(--input-bg)' }}>
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#129968" strokeWidth="2">
                       <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
                       <line x1="12" y1="18" x2="12.01" y2="18" />
                     </svg>
@@ -998,7 +1026,7 @@ export default function CHOSettings({
                     <span style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-h)' }}>
                       {sessionData.last_login_device || 'Current Device'}
                     </span>
-                    <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px', background: '#10b981', color: 'white' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px', background: '#129968', color: 'white' }}>
                       THIS DEVICE
                     </span>
                   </div>
@@ -1062,10 +1090,10 @@ export default function CHOSettings({
                         <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-h)' }}>
                           {sessionData.last_login_device || 'Current Device'}
                         </span>
-                        <span style={{ fontSize: '10px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px', background: '#10b981', color: 'white' }}>
+                        <span style={{ fontSize: '10px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px', background: '#129968', color: 'white' }}>
                           TRUSTED
                         </span>
-                        <span style={{ fontSize: '10px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px', background: '#dcfce7', color: '#16a34a' }}>
+                        <span style={{ fontSize: '10px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px', background: '#dcf7eb', color: '#129968' }}>
                           THIS DEVICE
                         </span>
                       </div>
@@ -1108,7 +1136,7 @@ export default function CHOSettings({
                   )}
 
                   {(otherSessionsCleared || revokedSessionIds.includes('previous')) && sessionData.previous_login && (
-                    <div style={{ padding: '12px 16px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '13px', color: '#16a34a', fontWeight: '500', marginBottom: '12px' }}>
+                    <div style={{ padding: '12px 16px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '13px', color: '#129968', fontWeight: '500', marginBottom: '12px' }}>
                       ✅ This session has been logged out.
                     </div>
                   )}
@@ -1548,7 +1576,7 @@ export default function CHOSettings({
               <div className="security-sessions-container">
                 {[
                   { label: 'Export as PDF', sub: 'Download all data as PDF documents', color: '#dc2626', icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6' },
-                  { label: 'Export as Excel', sub: 'Download data as Excel spreadsheet', color: '#16a34a', icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6' },
+                  { label: 'Export as Excel', sub: 'Download data as Excel spreadsheet', color: '#129968', icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6' },
                   { label: 'Export as CSV', sub: 'Download data as CSV file', color: '#2563eb', icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6' },
                 ].map(row => (
                   <div key={row.label} className="session-list-row">
@@ -1741,7 +1769,7 @@ export default function CHOSettings({
                   </div>
 
                   {restoreMsg && (
-                    <div style={{ marginTop: '8px', padding: '8px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: '500', background: 'var(--input-bg)', color: '#065f46' }}>
+                    <div style={{ marginTop: '8px', padding: '8px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: '500', background: 'var(--input-bg)', color: '#0a5e42' }}>
                       {restoreMsg}
                     </div>
                   )}
@@ -1767,7 +1795,7 @@ export default function CHOSettings({
               {/* Sync History */}
               <div className="security-section-card" style={{ borderColor: 'var(--border-color)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(16,185,129,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(18,153,104,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <span style={{ fontSize: '18px' }}>🔄</span>
                   </div>
                   <div>
@@ -1851,7 +1879,7 @@ export default function CHOSettings({
 
                   {clearSuccess && (
                     <div style={{
-                      background:'var(--input-bg)', color:'#065f46',
+                      background:'var(--input-bg)', color:'#0a5e42',
                       padding:'10px', borderRadius:'8px',
                       marginBottom:'16px', fontSize:'13px',
                       fontWeight:'500'

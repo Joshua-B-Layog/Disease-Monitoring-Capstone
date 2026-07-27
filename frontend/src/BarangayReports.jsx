@@ -451,7 +451,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
   const renderCalendar = () => { const days = getDaysInMonth(calYear, calMonth); const first = getFirstDay(calYear, calMonth); const cells = []; for (let i = 0; i < first; i++) cells.push(null); for (let d = 1; d <= days; d++) cells.push(d); return cells; };
 
   const actionBadgeStyle = (action) => {
-    if (action === 'Created')   return { background: '#dcfce7', color: '#16a34a' };
+    if (action === 'Created')   return { background: '#dcf7eb', color: '#129968' };
     if (action === 'Updated')   return { background: '#dbeafe', color: '#2563eb' };
     if (action === 'Deleted')   return { background: '#fee2e2', color: '#dc2626' };
     if (action === 'Logged In') return { background: '#f3e8ff', color: '#7c3aed' };
@@ -480,9 +480,9 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
     card:    { background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' },
     label:   { fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', letterSpacing: '0.04em', textTransform: 'uppercase' },
     input:   { padding: '9px 14px', border: '1px solid var(--input-border)', borderRadius: '7px', fontSize: '14px', color: 'var(--text-main)', background: 'var(--input-bg)', outline: 'none', width: '100%', boxSizing: 'border-box' },
-    dropBtn: (active) => ({ padding: '9px 14px', border: `1px solid ${active ? '#1E3A8A' : 'var(--input-border)'}`, borderRadius: '7px', fontSize: '14px', color: active ? '#1E3A8A' : 'var(--text-muted)', background: 'var(--input-bg)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap', fontWeight: active ? '600' : '400' }),
+    dropBtn: (active) => ({ padding: '9px 14px', border: `1px solid ${active ? '#121358' : 'var(--input-border)'}`, borderRadius: '7px', fontSize: '14px', color: active ? '#121358' : 'var(--text-muted)', background: 'var(--input-bg)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap', fontWeight: active ? '600' : '400' }),
     dropMenu: { position: 'absolute', top: '110%', left: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 200, minWidth: '200px', overflow: 'hidden' },
-    dropItem: (active) => ({ padding: '10px 16px', fontSize: '14px', cursor: 'pointer', color: active ? '#1E3A8A' : 'var(--text-main)', background: active ? 'var(--input-bg)' : 'transparent', display: 'block', width: '100%', border: 'none', textAlign: 'left', fontWeight: active ? '600' : '400' }),
+    dropItem: (active) => ({ padding: '10px 16px', fontSize: '14px', cursor: 'pointer', color: active ? '#121358' : 'var(--text-main)', background: active ? 'var(--input-bg)' : 'transparent', display: 'block', width: '100%', border: 'none', textAlign: 'left', fontWeight: active ? '600' : '400' }),
   };
 
   return (
@@ -537,7 +537,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                         </td>
                         <td style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>{l.entity}</td>
                         <td style={{ padding: '8px 12px', color: 'var(--text-muted)', fontSize: '12px' }}>{(l.details || '').replace(/\s*\(User ID:\s*\d+\)/gi, '').replace(/\s*\(Case ID:\s*\d+\)/gi, '')}</td>
-                        <td style={{ padding: '8px 12px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: l.user_role === 'CHO' ? '#2563eb' : '#16a34a' }}>
+                        <td style={{ padding: '8px 12px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: l.user_role === 'CHO' ? '#2563eb' : '#129968' }}>
                           {l.user_role === 'CHO' ? 'CHO Admin' : 'BHW'}
                         </td>
                       </tr>
@@ -566,7 +566,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                     p === '...' ? (
                       <div key={`me${i}`} ref={modalEllipsisRef} style={{ position: 'relative', display: 'inline-flex' }}>
                         <button onClick={() => setModalEllipsisOpen(o => !o)}
-                          style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)', borderRadius: '6px', background: modalEllipsisOpen ? 'rgba(30,58,138,0.15)' : 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '16px', fontWeight: '700', letterSpacing: '2px' }}>...</button>
+                          style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)', borderRadius: '6px', background: modalEllipsisOpen ? 'rgba(18,19,88,0.15)' : 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '16px', fontWeight: '700', letterSpacing: '2px' }}>...</button>
                         {modalEllipsisOpen && (
                           <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px', width: '160px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 100 }}>
                             <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px' }}>Go to page (1–{modalTotalPages})</div>
@@ -684,7 +684,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
               </button>
               <button onClick={handleGenerateReport}
                 disabled={offlineMode}
-                style={{ padding: '10px 28px', background: '#10b981', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#fff', cursor: offlineMode ? 'not-allowed' : 'pointer', opacity: offlineMode ? 0.4 : 1 }}>
+                style={{ padding: '10px 28px', background: '#129968', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#fff', cursor: offlineMode ? 'not-allowed' : 'pointer', opacity: offlineMode ? 0.4 : 1 }}>
                 Generate Report
               </button>
             </div>
@@ -765,7 +765,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
         </div>
         <button onClick={() => setShowGenModal(true)}
           disabled={offlineMode}
-          style={{ padding: '9px 22px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '7px', fontWeight: '600', fontSize: '14px', cursor: offlineMode ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', flexShrink: 0, opacity: offlineMode ? 0.4 : 1 }}
+          style={{ padding: '9px 22px', background: '#129968', color: '#fff', border: 'none', borderRadius: '7px', fontWeight: '600', fontSize: '14px', cursor: offlineMode ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', flexShrink: 0, opacity: offlineMode ? 0.4 : 1 }}
           onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
           onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
           Generate Report
@@ -854,7 +854,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                   )}
                 </div>
                 <button onClick={() => { setViewReport(file); setShowDownloadMenu(null); }}
-                  style={{ padding: '6px 14px', background: '#e6f4ea', border: '1px solid #bbf7d0', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', color: '#16a34a', fontWeight: '500' }}
+                  style={{ padding: '6px 14px', background: '#e6f8f0', border: '1px solid #baf0d7', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', color: '#129968', fontWeight: '500' }}
                   onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                   onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
                   View
@@ -877,7 +877,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                 { label: 'Cases Added',      value: casesAdded,      color: '#1e3a8a', bg: '#eff6ff' },
                 { label: 'Cases Updated',    value: casesUpdated,    color: '#0369a1', bg: '#e0f2fe' },
                 { label: 'Cases Deleted',    value: casesDeleted,    color: '#dc2626', bg: '#fee2e2' },
-                { label: 'Accounts Created', value: accountsCreated, color: '#059669', bg: '#d1fae5' },
+                { label: 'Accounts Created', value: accountsCreated, color: '#0e7d56', bg: '#d1f5e9' },
               ].map(stat => (
                 <div key={stat.label} style={{ background: stat.bg, borderRadius: '8px', padding: '14px', textAlign: 'center' }}>
                   <div style={{ fontSize: '26px', fontWeight: '800', color: stat.color }}>{stat.value}</div>
@@ -933,7 +933,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                     onMouseLeave={e => { if (filterAction !== a) e.target.style.background = 'transparent'; }}>
                     {a !== 'All Actions' && (
                       <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', marginRight: '8px',
-                        background: a === 'Created' ? '#16a34a' : a === 'Updated' ? '#2563eb' : a === 'Deleted' ? '#dc2626' : '#7c3aed' }} />
+                        background: a === 'Created' ? '#129968' : a === 'Updated' ? '#2563eb' : a === 'Deleted' ? '#dc2626' : '#7c3aed' }} />
                     )}
                     {a}
                   </button>
@@ -1108,8 +1108,8 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                       <div style={{ marginTop: '3px' }}>
                         <span style={{
                           fontSize: '10px', fontWeight: '700', padding: '1px 7px', borderRadius: '10px',
-                          background: log.user_role === 'CHO' ? 'rgba(37,99,235,0.12)' : 'rgba(16,185,129,0.12)',
-                          color: log.user_role === 'CHO' ? '#2563eb' : '#16a34a',
+                          background: log.user_role === 'CHO' ? 'rgba(37,99,235,0.12)' : 'rgba(18,153,104,0.12)',
+                          color: log.user_role === 'CHO' ? '#2563eb' : '#129968',
                         }}>
                           {log.user_role === 'CHO'
                             ? (log.cho_unit || 'CHO')
@@ -1124,7 +1124,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                     </td>
                     <td style={{ padding: compactMode ? '7px 8px' : '13px 14px', fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center' }}>{log.entity}</td>
                     <td style={{ padding: compactMode ? '7px 8px' : '13px 14px', fontSize: '13px', color: 'var(--text-muted)', maxWidth: '320px', textAlign: 'center' }}>{(log.details || '').replace(/\s*\(User ID:\s*\d+\)/gi, '').replace(/\s*\(Case ID:\s*\d+\)/gi, '')}</td>
-                    <td style={{ padding: compactMode ? '7px 8px' : '13px 14px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: log.user_role === 'CHO' ? '#2563eb' : '#16a34a' }}>
+                    <td style={{ padding: compactMode ? '7px 8px' : '13px 14px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: log.user_role === 'CHO' ? '#2563eb' : '#129968' }}>
                       {log.user_role === 'CHO' ? 'CHO Admin' : 'BHW'}
                     </td>
                   </tr>
@@ -1149,7 +1149,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
               p === '...' ? (
                 <div key={`le${i}`} ref={logEllipsisRef} style={{ position: 'relative', display: 'inline-flex' }}>
                   <button onClick={() => setLogEllipsisOpen(o => !o)}
-                    style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)', borderRadius: '6px', background: logEllipsisOpen ? 'rgba(30,58,138,0.15)' : 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '16px', fontWeight: '700', letterSpacing: '2px' }}>...</button>
+                    style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)', borderRadius: '6px', background: logEllipsisOpen ? 'rgba(18,19,88,0.15)' : 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '16px', fontWeight: '700', letterSpacing: '2px' }}>...</button>
                   {logEllipsisOpen && (
                     <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px', width: '160px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 100 }}>
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px' }}>Go to page (1–{totalLogPages})</div>
