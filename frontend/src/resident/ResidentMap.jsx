@@ -614,8 +614,9 @@ export default function ResidentMap() {
 
     const groups = {};
     allCases.forEach(c => {
+      if (!c.barangay_name) return;
       const bn = findCanonicalName(c.barangay_name);
-      if (!bn) { console.warn('Unmatched barangay in case data:', c.barangay_name); return; }
+      if (!bn) return;
       const coords = findCoords(bn);
       if (!coords) { console.warn('No coords for:', bn); return; }
       if (!groups[bn]) groups[bn] = { barangayName: bn, coords, totalCases: 0, diseases: {}, cases: [] };
@@ -730,9 +731,9 @@ export default function ResidentMap() {
       <h2 style={{ margin: '0 0 16px', fontSize: '24px', fontWeight: '700' }}>
         Disease Map
       </h2>
-      <p style={{ margin: '0 0 20px', color: 'var(--text-muted)', fontSize: '14px' }}>
-        Hover over a barangay for a quick summary. Click for full disease breakdown. Zoom in (≥17) to see purok-level pulse markers.
-      </p>
+<p style={{ margin: '0 0 20px', color: 'var(--text-main)', fontSize: '14px' }}>
+  Hover over a barangay for a quick summary. Click for full disease breakdown. Zoom in (≥17) to see purok-level pulse markers.
+</p>
       {offlineMode && (
         <div style={{ padding: '8px 14px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '13px', color: '#F59E0B' }}>
           Offline - showing cached data. Will refresh when reconnected.

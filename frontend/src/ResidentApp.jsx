@@ -227,7 +227,7 @@ export default function ResidentApp() {
 
       {/* ── FOOTER ── */}
       <footer style={{
-        background: 'linear-gradient(90deg, #121358 100%)',
+        background: 'linear-gradient(0deg, #121358 100%)',
         padding: '32px 24px 24px',
         top: 0,
         zIndex: 500,
@@ -235,20 +235,20 @@ export default function ResidentApp() {
       }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', textAlign: 'center' }}>
           <div style={{
-            background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)',
+            background: 'rgba(220,38,38,0.5 )', border: 'none',
             borderRadius: '12px', padding: '16px 24px', marginBottom: '24px',
           }}>
-            <div style={{ color: '#ef4444', fontWeight: '700', fontSize: '16px', marginBottom: '4px' }}>
+            <div style={{ color: '#fff', fontWeight: '700', fontSize: '16px', marginBottom: '4px' }}>
               National Emergency Hotline
             </div>
             <div style={{ fontSize: '24px', fontWeight: '800', color: '#fff', letterSpacing: '0.05em' }}>
               911
             </div>
-            <div style={{ fontSize: '13px', marginTop: '4px', color: 'rgba(255,255,255,0.6)' }}>
+            <div style={{ fontSize: '13px', marginTop: '4px', color: 'rgba(255,255,255,0.75)' }}>
               DOH Emergency: 1555 &nbsp;|&nbsp; Red Cross: 143 &nbsp;|&nbsp; PNP: 117
             </div>
           </div>
-          <div style={{ fontSize: '13px' }}>
+          <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)' }}>
             © 2026 City Health Office of Cabuyao, Laguna. All rights reserved.
           </div>
         </div>

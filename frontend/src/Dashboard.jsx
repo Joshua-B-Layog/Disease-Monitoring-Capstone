@@ -483,7 +483,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                     <div style={{ flex: 1, background: 'var(--input-bg)', height: '24px', borderRadius: '6px', overflow: 'hidden', position: 'relative' }}>
                       <div style={{
                         width: dHighest > 0 ? `${(bar.count / dHighest) * 100}%` : '0%',
-                        background: '#3b82f6',
+                        background: i === 0 ? '#DC2626' : bar.count >= 10 ? '#D97706' : bar.count > 0 ? '#129968' : '#3b82f6',
                         height: '100%', borderRadius: '6px', transition: 'width 0.4s ease',
                         display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
                         paddingRight: '8px', color: '#fff', fontWeight: '700', fontSize: '14px',
@@ -510,7 +510,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                   <div style={{ flex: 1, background: 'var(--input-bg)', height: '24px', borderRadius: '6px', overflow: 'hidden', position: 'relative' }}>
                     <div style={{
                       width: `${(bar.count / highestCount) * 100}%`,
-                      background: i === 0 ? '#DC2626' : i === 1 ? '#D97706' : '#3b82f6',
+                      background: i === 0 ? '#DC2626' : bar.count >= 10 ? '#D97706' : bar.count > 0 ? '#129968' : '#3b82f6',
                       height: '100%', borderRadius: '6px', transition: 'width 0.4s ease',
                       display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
                       paddingRight: '8px', color: '#fff', fontWeight: '700', fontSize: '14px',

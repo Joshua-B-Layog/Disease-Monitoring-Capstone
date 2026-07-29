@@ -11,24 +11,36 @@
   --bg-main: #0B1120;       
   --bg-surface: #243447;    
   --text-main: #F8FAFC;
-  --text-muted: #94A3B8;
+  --text-muted: #CBD5E1;
   --text-h: #E2E8F0;
   --input-bg: #0F172A;
   --input-border: #64748B;
   --border-color: #64748B;
+  --warning-bg: rgba(248,113,113,0.2);
+  --warning-text: #FCA5A5;
+  --warning-border: #FCA5A5;
+  --success-bg: rgba(52,211,153,0.2);
+  --success-text: #34D399;
+  --success-border: #34D399;
   color-scheme: dark;
 }
 
 [data-theme='light'] {
   /* LIGHT MODE VARIABLES  */
   --bg-main: #E5E7EB;
-  --bg-surface: #FFFFFF;
+  --bg-surface: #F3F4F6;
   --text-main: #111827;
-  --text-muted: #4B5563;
+  --text-muted: #374151;
   --text-h: #111827;
   --input-bg: #F9FAFB;
   --input-border: #6B7280;
   --border-color: #9CA3AF;
+  --warning-bg: rgba(220,38,38,0.12);
+  --warning-text: #DC2626;
+  --warning-border: #DC2626;
+  --success-bg: rgba(18,153,104,0.12);
+  --success-text: #129968;
+  --success-border: #129968;
   color-scheme: light;
 }
 
@@ -288,6 +300,17 @@ html, body, #root {
 .chart-main { grid-column: span 3; height: 350px; }
 .chart-side { grid-column: span 1; }
 .recent-records { grid-column: span 4; color: var(--text-main); }
+
+/* --- Contact Us grid --- */
+.contact-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .contact-grid { grid-template-columns: 1fr; }
+}
 
 /* --- Table Styling --- */
 .recent-records table {

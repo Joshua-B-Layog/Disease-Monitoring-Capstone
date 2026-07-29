@@ -1544,7 +1544,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             </div>
           </div>
           <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.55' }}>
-            {cat.diseases.map(d => d.name).join(', ')}
+            {(() => { const names = cat.diseases.map(d => d.name); return names.length > 4 ? names.slice(0, 4).join(', ') + ` (+${names.length - 4} more)` : names.join(', '); })()}
           </p>
           <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#3B82F6', fontSize: '13px', fontWeight: '600' }}>
             View Diseases <span style={{ fontSize: '16px' }}>›</span>
@@ -2215,7 +2215,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               )}
             </div>
 
-            <button onClick={() => { setView('categories'); setSelectedDisease(null); setSelectedCategory(null); setCategoryPage(0); setSearchQuery(''); }}
+            <button onClick={() => { setView('categories'); setSelectedDisease(null); setSearchQuery(''); }}
               style={{ padding: '8px 18px', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', fontSize: '13px' }}>
               ← Back
             </button>

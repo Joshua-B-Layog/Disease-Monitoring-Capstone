@@ -109,12 +109,7 @@ export default function ContactUs() {
       </h2>
 
       {/* 3-column grid */}
-      <div style={{
-        display: 'grid', gridTemplateColumns: '1fr 1fr 1fr',
-        gap: '24px',
-        alignItems: 'start',
-        '@media (max-width: 900px)': { gridTemplateColumns: '1fr' },
-      }}>
+      <div className="contact-grid">
 
         {/* Box 1: Send a message */}
         <div style={{
@@ -343,13 +338,13 @@ export default function ContactUs() {
       {/* National hotline */}
       <div style={{
         marginTop: '24px', textAlign: 'center',
-        padding: '16px', background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.35)',
+        padding: '16px', background: 'var(--warning-bg)', border: '1px solid var(--warning-border)',
         borderRadius: '10px',
       }}>
-        <div style={{ fontSize: '14px', color: '#fca5a5', fontWeight: '600' }}>
+        <div style={{ fontSize: '14px', color: 'var(--warning-text)', fontWeight: '600' }}>
           National Emergency Hotline: <strong style={{ fontSize: '20px' }}>911</strong>
         </div>
-        <div style={{ fontSize: '13px', color: '#f87171', marginTop: '4px' }}>
+        <div style={{ fontSize: '13px', color: 'var(--warning-text)', marginTop: '4px' }}>
           DOH: 1555 | Red Cross: 143 | PNP: 117
         </div>
       </div>

@@ -71,28 +71,28 @@ export default function Help() {
         {/* Section 3: Severe Diseases Warning */}
         <Section title="Warning Signs of Severe Diseases" icon="⚠️" danger>
           <div style={{
-            background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px',
+            background: 'var(--warning-bg)', border: '1px solid var(--warning-border)', borderRadius: '8px',
             padding: '16px 20px', marginBottom: '12px',
           }}>
             <p style={{
-              margin: '0 0 12px', fontSize: '14px', fontWeight: '600', color: '#fca5a5',
+              margin: '0 0 12px', fontSize: '14px', fontWeight: '600', color: 'var(--warning-text)',
             }}>
               Seek immediate medical care if you experience:
             </p>
-            <ul style={{ margin: 0, paddingLeft: '20px', color: '#f87171', fontSize: '14px', lineHeight: '2' }}>
+            <ul style={{ margin: 0, paddingLeft: '20px', color: 'var(--warning-text)', fontSize: '14px', lineHeight: '2' }}>
               {SEVERE_WARNINGS.map((w, i) => (
                 <li key={i}><strong>{w}</strong></li>
               ))}
             </ul>
           </div>
           <div style={{
-            textAlign: 'center', padding: '12px', background: 'rgba(18,153,104,0.12)',
-            borderRadius: '8px', border: '1px solid rgba(18,153,104,0.3)',
+            textAlign: 'center', padding: '12px', background: 'var(--success-bg)',
+            borderRadius: '8px', border: '1px solid var(--success-border)',
           }}>
-            <div style={{ fontSize: '14px', fontWeight: '700', color: '#3cb882' }}>
+            <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--success-text)' }}>
               🚑 If you have any of these symptoms, GO TO THE HOSPITAL IMMEDIATELY.
             </div>
-            <div style={{ fontSize: '13px', color: '#0e7d56', marginTop: '4px' }}>
+            <div style={{ fontSize: '13px', color: 'var(--success-text)', marginTop: '4px' }}>
               Call 911 or your local emergency hotline.
             </div>
           </div>

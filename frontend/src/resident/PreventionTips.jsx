@@ -634,7 +634,7 @@ export default function PreventionTips() {
               <span style={{ fontSize: '24px' }}>{disease.icon}</span>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)' }}>{disease.name}</div>
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-main)' }}>
                   {disease.tips.length} prevention tips
                 </div>
               </div>
@@ -644,7 +644,7 @@ export default function PreventionTips() {
             </div>
             {expanded === idx && (
               <div style={{ padding: '0 18px 16px', borderTop: '1px solid var(--border-color)' }}>
-                <ul style={{ margin: '12px 0', paddingLeft: '18px', fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.8' }}>
+                <ul style={{ margin: '12px 0', paddingLeft: '18px', fontSize: '13px', color: 'var(--text-main)', lineHeight: '1.8' }}>
                   {disease.tips.map((tip, i) => (
                     <li key={i}>{tip}</li>
                   ))}
@@ -720,7 +720,7 @@ export default function PreventionTips() {
         <div style={{ padding: '24px' }}>
           {scStep === 'pick' && (
             <div>
-              <p style={{ fontSize: '14px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+              <p style={{ fontSize: '14px', color: 'var(--text-main)', marginBottom: '16px' }}>
                 Choose a disease to check your symptoms against:
               </p>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px' }}>
