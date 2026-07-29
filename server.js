@@ -23,9 +23,9 @@ async function sendBrevoEmail(to, subject, htmlContent) {
         'Content-Type': 'application/json',
       }
     });
-    console.log(`✅ Email sent to: ${to}`);
+    console.log(`Email sent to: ${to}`);
   } catch (err) {
-    console.error('❌ Brevo API error:', err.response?.data || err.message);
+    console.error('Brevo API error:', err.response?.data || err.message);
     throw err;
   }
 }
@@ -483,7 +483,7 @@ app.put('/api/users/:id/profile', (req, res) => {
             return res.status(500).json({ error: err.message });
         }
         if (result.affectedRows === 0) return res.status(404).json({ error: 'User not found.' });
-        console.log(`✅ Profile updated for user ${id}: ${fullName}`);
+        console.log(`Profile updated for user ${id}: ${fullName}`);
         res.status(200).json({ message: 'Profile updated successfully.', fullName });
     });
 });
@@ -620,7 +620,7 @@ app.post('/api/cases', (req, res) => {
                     console.error("Insert case error:", insertErr.message);
                     return res.status(500).json({ error: insertErr.message });
                 }
-                console.log("✅ Case inserted, ID:", result.insertId);
+                console.log("Case inserted, ID:", result.insertId);
 
                 // Write audit log entry
                 const auditUserId = (req.body && req.body.user_id) || null;
@@ -1187,7 +1187,7 @@ app.put('/api/cases/:id', (req, res) => {
                 if (result.affectedRows === 0) {
                     return res.status(404).json({ error: 'Case not found.' });
                 }
-                console.log("✅ Case updated:", id);
+                console.log("Case updated:", id);
 
                 // Write audit log entry
                 const auditUserId = (req.body && req.body.user_id) || null;
@@ -1342,7 +1342,7 @@ app.put('/api/users/:id', async (req, res) => {
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: 'User not found.' });
         }
-        console.log("✅ User updated:", id);
+        console.log("User updated:", id);
         if (loggedUserId) {
           db.query('SELECT full_name, role, assigned_barangay_id FROM users WHERE user_id = ?', [loggedUserId], (aErr, aRes) => {
             if (!aErr && aRes.length > 0) {
@@ -1448,7 +1448,7 @@ app.delete('/api/cases/:id', (req, res) => {
             const message = `Case for ${patient_name} (${disease_name}) in Barangay ${barangay_name || 'N/A'} has been deleted.`;
             createNotificationForUsers(title, message, 'delete', 'ManageCases', barangay_id, 'delete');
 
-            console.log(`✅ Case ${id} deleted from database.`);
+            console.log(`Case ${id} deleted from database.`);
             return res.status(200).json({ message: 'Case deleted successfully.' });
         });
     });
@@ -1465,7 +1465,7 @@ app.delete('/api/users/:id', (req, res) => {
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: 'User not found.' });
         }
-        console.log(`✅ User ${id} deleted.`);
+        console.log(`User ${id} deleted.`);
         createAuditLog(id, 'CHO Admin', 'CHO', null, null, 'Deleted', 'User Account', `Deleted user account ID ${id}`);
         res.status(200).json({ message: 'User deleted successfully.' });
     });
@@ -1756,7 +1756,7 @@ app.post('/api/register', (req, res) => {
             }
         );
 
-        console.log("✅ Registered (pending approval):", { username, role: enforcedRole, assignedBarangayId });
+        console.log("Registered (pending approval):", { username, role: enforcedRole, assignedBarangayId });
         res.status(200).json({ message: 'Account registered successfully! Your registration is pending CHO approval. You will receive an email once reviewed.' });
     });
 });
@@ -2018,7 +2018,7 @@ app.post('/api/forgot-password', (req, res) => {
     
     db.query(findUserQuery, [identity, identity, identity], (err, results) => {
         if (err) {
-            console.error("❌ DB lookup error:", err.message);
+            console.error("DB lookup error:", err.message);
             return res.status(500).json({ error: 'Database error: ' + err.message });
         }
 
@@ -2027,7 +2027,7 @@ app.post('/api/forgot-password', (req, res) => {
         }
 
         const userFound = results[0];
-        console.log(`✅ Found user: ${userFound.username} | Email: ${userFound.email}`);
+        console.log(`Found user: ${userFound.username} | Email: ${userFound.email}`);
 
         if (!userFound.email) {
             return res.status(400).json({ error: 'This account has no email address on file.' });
@@ -2073,7 +2073,7 @@ app.post('/api/forgot-password', (req, res) => {
             };
             try {
                 await sendBrevoEmail(mailOptions.to, mailOptions.subject, mailOptions.html);
-                console.log(`✅ Email sent to: ${userFound.email}`);
+                console.log(`Email sent to: ${userFound.email}`);
                 return res.status(200).json({ 
                     message: `Recovery link sent to ${userFound.email}`,
                     routingTarget: 'email'
@@ -2183,7 +2183,7 @@ app.post('/api/users', async (req, res) => {
             `).catch(err => console.error('Temp password email failed:', err.message));
         }
 
-        console.log("✅ User added:", { username, fullName, barangayId });
+        console.log("User added:", { username, fullName, barangayId });
         createAuditLog(null, 'CHO Admin', 'CHO', null, null, 'Created', 'User Account', `Created account for ${fullName} (${role}) assigned to barangay ID ${barangayId}`);
         res.status(200).json({ message: 'User account created successfully.', user_id: result.insertId, tempPassword: tempPasswordGenerated });
     });
@@ -2215,7 +2215,7 @@ app.post('/api/send-2fa-email', (req, res) => {
                         <p style="color:#f3f4f6;font-size:16px;">Hi ${user.full_name},</p>
                         <p style="color:#f3f4f6;font-size:16px;">You requested to enable Two-Factor Authentication on your account.</p>
                         <div style="text-align:center;margin:32px 0;">
-                            <a href="${verifyLink}" style="background:#10b981;color:#fff;text-decoration:none;padding:14px 36px;font-size:16px;font-weight:bold;border-radius:6px;display:inline-block;">✅ Verify Email</a>
+                            <a href="${verifyLink}" style="background:#10b981;color:#fff;text-decoration:none;padding:14px 36px;font-size:16px;font-weight:bold;border-radius:6px;display:inline-block;"> Verify Email</a>
                         </div>
                         <p style="color:#6b7280;font-size:14px;border-top:1px solid #2e303a;padding-top:16px;">This link expires in 60 minutes. If you did not request this, ignore this email.</p>
                     </div>
@@ -3425,7 +3425,7 @@ app.post('/api/restore', (req, res) => {
         restoreBarangays(() => {
             restoreUsers(() => {
                 restoreDiseaseCases(() => {
-                    console.log('✅ Restore completed from backup dated ' + backup.backup_date);
+                    console.log(' Restore completed from backup dated ' + backup.backup_date);
                     res.json({ message: 'Restore completed successfully.' });
                 });
             });

@@ -12,7 +12,7 @@ const FeverIcon = ({ color = '#ef4444', size = 28 }) => (
   </svg>
 );
 
-const InfluenzaAIcon = ({ color = '#f59e0b', size = 28 }) => (
+const InfluenzaAIcon = ({ color = '#D97706', size = 28 }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
     <path d="m20.354,15.348l2.396.619c.083.022.168.032.25.032.445,0,.851-.299.968-.75.138-.534-.183-1.08-.718-1.218l-2.363-.611c.074-.463.113-.938.113-1.422s-.039-.958-.113-1.422l2.363-.611c.535-.138.856-.684.718-1.218-.139-.534-.683-.86-1.218-.718l-2.396.619c-.331-.822-.779-1.584-1.325-2.266l1.559-1.559c.283.111.591.173.913.173,1.379,0,2.5-1.121,2.5-2.5s-1.121-2.5-2.5-2.5-2.5,1.121-2.5,2.5c0,.322.062.63.173.913l-1.559,1.559c-.682-.546-1.444-.994-2.266-1.325l.619-2.397c.138-.534-.183-1.08-.718-1.218-.539-.144-1.08.183-1.219.718l-.611,2.363c-.463-.074-.938-.113-1.421-.113s-.958.039-1.421.113l-.611-2.363c-.138-.535-.682-.861-1.219-.718-.535.138-.856.684-.718,1.218l.619,2.397c-.822.331-1.584.779-2.266,1.325l-1.559-1.559c.111-.283.173-.591.173-.913,0-1.379-1.121-2.5-2.5-2.5S0,1.121,0,2.5s1.121,2.5,2.5,2.5c.322,0,.63-.062.913-.173l1.559,1.559c-.546.682-.994,1.444-1.325,2.266l-2.396-.619c-.534-.143-1.08.184-1.218.718s.183,1.08.718,1.218l2.363.611c-.074.463-.113.938-.113,1.422,0,.489.04,.97.115,1.438l-2.359.592c-.536.134-.861.678-.726,1.213.114.454.521.757.969.757.081,0,.163-.01.245-.03l2.41-.605c.33.816.776,1.572,1.318,2.25l-1.559,1.559c-.283-.111-.591-.173-.913-.173-1.379,0-2.5,1.121-2.5,2.5s1.121,2.5,2.5,2.5,2.5-1.121,2.5-2.5c0-.322-.062-.63-.173-.913l1.559-1.559c.682.546,1.444.994,2.266,1.325l-.619,2.397c-.138.534.183,1.08.718,1.218.084.022.168.032.251.032.445,0,.851-.299.968-.75l.611-2.363c.463.074.938.113,1.421.113s.958-.039,1.421-.113l.611,2.363c.117.451.522.75.968.75.083,0,.167-.01.251-.032.535-.138.856-.684.718-1.218l-.619-2.397c.822-.331,1.584-.779,2.266-1.325l1.559,1.559c-.111.283-.173.591-.173.913,0,1.379,1.121,2.5,2.5,2.5s2.5-1.121,2.5-2.5-1.121-2.5-2.5-2.5c-.322,0-.63.062-.913.173l-1.559-1.559c.546-.682.994-1.444,1.325-2.266ZM12,6.964c.828,0,1.5.672,1.5,1.5s-.672,1.5-1.5,1.5-1.5-.672-1.5-1.5.672-1.5,1.5-1.5Zm-5.036,5.036c0-.828.672-1.5,1.5-1.5.828,0,1.5.672,1.5,1.5,0,.828-.672,1.5-1.5,1.5-.828,0-1.5-.672-1.5-1.5Zm3.536,3.536c0-.828.672-1.5,1.5-1.5.828,0,1.5.672,1.5,1.5,0,.828-.672,1.5-1.5,1.5-.828,0-1.5-.672-1.5-1.5Zm3.536-3.536c0-.828.672-1.5,1.5-1.5s1.5.672,1.5,1.5c0,.828-.672,1.5-1.5,1.5s-1.5-.672-1.5-1.5Z"/>
   </svg>
@@ -82,22 +82,22 @@ const CHO_UNIT_BARANGAYS = {
   ],
 };
 
-// ── All disease cards split into 2 pages of 6 ──
+// ── All disease cards split into 2 pages of 6, sorted A-Z ──
 const DISEASE_PAGES = [
   [
-    { id: 1, name: 'Dengue Fever', dbName: 'Dengue', icon: <FeverIcon color="#ef4444" />, color: '#ef4444', desc: 'A viral infection transmitted by Aedes mosquitoes, causing high fever and severe body aches.' },
-    { id: 2, name: 'Influenza A', dbName: 'Influenza A', icon: <InfluenzaAIcon color="#f59e0b" />, color: '#f59e0b', desc: 'A highly contagious respiratory illness caused by influenza viruses, leading to seasonal outbreaks.' },
-    { id: 3, name: 'Covid-19', dbName: 'Covid-19', icon: '🛡️', color: '#3b82f6', desc: 'An infectious respiratory disease caused by the SARS-CoV-2 virus, requiring close contact tracing.' },
-    { id: 4, name: 'Leptospirosis', dbName: 'Leptospirosis', icon: <LeptospirosisIcon color="#129968" />, color: '#129968', desc: 'A bacterial disease spread through contaminated water, posing a high risk during flood seasons.' },
-    { id: 5, name: 'Tuberculosis', dbName: 'Tuberculosis', icon: <TuberculosisIcon color="#f97316" />, color: '#f97316', desc: 'An infectious bacterial disease that primarily affects the lungs, requiring long-term treatment.' },
-    { id: 6, name: 'Typhoid Fever', dbName: 'Typhoid Fever', icon: <TyphoidIcon color="#8b5cf6" />, color: '#8b5cf6', desc: 'A systemic infection caused by Salmonella Typhi, spread through contaminated food and water.' },
-  ],
-  [
     { id: 7, name: 'Cholera', dbName: 'Cholera', icon: '🌊', color: '#0ea5e9', desc: 'An acute diarrheal infection caused by ingestion of food or water contaminated with Vibrio cholerae.' },
-    { id: 8, name: 'Measles', dbName: 'Measles', icon: '🔴', color: '#dc2626', desc: 'A highly contagious viral disease causing fever and rash, preventable through vaccination.' },
+    { id: 3, name: 'Covid-19', dbName: 'Covid-19', icon: '🛡️', color: '#3b82f6', desc: 'An infectious respiratory disease caused by the SARS-CoV-2 virus, requiring close contact tracing.' },
+    { id: 1, name: 'Dengue Fever', dbName: 'Dengue', icon: <FeverIcon color="#ef4444" />, color: '#ef4444', desc: 'A viral infection transmitted by Aedes mosquitoes, causing high fever and severe body aches.' },
     { id: 9, name: 'Hepatitis A', dbName: 'Hepatitis A', icon: '🫀', color: '#ca8a04', desc: 'A viral liver infection spread through contaminated food and water or close contact.' },
     { id: 10, name: 'Hepatitis B', dbName: 'Hepatitis B', icon: '🩸', color: '#b45309', desc: 'A serious liver infection caused by the hepatitis B virus, transmitted through blood and bodily fluids.' },
+    { id: 2, name: 'Influenza A', dbName: 'Influenza A', icon: <InfluenzaAIcon color="#D97706" />, color: '#D97706', desc: 'A highly contagious respiratory illness caused by influenza viruses, leading to seasonal outbreaks.' },
+  ],
+  [
+    { id: 4, name: 'Leptospirosis', dbName: 'Leptospirosis', icon: <LeptospirosisIcon color="#129968" />, color: '#129968', desc: 'A bacterial disease spread through contaminated water, posing a high risk during flood seasons.' },
+    { id: 8, name: 'Measles', dbName: 'Measles', icon: '🔴', color: '#dc2626', desc: 'A highly contagious viral disease causing fever and rash, preventable through vaccination.' },
     { id: 11, name: 'Rabies', dbName: 'Rabies', icon: '🐾', color: '#7c3aed', desc: 'A fatal viral disease transmitted through the bite of an infected animal, requiring immediate treatment.' },
+    { id: 5, name: 'Tuberculosis', dbName: 'Tuberculosis', icon: <TuberculosisIcon color="#f97316" />, color: '#f97316', desc: 'An infectious bacterial disease that primarily affects the lungs, requiring long-term treatment.' },
+    { id: 6, name: 'Typhoid Fever', dbName: 'Typhoid Fever', icon: <TyphoidIcon color="#8b5cf6" />, color: '#8b5cf6', desc: 'A systemic infection caused by Salmonella Typhi, spread through contaminated food and water.' },
     { id: 12, name: 'Other Communicable Diseases', dbName: 'Other', icon: '➕', color: '#64748b', desc: 'General tracking for various infectious diseases and emerging local health threats within the community.' },
   ],
 ];
@@ -289,8 +289,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     ? CHO_UNIT_BARANGAYS[sessionContext]
     : CABUYAO_BARANGAYS;
   const scopedBarangayList = (loginRole === 'CHO' && scopedBarangayOptions.length > 0)
-    ? barangayList.filter(b => scopedBarangayOptions.includes(b.name))
-    : barangayList;
+    ? barangayList.filter(b => scopedBarangayOptions.includes(b.name)).sort((a, b) => a.name.localeCompare(b.name))
+    : [...barangayList].sort((a, b) => a.name.localeCompare(b.name));
 
   const baseCases = (loginRole === 'BHW' && loginBarangay)
     ? allCases.filter(c => c.barangay_name === loginBarangay)
@@ -347,7 +347,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       }
       uniqueFromCases.add(purokVal);
     });
-    return [...new Set([...PUROK_OPTIONS, ...uniqueFromCases])];
+    return [...new Set([...PUROK_OPTIONS, ...uniqueFromCases])].sort();
   }, [allCases, loginRole, loginBarangay]);
 
   // Purok/Blk/Phase filter dropdown
@@ -1152,7 +1152,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
   const getStatusStyle = (status) => {
     if (status === 'Active') return { background: 'rgba(245,158,11,0.15)', color: '#fbbf24' };
-    if (status === 'Pending') return { background: 'rgba(37,99,235,0.15)', color: '#60A5FA' };
+    if (status === 'Pending') return { background: 'rgba(37,99,235,0.15)', color: '#3B82F6' };
     if (status === 'Under Treatment') return { background: 'rgba(124,58,237,0.15)', color: '#a78bfa' };
     if (status === 'Recovered') return { background: 'rgba(18,153,104,0.15)', color: '#3cb882' };
     if (status === 'Deceased') return { background: 'rgba(220,38,38,0.15)', color: '#f87171' };
@@ -1522,7 +1522,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     return (
       <div style={{ padding: compactMode ? '24px 14px 14px' : '48px 28px 28px', color: 'var(--text-main)', fontSize: `calc(14px * ${fs})` }}>
         {offlineMode && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '13px', color: '#F59E0B' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '13px', color: '#D97706' }}>
             <span style={{ fontSize: '16px' }}>⚠</span>
             Offline - showing cached data. Changes will sync when reconnected.
           </div>
@@ -1609,7 +1609,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   </div>
                 </div>
                 <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.55' }}>{disease.desc}</p>
-                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#60A5FA', fontSize: '13px', fontWeight: '600' }}>
+                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#3B82F6', fontSize: '13px', fontWeight: '600' }}>
                   View Cases <span style={{ fontSize: '16px' }}>›</span>
                 </div>
               </div>
@@ -1619,8 +1619,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
         <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '24px' }}>
           {DISEASE_PAGES.map((_, i) => (
-            <div key={i} onClick={() => setCardPage(i)}
-              style={{ width: '10px', height: '10px', borderRadius: '50%', cursor: 'pointer', background: cardPage === i ? '#121358' : 'var(--border-color)', transition: 'background 0.2s' }} />
+            <div key={i}
+              style={{ width: '10px', height: '10px', borderRadius: '50%', background: cardPage === i ? '#121358' : 'var(--border-color)', transition: 'background 0.2s' }} />
           ))}
         </div>
       </div>
@@ -1681,7 +1681,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               style={{
                 padding: '8px 20px', cursor: 'pointer', fontSize: '13px', fontWeight: inboxSubTab === 'registrations' ? '700' : '500',
                 color: inboxSubTab === 'registrations' ? 'var(--text-main)' : 'var(--text-muted)',
-                borderBottom: inboxSubTab === 'registrations' ? '2px solid #F59E0B' : '2px solid transparent',
+                borderBottom: inboxSubTab === 'registrations' ? '2px solid #D97706' : '2px solid transparent',
                 transition: 'all 0.15s',
               }}>
               Registrations ({pendingRegistrations.length})
@@ -1698,7 +1698,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             ) : (
               myEditRequests.map(req => (
                 <div key={req.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)' }}>
-                  <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: req.status === 'accepted' ? '#129968' : req.status === 'rejected' ? '#ef4444' : '#f59e0b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '14px', flexShrink: 0 }}>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: req.status === 'accepted' ? '#129968' : req.status === 'rejected' ? '#ef4444' : '#D97706', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '14px', flexShrink: 0 }}>
                     {req.status === 'accepted' ? '✓' : req.status === 'rejected' ? '✕' : '…'}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -1706,7 +1706,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       {req.patient_name || 'Unknown'} · {req.disease_name || req.disease_name_full || 'Unknown'}
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                      From {req.from_barangay_name || 'your barangay'} · <span style={{ textTransform: 'capitalize', fontWeight: '600', color: req.status === 'accepted' ? '#129968' : req.status === 'rejected' ? '#ef4444' : '#f59e0b' }}>{req.status}</span>
+                      From {req.from_barangay_name || 'your barangay'} · <span style={{ textTransform: 'capitalize', fontWeight: '600', color: req.status === 'accepted' ? '#129968' : req.status === 'rejected' ? '#ef4444' : '#D97706' }}>{req.status}</span>
                     </div>
                     {req.note && (
                       <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '2px' }}>"{req.note}"</div>
@@ -1720,7 +1720,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     setMyEditRequests(prev => prev.filter(r => r.id !== req.id));
                     setView('outbox');
                   }} title="View in Outbox"
-                    style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #60A5FA', background: 'rgba(96,165,250,0.15)', color: '#60A5FA', cursor: 'pointer', fontSize: '16px', flexShrink: 0 }}>
+                    style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #3B82F6', background: 'rgba(96,165,250,0.15)', color: '#3B82F6', cursor: 'pointer', fontSize: '16px', flexShrink: 0 }}>
                     →
                   </button>
                 </div>
@@ -1841,7 +1841,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             ) : (
               pendingRegistrations.map(reg => (
                 <div key={reg.user_id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)' }}>
-                  <div className="inbox-avatar-circle" style={{ background: '#F59E0B' }}>
+                  <div className="inbox-avatar-circle" style={{ background: '#D97706' }}>
                     {(reg.full_name || 'U').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -1888,7 +1888,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '14.4px', color: 'var(--text-muted)', lineHeight: 1, textAlign: 'left' }}>
                       From Resident{msg.barangay ? ` (${msg.barangay})` : msg.target_cho_unit ? ` (${msg.target_cho_unit})` : ''}
-                      {msg.status === 'pending' && <span style={{ marginLeft: '8px', color: '#f59e0b', fontWeight: '600' }}>· Pending review</span>}
+                      {msg.status === 'pending' && <span style={{ marginLeft: '8px', color: '#D97706', fontWeight: '600' }}>· Pending review</span>}
                     </div>
                     <div style={{ display: 'flex', gap: '8px', marginTop: '6px', alignItems: 'center' }}>
                       <div className="inbox-avatar-circle" style={{ background: '#129968' }}>
@@ -1942,7 +1942,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       });
                       setView('add');
                     }} title="Complete Case"
-                      style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #f59e0b', background: 'rgba(245,158,11,0.1)', color: '#f59e0b', cursor: 'pointer', fontSize: '12px', fontWeight: '600', flexShrink: 0 }}>
+                      style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #D97706', background: 'rgba(245,158,11,0.1)', color: '#D97706', cursor: 'pointer', fontSize: '12px', fontWeight: '600', flexShrink: 0 }}>
                       Complete →
                     </button>
                   )}
@@ -1977,7 +1977,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           ) : (
             outboxItems.map(item => (
               <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)' }}>
-                <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: item.status === 'accepted' ? '#129968' : item.status === 'rejected' ? '#ef4444' : '#f59e0b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '11px', flexShrink: 0 }}>
+                <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: item.status === 'accepted' ? '#129968' : item.status === 'rejected' ? '#ef4444' : '#D97706', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '11px', flexShrink: 0 }}>
                   {item.status === 'accepted' ? '✓' : item.status === 'rejected' ? '✕' : '…'}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -1996,7 +1996,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     ) : (
                       <>{item.direction === 'sent' ? 'Sent to' : 'Received from'} {item.direction === 'sent' ? (item.to_cho_unit || item.to_barangay_name || '—') : (item.from_barangay_name ? `BHW (${item.from_barangay_name})` : item.from_cho_unit || '—')}</>
                     )}
-                    <span> · Status: <span style={{ textTransform: 'capitalize', fontWeight: '600', color: item.status === 'accepted' ? '#129968' : item.status === 'rejected' ? '#ef4444' : '#f59e0b' }}>{item.status}</span></span>
+                    <span> · Status: <span style={{ textTransform: 'capitalize', fontWeight: '600', color: item.status === 'accepted' ? '#129968' : item.status === 'rejected' ? '#ef4444' : '#D97706' }}>{item.status}</span></span>
                     {item.barangay_name && <span> · {item.item_type === 'edit_request' ? 'Barangay' : 'Assigned to'} {item.barangay_name}</span>}
                   </div>
                 </div>
@@ -2156,7 +2156,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     >
                       All Barangays
                     </div>
-                    {scopedBarangayOptions.map(b => (
+                    {[...scopedBarangayOptions].sort().map(b => (
                       <div
                         key={b}
                         className={`mc-custom-dropdown-item ${filterBarangay === b ? 'mc-custom-dropdown-item--active' : ''}`}
@@ -2202,7 +2202,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               </button>
               {statusOpen && (
                 <div style={{ position: 'absolute', top: '105%', left: 0, minWidth: '180px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', zIndex: 100, overflow: 'hidden' }}>
-                  {['All Status', 'Active', 'Pending', 'Under Treatment', 'Recovered', 'Deceased', 'Draft'].map(s => (
+                  {['All Status', ...['Active', 'Pending', 'Under Treatment', 'Recovered', 'Deceased', 'Draft'].sort()].map(s => (
                     <button key={s} type="button"
                       onClick={() => { setFilterStatus(s); setStatusOpen(false); setTablePage(1); }}
                       style={{ display: 'block', width: '100%', padding: '10px 14px', background: filterStatus === s ? 'var(--input-bg)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: filterStatus === s ? '600' : '400' }}
@@ -2792,7 +2792,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           ...inputStyle,
                           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                           cursor: 'pointer', textAlign: 'left',
-                          border: `1px solid ${purokOpen ? '#60A5FA' : 'var(--border-color)'}`,
+                          border: `1px solid ${purokOpen ? '#3B82F6' : 'var(--border-color)'}`,
                         }}
                       >
                           <span>{formData.purok || '— Select Location —'}</span>
@@ -2830,7 +2830,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                                 padding: '8px 12px', cursor: 'pointer', fontSize: '13px',
                                 borderRadius: '6px',
                                 background: formData.purok === p ? 'rgba(37,99,235,0.12)' : 'transparent',
-                                color: formData.purok === p ? '#60A5FA' : 'var(--text-main)',
+                                color: formData.purok === p ? '#3B82F6' : 'var(--text-main)',
                                 fontWeight: formData.purok === p ? '600' : '400',
                               }}
                               onMouseEnter={e => e.currentTarget.style.background = 'var(--input-bg)'}
@@ -2860,7 +2860,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           ...inputStyle,
                           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                           cursor: 'pointer', textAlign: 'left',
-                          border: formErrors.barangayId ? '2px solid #ef4444' : `1px solid ${barangayFormOpen ? '#60A5FA' : 'var(--border-color)'}`,
+                          border: formErrors.barangayId ? '2px solid #ef4444' : `1px solid ${barangayFormOpen ? '#3B82F6' : 'var(--border-color)'}`,
                           background: formErrors.barangayId ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)',
                         }}
                       >
@@ -2902,7 +2902,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                               style={{
                                 padding: '8px 12px', cursor: 'pointer', fontSize: '13px', borderRadius: '6px',
                                 background: String(formData.barangayId) === String(b.id) ? 'rgba(37,99,235,0.12)' : 'transparent',
-                                color: String(formData.barangayId) === String(b.id) ? '#60A5FA' : 'var(--text-main)',
+                                color: String(formData.barangayId) === String(b.id) ? '#3B82F6' : 'var(--text-main)',
                                 fontWeight: String(formData.barangayId) === String(b.id) ? '600' : '400',
                               }}
                               onMouseEnter={e => e.currentTarget.style.background = 'var(--input-bg)'}
@@ -2939,7 +2939,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         ...inputStyle,
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                         cursor: 'pointer', textAlign: 'left',
-                          border: `1px solid ${diseaseOpen ? '#60A5FA' : 'var(--border-color)'}`,
+                          border: `1px solid ${diseaseOpen ? '#3B82F6' : 'var(--border-color)'}`,
                       }}
                     >
                       <span>{formData.diseaseType || '— Select Disease —'}</span>
@@ -2965,14 +2965,14 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         >
                           — Select Disease —
                         </div>
-                        {ALL_DISEASE_OPTIONS.concat(['Other Communicable Diseases']).map(d => (
+                        {[...ALL_DISEASE_OPTIONS, 'Other Communicable Diseases'].sort().map(d => (
                           <div
                             key={d}
                             onClick={() => { setFormData({ ...formData, diseaseType: d }); setDiseaseOpen(false); setFormErrors(prev => ({ ...prev, diseaseType: false })); }}
                             style={{
                               padding: '8px 12px', cursor: 'pointer', fontSize: '13px', borderRadius: '6px',
                               background: formData.diseaseType === d ? 'rgba(37,99,235,0.12)' : 'transparent',
-                              color: formData.diseaseType === d ? '#60A5FA' : 'var(--text-main)',
+                              color: formData.diseaseType === d ? '#3B82F6' : 'var(--text-main)',
                               fontWeight: formData.diseaseType === d ? '600' : '400',
                             }}
                             onMouseEnter={e => e.currentTarget.style.background = 'var(--input-bg)'}
@@ -3009,7 +3009,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     </button>
                     {severityOpen && (
                       <div style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 100, overflow: 'hidden' }}>
-                        {['Mild', 'Moderate', 'Severe', 'Asymptomatic'].map(s => (
+                        {['Mild', 'Moderate', 'Severe', 'Asymptomatic'].sort().map(s => (
                           <button key={s} type="button"
                             onClick={() => { setFormData({ ...formData, severity: s }); setSeverityOpen(false); }}
                             style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.severity === s ? 'rgba(18,153,104,0.12)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: formData.severity === s ? '600' : '400' }}
@@ -3038,7 +3038,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     </button>
                     {patientStatusOpen && (
                       <div style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 100, overflow: 'hidden' }}>
-                        {['Active', 'Pending', 'Under Treatment', 'Recovered', 'Deceased'].map(s => (
+                        {['Active', 'Pending', 'Under Treatment', 'Recovered', 'Deceased'].sort().map(s => (
                           <button key={s} type="button"
                             onClick={() => { setFormData({ ...formData, status: s }); setPatientStatusOpen(false); }}
                             style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.status === s ? 'rgba(18,153,104,0.12)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: formData.status === s ? '600' : '400' }}
@@ -3165,7 +3165,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       />
                       <button type="button" onClick={() => handleSendEditRequest()}
                         disabled={!editRequestNote.trim()}
-                        style={{ padding: '10px 28px', borderRadius: '6px', border: 'none', background: editRequestNote.trim() ? '#0d9488' : '#94a3b8', color: 'white', cursor: editRequestNote.trim() ? 'pointer' : 'not-allowed', fontWeight: '600', fontSize: '15px' }}>
+                        style={{ padding: '10px 28px', borderRadius: '6px', border: 'none', background: editRequestNote.trim() ? '#0d9488' : '#64748b', color: 'white', cursor: editRequestNote.trim() ? 'pointer' : 'not-allowed', fontWeight: '600', fontSize: '15px' }}>
                         Send
                       </button>
                       <button type="button" onClick={() => setShowEditRequestForm(false)}

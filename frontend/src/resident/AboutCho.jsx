@@ -84,7 +84,7 @@ export default function AboutCho() {
       }}>
         {/* Header */}
         <div style={{
-          background: 'linear-gradient(135deg, #121358 0%, #00308F 100%)',
+          background: 'linear-gradient(135deg, #121358 0%, #2F578A 100%)',
           padding: '24px', color: '#fff',
         }}>
           <h3 style={{ margin: '0 0 4px', fontSize: '20px', fontWeight: '700' }}>{selected.name}</h3>

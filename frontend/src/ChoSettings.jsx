@@ -22,7 +22,7 @@ function OfflineSyncPanel() {
   useEffect(() => { refresh(); }, []);
 
   const statusColor = (s) => {
-    if (s === 'pending') return '#F59E0B';
+    if (s === 'pending') return '#D97706';
     if (s === 'syncing') return '#6366F1';
     if (s === 'done') return '#129968';
     return '#EF4444';
@@ -695,7 +695,7 @@ export default function CHOSettings({
           <div>
             <h1 className="settings-title">Settings</h1>
             {offlineMode && (
-              <div style={{ padding: '10px 14px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '13px', color: '#F59E0B', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ padding: '10px 14px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '13px', color: '#D97706', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '16px' }}>⚠</span>
                 Offline - settings changes require an internet connection.
               </div>
@@ -1763,7 +1763,7 @@ export default function CHOSettings({
                           e.target.value = '';
                         }
                       }} />
-                    <button onClick={() => restoreInputRef.current?.click()} disabled={restoreLoading || offlineMode} style={{ ...offlineBtnStyle, flex: 1, padding: '12px', background: restoreLoading ? '#94a3b8' : 'var(--bg-surface)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: restoreLoading || offlineMode ? 'not-allowed' : 'pointer' }} title={offlineMode ? 'Unavailable offline' : ''}>
+                    <button onClick={() => restoreInputRef.current?.click()} disabled={restoreLoading || offlineMode} style={{ ...offlineBtnStyle, flex: 1, padding: '12px', background: restoreLoading ? '#64748b' : 'var(--bg-surface)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: restoreLoading || offlineMode ? 'not-allowed' : 'pointer' }} title={offlineMode ? 'Unavailable offline' : ''}>
                       {restoreLoading ? 'Restoring...' : 'Restore'}
                     </button>
                   </div>

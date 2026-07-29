@@ -208,7 +208,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     }
     const barRows = bars.map((bar, i) => {
       const pct = highest > 0 ? Math.round((bar.count / highest) * 100) : 0;
-      const color = i === 0 ? '#DC2626' : i === 1 ? '#f59e0b' : '#3b82f6';
+      const color = i === 0 ? '#DC2626' : i === 1 ? '#D97706' : '#3b82f6';
       return `
         <tr>
           <td style="padding:6px 10px 6px 0;font-size:13px;white-space:nowrap;min-width:160px;">${bar.label}</td>
@@ -313,7 +313,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       <style>
         body { font-family: Arial, sans-serif; background: #0B1120; color: white; padding: 40px; }
         h1 { color: #129968; margin-bottom: 4px; } 
-        h2 { color: #60a5fa; margin-top: 36px; margin-bottom: 12px; font-size: 18px; }
+        h2 { color: #3b82f6; margin-top: 36px; margin-bottom: 12px; font-size: 18px; }
         p { color: #9ca3af; margin: 0 0 24px 0; font-size: 13px; }
         .stats { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
         .stat { background: #1e293b; padding: 18px 28px; border-radius: 8px; text-align: center; min-width: 100px; }
@@ -323,7 +323,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         table.bars td { padding: 5px 8px; font-size: 13px; color: #e2e8f0; }
         .track { background: #334155; border-radius: 4px; height: 24px; width: 100%; overflow: hidden; position: relative; }
         .fill-red { background: #ef4444; height: 100%; border-radius: 4px; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; color: #fff; font-weight: 700; font-size: 14px; box-sizing: border-box; }
-        .fill-amber { background: #f59e0b; height: 100%; border-radius: 4px; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; color: #fff; font-weight: 700; font-size: 14px; box-sizing: border-box; }
+        .fill-amber { background: #D97706; height: 100%; border-radius: 4px; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; color: #fff; font-weight: 700; font-size: 14px; box-sizing: border-box; }
         .fill-blue { background: #3b82f6; height: 100%; border-radius: 4px; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; color: #fff; font-weight: 700; font-size: 14px; box-sizing: border-box; }
         footer { color: #4b5563; font-size: 11px; margin-top: 40px; border-top: 1px solid #1e293b; padding-top: 12px; }
       </style></head><body>
@@ -332,7 +332,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
       <div class="stats">
         <div class="stat"><div class="num">${totalCases}</div><div class="lbl">Total Cases</div></div>
-        <div class="stat"><div class="num" style="color:#f59e0b;">${activeCases}</div><div class="lbl">Active</div></div>
+        <div class="stat"><div class="num" style="color:#D97706;">${activeCases}</div><div class="lbl">Active</div></div>
         <div class="stat"><div class="num">${recoveredCases}</div><div class="lbl">Recovered</div></div>
         <div class="stat"><div class="num" style="color:#ef4444;">${deathCases}</div><div class="lbl">Deaths</div></div>
       </div>
@@ -427,19 +427,34 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         <div style={{ padding: compactMode ? '14px' : '24px', display: 'flex', flexDirection: 'column', gap: compactMode ? '12px' : '20px', fontSize: `calc(14px * ${fontScale || '1'})` }}>
 
       {offlineMode && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '13px', color: '#F59E0B' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '13px', color: '#D97706' }}>
           <span style={{ fontSize: '16px' }}>⚠</span>
           Offline - showing cached data. Will refresh when reconnected.
         </div>
       )}
 
+      {/* ── WELCOME BANNER ── */}
+      <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px 16px' : '20px 24px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <div style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: '500' }}>
+          {new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening'}
+        </div>
+        <div style={{ color: 'var(--text-main)', fontSize: '22px', fontWeight: '700', marginTop: '2px' }}>
+          Welcome back, {loggedUser || 'User'}
+        </div>
+        <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '4px' }}>
+          {loginRole === 'CHO' ? `City Health Officer - ${sessionContext || ''}` : `Barangay Health Worker - ${loginBarangay || ''}`}
+          <span style={{ margin: '0 8px' }}>•</span>
+          {new Date().toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+        </div>  
+      </div>
+
       {/* ── STAT CARDS ── */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: compactMode ? '10px' : '16px' }}>
         {[
-          { label: 'Total Cases', value: totalCases, color: '#60A5FA' },
-          { label: 'Active', value: activeCases, color: '#f59e0b' },
-          { label: 'Recovered', value: recoveredCases, color: '#129968' },
-          { label: 'Deaths', value: deathCases, color: '#ef4444' },
+          { label: 'Total Cases', value: totalCases, color: '#3B82F6' },
+          { label: 'Active', value: activeCases, color: '#D97706' },
+          { label: 'Recovered', value: recoveredCases, color: '#0D7A4E' },
+          { label: 'Deaths', value: deathCases, color: '#DC2626' },
         ].map(card => (
             <div key={card.label} style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' }}>
             <div style={{ color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{card.label}</div>
@@ -495,7 +510,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                   <div style={{ flex: 1, background: 'var(--input-bg)', height: '24px', borderRadius: '6px', overflow: 'hidden', position: 'relative' }}>
                     <div style={{
                       width: `${(bar.count / highestCount) * 100}%`,
-                      background: i === 0 ? '#DC2626' : i === 1 ? '#f59e0b' : '#3b82f6',
+                      background: i === 0 ? '#DC2626' : i === 1 ? '#D97706' : '#3b82f6',
                       height: '100%', borderRadius: '6px', transition: 'width 0.4s ease',
                       display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
                       paddingRight: '8px', color: '#fff', fontWeight: '700', fontSize: '14px',
@@ -531,7 +546,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                   background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
                   borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
                 }}>
-                  {ALL_DISEASES.map(d => (
+                  {[...ALL_DISEASES].sort().map(d => (
                     <div
                       key={d}
                       onClick={() => { setSelectedDisease(d); setDiseaseOpen(false); }}

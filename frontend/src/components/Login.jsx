@@ -2,6 +2,142 @@
   import { API_URL } from '../config';
   import ChoLogoIcon from '../assets/ChoLogo';
   import { getCachedUsers, upsertCachedUser } from '../offlineSync';
+import L from 'leaflet';
+import { MapContainer, TileLayer, useMap, GeoJSON } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import cabuyaoBoundaries from '../data/cabuyao_barangays.geojson.json';
+
+function getFeatureBounds(f) {
+  let minLat = Infinity, maxLat = -Infinity;
+  let minLng = Infinity, maxLng = -Infinity;
+  const rings = f.geometry.type === 'MultiPolygon'
+    ? f.geometry.coordinates.flat(2)
+    : f.geometry.coordinates[0];
+  for (const [lng, lat] of rings) {
+    if (lat < minLat) minLat = lat;
+    if (lat > maxLat) maxLat = lat;
+    if (lng < minLng) minLng = lng;
+    if (lng > maxLng) maxLng = lng;
+  }
+  return [[minLat, minLng], [maxLat, maxLng]];
+}
+
+const FEATURE_BOUNDS = {};
+for (const f of cabuyaoBoundaries.features) {
+  FEATURE_BOUNDS[f.properties.ADM4_EN] = getFeatureBounds(f);
+}
+
+const OVERALL_BOUNDS = (() => {
+  let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
+  for (const b of Object.values(FEATURE_BOUNDS)) {
+    if (b[0][0] < minLat) minLat = b[0][0];
+    if (b[1][0] > maxLat) maxLat = b[1][0];
+    if (b[0][1] < minLng) minLng = b[0][1];
+    if (b[1][1] > maxLng) maxLng = b[1][1];
+  }
+  return [[minLat, minLng], [maxLat, maxLng]];
+})();
+
+const CABUYAO_CENTER = [
+  (OVERALL_BOUNDS[0][0] + OVERALL_BOUNDS[1][0]) / 2,
+  (OVERALL_BOUNDS[0][1] + OVERALL_BOUNDS[1][1]) / 2,
+];
+
+const ANIM_SCENES = [
+  { bounds: OVERALL_BOUNDS, highlight: null,    label: 'Cabuyao City Overview' },
+  { bounds: FEATURE_BOUNDS['Barangay Dos (Pob.)'], highlight: 'Barangay Dos (Pob.)', label: 'Barangay Dos (Poblacion)' },
+  { bounds: FEATURE_BOUNDS['Baclaran'],             highlight: 'Baclaran',             label: 'Baclaran' },
+  { bounds: FEATURE_BOUNDS['Pulo'],                 highlight: 'Pulo',                 label: 'Pulo' },
+  { bounds: FEATURE_BOUNDS['Casile'],               highlight: 'Casile',               label: 'Casile' },
+  { bounds: FEATURE_BOUNDS['Niugan'],               highlight: 'Niugan',               label: 'Niugan' },
+  { bounds: FEATURE_BOUNDS['Bigaa'],                highlight: 'Bigaa',                label: 'Bigaa' },
+  { bounds: FEATURE_BOUNDS['Sala'],                 highlight: 'Sala',                 label: 'Sala' },
+];
+
+function AnimatedMapView({ setFade }) {
+    const map = useMap();
+    const [sceneIdx, setSceneIdx] = useState(0);
+    const idxRef = useRef(0);
+    const mountedRef = useRef(true);
+
+    useEffect(() => {
+      mountedRef.current = true;
+      return () => { mountedRef.current = false; };
+    }, []);
+
+    useEffect(() => {
+      setSceneIdx(0);
+      map.fitBounds(L.latLngBounds(ANIM_SCENES[0].bounds), { padding: [40, 40], maxZoom: 12 });
+    }, []);
+
+    useEffect(() => {
+      const advance = () => {
+        if (!mountedRef.current) return;
+        setFade(0);
+
+        setTimeout(() => {
+          if (!mountedRef.current) return;
+          idxRef.current = (idxRef.current + 1) % ANIM_SCENES.length;
+          const scene = ANIM_SCENES[idxRef.current];
+          setSceneIdx(idxRef.current);
+          map.fitBounds(L.latLngBounds(scene.bounds), { padding: [20, 20], maxZoom: 15, animate: true, duration: 1.5 });
+
+          setTimeout(() => {
+            if (mountedRef.current) setFade(1);
+          }, 600);
+        }, 700);
+      };
+
+      const first = setTimeout(advance, 3000);
+      const id = setInterval(advance, 7000);
+      return () => { mountedRef.current = false; clearTimeout(first); clearInterval(id); };
+    }, []);
+
+    const currentScene = ANIM_SCENES[sceneIdx];
+
+    return (
+      <>
+        <GeoJSON
+          key={sceneIdx}
+          data={cabuyaoBoundaries}
+          style={(feature) => {
+            const name = feature.properties.ADM4_EN;
+            const isHighlighted = currentScene.highlight && name === currentScene.highlight;
+            const isOverview = currentScene.highlight === null;
+            if (isHighlighted) {
+              return { fillColor: '#121358', fillOpacity: 0.3, color: '#ffffff', weight: 2.5 };
+            }
+            return {
+              fillColor: '#ffffff',
+              fillOpacity: isOverview ? 0.1 : 0.02,
+              color: isOverview ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)',
+              weight: isOverview ? 1.5 : 0.5,
+            };
+          }}
+          onEachFeature={(feature, layer) => {
+            if (currentScene.highlight === null) {
+              layer.bindTooltip(feature.properties.ADM4_EN, {
+                permanent: true,
+                direction: 'center',
+                className: 'map-label-tooltip',
+              });
+            }
+          }}
+        />
+        {currentScene.label && (
+          <div style={{
+            position: 'absolute', top: 16, left: 16, zIndex: 1000,
+            background: 'rgba(0,0,0,0.6)', color: '#fff',
+            padding: '6px 14px', borderRadius: 6,
+            fontSize: 13, fontWeight: 600, pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+          }}>
+            {currentScene.label}
+          </div>
+        )}
+      </>
+    );
+  }
 
   export default function Login({ onLoginSuccess, onForgotPassword, theme, toggleTheme }) {
     const [step, setStep] = useState('role'); // 'role', 'cho_select', 'bhw_select', 'auth', 'forgot_password', 'signup', 'cho_contact', 'signup_role'
@@ -11,6 +147,7 @@
     const [otpLoading, setOtpLoading] = useState(false);
     const [selectedRole, setSelectedRole] = useState('CHO'); 
     const [selectedContext, setSelectedContext] = useState(''); 
+    const [mapFade, setMapFade] = useState(1);
     
     // Login Form States
     const [email, setEmail] = useState('');
@@ -414,7 +551,26 @@ const handleLoginOtpSubmit = async (e) => {
           {theme === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode'}
         </button>
 
-        <div className="login-left"></div>
+        <div className="login-left">
+          <div style={{ position: 'absolute', inset: 0, opacity: mapFade, transition: 'opacity 0.7s ease-in-out' }}>
+            <MapContainer
+              center={CABUYAO_CENTER}
+              zoom={12}
+              zoomControl={false}
+              scrollWheelZoom={false}
+              dragging={false}
+              touchZoom={false}
+              doubleClickZoom={false}
+              attributionControl={false}
+              style={{ width: '100%', height: '100%', background: 'transparent' }}
+            >
+              <TileLayer
+                url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+              />
+              <AnimatedMapView setFade={setMapFade} />
+            </MapContainer>
+          </div>
+        </div>
 
         <div className="login-right">
           <div className="login-form-container">

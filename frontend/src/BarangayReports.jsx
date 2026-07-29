@@ -697,7 +697,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <h2 style={{ margin: '0 0 2px 0', fontSize: '22px', fontWeight: '700', color: 'var(--text-h)' }}>Audit Reports</h2>
           {offlineMode && (
-            <span style={{ fontSize: '12px', color: '#F59E0B', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '6px', padding: '4px 10px' }}>
+            <span style={{ fontSize: '12px', color: '#D97706', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '6px', padding: '4px 10px' }}>
               Offline - showing cached data
             </span>
           )}

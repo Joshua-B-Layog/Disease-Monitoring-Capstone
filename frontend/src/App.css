@@ -9,7 +9,7 @@
 :root {
   /* DARK MODE VARIABLES */
   --bg-main: #0B1120;       
-  --bg-surface: #1E293B;    
+  --bg-surface: #243447;    
   --text-main: #F8FAFC;
   --text-muted: #94A3B8;
   --text-h: #E2E8F0;
@@ -21,10 +21,10 @@
 
 [data-theme='light'] {
   /* LIGHT MODE VARIABLES  */
-  --bg-main: #F3F4F6;
+  --bg-main: #E5E7EB;
   --bg-surface: #FFFFFF;
   --text-main: #111827;
-  --text-muted: #6B7280;
+  --text-muted: #4B5563;
   --text-h: #111827;
   --input-bg: #F9FAFB;
   --input-border: #6B7280;
@@ -55,9 +55,8 @@ html, body, #root {
 
 .login-left { 
   flex: 1.2; 
-  display: flex; 
-  align-items: center; 
-  justify-content: center; 
+  position: relative; 
+  overflow: hidden; 
   background: linear-gradient(135deg, #121358 0%, var(--bg-main) 100%); 
 }
 
@@ -461,4 +460,20 @@ html, body, #root {
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* Login map barangay label tooltips */
+.map-label-tooltip {
+  background: rgba(0, 0, 0, 0.55) !important;
+  border: none !important;
+  color: #ffffff !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  padding: 2px 7px !important;
+  border-radius: 4px !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3) !important;
+  white-space: nowrap !important;
+}
+.map-label-tooltip::before {
+  display: none !important;
 }

@@ -243,7 +243,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'Avian Influenza', icon: '🐔', color: '#f59e0b', videoId: 'iAusO1XxhnQ',
+    name: 'Avian Influenza', icon: '🐔', color: '#D97706', videoId: 'iAusO1XxhnQ',
     tips: [
       'Avoid contact with sick or dead birds.',
       'Cook poultry and eggs thoroughly before eating.',
@@ -376,7 +376,7 @@ const DISEASES = [
     ],
   },
   {
-    name: 'Influenza', icon: '🤒', color: '#f59e0b', videoId: 'wMUk5zSlzqY',
+    name: 'Influenza', icon: '🤒', color: '#D97706', videoId: 'wMUk5zSlzqY',
     tips: [
       'Get the annual flu vaccine.',
       'Wash hands frequently with soap and water.',
@@ -596,7 +596,7 @@ export default function PreventionTips() {
 
   const getResultLevel = (pct) => {
     if (pct < 25) return { label: 'Low Likelihood', color: '#129968', bg: 'rgba(18,153,104,0.12)', text: 'Your symptoms do not strongly match this disease. Stay observant and practice prevention measures.' };
-    if (pct < 50) return { label: 'Moderate Risk', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', text: 'Your symptoms partially match this disease. Consider visiting a health center for a check-up.' };
+    if (pct < 50) return { label: 'Moderate Risk', color: '#D97706', bg: 'rgba(245,158,11,0.12)', text: 'Your symptoms partially match this disease. Consider visiting a health center for a check-up.' };
     return { label: 'High Risk', color: '#DC2626', bg: 'rgba(220,38,38,0.12)', text: 'Your symptoms strongly match this disease. Please go to the hospital immediately for evaluation.' };
   };
 
@@ -638,7 +638,7 @@ export default function PreventionTips() {
                   {disease.tips.length} prevention tips
                 </div>
               </div>
-              <span style={{ color: '#94a3b8', fontSize: '16px' }}>
+              <span style={{ color: '#64748b', fontSize: '16px' }}>
                 {expanded === idx ? '▲' : '▼'}
               </span>
             </div>
@@ -797,7 +797,7 @@ export default function PreventionTips() {
                   <button onClick={calculateResult}
                     disabled={answeredCount < disease.symptoms.length}
                     style={{
-                      padding: '12px 40px', background: answeredCount < disease.symptoms.length ? '#94a3b8' : '#129968',
+                      padding: '12px 40px', background: answeredCount < disease.symptoms.length ? '#64748b' : '#129968',
                       color: '#fff', border: 'none', borderRadius: '8px',
                       fontSize: '15px', fontWeight: '700', cursor: answeredCount < disease.symptoms.length ? 'not-allowed' : 'pointer',
                     }}>

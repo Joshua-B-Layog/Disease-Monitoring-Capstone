@@ -471,8 +471,8 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             {/* ── ONLINE/OFFLINE INDICATOR ── */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', background: isOnline ? 'rgba(18,153,104,0.1)' : 'rgba(245,158,11,0.1)', color: isOnline ? '#129968' : '#F59E0B', border: `1px solid ${isOnline ? 'rgba(18,153,104,0.3)' : 'rgba(245,158,11,0.3)'}` }}>
-              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: isOnline ? '#129968' : '#F59E0B' }}></span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', background: isOnline ? 'rgba(18,153,104,0.1)' : 'rgba(245,158,11,0.1)', color: isOnline ? '#129968' : '#D97706', border: `1px solid ${isOnline ? 'rgba(18,153,104,0.3)' : 'rgba(245,158,11,0.3)'}` }}>
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: isOnline ? '#129968' : '#D97706' }}></span>
               {isOnline ? 'Online' : 'Offline'}
             </div>
             {/* ── BELL ICON + NOTIFICATION DROPDOWN ── */}
@@ -719,7 +719,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             position: 'fixed', bottom: '24px', right: '24px', zIndex: 9000,
             display: 'flex', alignItems: 'center', gap: '8px',
             padding: '10px 18px', borderRadius: '24px',
-            background: syncingActive ? '#6366F1' : navigator.onLine ? '#129968' : '#F59E0B',
+            background: syncingActive ? '#6366F1' : navigator.onLine ? '#129968' : '#D97706',
             color: '#fff', border: 'none', cursor: syncingActive ? 'wait' : 'pointer',
             boxShadow: '0 4px 16px rgba(0,0,0,0.25)', fontSize: '13px', fontWeight: '600',
             transition: 'all 0.2s'
@@ -730,7 +730,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
           ) : '⟳'}
           {syncingActive ? 'Syncing...' : `Sync ${pendingSyncCount} item${pendingSyncCount > 1 ? 's' : ''}`}
           {pendingSyncCount > 0 && !syncingActive && (
-            <span style={{ background: '#fff', color: navigator.onLine ? '#129968' : '#F59E0B', borderRadius: '50%', width: '20px', height: '20px', fontSize: '11px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ background: '#fff', color: navigator.onLine ? '#129968' : '#D97706', borderRadius: '50%', width: '20px', height: '20px', fontSize: '11px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {pendingSyncCount}
             </span>
           )}
@@ -808,7 +808,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             {/* ── Profile details body ── */}
             <div style={{ padding: '28px 32px' }}>
               {profileLoading ? (
-                <div style={{ textAlign: 'center', padding: '24px', color: '#94a3b8', fontSize: '14px' }}>
+                <div style={{ textAlign: 'center', padding: '24px', color: '#64748b', fontSize: '14px' }}>
                   Loading profile...
                 </div>
               ) : profileData ? (
@@ -823,7 +823,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                   </div>
                 </>
               ) : (
-                <div style={{ textAlign: 'center', padding: '16px', color: '#94a3b8', fontSize: '14px' }}>
+                <div style={{ textAlign: 'center', padding: '16px', color: '#64748b', fontSize: '14px' }}>
                   Could not load profile details.
                 </div>
               )}

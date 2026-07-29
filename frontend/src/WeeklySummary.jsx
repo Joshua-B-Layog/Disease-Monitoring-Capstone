@@ -57,7 +57,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
 
   const getRiskColor = (count) => {
     if (count >= 20) return '#DC2626';
-    if (count >= 10) return '#f59e0b';
+    if (count >= 10) return '#D97706';
     return '#129968';
   };
 
@@ -80,7 +80,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
   };
 
   const getSeverityColor = (sev) => {
-    const map = { Critical: '#DC2626', Severe: '#f59e0b', Moderate: '#3b82f6', Mild: '#129968', Asymptomatic: '#6b7280' };
+    const map = { Critical: '#DC2626', Severe: '#D97706', Moderate: '#3b82f6', Mild: '#129968', Asymptomatic: '#6b7280' };
     return map[sev] || '#6b7280';
   };
 
@@ -159,7 +159,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
         th { background: #1e3a8a; color: white; padding: 9px 12px; text-align: left; font-size: 12px; }
         td { padding: 8px 12px; border-bottom: 1px solid #e5e7eb; }
         tr:nth-child(even) td { background: #f9fafb; }
-        .footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid #e2e8f0; color: #94a3b8; font-size: 11px; text-align: center; }
+        .footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 11px; text-align: center; }
         @media print { .no-print { display: none !important; } body { padding: 16px; } }
       </style></head><body>
       <h1>Weekly Disease Summary Report</h1>
@@ -168,7 +168,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
       <div class="metrics">
         <div class="metric-card" style="background:#eff6ff"><div class="metric-val" style="color:#1e3a8a">${summary.total_cases}</div><div class="metric-label">Total Cases</div></div>
         <div class="metric-card" style="background:#fef2f2"><div class="metric-val" style="color:#DC2626">${summary.new_this_week}</div><div class="metric-label">New This Week</div></div>
-        <div class="metric-card" style="background:#fffbeb"><div class="metric-val" style="color:#f59e0b">${summary.active_cases}</div><div class="metric-label">Active</div></div>
+        <div class="metric-card" style="background:#fffbeb"><div class="metric-val" style="color:#D97706">${summary.active_cases}</div><div class="metric-label">Active</div></div>
         <div class="metric-card" style="background:#f0fdf4"><div class="metric-val" style="color:#129968">${summary.recovered}</div><div class="metric-label">Recovered</div></div>
         <div class="metric-card" style="background:#fef2f2"><div class="metric-val" style="color:#991b1b">${summary.deceased}</div><div class="metric-label">Deceased</div></div>
       </div>
@@ -204,13 +204,13 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
     const newCaseRows = newCases.map(c => `<tr><td>#${String(c.case_id).padStart(3,'0')}</td><td>${c.patient_name||''}</td><td>${c.age||'--'}</td><td>${c.disease_name||''}</td><td>${c.barangay_name||''}</td><td>${c.severity||'N/A'}</td><td>${c.status||''}</td></tr>`).join('');
 
     const html = `<html><head><meta charset="utf-8"><title>Weekly Summary Report</title>
-      <style>body{font-family:Arial,sans-serif;padding:32px;font-size:13px;color:#111}h1{color:#1e3a8a;font-size:22px;margin:0 0 4px 0}p{color:#555;margin:0 0 16px 0}h2{color:#1e3a8a;font-size:16px;margin:24px 0 8px 0;border-bottom:2px solid #1e3a8a;padding-bottom:4px}table{width:100%;border-collapse:collapse;margin-bottom:16px}th{background:#1e3a8a;color:white;padding:9px 12px;text-align:left;font-size:12px}td{padding:8px 12px;border-bottom:1px solid #e5e7eb}tr:nth-child(even) td{background:#f9fafb}.footer{margin-top:32px;padding-top:12px;border-top:1px solid #e2e8f0;color:#94a3b8;font-size:11px;text-align:center}</style></head><body>
+      <style>body{font-family:Arial,sans-serif;padding:32px;font-size:13px;color:#111}h1{color:#1e3a8a;font-size:22px;margin:0 0 4px 0}p{color:#555;margin:0 0 16px 0}h2{color:#1e3a8a;font-size:16px;margin:24px 0 8px 0;border-bottom:2px solid #1e3a8a;padding-bottom:4px}table{width:100%;border-collapse:collapse;margin-bottom:16px}th{background:#1e3a8a;color:white;padding:9px 12px;text-align:left;font-size:12px}td{padding:8px 12px;border-bottom:1px solid #e5e7eb}tr:nth-child(even) td{background:#f9fafb}.footer{margin-top:32px;padding-top:12px;border-top:1px solid #e2e8f0;color:#64748b;font-size:11px;text-align:center}</style></head><body>
       <h1>Weekly Disease Summary Report</h1>
       <p><b>Scope:</b> ${scopeLabel} | <b>Period:</b> ${fmtDate(dateRange.start)} - ${fmtDate(dateRange.end)} | <b>Prepared by:</b> ${data.generatedBy}</p>
       <table style="width:100%;margin-bottom:20px"><tr>
         <td style="background:#eff6ff;padding:12px;border-radius:8px 0 0 8px;text-align:center"><div style="font-size:24px;font-weight:700;color:#1e3a8a">${summary.total_cases}</div><div style="font-size:11px;color:#64748b">Total Cases</div></td>
         <td style="background:#fef2f2;padding:12px;text-align:center"><div style="font-size:24px;font-weight:700;color:#DC2626">${summary.new_this_week}</div><div style="font-size:11px;color:#64748b">New This Week</div></td>
-        <td style="background:#fffbeb;padding:12px;text-align:center"><div style="font-size:24px;font-weight:700;color:#f59e0b">${summary.active_cases}</div><div style="font-size:11px;color:#64748b">Active</div></td>
+        <td style="background:#fffbeb;padding:12px;text-align:center"><div style="font-size:24px;font-weight:700;color:#D97706">${summary.active_cases}</div><div style="font-size:11px;color:#64748b">Active</div></td>
         <td style="background:#f0fdf4;padding:12px;border-radius:0 8px 8px 0;text-align:center"><div style="font-size:24px;font-weight:700;color:#129968">${summary.recovered}</div><div style="font-size:11px;color:#64748b">Recovered</div></td>
       </tr></table>
       <h2>Cases by Barangay</h2><table><thead><tr><th>Barangay</th><th style="text-align:right">Count</th><th>Distribution</th><th style="text-align:center">Risk</th></tr></thead><tbody>${barangayRows||'<tr><td colspan="4">No data</td></tr>'}</tbody></table>
@@ -282,7 +282,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
           </div>
         </div>
         {offlineMode && (
-          <div style={{ padding: '8px 14px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '13px', color: '#F59E0B' }}>
+          <div style={{ padding: '8px 14px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '13px', color: '#D97706' }}>
             Offline — showing last cached report
           </div>
         )}
@@ -313,8 +313,8 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
           <div style={{ fontSize: '28px', fontWeight: '700', color: '#DC2626' }}>{summary.new_this_week}</div>
           <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>New This Period</div>
         </div>
-        <div style={{ ...cardStyle, borderLeft: '3px solid #f59e0b' }}>
-          <div style={{ fontSize: '28px', fontWeight: '700', color: '#f59e0b' }}>{summary.active_cases}</div>
+        <div style={{ ...cardStyle, borderLeft: '3px solid #D97706' }}>
+          <div style={{ fontSize: '28px', fontWeight: '700', color: '#D97706' }}>{summary.active_cases}</div>
           <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>Active</div>
         </div>
         <div style={{ ...cardStyle, borderLeft: '3px solid #129968' }}>
@@ -391,7 +391,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
                 <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: '700', fontSize: '14px' }}>{d.count}</td>
                 <td style={{ padding: '10px 16px' }}>
                   <div style={{ background: 'var(--border-color)', borderRadius: '4px', height: '18px', overflow: 'hidden' }}>
-                    <div style={{ width: `${(d.count / maxDiseaseCount) * 100}%`, background: d.count / maxDiseaseCount >= 0.7 ? '#DC2626' : d.count / maxDiseaseCount >= 0.35 ? '#f59e0b' : '#129968', height: '100%', borderRadius: '4px', transition: 'width 0.5s ease' }} />
+                    <div style={{ width: `${(d.count / maxDiseaseCount) * 100}%`, background: d.count / maxDiseaseCount >= 0.7 ? '#DC2626' : d.count / maxDiseaseCount >= 0.35 ? '#D97706' : '#129968', height: '100%', borderRadius: '4px', transition: 'width 0.5s ease' }} />
                   </div>
                 </td>
               </tr>
@@ -455,11 +455,11 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
             )}
             {byBarangay.filter(b => b.count >= 10 && b.count < 20).length > 0 && (
               <div style={{ marginBottom: '12px' }}>
-                <div style={{ fontSize: '12px', fontWeight: '700', color: '#f59e0b', marginBottom: '6px' }}>MEDIUM RISK (10-19 cases)</div>
+                <div style={{ fontSize: '12px', fontWeight: '700', color: '#D97706', marginBottom: '6px' }}>MEDIUM RISK (10-19 cases)</div>
                 {byBarangay.filter(b => b.count >= 10 && b.count < 20).map(b => (
-                  <div key={b.barangay_name} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', background: '#f59e0b15', borderRadius: '6px', marginBottom: '4px', borderLeft: '3px solid #f59e0b' }}>
+                  <div key={b.barangay_name} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', background: '#D9770615', borderRadius: '6px', marginBottom: '4px', borderLeft: '3px solid #D97706' }}>
                     <span style={{ fontSize: '13px' }}>{b.barangay_name}</span>
-                    <span style={{ fontSize: '13px', fontWeight: '700', color: '#f59e0b' }}>{b.count} cases</span>
+                    <span style={{ fontSize: '13px', fontWeight: '700', color: '#D97706' }}>{b.count} cases</span>
                   </div>
                 ))}
               </div>

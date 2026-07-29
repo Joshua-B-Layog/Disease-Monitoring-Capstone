@@ -359,7 +359,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h2 style={{ margin: 0, fontSize: '22px', color: 'var(--text-h)', fontWeight: '700' }}>User Accounts</h2>
         {offlineMode && (
-          <span style={{ fontSize: '12px', color: '#F59E0B', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '6px', padding: '4px 10px' }}>
+          <span style={{ fontSize: '12px', color: '#D97706', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '6px', padding: '4px 10px' }}>
             Offline - showing cached data
           </span>
         )}
@@ -398,7 +398,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                   style={{
                     padding: '8px 12px', cursor: 'pointer', fontSize: '13px',
                     background: filterBarangay === 'All Barangays' ? 'var(--input-bg)' : 'transparent',
-                    color: filterBarangay === 'All Barangays' ? '#60A5FA' : 'var(--text-main)',
+                    color: filterBarangay === 'All Barangays' ? '#3B82F6' : 'var(--text-main)',
                     fontWeight: filterBarangay === 'All Barangays' ? '600' : '400',
                   }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--input-bg)'}
@@ -413,7 +413,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                     style={{
                       padding: '8px 12px', cursor: 'pointer', fontSize: '13px',
                       background: filterBarangay === b.name ? 'var(--input-bg)' : 'transparent',
-                      color: filterBarangay === b.name ? '#60A5FA' : 'var(--text-main)',
+                      color: filterBarangay === b.name ? '#3B82F6' : 'var(--text-main)',
                       fontWeight: filterBarangay === b.name ? '600' : '400',
                     }}
                     onMouseEnter={e => e.currentTarget.style.background = 'var(--input-bg)'}
@@ -436,7 +436,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                 {['All Status', 'Active', 'Inactive'].map(s => (
                   <button key={s} type="button"
                     onClick={() => { setFilterStatus(s); setStatusOpen(false); setCurrentPage(1); }}
-                    style={{ display: 'block', width: '100%', padding: '10px 14px', background: filterStatus === s ? 'var(--input-bg)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: filterStatus === s ? '#60A5FA' : 'var(--text-main)', cursor: 'pointer', fontWeight: filterStatus === s ? '600' : '400' }}
+                    style={{ display: 'block', width: '100%', padding: '10px 14px', background: filterStatus === s ? 'var(--input-bg)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: filterStatus === s ? '#3B82F6' : 'var(--text-main)', cursor: 'pointer', fontWeight: filterStatus === s ? '600' : '400' }}
                     onMouseEnter={e => { if (filterStatus !== s) e.target.style.background = 'var(--input-bg)'; }}
                     onMouseLeave={e => { if (filterStatus !== s) e.target.style.background = 'transparent'; }}>
                     {s}
@@ -530,7 +530,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                           onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                           onMouseLeave={e => e.currentTarget.style.opacity = '1'}
                           style={{ padding: '6px 10px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', borderRadius: '6px', cursor: offlineMode ? 'not-allowed' : 'pointer', opacity: offlineMode ? 0.4 : 1 }}>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#60A5FA" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                         </button>
                         <button onClick={() => {
                               if (confirmDelete) {
@@ -646,7 +646,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                       {[{ value: 'BHW', label: 'Barangay Health Worker (BHW)' }, { value: 'CHO', label: 'City Health Office (CHO)' }].map(r => (
                         <button key={r.value} type="button"
                           onClick={() => { setFormData({ ...formData, role: r.value, barangayId: '' }); setRoleOpen(false); }}
-                          style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.role === r.value ? 'var(--input-bg)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: formData.role === r.value ? '#60A5FA' : 'var(--text-main)', cursor: 'pointer', fontWeight: formData.role === r.value ? '600' : '400' }}
+                          style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.role === r.value ? 'var(--input-bg)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: formData.role === r.value ? '#3B82F6' : 'var(--text-main)', cursor: 'pointer', fontWeight: formData.role === r.value ? '600' : '400' }}
                           onMouseEnter={e => { if (formData.role !== r.value) e.target.style.background = 'var(--input-bg)'; }}
                           onMouseLeave={e => { if (formData.role !== r.value) e.target.style.background = 'transparent'; }}>
                           {r.label}
@@ -684,20 +684,20 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                           {visibleBarangayAssignOptions.length > 0 && <div style={{ padding: '6px 14px 2px', fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>CHO Unit I</div>}
                           {visibleBarangayAssignOptions.filter(b => unitIBarangays.includes(b)).map(b => (
                             <div key={b.id} onClick={() => { setFormData({ ...formData, barangayId: b.id }); setBarangayAssignOpen(false); }}
-                              style={{ padding: '8px 14px 8px 18px', cursor: 'pointer', fontSize: '14px', color: formData.barangayId === b.id ? '#60A5FA' : 'var(--text-main)', background: formData.barangayId === b.id ? 'var(--input-bg)' : 'transparent', fontWeight: formData.barangayId === b.id ? '600' : '400' }}>
+                              style={{ padding: '8px 14px 8px 18px', cursor: 'pointer', fontSize: '14px', color: formData.barangayId === b.id ? '#3B82F6' : 'var(--text-main)', background: formData.barangayId === b.id ? 'var(--input-bg)' : 'transparent', fontWeight: formData.barangayId === b.id ? '600' : '400' }}>
                               {b.name}
                             </div>
                           ))}
                           {visibleBarangayAssignOptions.filter(b => unitIIBarangays.includes(b)).length > 0 && <div style={{ padding: '8px 14px 2px', fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>CHO Unit II</div>}
                           {visibleBarangayAssignOptions.filter(b => unitIIBarangays.includes(b)).map(b => (
                             <div key={b.id} onClick={() => { setFormData({ ...formData, barangayId: b.id }); setBarangayAssignOpen(false); }}
-                              style={{ padding: '8px 14px 8px 18px', cursor: 'pointer', fontSize: '14px', color: formData.barangayId === b.id ? '#60A5FA' : 'var(--text-main)', background: formData.barangayId === b.id ? 'var(--input-bg)' : 'transparent', fontWeight: formData.barangayId === b.id ? '600' : '400' }}>
+                              style={{ padding: '8px 14px 8px 18px', cursor: 'pointer', fontSize: '14px', color: formData.barangayId === b.id ? '#3B82F6' : 'var(--text-main)', background: formData.barangayId === b.id ? 'var(--input-bg)' : 'transparent', fontWeight: formData.barangayId === b.id ? '600' : '400' }}>
                               {b.name}
                             </div>
                           ))}
                           {!showAllBarangayAssign && allBarangayAssignOptions.length > 5 && (
                             <div onClick={() => setShowAllBarangayAssign(true)}
-                              style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '13px', color: '#60A5FA', fontWeight: '600', borderTop: '1px solid var(--border-color)', textAlign: 'center' }}>
+                              style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '13px', color: '#3B82F6', fontWeight: '600', borderTop: '1px solid var(--border-color)', textAlign: 'center' }}>
                               Show all {allBarangayAssignOptions.length} barangays
                             </div>
                           )}
