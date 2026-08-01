@@ -704,11 +704,11 @@ export default function CHOSettings({
               Manage your account credentials, notifications, and core configuration behaviors.
             </p>
             <div className="menu-grid">
-              <NavigationCard title={t('Profile Settings')} icon="👤" view="profile" />
-              <NavigationCard title={t('Account Security')} icon="🔒" view="security" />
-              <NavigationCard title={t('Notifications')} icon="🔔" view="notifications" />
-              <NavigationCard title={t('System Preferences')} icon="⚙️" view="system" />
-              <NavigationCard title={t('Data Management')} icon="💾" view="data" isFullWidth />
+              <NavigationCard title={t('Profile Settings')} icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="#121358"><path d="m23.58 8.536-3.362-5.4-4.945 3.08v-6.216h-6.546v6.216l-4.945-3.08-3.362 5.4 5.563 3.464-5.563 3.464 3.362 5.4 4.945-3.08v6.216h6.546v-6.216l4.945 3.08 3.362-5.4-5.563-3.464z"/></svg>} view="profile" />
+              <NavigationCard title={t('Account Security')} icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="#2563EB"><path d="M19.944,2.642,12,.009,4.056,2.643A3,3,0,0,0,2,5.49V12c0,7.524,9.2,11.679,9.594,11.852l.354.157.368-.122C12.711,23.755,22,20.577,22,12V5.49A3,3,0,0,0,19.944,2.642Z"/></svg>} view="security" />
+              <NavigationCard title={t('Notifications')} icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="#D97706"><path d="M20,8c-2.21,0-4-1.79-4-4S17.79,0,20,0s4,1.79,4,4-1.79,4-4,4Zm-8,7.42c.77,0,1.54-.29,2.12-.88l4.67-4.67c-2.73-.56-4.79-2.98-4.79-5.88,0-.34,.04-.67,.09-1H5c-1.81,0-3.38,.97-4.26,2.41L9.88,14.55c.58,.58,1.35,.88,2.12,.88Zm9.76-5.69l-6.23,6.23c-.97,.97-2.26,1.46-3.54,1.46s-2.56-.49-3.54-1.46L.05,7.54c-.01,.15-.05,.3-.05,.46v11c0,2.76,2.24,5,5,5h14c2.76,0,5-2.24,5-5l-.02-10.53c-.64,.57-1.39,1-2.22,1.26Z"/></svg>} view="notifications" />
+              <NavigationCard title={t('System Preferences')} icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="#475569"><path d="M21,12a9.143,9.143,0,0,0-.15-1.645L23.893,8.6l-3-5.2L17.849,5.159A9,9,0,0,0,15,3.513V0H9V3.513A9,9,0,0,0,6.151,5.159L3.107,3.4l-3,5.2L3.15,10.355a9.1,9.1,0,0,0,0,3.29L.107,15.4l3,5.2,3.044-1.758A9,9,0,0,0,9,20.487V24h6V20.487a9,9,0,0,0,2.849-1.646L20.893,20.6l3-5.2L20.85,13.645A9.143,9.143,0,0,0,21,12Zm-6,0a3,3,0,1,1-3-3A3,3,0,0,1,15,12Z"/></svg>} view="system" />
+              <NavigationCard title={t('Data Management')} icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="#0891B2"><path d="m22.5 18c0-.46-.089-.895-.218-1.312l1.417-.816-.999-1.732-1.41.813c-.605-.652-1.393-1.126-2.289-1.331v-1.621h-2v1.621c-.896.205-1.685.678-2.289 1.331l-1.41-.813-.999 1.732 1.417.816c-.129.418-.218.853-.218 1.312s.089.895.218 1.312l-1.417.816.999 1.732 1.41-.813c.605.652 1.393 1.126 2.289 1.331v1.621h2v-1.621c.896-.205 1.685-.678 2.289-1.331l1.41.813.999-1.732-1.417-.816c.129-.418.218-.853.218-1.312zm-4.5 1.5c-.827 0-1.5-.673-1.5-1.5s.673-1.5 1.5-1.5 1.5.673 1.5 1.5-.673 1.5-1.5 1.5z"/></svg>} view="data" isFullWidth />
             </div>
           </div>
         )}
@@ -840,9 +840,7 @@ export default function CHOSettings({
             <div className="security-section-card">
               <div className="security-card-header">
                 <div className="security-icon-box">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                  </svg>
+                  <svg width="22" height="22" viewBox="0 0 512 512" fill="#D97706"><path d="M405.333,179.712v-30.379C405.333,66.859,338.475,0,256,0S106.667,66.859,106.667,149.333v30.379   c-38.826,16.945-63.944,55.259-64,97.621v128C42.737,464.214,90.452,511.93,149.333,512h213.333   c58.881-0.07,106.596-47.786,106.667-106.667v-128C469.278,234.971,444.159,196.657,405.333,179.712z M277.333,362.667   c0,11.782-9.551,21.333-21.333,21.333c-11.782,0-21.333-9.551-21.333-21.333V320c0-11.782,9.551-21.333,21.333-21.333   c11.782,0,21.333,9.551,21.333,21.333V362.667z M362.667,170.667H149.333v-21.333c0-58.91,47.756-106.667,106.667-106.667   s106.667,47.756,106.667,106.667V170.667z"/></svg>
                 </div>
                 <div className="security-header-text">
                   <h3>Change Password</h3>
@@ -906,9 +904,7 @@ export default function CHOSettings({
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div className="security-card-header" style={{ marginBottom: twoFaStep === 'idle' ? 0 : '16px', flex: 1 }}>
                   <div className="security-icon-box">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
-                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                    </svg>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="#2563EB"><path d="M19.944,2.642,12,.009,4.056,2.643A3,3,0,0,0,2,5.49V12c0,7.524,9.2,11.679,9.594,11.852l.354.157.368-.122C12.711,23.755,22,20.577,22,12V5.49A3,3,0,0,0,19.944,2.642Z"/></svg>
                   </div>
                   <div className="security-header-text">
                     <h3>Two-Factor Authentication</h3>
@@ -993,10 +989,7 @@ export default function CHOSettings({
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <div className="security-card-header" style={{ marginBottom: 0 }}>
                   <div className="security-icon-box" style={{ background: 'var(--input-bg)' }}>
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#129968" strokeWidth="2">
-                      <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
-                      <line x1="12" y1="18" x2="12.01" y2="18" />
-                    </svg>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="#64748B"><path d="M24,13V4a3,3,0,0,0-3-3H3A3,3,0,0,0,0,4v9Z"/><polygon points="24 19 24 15 0 15 0 19 11 19 11 21 6 21 6 23 18 23 18 21 13 21 13 19 24 19"/></svg>
                   </div>
                   <div className="security-header-text">
                     <h3>Login Sessions</h3>
@@ -1182,7 +1175,7 @@ export default function CHOSettings({
 
             {[
               {
-                icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
+                icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="#D97706"><path d="M20,8c-2.21,0-4-1.79-4-4S17.79,0,20,0s4,1.79,4,4-1.79,4-4,4Zm-8,7.42c.77,0,1.54-.29,2.12-.88l4.67-4.67c-2.73-.56-4.79-2.98-4.79-5.88,0-.34,.04-.67,.09-1H5c-1.81,0-3.38,.97-4.26,2.41L9.88,14.55c.58,.58,1.35,.88,2.12,.88Zm9.76-5.69l-6.23,6.23c-.97,.97-2.26,1.46-3.54,1.46s-2.56-.49-3.54-1.46L.05,7.54c-.01,.15-.05,.3-.05,.46v11c0,2.76,2.24,5,5,5h14c2.76,0,5-2.24,5-5l-.02-10.53c-.64,.57-1.39,1-2.22,1.26Z"/></svg>,
                 title: 'Notification Channels', subtitle: 'Choose how you want to receive notifications',
                 rows: [
                   { key: 'pushNotifications', label: 'Push Notifications', sub: 'Receive push notifications in browser' },
@@ -1191,7 +1184,7 @@ export default function CHOSettings({
                 ],
               },
               {
-                icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
+                icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="#EA580C"><path d="m21.976,10.015h-6.976c-1.654,0-3-1.346-3-3V.038c-.161-.011-.322-.024-.485-.024h-4.515C4.243.015,2,2.258,2,5.015v14c0,2.757,2.243,5,5,5h10c2.757,0,5-2.243,5-5v-8.515c0-.163-.013-.324-.024-.485Zm-10.976,1.985c0-.552.448-1,1-1s1,.448,1,1v3.5c0,.552-.448,1-1,1s-1-.448-1-1v-3.5Zm1,9c-.828,0-1.5-.672-1.5-1.5s.672-1.5,1.5-1.5,1.5.672,1.5,1.5-.672,1.5-1.5,1.5Zm2-13.985V.474c.913.346,1.753.879,2.465,1.59l3.484,3.486c.712.711,1.245,1.551,1.591,2.464h-6.54c-.552,0-1-.449-1-1Z"/></svg>,
                 title: 'Case Notifications', subtitle: 'Get notified about case activities',
                 rows: [
                   { key: 'newCaseReported', label: 'New Case Reported', sub: 'When a new case is reported in your barangay' },
@@ -1201,7 +1194,7 @@ export default function CHOSettings({
                 ],
               },
               {
-                icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
+                icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="#D97706"><path d="m20,0H4C1.794,0,0,1.794,0,4v12c0,2.206,1.794,4,4,4h2.923l3.749,3.157c.382.339.861.507,1.337.507.468,0,.931-.163,1.292-.484l3.848-3.18h2.852c2.206,0,4-1.794,4-4V4c0-2.206-1.794-4-4-4ZM7,12c-.828,0-1.5-.672-1.5-1.5s.672-1.5,1.5-1.5,1.5.672,1.5,1.5-.672,1.5-1.5,1.5Zm5,0c-.828,0-1.5-.672-1.5-1.5s.672-1.5,1.5-1.5,1.5.672,1.5,1.5-.672,1.5-1.5,1.5Zm5,0c-.828,0-1.5-.672-1.5-1.5s.672-1.5,1.5-1.5,1.5.672,1.5,1.5-.672,1.5-1.5,1.5Z"/></svg>,
                 title: 'System Notifications', subtitle: 'Updates about the system',
                 rows: [
                   { key: 'weeklySummary', label: 'Weekly Summary', sub: 'Receive a weekly summary of cases' },
@@ -1279,10 +1272,7 @@ export default function CHOSettings({
               <div className="security-section-card" style={{ marginTop: '24px', borderColor: '#fde68a' }}>
                 <div className="security-card-header">
                   <div className="security-icon-box" style={{ background: 'var(--input-bg)' }}>
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2">
-                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                      <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                    </svg>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="#DC2626"><path d="M20.5,8.48V3.5h-4.98L12-.02l-3.52,3.52H3.5v4.98L-.02,12l3.52,3.52v4.98h4.98l3.52,3.52,3.52-3.52h4.98v-4.98l3.52-3.52-3.52-3.52Zm-7.5,9.52h-2v-2h2v2Zm0-4h-2V6h2V14Z"/></svg>
                   </div>
                   <div className="security-header-text">
                     <h3>Send Maintenance Notice</h3>
@@ -1359,10 +1349,7 @@ export default function CHOSettings({
             <div className="security-section-card">
               <div className="security-card-header">
                 <div className="security-icon-box">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
-                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-                    <line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
-                  </svg>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="#9333EA"><path d="m15.988,11.726c.158,1.78-1.24,3.274-2.988,3.274h-3.978c-.691,0-1.181-.666-.975-1.325.502-1.609,1.936-4.165,4.24-4.608,1.755-.338,3.542.879,3.7,2.659Zm.034-3.662c.74.558,1.279,1.309,1.611,2.141l5.659-6.085c.943-.942.945-2.47.003-3.413-.941-.942-2.467-.943-3.409-.002-.032.032-5.573,6.513-5.573,6.513.609.175,1.191.456,1.708.846Zm.667,7.312c-.944,1.032-2.289,1.625-3.688,1.625h-3.978c-.958,0-1.868-.46-2.435-1.23s-.735-1.776-.45-2.69c.729-2.332,2.621-5.229,5.565-5.915l4.388-5.164H5C2.243,2,0,4.243,0,7v8c0,2.757,2.243,5,5,5h6v2h-3c-.552,0-1,.447-1,1s.448,1,1,1h8c.553,0,1-.447,1-1s-.447-1-1-1h-3v-2h6c2.757,0,5-2.243,5-5V6.285l-6.091,6.546c-.16.94-.568,1.83-1.22,2.543Z"/></svg>
                 </div>
                 <div className="security-header-text">
                   <h3>Appearance</h3>
@@ -1410,11 +1397,7 @@ export default function CHOSettings({
             <div className="security-section-card">
               <div className="security-card-header">
                 <div className="security-icon-box">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10"/>
-                    <line x1="2" y1="12" x2="22" y2="12"/>
-                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-                  </svg>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="#0D9488"><path d="M24,7v2c0,.552-.448,1-1,1s-1-.448-1-1v-2c0-1.103-.897-2-2-2h-2.029l1.25,1.307c.383,.398,.371,1.031-.028,1.414-.194,.187-.443,.279-.693,.279-.262,0-.524-.103-.721-.307l-2.212-2.301c-.761-.761-.761-2.023,.013-2.798L17.779,.307c.383-.398,1.017-.41,1.414-.028,.398,.383,.411,1.016,.028,1.414l-1.257,1.307h2.036c2.206,0,4,1.794,4,4ZM6.221,16.307c-.383-.398-1.016-.409-1.414-.027-.398,.383-.411,1.016-.028,1.414l1.25,1.307h-2.029c-1.103,0-2-.897-2-2v-2c0-.553-.448-1-1-1s-1,.447-1,1v2c0,2.206,1.794,4,4,4h2.035l-1.256,1.307c-.383,.398-.371,1.031,.028,1.414,.194,.187,.443,.279,.693,.279,.262,0,.524-.103,.721-.307l2.199-2.288c.773-.774,.773-2.036,.013-2.798l-2.212-2.301Zm5.779-8.307c0,2.209-1.791,4-4,4H4c-2.209,0-4-1.791-4-4V4C0,1.791,1.791,0,4,0h4c2.209,0,4,1.791,4,4v4Zm-2.5-4.384c0-.34-.276-.616-.616-.616h-2.257v-.384c0-.34-.276-.616-.616-.616h-.021c-.34,0-.616,.276-.616,.616v.384H3.116c-.34,0-.616,.276-.616,.616v.021c0,.34,.276,.616,.616,.616H7.308c-.111,.963-.484,2.151-1.303,3.071-.276-.31-.507-.648-.692-1-.106-.202-.318-.325-.545-.325-.464,0-.769,.492-.553,.903,.225,.43,.501,.843,.83,1.22-.539,.328-1.189,.559-1.977,.635-.32,.031-.568,.293-.568,.614v.021c0,.365,.316,.648,.679,.614,1.146-.107,2.079-.485,2.832-1.022,.749,.533,1.671,.913,2.808,1.022,.364,.035,.68-.248,.68-.613v-.021c0-.316-.24-.583-.555-.613-.792-.075-1.442-.31-1.984-.639,.99-1.135,1.485-2.591,1.607-3.866h.316c.34,0,.616-.276,.616-.616v-.021Z"/></svg>
                 </div>
                 <div className="security-header-text">
                   <h3>Language & Region</h3>
@@ -1469,11 +1452,7 @@ export default function CHOSettings({
             <div className="security-section-card">
               <div className="security-card-header">
                 <div className="security-icon-box">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
-                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-                    <line x1="8" y1="21" x2="16" y2="21"/>
-                    <line x1="12" y1="17" x2="12" y2="21"/>
-                  </svg>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="#8B5CF6"><path d="m23.265 8.379-.983-.567c.129-.418.218-.853.218-1.313s-.09-.895-.218-1.313l.983-.567c.479-.275.643-.887.367-1.366-.276-.478-.886-.643-1.366-.367l-.977.563c-.605-.652-1.393-1.126-2.289-1.33v-1.121c0-.552-.448-1-1-1s-1 .448-1 1v1.121c-.896.205-1.685.678-2.289 1.33l-.977-.563c-.48-.276-1.09-.112-1.366.367s-.112 1.09.367 1.366l.983.567c-.129.418-.218.853-.218 1.313s.09.895.218 1.313l-.983.567c-.479.275-.643.887-.367 1.366.277.482.895.64 1.366.367l.977-.563c.605.652 1.393 1.126 2.289 1.33v1.121c0 .552.448 1 1 1s1-.448 1-1v-1.121c.896-.205 1.685-.678 2.289-1.33l.977.563c.47.273 1.088.116 1.366-.367.276-.479.112-1.09-.367-1.366zm-5.265-.379c-.827 0-1.5-.673-1.5-1.5s.673-1.5 1.5-1.5 1.5.673 1.5 1.5-.673 1.5-1.5 1.5zm6 4.52v2.48c0 2.757-2.243 5-5 5h-6v2h4c.552 0 1 .448 1 1s-.448 1-1 1h-10c-.552 0-1-.448-1-1s.448-1 1-1h4v-2h-6c-2.757 0-5-2.243-5-5v-8c0-2.757 2.243-5 5-5h5.798c-.818 1.306-1.298 2.845-1.298 4.5 0 4.694 3.806 8.5 8.5 8.5 2.342 0 4.463-.948 6-2.48z"/></svg>
                 </div>
                 <div className="security-header-text">
                   <h3>System Behavior</h3>
@@ -1525,10 +1504,7 @@ export default function CHOSettings({
             <div className="security-section-card">
               <div className="security-card-header">
                 <div className="security-icon-box">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
-                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
-                  </svg>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="#0891B2"><path d="m22.5 18c0-.46-.089-.895-.218-1.312l1.417-.816-.999-1.732-1.41.813c-.605-.652-1.393-1.126-2.289-1.331v-1.621h-2v1.621c-.896.205-1.685.678-2.289 1.331l-1.41-.813-.999 1.732 1.417.816c-.129.418-.218.853-.218 1.312s.089.895.218 1.312l-1.417.816.999 1.732 1.41-.813c.605.652 1.393 1.126 2.289 1.331v1.621h2v-1.621c.896-.205 1.685-.678 2.289-1.331l1.41.813.999-1.732-1.417-.816c.129-.418.218-.853.218-1.312zm-4.5 1.5c-.827 0-1.5-.673-1.5-1.5s.673-1.5 1.5-1.5 1.5.673 1.5 1.5-.673 1.5-1.5 1.5zm-18-8.933v-2.167c1.876 1.596 4.92 2.6 8.5 2.6s6.624-1.004 8.5-2.6v1.669c-2.455.307-4.559 1.724-5.802 3.735-.841.124-1.745.196-2.698.196-4.865 0-8.5-1.812-8.5-3.433zm0-6.067c0-2.485 3.806-4.5 8.5-4.5s8.5 2.015 8.5 4.5-3.806 4.5-8.5 4.5-8.5-2.015-8.5-4.5zm0 11.066v-1.74c1.876 1.334 4.92 2.174 8.5 2.174.614 0 1.204-.033 1.783-.081-.179.665-.283 1.36-.283 2.081 0 .316.023.627.059.933-.504.041-1.022.067-1.559.067-4.865 0-8.5-1.812-8.5-3.434zm10.549 5.329c.395 1.016.987 1.932 1.736 2.697-1.183.27-2.485.408-3.784.408-4.224 0-8.5-1.447-8.5-4.214v-.96c1.876 1.334 4.92 2.174 8.5 2.174.708 0 1.387-.042 2.049-.105z"/></svg>
                 </div>
                 <div className="security-header-text">
                   <h3>Storage Overview</h3>
@@ -1563,10 +1539,7 @@ export default function CHOSettings({
             <div className="security-section-card">
               <div className="security-card-header">
                 <div className="security-icon-box">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                  </svg>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="#129968"><path d="M23.13,18.09l-1.61,1.61c-.2,.2-.45,.29-.71,.29s-.51-.1-.71-.29c-.39-.39-.39-1.02,0-1.41l1.29-1.29h-7.4c-.55,0-1-.45-1-1s.45-1,1-1h7.4l-1.29-1.29c-.39-.39-.39-1.02,0-1.41s1.02-.39,1.41,0l1.61,1.61c1.15,1.15,1.15,3.03,0,4.19ZM13,8h6.54c-.35-.91-.88-1.75-1.59-2.46l-3.48-3.49c-.71-.71-1.55-1.24-2.46-1.59V7c0,.55,.45,1,1,1Zm4.81,11h-3.81c-1.65,0-3-1.35-3-3s1.35-3,3-3h3.81c0-.77,.29-1.54,.88-2.12,.37-.37,.82-.63,1.29-.76v-.12h-6.98c-1.65,0-3-1.35-3-3V.02c-.16-.01-.32-.02-.49-.02H5C2.24,0,0,2.24,0,5v14c0,2.76,2.24,5,5,5H15c1.81,0,3.4-.97,4.28-2.42-.21-.13-.41-.28-.59-.46-.58-.58-.88-1.35-.88-2.12Z"/></svg>
                 </div>
                 <div className="security-header-text">
                   <h3>Export Data</h3>
@@ -1698,9 +1671,7 @@ export default function CHOSettings({
               <div className="security-section-card">
                 <div className="security-card-header">
                   <div className="security-icon-box">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
-                      <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-                    </svg>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="#0D9488"><path d="m8.5,16c3.58,0,6.624-.839,8.5-2.173v1.74c0,1.621-3.635,3.434-8.5,3.434S0,17.188,0,15.566v-1.74c1.876,1.334,4.92,2.174,8.5,2.174ZM0,18.826v.96c0,2.767,4.276,4.214,8.5,4.214s8.5-1.447,8.5-4.214v-.96c-1.876,1.334-4.92,2.174-8.5,2.174s-6.624-.839-8.5-2.174ZM22,0v1.534c-1.078-.97-2.482-1.534-4-1.534-2.967,0-5.431,2.167-5.91,5h2.052c.447-1.72,1.999-3,3.858-3,1,0,1.928.367,2.644,1h-1.644v2h5V0h-2Zm-4,10c-.994,0-1.929-.368-2.646-1h1.646v-2h-5v5h2v-1.531c1.08.966,2.494,1.531,4,1.531,2.967,0,5.431-2.167,5.91-5h-2.052c-.447,1.72-1.999,3-3.858,3Zm-9.5-1c.513,0,1.012-.028,1.5-.074v-2.926c0-2.151.854-4.1,2.235-5.538-1.128-.293-2.393-.462-3.735-.462C3.806,0,0,2.015,0,4.5s3.806,4.5,8.5,4.5Zm0,5c.516,0,1.015-.024,1.5-.063v-3.003c-.489.04-.987.066-1.5.066-3.58,0-6.624-1.004-8.5-2.6v2.167c0,1.621,3.635,3.433,8.5,3.433Z"/></svg>
                   </div>
                   <div className="security-header-text">
                     <h3>Backup & Restore</h3>
@@ -1796,7 +1767,7 @@ export default function CHOSettings({
               <div className="security-section-card" style={{ borderColor: 'var(--border-color)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
                   <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(18,153,104,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ fontSize: '18px' }}>🔄</span>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="#2563EB"><path d="M0,7v-3c0-.552,.448-1,1-1s1,.448,1,1v1.412C4.21,2.067,7.966,0,12,0c6.253,0,11.391,4.69,11.951,10.91,.05,.55-.356,1.036-.906,1.086-.03,.002-.061,.004-.091,.004-.512,0-.948-.391-.995-.91-.467-5.182-4.748-9.09-9.959-9.09-3.559,0-6.878,1.916-8.662,5h1.662c.552,0,1,.448,1,1s-.448,1-1,1H2c-1.103,0-2-.897-2-2ZM22,15h-3c-.553,0-1,.447-1,1s.447,1,1,1h1.662c-1.785,3.084-5.104,5-8.662,5-5.21,0-9.492-3.908-9.959-9.09-.049-.549-.523-.944-1.086-.906C.405,12.054,0,12.54,.049,13.09c.561,6.22,5.699,10.91,11.951,10.91,4.033,0,7.79-2.068,10-5.413v1.413c0,.553,.447,1,1,1s1-.447,1-1v-3c0-1.103-.897-2-2-2ZM14,7c1.105,0,2,.895,2,2v6c0,1.105-.895,2-2,2h-4c-1.105,0-2-.895-2-2v-6c0-1.105,.895-2,2-2h4Zm-1,7c0-.552-.448-1-1-1h-1c-.552,0-1,.448-1,1s.448,1,1,1h1c.552,0,1-.448,1-1Zm1-4c0-.552-.448-1-1-1h-2c-.552,0-1,.448-1,1s.448,1,1,1h2c.552,0,1-.448,1-1Z"/></svg>
                   </div>
                   <div>
                     <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: 'var(--text-main)' }}>Offline Sync</h3>
@@ -1810,10 +1781,7 @@ export default function CHOSettings({
               {/* Danger Zone */}
               <div className="security-section-card" style={{ borderColor: 'var(--border-color)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                    <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                  </svg>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="#DC2626"><path d="M20.5,8.48V3.5h-4.98L12-.02l-3.52,3.52H3.5v4.98L-.02,12l3.52,3.52v4.98h4.98l3.52,3.52,3.52-3.52h4.98v-4.98l3.52-3.52-3.52-3.52Zm-7.5,9.52h-2v-2h2v2Zm0-4h-2V6h2V14Z"/></svg>
                   <div>
                     <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#dc2626' }}>Danger Zone</h3>
                     <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Irreversible actions</span>
@@ -1826,7 +1794,8 @@ export default function CHOSettings({
                     <div style={{ fontSize: '13px', color: '#991b1b' }}>This will permanently delete all your data. This action cannot be undone.</div>
                   </div>
                   <button onClick={() => setShowClearModal(true)} disabled={offlineMode} style={{ ...offlineBtnStyle, padding: '10px 20px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '13px', fontWeight: '600', color: '#dc2626', cursor: offlineMode ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }} title={offlineMode ? 'Unavailable offline' : ''}>
-                    🗑️ Clear Data
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                    Clear Data
                   </button>
                 </div>
               </div>
