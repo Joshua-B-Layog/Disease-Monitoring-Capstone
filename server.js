@@ -83,6 +83,8 @@ function isSameBarangay(name1, name2) {
 
 const app = express();
 
+const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+
 // ==========================================
 // 2. MIDDLEWARE
 // ==========================================
@@ -118,6 +120,16 @@ db.query("SHOW COLUMNS FROM users LIKE 'initial_password'", (err, rows) => {
         db.query("ALTER TABLE users ADD COLUMN initial_password VARCHAR(255) DEFAULT NULL AFTER password", (alterErr) => {
             if (alterErr) console.error('Migration error adding initial_password:', alterErr.message);
             else console.log('Migration: added initial_password column to users table');
+        });
+    }
+});
+
+// Add updated_at column to disease_cases if missing (required for offline sync conflict detection)
+db.query("SHOW COLUMNS FROM disease_cases LIKE 'updated_at'", (err, rows) => {
+    if (!err && rows.length === 0) {
+        db.query("ALTER TABLE disease_cases ADD COLUMN updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER date_reported", (alterErr) => {
+            if (alterErr) console.error('Migration error adding updated_at:', alterErr.message);
+            else console.log('Migration: added updated_at column to disease_cases table');
         });
     }
 });
@@ -602,17 +614,18 @@ app.post('/api/cases', (req, res) => {
             let diseaseId = diseaseResults && diseaseResults.length > 0 ? diseaseResults[0].id : null;
 
             const doInsert = (dId) => {
+            const reportTs = (req.body && req.body._offlineTimestamp) ? new Date(req.body._offlineTimestamp) : null;
             const insertQuery = `
                 INSERT INTO disease_cases 
                 (patient_name, disease_id, age, severity, gender, status, contact, 
                  onset_date, address, barangay_id, symptoms, physician, latitude, longitude, date_reported)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, NOW()))
             `;
             const vals = [
                 patient_name, dId, age || 0, severity, gender || 'Male',
                 status || 'Active', contact || null, onset_date || null, address || null,
                 barangay_id || null, symptoms || null, physician || null,
-                latitude || null, longitude || null
+                latitude || null, longitude || null, reportTs
             ];
 
             db.query(insertQuery, vals, (insertErr, result) => {
@@ -623,7 +636,9 @@ app.post('/api/cases', (req, res) => {
                 console.log("Case inserted, ID:", result.insertId);
 
                 // Write audit log entry
-                const auditUserId = (req.body && req.body.user_id) || null;
+                const isOfflineCreate = !!(req.body && req.body._offlineTimestamp);
+                const auditUserId = (req.body && (req.body.user_id || req.body._offlineUserId)) || null;
+                const auditAction = isOfflineCreate ? 'Synced Case (Offline)' : 'Created';
                 const auditDisease = disease_name || 'Unknown Disease';
                 const auditPatient = patient_name || 'Unknown Patient';
                 if (auditUserId) {
@@ -634,7 +649,7 @@ app.post('/api/cases', (req, res) => {
                         const brgy = (!bErr && bRes.length > 0) ? bRes[0].name : null;
                         db.query(
                           'INSERT INTO audit_logs (user_id, user_name, user_role, barangay, action, entity, details) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                          [auditUserId, u.full_name, u.role, brgy, 'Created', 'Case Record',
+                          [auditUserId, u.full_name, u.role, brgy, auditAction, 'Case Record',
                            `Added new ${auditDisease} case for ${auditPatient} (Case ID: ${result.insertId})`],
                           (aErr) => { if (aErr) console.error('Audit log error:', aErr.message); }
                         );
@@ -1164,6 +1179,8 @@ app.put('/api/cases/:id', (req, res) => {
         let diseaseId = diseaseResults && diseaseResults.length > 0 ? diseaseResults[0].id : null;
 
         const doUpdate = (dId) => {
+            const offlineTs = (req.body && req.body._offlineTimestamp) ? new Date(req.body._offlineTimestamp).getTime() : 0;
+            const applyUpdate = () => {
             const updateQuery = `
                 UPDATE disease_cases SET
                     patient_name = ?, disease_id = ?, age = ?, severity = ?, gender = ?,
@@ -1190,7 +1207,9 @@ app.put('/api/cases/:id', (req, res) => {
                 console.log("Case updated:", id);
 
                 // Write audit log entry
-                const auditUserId = (req.body && req.body.user_id) || null;
+                const isOfflineEdit = !!(req.body && req.body._offlineTimestamp);
+                const auditUserId = (req.body && (req.body.user_id || req.body._offlineUserId)) || null;
+                const auditAction = isOfflineEdit ? 'Synced Edit (Offline)' : 'Updated';
                 const auditDisease = disease_name || 'Unknown Disease';
                 const auditPatient = patient_name || 'Unknown Patient';
                 if (auditUserId) {
@@ -1201,7 +1220,7 @@ app.put('/api/cases/:id', (req, res) => {
                         const brgy = (!bErr && bRes.length > 0) ? bRes[0].name : null;
                         db.query(
                           'INSERT INTO audit_logs (user_id, user_name, user_role, barangay, action, entity, details) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                          [auditUserId, u.full_name, u.role, brgy, 'Updated', 'Case Record',
+                          [auditUserId, u.full_name, u.role, brgy, auditAction, 'Case Record',
                            `Updated ${auditDisease} case for ${auditPatient} (Case ID: ${id})`],
                           (aErr) => { if (aErr) console.error('Audit log error:', aErr.message); }
                         );
@@ -1261,6 +1280,19 @@ app.put('/api/cases/:id', (req, res) => {
 
                 return res.status(200).json({ message: 'Case updated successfully' });
             });
+            };
+            if (offlineTs) {
+                db.query('SELECT updated_at FROM disease_cases WHERE case_id = ?', [id], (cErr, cRows) => {
+                    if (cErr) return res.status(500).json({ error: cErr.message });
+                    const serverTs = cRows[0] && cRows[0].updated_at ? new Date(cRows[0].updated_at).getTime() : 0;
+                    if (serverTs > offlineTs && serverTs > 0) {
+                        return res.status(409).json({ error: 'Conflict detected: this case was updated by someone else while you were offline.', _conflict: { caseId: id, serverUpdated: new Date(serverTs).toISOString(), offlineTimestamp: new Date(offlineTs).toISOString() } });
+                    }
+                    applyUpdate();
+                });
+            } else {
+                applyUpdate();
+            }
         };
 
         if (contact && contact.trim()) {
@@ -1424,7 +1456,9 @@ app.delete('/api/cases/:id', (req, res) => {
             }
             
             // Write audit log entry
-            const auditUserId = (req.body && req.body.user_id) || null;
+            const isOfflineDelete = !!(req.body && req.body._offlineTimestamp);
+            const auditUserId = (req.body && (req.body.user_id || req.body._offlineUserId)) || null;
+            const auditAction = isOfflineDelete ? 'Synced Delete (Offline)' : 'Deleted';
             const auditDisease = disease_name || 'Unknown Disease';
             const auditPatient = patient_name || 'Unknown Patient';
             if (auditUserId) {
@@ -1435,7 +1469,7 @@ app.delete('/api/cases/:id', (req, res) => {
                     const brgy = (!bErr && bRes.length > 0) ? bRes[0].name : null;
                     db.query(
                       'INSERT INTO audit_logs (user_id, user_name, user_role, barangay, action, entity, details) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                      [auditUserId, u.full_name, u.role, brgy, 'Deleted', 'Case Record',
+                      [auditUserId, u.full_name, u.role, brgy, auditAction, 'Case Record',
                        `Deleted case for ${auditPatient} (${auditDisease}) in Barangay ${barangay_name || 'N/A'} (Case ID: ${id})`],
                       (aErr) => { if (aErr) console.error('Audit log error:', aErr.message); }
                     );
@@ -1789,33 +1823,72 @@ app.post('/api/sync', (req, res) => {
 
         if (type === 'create' && endpoint === '/api/cases') {
             const p = payload || {};
-            const insertQuery = `
-                INSERT INTO disease_cases
-                    (patient_name, disease_name, age, severity, gender, status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude, user_id, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `;
-            const ts = p._offlineTimestamp ? new Date(p._offlineTimestamp) : new Date();
-            db.query(insertQuery, [
-                p.patient_name, p.disease_name, p.age, p.severity || 'Moderate',
-                p.gender || 'Other', p.status || 'Active', p.contact,
-                p.onset_date, p.address, p.barangay_id, p.symptoms,
-                p.physician, p.latitude, p.longitude, p._offlineUserId || p.user_id || null, ts
-            ], (err, result) => {
-                if (err) {
-                    console.error('[Sync] Create failed:', err.message);
-                    results.push({ type, error: err.message });
-                } else {
-                    processed++;
-                    results.push({ type, newCaseId: result.insertId });
-                    if (p._offlineUserId) {
-                        createAuditLog(p._offlineUserId, p._offlineUserName || 'Offline User', null, null, null, 'Synced Case (Offline)', 'Disease Case', `Offline case synced: ${p.patient_name} — ${p.disease_name}`);
+            const doInsert = (dId) => {
+                const insertQuery = `
+                    INSERT INTO disease_cases
+                        (patient_name, disease_id, age, severity, gender, status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude, date_reported)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `;
+                const ts = p._offlineTimestamp ? new Date(p._offlineTimestamp) : new Date();
+                db.query(insertQuery, [
+                    p.patient_name, dId, p.age, p.severity || 'Moderate',
+                    p.gender || 'Other', p.status || 'Active', p.contact,
+                    p.onset_date, p.address, p.barangay_id, p.symptoms,
+                    p.physician, p.latitude, p.longitude, ts
+                ], (err, result) => {
+                    if (err) {
+                        console.error('[Sync] Create failed:', err.message);
+                        results.push({ type, error: err.message });
+                    } else {
+                        processed++;
+                        results.push({ type, newCaseId: result.insertId });
+                        if (p._offlineUserId) {
+                            createAuditLog(p._offlineUserId, p._offlineUserName || 'Offline User', null, null, null, 'Synced Case (Offline)', 'Disease Case', `Offline case synced: ${p.patient_name} — ${p.disease_name}`);
+                        }
                     }
+                    processNext(index + 1);
+                });
+            };
+            const findDiseaseQuery = 'SELECT id FROM diseases WHERE LOWER(name) = LOWER(?)';
+            db.query(findDiseaseQuery, [p.disease_name], (dErr, diseaseResults) => {
+                let diseaseId = diseaseResults && diseaseResults.length > 0 ? diseaseResults[0].id : null;
+                if (!diseaseId && p.disease_name) {
+                    db.query('INSERT IGNORE INTO diseases (name) VALUES (?)', [p.disease_name], (iErr, iResult) => {
+                        const newId = iResult && iResult.insertId ? iResult.insertId : null;
+                        doInsert(newId);
+                    });
+                } else {
+                    doInsert(diseaseId);
                 }
-                processNext(index + 1);
             });
         } else if (type === 'edit' && endpoint && endpoint.startsWith('/api/cases/')) {
             const caseId = endpoint.split('/').pop();
             const p = payload || {};
+            const doEdit = (dId) => {
+                const updateQuery = `
+                    UPDATE disease_cases SET
+                        patient_name=?, disease_id=?, age=?, severity=?, gender=?, status=?,
+                        contact=?, onset_date=?, address=?, barangay_id=?, symptoms=?,
+                        physician=?, latitude=?, longitude=?, updated_at=NOW()
+                    WHERE case_id=?
+                `;
+                db.query(updateQuery, [
+                    p.patient_name, dId, p.age, p.severity,
+                    p.gender, p.status, p.contact, p.onset_date, p.address,
+                    p.barangay_id, p.symptoms, p.physician, p.latitude, p.longitude, caseId
+                ], (err) => {
+                    if (err) {
+                        results.push({ type, error: err.message });
+                    } else {
+                        processed++;
+                        results.push({ type, caseId });
+                        if (p._offlineUserId) {
+                            createAuditLog(p._offlineUserId, p._offlineUserName || 'Offline User', null, null, null, 'Synced Edit (Offline)', 'Disease Case', `Offline edit synced for case #${caseId}`);
+                        }
+                    }
+                    processNext(index + 1);
+                });
+            };
             db.query(
                 `SELECT updated_at FROM disease_cases WHERE case_id = ?`, [caseId],
                 (selErr, rows) => {
@@ -1830,28 +1903,17 @@ app.post('/api/sync', (req, res) => {
                         results.push({ type, conflict: true, caseId });
                         return processNext(index + 1);
                     }
-                    const updateQuery = `
-                        UPDATE disease_cases SET
-                            patient_name=?, disease_name=?, age=?, severity=?, gender=?, status=?,
-                            contact=?, onset_date=?, address=?, barangay_id=?, symptoms=?,
-                            physician=?, latitude=?, longitude=?, updated_at=NOW()
-                        WHERE case_id=?
-                    `;
-                    db.query(updateQuery, [
-                        p.patient_name, p.disease_name, p.age, p.severity,
-                        p.gender, p.status, p.contact, p.onset_date, p.address,
-                        p.barangay_id, p.symptoms, p.physician, p.latitude, p.longitude, caseId
-                    ], (err) => {
-                        if (err) {
-                            results.push({ type, error: err.message });
+                    const findDiseaseQuery = 'SELECT id FROM diseases WHERE LOWER(name) = LOWER(?)';
+                    db.query(findDiseaseQuery, [p.disease_name], (dErr, dRows) => {
+                        const dId = dRows && dRows.length > 0 ? dRows[0].id : null;
+                        if (!dId && p.disease_name) {
+                            db.query('INSERT IGNORE INTO diseases (name) VALUES (?)', [p.disease_name], (iErr, iResult) => {
+                                const newId = iResult && iResult.insertId ? iResult.insertId : null;
+                                doEdit(newId);
+                            });
                         } else {
-                            processed++;
-                            results.push({ type, caseId });
-                            if (p._offlineUserId) {
-                                createAuditLog(p._offlineUserId, p._offlineUserName || 'Offline User', null, null, null, 'Synced Edit (Offline)', 'Disease Case', `Offline edit synced for case #${caseId}`);
-                            }
+                            doEdit(dId);
                         }
-                        processNext(index + 1);
                     });
                 }
             );
@@ -1871,9 +1933,10 @@ app.post('/api/sync', (req, res) => {
             });
         } else if (type === 'message' && endpoint === '/api/contact-messages') {
             const p = payload || {};
+            const detectedBarangay = detectBarangayFromAddress(p.address);
             db.query(
-                `INSERT INTO contact_messages (name, email, mobile, barangay, disease_name, message, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'new', ?)`,
-                [p.name, p.email, p.mobile, p.barangay, p.disease_name, p.message, new Date(p._offlineTimestamp || Date.now())],
+                `INSERT INTO contact_messages (name, target_cho_unit, disease_name, message, age, gender, contact_no, address, barangay, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [p.name, p.targetCho || null, p.disease || p.disease_name || null, p.message, p.age || null, p.gender || null, p.contact || p.mobile || null, p.address || null, detectedBarangay || p.barangay || null, new Date(p._offlineTimestamp || Date.now())],
                 (err) => {
                     if (err) {
                         results.push({ type, error: err.message });
@@ -2042,7 +2105,7 @@ app.post('/api/forgot-password', (req, res) => {
                 return res.status(500).json({ error: 'Failed to save reset token: ' + updateErr.message });
             }
 
-            const resetLink = `http://localhost:3000/reset-password?token=${token}&email=${encodeURIComponent(userFound.email)}`;
+            const resetLink = `${FRONTEND_URL}/reset-password?token=${token}&email=${encodeURIComponent(userFound.email)}`;
 
             const mailOptions = {
                 from: `"Cabuyao Health System" <${process.env.BREVO_FROM}>`,
@@ -2203,7 +2266,7 @@ app.post('/api/send-2fa-email', (req, res) => {
             [token, expiry, userId], async (updateErr) => {
             if (updateErr) return res.status(500).json({ error: 'Failed to save verification token.' });
 
-            const verifyLink = `http://localhost:3000/verify-2fa?token=${token}&userId=${userId}`;
+            const verifyLink = `${FRONTEND_URL}/verify-2fa?token=${token}&userId=${userId}`;
 
             try {
                 await sendBrevoEmail(user.email, 'Cabuyao Health - Verify Your Email for 2FA', `
