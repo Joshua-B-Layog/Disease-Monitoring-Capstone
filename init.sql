@@ -64,7 +64,10 @@ INSERT INTO `barangays` (`id`, `name`) VALUES
 
 CREATE TABLE `diseases` (
   `id` int(11) NOT NULL,
-  `name` varchar(100) NOT NULL
+  `name` varchar(100) NOT NULL,
+  `icon` varchar(100) DEFAULT NULL,
+  `color` varchar(20) DEFAULT NULL,
+  `description` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -100,6 +103,39 @@ INSERT INTO `diseases` (`id`, `name`) VALUES
 (27, 'Sore Eyes'),
 (1, 'Tuberculosis'),
 (2, 'Typhoid Fever');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `disease_categories`
+--
+
+CREATE TABLE IF NOT EXISTS `disease_categories` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  `icon` varchar(100) DEFAULT NULL,
+  `color` varchar(20) DEFAULT NULL,
+  `description` varchar(255) DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `disease_category_items`
+--
+
+CREATE TABLE IF NOT EXISTS `disease_category_items` (
+  `category_id` int(11) NOT NULL,
+  `disease_id` int(11) NOT NULL,
+  PRIMARY KEY (`category_id`,`disease_id`),
+  KEY `disease_id` (`disease_id`),
+  CONSTRAINT `dci_ibfk_1` FOREIGN KEY (`category_id`) REFERENCES `disease_categories` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `dci_ibfk_2` FOREIGN KEY (`disease_id`) REFERENCES `diseases` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 

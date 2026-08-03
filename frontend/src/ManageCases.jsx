@@ -36,6 +36,44 @@ const TyphoidIcon = ({ color = '#8b5cf6', size = 28 }) => (
   </svg>
 );
 
+// ── Icon token system: icons are stored as serializable tokens so they survive the DB round-trip ──
+const SVG_ICON_DEFS = [
+  { token: 'svg:fever', name: 'Fever', render: () => <FeverIcon color="#ef4444" /> },
+  { token: 'svg:flu-a', name: 'Influenza A', render: () => <InfluenzaAIcon color="#D97706" /> },
+  { token: 'svg:leptospirosis', name: 'Leptospirosis', render: () => <LeptospirosisIcon color="#129968" /> },
+  { token: 'svg:tuberculosis', name: 'Tuberculosis', render: () => <TuberculosisIcon color="#F97316" /> },
+  { token: 'svg:typhoid', name: 'Typhoid', render: () => <TyphoidIcon color="#8B5CF6" /> },
+];
+
+// Maps each built-in SVG disease to its token
+const SVG_ENTRY_TOKEN = {
+  'Dengue Fever': 'svg:fever',
+  'Influenza A': 'svg:flu-a',
+  'Leptospirosis': 'svg:leptospirosis',
+  'Tuberculosis': 'svg:tuberculosis',
+  'Typhoid Fever': 'svg:typhoid',
+};
+
+// Convert any icon (emoji string or SVG JSX element) to its serializable token
+const iconToToken = (icon, fallback = '🦠') => {
+  if (!icon) return fallback;
+  if (typeof icon === 'string') return icon;
+  const elName = icon && icon.type && icon.type.name;
+  if (elName) {
+    const def = SVG_ICON_DEFS.find(s => s.render().type.name === elName);
+    if (def) return def.token;
+  }
+  return fallback;
+};
+
+// Resolve a token back to a renderable icon (emoji string or SVG element)
+const resolveIcon = (token) => {
+  if (!token) return '🦠';
+  const def = SVG_ICON_DEFS.find(s => s.token === token);
+  if (def) return def.render();
+  return typeof token === 'string' ? token : '🦠';
+};
+
 const BARANGAY_COORDS = {
   'Baclaran': [14.2450, 121.1630],
   'Banay-Banay': [14.2550, 121.1300],
@@ -115,15 +153,15 @@ const ALL_DISEASE_ENTRIES = [
 ];
 
 // Icon picker choices: every disease's own icon (SVG components + emojis) labelled by disease name,
-// with duplicate emoji icons removed (only the first disease using that emoji is kept)
+// keyed by serializable token, with duplicate emoji icons removed (only the first disease using that emoji is kept)
 const DISEASE_ICON_CHOICES = (() => {
   const seen = new Set();
   const out = [];
   for (const d of ALL_DISEASE_ENTRIES) {
-    const dedupeKey = typeof d.icon === 'string' ? 'e:' + d.icon : 's:' + d.name;
-    if (seen.has(dedupeKey)) continue;
-    seen.add(dedupeKey);
-    out.push({ key: d.name, icon: d.icon });
+    const token = SVG_ENTRY_TOKEN[d.name] || iconToToken(d.icon);
+    if (seen.has(token)) continue;
+    seen.add(token);
+    out.push({ key: token, label: d.name, icon: d.icon });
   }
   return out;
 })();
@@ -132,7 +170,7 @@ const DISEASE_ICON_CHOICES = (() => {
 // minus any emoji already covered by the disease icons above
 const EXTRA_ICON_CHOICES = (() => {
   const covered = new Set(
-    DISEASE_ICON_CHOICES.filter(c => typeof c.icon === 'string').map(c => c.icon)
+    DISEASE_ICON_CHOICES.filter(c => typeof c.key === 'string' && !c.key.startsWith('svg:')).map(c => c.key)
   );
   return ['🦠','🦟','🫁','🩺','💊','🧪','🧫','🦷','👁️','🩹','🦻','🧠','🫀','🩸','🦾','🐾','😷','🤒','🏥','🧬','💧','🫧','🌡️','🩼']
     .filter(ic => !covered.has(ic));
@@ -193,6 +231,56 @@ const DISEASE_CATEGORIES = [
 ];
 
 const ALL_DISEASE_OPTIONS = ALL_DISEASE_ENTRIES.map(d => d.name).sort();
+
+// Merge DB diseases into ALL_DISEASE_ENTRIES so added diseases persist in the UI after refresh
+const mergeDiseaseEntries = (dbList) => {
+  if (!Array.isArray(dbList)) return;
+  const known = new Set(ALL_DISEASE_ENTRIES.map(d => (d.dbName || '').toLowerCase()));
+  let added = false;
+  dbList.forEach(d => {
+    const nm = (d.name || '').trim();
+    if (!nm) return;
+    if (known.has(nm.toLowerCase())) return;
+    ALL_DISEASE_ENTRIES.push({
+      id: d.id,
+      name: nm,
+      dbName: nm,
+      icon: resolveIcon(d.icon || null),
+      color: d.color || '#3B82F6',
+      desc: d.description || 'Custom communicable disease',
+    });
+    known.add(nm.toLowerCase());
+    added = true;
+  });
+  if (added) {
+    SORTED_CARD_DBNAMES.length = 0;
+    SORTED_CARD_DBNAMES.push(...ALL_DISEASE_ENTRIES.map(d => d.dbName.toLowerCase()).sort((a, b) => b.length - a.length));
+    ALL_DISEASE_OPTIONS.length = 0;
+    ALL_DISEASE_OPTIONS.push(...ALL_DISEASE_ENTRIES.map(d => d.name).sort());
+  }
+};
+
+// Merge persisted custom categories into DISEASE_CATEGORIES (call after mergeDiseaseEntries)
+const mergeCustomCategories = (categories) => {
+  if (!Array.isArray(categories)) return;
+  const knownIds = new Set(DISEASE_CATEGORIES.map(c => c.id));
+  categories.forEach(cat => {
+    const id = 'custom-' + cat.id;
+    if (knownIds.has(id)) return;
+    const diseases = (cat.diseases || [])
+      .map(did => ALL_DISEASE_ENTRIES.find(d => d.id === did))
+      .filter(Boolean);
+    DISEASE_CATEGORIES.push({
+      id,
+      name: cat.name,
+      icon: resolveIcon(cat.icon || null),
+      color: cat.color || '#3B82F6',
+      desc: cat.description || 'Custom disease category',
+      diseases,
+    });
+    knownIds.add(id);
+  });
+};
 
 const CABUYAO_BARANGAYS = [
   'Baclaran','Banay-Banay','Banlic','Barangay Dos (Poblacion)','Barangay Tres (Poblacion)',
@@ -328,6 +416,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const [pendingContactMessageId, setPendingContactMessageId] = useState(null);
   const [cardPage, setCardPage] = useState(0);
   const [categoryPage, setCategoryPage] = useState(0);
+  const [browseAllCategories, setBrowseAllCategories] = useState(false);
+  const [browseAllExclusive, setBrowseAllExclusive] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [diseasePage, setDiseasePage] = useState(0);
   const [selectedDisease, setSelectedDisease] = useState(null);
@@ -470,6 +560,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       setSelectedDisease(diseaseEntry);
       setSelectedCategory(null);
       setCategoryPage(0);
+      setBrowseAllCategories(false);
+      setBrowseAllExclusive(false);
       setFilterBarangay(targetBarangay || 'All Barangays');
       if (caseFilter.purok) {
         setFilterPurok(caseFilter.purok);
@@ -919,10 +1011,25 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         if (cached.length > 0) setBarangayList(cached);
       });
     axios.get(API_URL + '/api/diseases')
-      .then(res => { setAllDiseases(res.data); cacheDiseases(res.data).catch(() => {}); })
+      .then(async res => {
+        mergeDiseaseEntries(res.data);
+        setAllDiseases(res.data);
+        cacheDiseases(res.data).catch(() => {});
+        try {
+          const cres = await axios.get(API_URL + '/api/disease_categories');
+          mergeCustomCategories(cres.data);
+        } catch (e) { /* categories unavailable offline — skip */ }
+      })
       .catch(async () => {
         const cached = await getCachedDiseases();
-        if (cached.length > 0) setAllDiseases(cached);
+        if (cached.length > 0) {
+          mergeDiseaseEntries(cached);
+          setAllDiseases(cached);
+        }
+        try {
+          const cres = await axios.get(API_URL + '/api/disease_categories');
+          mergeCustomCategories(cres.data);
+        } catch (e) { /* categories unavailable offline — skip */ }
       });
   }, []);
 
@@ -1363,27 +1470,42 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       return;
     }
     try {
-      const res = await axios.post(API_URL + '/api/diseases', { name: newDiseaseName.trim() });
+      const res = await axios.post(API_URL + '/api/diseases', {
+        name: newDiseaseName.trim(),
+        icon: newDiseaseIcon || '🦠',
+        color: newDiseaseColor,
+        description: newDiseaseDesc,
+      });
       const entry = {
         id: res.data.id,
         name: newDiseaseName.trim(),
         dbName: newDiseaseName.trim(),
-        icon: newDiseaseIcon || '🦠',
+        icon: resolveIcon(newDiseaseIcon),
         color: newDiseaseColor,
         desc: newDiseaseDesc,
       };
       ALL_DISEASE_ENTRIES.push(entry);
       if (newDiseaseCategory && newDiseaseCategory !== 'all') {
         if (newDiseaseCategory === '__new__') {
-          const catId = newCategoryName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Date.now();
-          DISEASE_CATEGORIES.push({
-            id: catId,
-            name: newCategoryName.trim(),
-            icon: '📁',
-            color: newDiseaseColor,
-            desc: 'Custom disease category',
-            diseases: [entry],
-          });
+          try {
+            const cres = await axios.post(API_URL + '/api/disease_categories', {
+              name: newCategoryName.trim(),
+              icon: newDiseaseIcon || '📁',
+              color: newDiseaseColor,
+              description: newDiseaseDesc,
+              diseaseIds: [res.data.id],
+            });
+            DISEASE_CATEGORIES.push({
+              id: 'custom-' + cres.data.id,
+              name: newCategoryName.trim(),
+              icon: resolveIcon(newDiseaseIcon),
+              color: newDiseaseColor,
+              desc: newDiseaseDesc,
+              diseases: [entry],
+            });
+          } catch (catErr) {
+            console.error('Category creation failed:', catErr.message);
+          }
         } else {
           const cat = DISEASE_CATEGORIES.find(c => c.id === newDiseaseCategory);
           if (cat) cat.diseases.push(entry);
@@ -1610,8 +1732,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   // ═══════════════════════════════════
   if (view === 'categories') {
     const gridCategories = DISEASE_CATEGORIES.filter(c => c.id !== 'exclusive');
-    const totalCategoryPages = Math.ceil(gridCategories.length / CATEGORIES_PER_PAGE);
-    const currentCategories = gridCategories.slice(categoryPage * CATEGORIES_PER_PAGE, (categoryPage + 1) * CATEGORIES_PER_PAGE);
+    const builtinCategories = gridCategories.filter(c => !String(c.id).startsWith('custom-'));
+    const totalCategoryPages = Math.ceil(builtinCategories.length / CATEGORIES_PER_PAGE);
+    const currentCategories = builtinCategories.slice(categoryPage * CATEGORIES_PER_PAGE, (categoryPage + 1) * CATEGORIES_PER_PAGE);
 
     const category = selectedCategory ? DISEASE_CATEGORIES.find(c => c.id === selectedCategory) : null;
     const diseaseEntries = category ? category.diseases : [];
@@ -1626,7 +1749,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       const count = getCaseCount(cat);
       return (
         <div key={cat.id}
-          onClick={() => { setSelectedCategory(cat.id); setDiseasePage(0); }}
+          onClick={() => { setSelectedCategory(cat.id); setDiseasePage(0); setBrowseAllCategories(false); setBrowseAllExclusive(false); }}
           style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: compactMode ? '14px' : '24px', cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s' }}
           onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.15)'; }}
           onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
@@ -1663,6 +1786,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               setFilterBarangay('All Barangays');
               setFilterStatus('All Status');
               setView('list');
+              setBrowseAllCategories(false);
+              setBrowseAllExclusive(false);
             }}
             style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '24px', cursor: 'pointer', textAlign: 'center', transition: 'transform 0.15s, box-shadow 0.15s' }}
             onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.1)'; }}
@@ -1686,6 +1811,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             setFilterBarangay('All Barangays');
             setFilterStatus('All Status');
             setView('list');
+            setBrowseAllCategories(false);
+            setBrowseAllExclusive(false);
           }}
           style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: compactMode ? '14px' : '24px', cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s' }}
           onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.15)'; }}
@@ -1707,6 +1834,61 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         </div>
       );
     };
+
+    if (!category && browseAllCategories) {
+      return (
+        <div style={{ padding: compactMode ? '24px 14px 14px' : '48px 28px 28px', color: 'var(--text-main)', fontSize: `calc(14px * ${fs})` }}>
+          {offlineMode && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '13px', color: '#D97706' }}>
+              <span style={{ fontSize: '16px' }}>⚠</span>
+              Offline - showing cached data. Changes will sync when reconnected.
+            </div>
+          )}
+          <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Dashboard / Manage Cases / Other Categories</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+            <div>
+              <h2 style={{ margin: '0 0 4px 0', fontSize: '22px' }}>Other Categories</h2>
+              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '14px' }}>All disease categories in the system</p>
+            </div>
+            <button onClick={() => setBrowseAllCategories(false)}
+              style={{ padding: '8px 18px', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', fontSize: '13px' }}>
+              ← Back
+            </button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: compactMode ? '12px' : '16px' }}>
+            {gridCategories.map(cat => renderCategoryCard(cat))}
+          </div>
+        </div>
+      );
+    }
+
+    if (!category && browseAllExclusive) {
+      const exclusiveCat = DISEASE_CATEGORIES.find(c => c.id === 'exclusive');
+      return (
+        <div style={{ padding: compactMode ? '24px 14px 14px' : '48px 28px 28px', color: 'var(--text-main)', fontSize: `calc(14px * ${fs})` }}>
+          {offlineMode && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '13px', color: '#D97706' }}>
+              <span style={{ fontSize: '16px' }}>⚠</span>
+              Offline - showing cached data. Changes will sync when reconnected.
+            </div>
+          )}
+          <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Dashboard / Manage Cases / Other Exclusive Diseases</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+            <div>
+              <h2 style={{ margin: '0 0 4px 0', fontSize: '22px' }}>⚠️ Other Exclusive Diseases</h2>
+              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '14px' }}>{exclusiveCat?.desc}</p>
+            </div>
+            <button onClick={() => setBrowseAllExclusive(false)}
+              style={{ padding: '8px 18px', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', fontSize: '13px' }}>
+              ← Back
+            </button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: compactMode ? '12px' : '16px' }}>
+            {(exclusiveCat?.diseases || []).map(d => renderDiseaseCard(d, false))}
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div style={{ padding: compactMode ? '24px 14px 14px' : '48px 28px 28px', color: 'var(--text-main)', fontSize: `calc(14px * ${fs})` }}>
@@ -1749,7 +1931,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               </div>
             </div>
             {category && (
-              <button onClick={() => { setSelectedCategory(null); setCategoryPage(0); setDiseasePage(0); setCarouselIndex(0); }}
+              <button onClick={() => { setSelectedCategory(null); setCategoryPage(0); setDiseasePage(0); setCarouselIndex(0); setBrowseAllCategories(false); setBrowseAllExclusive(false); }}
                 style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '13px', padding: '2px 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 ← Back to Categories
               </button>
@@ -1767,7 +1949,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 </button>
               </div>
             )}
-            {!category && (
+        {!category && (
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                 {keyboardShortcuts && (
                   <div style={{ position: 'relative' }} ref={shortcutsRef}>
@@ -1826,6 +2008,14 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       ))}
                     </div>
                   )}
+                  {builtinCategories.length >= 6 && (
+                    <div style={{ textAlign: 'center', marginTop: '16px' }}>
+                      <button onClick={() => setBrowseAllCategories(true)}
+                        style={{ padding: '10px 20px', background: '#121358', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
+                        More Categories
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
               {carouselIndex === 1 && (() => {
@@ -1858,9 +2048,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         </div>
                       ))}
                     </div>
-                    {(exclusiveCat?.diseases || []).length > 6 && (
+                    {(exclusiveCat?.diseases || []).length >= 6 && (
                       <div style={{ textAlign: 'center', marginTop: '16px' }}>
-                        <button onClick={() => { setSelectedCategory('exclusive'); setDiseasePage(0); }}
+                        <button onClick={() => { setBrowseAllExclusive(true); }}
                           style={{ padding: '10px 20px', background: '#121358', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
                           Other Exclusive Diseases
                         </button>
@@ -1891,9 +2081,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   <label style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>Icon</label>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', maxHeight: '132px', overflowY: 'auto', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', marginBottom: '12px' }}>
                     {DISEASE_ICON_CHOICES.map(c => {
-                      const active = newDiseaseIcon === c.icon;
+                      const active = newDiseaseIcon === c.key;
                       return (
-                        <div key={'d_' + c.key} title={c.key} onClick={() => setNewDiseaseIcon(c.icon)}
+                        <div key={'d_' + c.key} title={c.label} onClick={() => setNewDiseaseIcon(c.key)}
                           style={{ width: '34px', height: '34px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', cursor: 'pointer', fontSize: '17px', border: active ? '2px solid #3B82F6' : '1px solid var(--border-color)', background: active ? 'rgba(59,130,246,0.12)' : 'var(--bg-surface)' }}>
                           {c.icon}
                         </div>

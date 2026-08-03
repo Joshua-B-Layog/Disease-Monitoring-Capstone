@@ -134,6 +134,42 @@ db.query("SHOW COLUMNS FROM disease_cases LIKE 'updated_at'", (err, rows) => {
     }
 });
 
+// Add icon/color/description columns to diseases if missing (for "Add New Disease" full persistence)
+db.query("SHOW COLUMNS FROM diseases LIKE 'icon'", (err, rows) => {
+    if (!err && rows.length === 0) {
+        db.query("ALTER TABLE diseases ADD COLUMN icon VARCHAR(100) DEFAULT NULL, ADD COLUMN color VARCHAR(20) DEFAULT NULL, ADD COLUMN description VARCHAR(255) DEFAULT NULL", (alterErr) => {
+            if (alterErr) console.error('Migration error adding disease metadata columns:', alterErr.message);
+            else console.log('Migration: added icon/color/description columns to diseases table');
+        });
+    }
+});
+
+// Custom disease categories (persisted user-created categories for the disease carousel)
+db.query(`CREATE TABLE IF NOT EXISTS disease_categories (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    icon VARCHAR(100) DEFAULT NULL,
+    color VARCHAR(20) DEFAULT NULL,
+    description VARCHAR(255) DEFAULT NULL,
+    created_by INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)`, (err) => {
+    if (err) console.error('Error creating disease_categories table:', err.message);
+    else console.log('disease_categories table created/verified');
+});
+
+// Join table linking diseases to custom categories
+db.query(`CREATE TABLE IF NOT EXISTS disease_category_items (
+    category_id INT NOT NULL,
+    disease_id INT NOT NULL,
+    PRIMARY KEY (category_id, disease_id),
+    FOREIGN KEY (category_id) REFERENCES disease_categories(id) ON DELETE CASCADE,
+    FOREIGN KEY (disease_id) REFERENCES diseases(id) ON DELETE CASCADE
+)`, (err) => {
+    if (err) console.error('Error creating disease_category_items table:', err.message);
+    else console.log('disease_category_items table created/verified');
+});
+
 db.query('CREATE TABLE IF NOT EXISTS notifications (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT, title VARCHAR(255), message TEXT, type VARCHAR(50), is_read TINYINT DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, link_to VARCHAR(100), reference_id INT NULL, FOREIGN KEY (user_id) REFERENCES users(user_id))', (err) => {
     if (err) console.error('Error creating notifications table:', err.message);
     else {
@@ -415,11 +451,53 @@ app.get('/api/diseases', (req, res) => {
 // ROUTE: Add a new disease
 app.post('/api/diseases', (req, res) => {
     const name = (req.body && req.body.name ? req.body.name : '').trim();
+    const icon = (req.body && req.body.icon ? String(req.body.icon).slice(0, 100) : null);
+    const color = (req.body && req.body.color ? String(req.body.color).slice(0, 20) : null);
+    const description = (req.body && req.body.description ? String(req.body.description).slice(0, 255) : null);
     if (!name) return res.status(400).json({ error: 'Disease name is required.' });
-    db.query('INSERT IGNORE INTO diseases (name) VALUES (?)', [name], (err, result) => {
+    db.query('INSERT IGNORE INTO diseases (name, icon, color, description) VALUES (?, ?, ?, ?)', [name, icon, color, description], (err, result) => {
         if (err) return res.status(500).json({ error: err.message });
         if (result.affectedRows === 0) return res.status(409).json({ error: 'Disease already exists.' });
         res.status(201).json({ message: 'Disease added successfully.', id: result.insertId });
+    });
+});
+
+// ROUTE: Get all custom disease categories (with their linked disease ids)
+app.get('/api/disease_categories', (req, res) => {
+    db.query('SELECT * FROM disease_categories ORDER BY id', (err, categories) => {
+        if (err) return res.status(500).json({ error: err.message });
+        db.query('SELECT category_id, disease_id FROM disease_category_items', (err2, items) => {
+            if (err2) return res.status(500).json({ error: err2.message });
+            const byCat = {};
+            items.forEach(it => {
+                if (!byCat[it.category_id]) byCat[it.category_id] = [];
+                byCat[it.category_id].push(it.disease_id);
+            });
+            res.json(categories.map(c => ({ ...c, diseases: byCat[c.id] || [] })));
+        });
+    });
+});
+
+// ROUTE: Create a custom disease category and link diseases to it
+app.post('/api/disease_categories', (req, res) => {
+    const name = (req.body && req.body.name ? req.body.name : '').trim();
+    const icon = (req.body && req.body.icon ? String(req.body.icon).slice(0, 100) : null);
+    const color = (req.body && req.body.color ? String(req.body.color).slice(0, 20) : null);
+    const description = (req.body && req.body.description ? String(req.body.description).slice(0, 255) : null);
+    const diseaseIds = Array.isArray(req.body && req.body.diseaseIds) ? req.body.diseaseIds.filter(Number.isInteger) : [];
+    if (!name) return res.status(400).json({ error: 'Category name is required.' });
+    db.query('INSERT INTO disease_categories (name, icon, color, description) VALUES (?, ?, ?, ?)', [name, icon, color, description], (err, result) => {
+        if (err) {
+            if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Category already exists.' });
+            return res.status(500).json({ error: err.message });
+        }
+        const catId = result.insertId;
+        if (diseaseIds.length === 0) return res.status(201).json({ message: 'Category added successfully.', id: catId });
+        const values = diseaseIds.map(did => [catId, did]);
+        db.query('INSERT IGNORE INTO disease_category_items (category_id, disease_id) VALUES ?', [values], (err2) => {
+            if (err2) return res.status(500).json({ error: err2.message });
+            res.status(201).json({ message: 'Category added successfully.', id: catId });
+        });
     });
 });
 
@@ -2812,14 +2890,24 @@ app.get('/api/backup', (req, res) => {
           if (err) return res.status(500).json({ error: err.message });
           results.diseases = diseases;
 
-          results.backup_date = new Date().toISOString();
-          results.system = 'Cabuyao CDMS';
-          results.version = '1.0';
+          db.query('SELECT * FROM disease_categories', (err, disease_categories) => {
+            if (err) return res.status(500).json({ error: err.message });
+            results.disease_categories = disease_categories;
 
-          res.setHeader('Content-Type', 'application/json');
-          res.setHeader('Content-Disposition',
-            `attachment; filename=CDMS_Backup_${new Date().toISOString().split('T')[0]}.json`);
-          res.json(results);
+            db.query('SELECT * FROM disease_category_items', (err, disease_category_items) => {
+              if (err) return res.status(500).json({ error: err.message });
+              results.disease_category_items = disease_category_items;
+
+              results.backup_date = new Date().toISOString();
+              results.system = 'Cabuyao CDMS';
+              results.version = '1.1';
+
+              res.setHeader('Content-Type', 'application/json');
+              res.setHeader('Content-Disposition',
+                `attachment; filename=CDMS_Backup_${new Date().toISOString().split('T')[0]}.json`);
+              res.json(results);
+            });
+          });
         });
       });
     });
@@ -3488,9 +3576,33 @@ app.post('/api/restore', (req, res) => {
         let done = 0;
         backup.diseases.forEach(d => {
             db.query(
-                `INSERT IGNORE INTO diseases (id, name) VALUES (?, ?)`,
-                [d.id, d.name],
+                `INSERT IGNORE INTO diseases (id, name, icon, color, description) VALUES (?, ?, ?, ?, ?)`,
+                [d.id, d.name, d.icon || null, d.color || null, d.description || null],
                 (err) => { if (err) console.error('Restore disease error:', err.message); done++; if (done >= backup.diseases.length) callback(); }
+            );
+        });
+    };
+
+    const restoreCategories = (callback) => {
+        const restoreItems = (items, afterItems) => {
+            if (!items || items.length === 0) return afterItems();
+            let done = 0;
+            items.forEach(it => {
+                db.query(
+                    'INSERT IGNORE INTO disease_category_items (category_id, disease_id) VALUES (?, ?)',
+                    [it.category_id, it.disease_id],
+                    (err) => { if (err) console.error('Restore category item error:', err.message); done++; if (done >= items.length) afterItems(); }
+                );
+            });
+        };
+        const cats = backup.disease_categories || [];
+        if (cats.length === 0) return restoreItems(backup.disease_category_items, callback);
+        let done = 0;
+        cats.forEach(c => {
+            db.query(
+                `INSERT IGNORE INTO disease_categories (id, name, icon, color, description) VALUES (?, ?, ?, ?, ?)`,
+                [c.id, c.name, c.icon || null, c.color || null, c.description || null],
+                (err) => { if (err) console.error('Restore category error:', err.message); done++; if (done >= cats.length) restoreItems(backup.disease_category_items, callback); }
             );
         });
     };
@@ -3499,8 +3611,10 @@ app.post('/api/restore', (req, res) => {
         restoreBarangays(() => {
             restoreUsers(() => {
                 restoreDiseaseCases(() => {
-                    console.log(' Restore completed from backup dated ' + backup.backup_date);
-                    res.json({ message: 'Restore completed successfully.' });
+                    restoreCategories(() => {
+                        console.log(' Restore completed from backup dated ' + backup.backup_date);
+                        res.json({ message: 'Restore completed successfully.' });
+                    });
                 });
             });
         });
@@ -3523,6 +3637,8 @@ app.post('/api/restore/preview', (req, res) => {
             users: backup.users?.length || 0,
             barangays: backup.barangays?.length || 0,
             diseases: backup.diseases?.length || 0,
+            disease_categories: backup.disease_categories?.length || 0,
+            disease_category_items: backup.disease_category_items?.length || 0,
         }
     });
 });
