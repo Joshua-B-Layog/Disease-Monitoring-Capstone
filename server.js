@@ -412,6 +412,17 @@ app.get('/api/diseases', (req, res) => {
     });
 });
 
+// ROUTE: Add a new disease
+app.post('/api/diseases', (req, res) => {
+    const name = (req.body && req.body.name ? req.body.name : '').trim();
+    if (!name) return res.status(400).json({ error: 'Disease name is required.' });
+    db.query('INSERT IGNORE INTO diseases (name) VALUES (?)', [name], (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (result.affectedRows === 0) return res.status(409).json({ error: 'Disease already exists.' });
+        res.status(201).json({ message: 'Disease added successfully.', id: result.insertId });
+    });
+});
+
 // ROUTE: Get list of barangays
 app.get('/api/barangays', (req, res) => {
     db.query("SELECT * FROM barangays ORDER BY name", (err, results) => {

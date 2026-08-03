@@ -114,6 +114,30 @@ const ALL_DISEASE_ENTRIES = [
   { id: 28, name: 'Typhoid Fever',                 dbName: 'Typhoid Fever', icon: <TyphoidIcon color="#8B5CF6" />, color: '#8B5CF6', desc: 'A systemic infection caused by Salmonella Typhi, spread through contaminated food and water.' },
 ];
 
+// Icon picker choices: every disease's own icon (SVG components + emojis) labelled by disease name,
+// with duplicate emoji icons removed (only the first disease using that emoji is kept)
+const DISEASE_ICON_CHOICES = (() => {
+  const seen = new Set();
+  const out = [];
+  for (const d of ALL_DISEASE_ENTRIES) {
+    const dedupeKey = typeof d.icon === 'string' ? 'e:' + d.icon : 's:' + d.name;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    out.push({ key: d.name, icon: d.icon });
+  }
+  return out;
+})();
+
+// Extra emoji choices for the "Add New Disease" icon picker,
+// minus any emoji already covered by the disease icons above
+const EXTRA_ICON_CHOICES = (() => {
+  const covered = new Set(
+    DISEASE_ICON_CHOICES.filter(c => typeof c.icon === 'string').map(c => c.icon)
+  );
+  return ['🦠','🦟','🫁','🩺','💊','🧪','🧫','🦷','👁️','🩹','🦻','🧠','🫀','🩸','🦾','🐾','😷','🤒','🏥','🧬','💧','🫧','🌡️','🩼']
+    .filter(ic => !covered.has(ic));
+})();
+
 // Card dbNames sorted by length descending (longest-first for prefix matching)
 const SORTED_CARD_DBNAMES = ALL_DISEASE_ENTRIES
   .map(d => d.dbName.toLowerCase())
@@ -313,6 +337,14 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const [routingDescription, setRoutingDescription] = useState('');
   const [routingTargetType, setRoutingTargetType] = useState(null);
   const [routingTargetBarangay, setRoutingTargetBarangay] = useState('');
+  const [carouselIndex, setCarouselIndex] = useState(0); // 0 = categories grid, 1 = exclusive diseases, 2 = add disease form
+  const [newDiseaseName, setNewDiseaseName] = useState('');
+  const [newDiseaseIcon, setNewDiseaseIcon] = useState('🦠');
+  const [newDiseaseColor, setNewDiseaseColor] = useState('#3B82F6');
+  const [newDiseaseDesc, setNewDiseaseDesc] = useState('');
+  const [newDiseaseCategory, setNewDiseaseCategory] = useState('all');
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [addDiseaseMsg, setAddDiseaseMsg] = useState('');
 
   const [allCases, setAllCases] = useState([]);
   const [loadingCases, setLoadingCases] = useState(false);
@@ -385,6 +417,10 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   // Purok/Blk/Phase filter dropdown
   const [purokOpen, setPurokOpen] = useState(false);
   const purokRef = useRef(null);
+
+  // Add New Disease category dropdown
+  const [categoryOpen, setCategoryOpen] = useState(false);
+  const categoryRef = useRef(null);
 
   // Form dropdowns
   const [barangayFormOpen, setBarangayFormOpen] = useState(false);
@@ -904,6 +940,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       if (purokRef.current && !purokRef.current.contains(e.target)) {
         setPurokOpen(false);
       }
+      if (categoryRef.current && !categoryRef.current.contains(e.target)) {
+        setCategoryOpen(false);
+      }
       if (barangayFormRef.current && !barangayFormRef.current.contains(e.target)) setBarangayFormOpen(false);
       if (diseaseFormRef.current && !diseaseFormRef.current.contains(e.target)) setDiseaseOpen(false);
       if (statusRef.current && !statusRef.current.contains(e.target)) {
@@ -1311,6 +1350,63 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     setView('add');
   };
 
+  // ── DISEASE CAROUSEL ──
+  const changeCarousel = (dir) => setCarouselIndex(prev => (prev + dir + 3) % 3);
+
+  const handleAddNewDisease = async () => {
+    if (!newDiseaseName.trim()) {
+      setAddDiseaseMsg('Error: Disease name is required.');
+      return;
+    }
+    if (newDiseaseCategory === '__new__' && !newCategoryName.trim()) {
+      setAddDiseaseMsg('Error: New category name is required.');
+      return;
+    }
+    try {
+      const res = await axios.post(API_URL + '/api/diseases', { name: newDiseaseName.trim() });
+      const entry = {
+        id: res.data.id,
+        name: newDiseaseName.trim(),
+        dbName: newDiseaseName.trim(),
+        icon: newDiseaseIcon || '🦠',
+        color: newDiseaseColor,
+        desc: newDiseaseDesc,
+      };
+      ALL_DISEASE_ENTRIES.push(entry);
+      if (newDiseaseCategory && newDiseaseCategory !== 'all') {
+        if (newDiseaseCategory === '__new__') {
+          const catId = newCategoryName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Date.now();
+          DISEASE_CATEGORIES.push({
+            id: catId,
+            name: newCategoryName.trim(),
+            icon: '📁',
+            color: newDiseaseColor,
+            desc: 'Custom disease category',
+            diseases: [entry],
+          });
+        } else {
+          const cat = DISEASE_CATEGORIES.find(c => c.id === newDiseaseCategory);
+          if (cat) cat.diseases.push(entry);
+        }
+      }
+      ALL_DISEASE_OPTIONS.length = 0;
+      ALL_DISEASE_OPTIONS.push(...ALL_DISEASE_ENTRIES.map(d => d.name).sort());
+      setAddDiseaseMsg('Disease added successfully!');
+      setNewDiseaseName('');
+      setNewDiseaseDesc('');
+      setNewDiseaseIcon('🦠');
+      setNewDiseaseColor('#3B82F6');
+      setNewDiseaseCategory('all');
+      setNewCategoryName('');
+      const dres = await axios.get(API_URL + '/api/diseases');
+      setAllDiseases(dres.data);
+      cacheDiseases(dres.data).catch(() => {});
+      setTimeout(() => { setAddDiseaseMsg(''); setCarouselIndex(0); }, 1200);
+    } catch (err) {
+      setAddDiseaseMsg('Error: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
   // ── SAVE CASE (Add or Edit) ──
   const handleSave = async (e, isDraft = false) => {
     if (e && e.preventDefault) e.preventDefault();
@@ -1513,8 +1609,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   // VIEW: DISEASE CARDS
   // ═══════════════════════════════════
   if (view === 'categories') {
-    const totalCategoryPages = Math.ceil(DISEASE_CATEGORIES.length / CATEGORIES_PER_PAGE);
-    const currentCategories = DISEASE_CATEGORIES.slice(categoryPage * CATEGORIES_PER_PAGE, (categoryPage + 1) * CATEGORIES_PER_PAGE);
+    const gridCategories = DISEASE_CATEGORIES.filter(c => c.id !== 'exclusive');
+    const totalCategoryPages = Math.ceil(gridCategories.length / CATEGORIES_PER_PAGE);
+    const currentCategories = gridCategories.slice(categoryPage * CATEGORIES_PER_PAGE, (categoryPage + 1) * CATEGORIES_PER_PAGE);
 
     const category = selectedCategory ? DISEASE_CATEGORIES.find(c => c.id === selectedCategory) : null;
     const diseaseEntries = category ? category.diseases : [];
@@ -1652,23 +1749,10 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               </div>
             </div>
             {category && (
-              <button onClick={() => { setSelectedCategory(null); setCategoryPage(0); setDiseasePage(0); }}
+              <button onClick={() => { setSelectedCategory(null); setCategoryPage(0); setDiseasePage(0); setCarouselIndex(0); }}
                 style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '13px', padding: '2px 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 ← Back to Categories
               </button>
-            )}
-            {!category && showCategoryPagination && (
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Page {categoryPage + 1} / {totalCategoryPages}</span>
-                <button onClick={() => setCategoryPage(Math.max(0, categoryPage - 1))} disabled={categoryPage === 0}
-                  style={{ padding: '7px 16px', background: categoryPage === 0 ? 'var(--input-bg)' : '#121358', color: categoryPage === 0 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: categoryPage === 0 ? 'not-allowed' : 'pointer', fontSize: '13px' }}>
-                  ← Prev
-                </button>
-                <button onClick={() => setCategoryPage(Math.min(totalCategoryPages - 1, categoryPage + 1))} disabled={categoryPage >= totalCategoryPages - 1}
-                  style={{ padding: '7px 16px', background: categoryPage >= totalCategoryPages - 1 ? 'var(--input-bg)' : '#121358', color: categoryPage >= totalCategoryPages - 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: categoryPage >= totalCategoryPages - 1 ? 'not-allowed' : 'pointer', fontSize: '13px' }}>
-                  Next →
-                </button>
-              </div>
             )}
             {category && showDiseasePagination && (
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -1683,7 +1767,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 </button>
               </div>
             )}
-            {!category && !showCategoryPagination && (
+            {!category && (
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                 {keyboardShortcuts && (
                   <div style={{ position: 'relative' }} ref={shortcutsRef}>
@@ -1708,22 +1792,216 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           </div>
         </div>
 
-        {category ? (
-          <div style={{ display: 'grid', gridTemplateColumns: gridMode ? '1fr 1fr' : '1fr 1fr 1fr', gap: gridMode ? (compactMode ? '12px' : '16px') : '24px', marginTop: gridMode ? '16px' : '24px' }}>
-            {currentDiseases.map(entry => renderDiseaseCard(entry, !gridMode))}
+        {!category && (
+        <div style={{ position: 'relative', marginBottom: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0px', minHeight: '220px' }}>
+          {/* LEFT faded peek */}
+          <div className="cdms-carousel-peek" style={{
+            width: '80px', height: '180px', background: 'var(--bg-surface)',
+            border: '1px solid var(--border-color)', borderRadius: '12px 0 0 12px',
+            opacity: 0.35, flexShrink: 0, clipPath: 'polygon(0 0, 100% 10%, 100% 90%, 0 100%)',
+          }} />
+
+          {/* CENTER active card */}
+          <div style={{
+            flex: '0 1 980px', width: 'min(100%, 980px)', minHeight: '260px',
+            background: 'var(--bg-surface)', border: '2px solid var(--border-color)',
+            borderRadius: '14px', padding: '24px', position: 'relative',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+          }}>
+            <div key={carouselIndex} className="cdms-carousel-slide" style={{ textAlign: 'center' }}>
+              {carouselIndex === 0 && (
+                <div>
+                  <h3 style={{ margin: '0 0 6px 0', fontSize: '18px', color: 'var(--text-main)' }}>📋 All Diseases & Categories</h3>
+                  <p style={{ margin: '0 0 14px 0', fontSize: '13px', color: 'var(--text-muted)' }}>
+                    Browse all disease categories below, or use the ◀ ▶ arrows for exclusive diseases and to add a new one.
+                  </p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: compactMode ? '12px' : '16px', textAlign: 'left', maxWidth: '900px', margin: '0 auto' }}>
+                    {currentCategories.map(cat => renderCategoryCard(cat))}
+                  </div>
+                  {showCategoryPagination && (
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '16px' }}>
+                      {Array.from({ length: totalCategoryPages }).map((_, i) => (
+                        <div key={i} onClick={() => setCategoryPage(i)}
+                          style={{ width: '10px', height: '10px', borderRadius: '50%', background: categoryPage === i ? '#121358' : 'var(--border-color)', transition: 'background 0.2s', cursor: 'pointer' }} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {carouselIndex === 1 && (() => {
+                const exclusiveCat = DISEASE_CATEGORIES.find(c => c.id === 'exclusive');
+                return (
+                  <div>
+                    <h3 style={{ margin: '0 0 6px 0', fontSize: '18px', color: 'var(--text-main)' }}>⚠️ Exclusive Diseases</h3>
+                    <p style={{ margin: '0 0 14px 0', fontSize: '13px', color: 'var(--text-muted)' }}>{exclusiveCat?.desc}</p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', textAlign: 'left', maxWidth: '760px', margin: '0 auto' }}>
+                      {(exclusiveCat?.diseases || []).slice(0, 6).map(d => (
+                        <div key={d.name}
+                          onClick={() => {
+                            setSelectedDisease(d);
+                            setFilterPurok('All Puroks');
+                            setTablePage(1);
+                            setSearchQuery('');
+                            setFilterBarangay('All Barangays');
+                            setFilterStatus('All Status');
+                            setView('list');
+                          }}
+                          style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px', cursor: 'pointer', textAlign: 'center', transition: 'transform 0.15s, box-shadow 0.15s' }}
+                          onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.15)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
+                          <div style={{ fontSize: '28px', lineHeight: 1, marginBottom: '8px' }}>{d.icon}</div>
+                          <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '4px' }}>{d.name}</div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: '1.35', marginBottom: '10px' }}>{d.desc}</div>
+                          <div style={{ background: d.color, color: '#fff', borderRadius: '50%', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', margin: '0 auto' }}>
+                            {getCaseCount(d)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {(exclusiveCat?.diseases || []).length > 6 && (
+                      <div style={{ textAlign: 'center', marginTop: '16px' }}>
+                        <button onClick={() => { setSelectedCategory('exclusive'); setDiseasePage(0); }}
+                          style={{ padding: '10px 20px', background: '#121358', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
+                          Other Exclusive Diseases
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+              {carouselIndex === 2 && (
+                <div style={{ maxWidth: '720px', margin: '0 auto', textAlign: 'left' }}>
+                  <h3 style={{ margin: '0 0 12px 0', fontSize: '18px', color: 'var(--text-main)', textAlign: 'center' }}>➕ Add New Disease</h3>
+                  {addDiseaseMsg && (
+                    <div style={{ padding: '8px 12px', marginBottom: '10px', borderRadius: '6px', fontSize: '13px', background: addDiseaseMsg.startsWith('Error') ? '#fee2e2' : '#d1f5e9', color: addDiseaseMsg.startsWith('Error') ? '#991b1b' : '#0a5e42' }}>
+                      {addDiseaseMsg}
+                    </div>
+                  )}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                    <input type="text" placeholder="Disease name" value={newDiseaseName}
+                      onChange={e => setNewDiseaseName(e.target.value)}
+                      style={{ padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '14px' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 10px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)' }}>
+                      <label style={{ fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Color</label>
+                      <input type="color" value={newDiseaseColor}
+                        onChange={e => setNewDiseaseColor(e.target.value)}
+                        style={{ width: '100%', height: '32px', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }} />
+                    </div>
+                  </div>
+                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>Icon</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', maxHeight: '132px', overflowY: 'auto', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', marginBottom: '12px' }}>
+                    {DISEASE_ICON_CHOICES.map(c => {
+                      const active = newDiseaseIcon === c.icon;
+                      return (
+                        <div key={'d_' + c.key} title={c.key} onClick={() => setNewDiseaseIcon(c.icon)}
+                          style={{ width: '34px', height: '34px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', cursor: 'pointer', fontSize: '17px', border: active ? '2px solid #3B82F6' : '1px solid var(--border-color)', background: active ? 'rgba(59,130,246,0.12)' : 'var(--bg-surface)' }}>
+                          {c.icon}
+                        </div>
+                      );
+                    })}
+                    {EXTRA_ICON_CHOICES.map(ic => {
+                      const active = newDiseaseIcon === ic;
+                      return (
+                        <div key={'x_' + ic} title={ic} onClick={() => setNewDiseaseIcon(ic)}
+                          style={{ width: '34px', height: '34px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', cursor: 'pointer', fontSize: '17px', border: active ? '2px solid #3B82F6' : '1px solid var(--border-color)', background: active ? 'rgba(59,130,246,0.12)' : 'var(--bg-surface)' }}>
+                          {ic}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                    <div style={{ position: 'relative' }} ref={categoryRef}>
+                      <button className="mc-custom-dropdown-btn" style={{ width: '100%' }} onClick={() => setCategoryOpen(!categoryOpen)}>
+                        <span>
+                          {newDiseaseCategory === '__new__' ? '➕ Add new category...'
+                            : newDiseaseCategory === 'all' ? 'All Diseases'
+                            : (DISEASE_CATEGORIES.find(c => c.id === newDiseaseCategory)?.name || 'All Diseases')}
+                        </span>
+                        <span style={{ marginLeft: '6px', opacity: 0.6, transition: 'transform 0.2s', display: 'inline-block', transform: categoryOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                      </button>
+                      {categoryOpen && (
+                        <div className="mc-custom-dropdown-panel">
+                          <div
+                            className={`mc-custom-dropdown-item ${newDiseaseCategory === 'all' ? 'mc-custom-dropdown-item--active' : ''}`}
+                            onClick={() => { setNewDiseaseCategory('all'); setCategoryOpen(false); }}
+                          >
+                            All Diseases
+                          </div>
+                          {DISEASE_CATEGORIES.filter(c => c.id !== 'all').map(c => (
+                            <div
+                              key={c.id}
+                              className={`mc-custom-dropdown-item ${newDiseaseCategory === c.id ? 'mc-custom-dropdown-item--active' : ''}`}
+                              onClick={() => { setNewDiseaseCategory(c.id); setCategoryOpen(false); }}
+                            >
+                              {c.name}
+                            </div>
+                          ))}
+                          <div
+                            className={`mc-custom-dropdown-item ${newDiseaseCategory === '__new__' ? 'mc-custom-dropdown-item--active' : ''}`}
+                            onClick={() => { setNewDiseaseCategory('__new__'); setCategoryOpen(false); }}
+                          >
+                            ➕ Add new category...
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <textarea placeholder="Short description" value={newDiseaseDesc} rows={1}
+                      onChange={e => setNewDiseaseDesc(e.target.value)}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '14px', boxSizing: 'border-box', resize: 'vertical' }} />
+                  </div>
+                  {newDiseaseCategory === '__new__' && (
+                    <div style={{ marginBottom: '12px' }}>
+                      <label style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>New category name</label>
+                      <input type="text" placeholder="e.g. Rare Diseases" value={newCategoryName}
+                        onChange={e => setNewCategoryName(e.target.value)}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '14px' }} />
+                    </div>
+                  )}
+                  <div style={{ textAlign: 'center' }}>
+                    <button onClick={handleAddNewDisease}
+                      style={{ padding: '10px 24px', background: '#129968', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
+                      Save Disease
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Left / Right carousel controls */}
+            <button onClick={() => changeCarousel(-1)} title="Previous" className="cdms-carousel-arrow"
+              style={{
+                position: 'absolute', top: '50%', left: '-18px', transform: 'translateY(-50%)',
+                width: '36px', height: '36px', borderRadius: '50%', background: '#121358',
+                border: '2px solid var(--bg-main)', color: '#fff', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.3)', zIndex: 2,
+              }}>
+              ◀
+            </button>
+            <button onClick={() => changeCarousel(1)} title="Next" className="cdms-carousel-arrow"
+              style={{
+                position: 'absolute', top: '50%', right: '-18px', transform: 'translateY(-50%)',
+                width: '36px', height: '36px', borderRadius: '50%', background: '#121358',
+                border: '2px solid var(--bg-main)', color: '#fff', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.3)', zIndex: 2,
+              }}>
+              ▶
+            </button>
           </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: compactMode ? '12px' : '20px', marginTop: '16px' }}>
-            {currentCategories.map(cat => renderCategoryCard(cat))}
-          </div>
+
+          {/* RIGHT faded peek */}
+          <div className="cdms-carousel-peek" style={{
+            width: '80px', height: '180px', background: 'var(--bg-surface)',
+            border: '1px solid var(--border-color)', borderRadius: '0 12px 12px 0',
+            opacity: 0.35, flexShrink: 0, clipPath: 'polygon(0 10%, 100% 0, 100% 100%, 0 90%)',
+          }} />
+        </div>
         )}
 
-        {!category && showCategoryPagination && (
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '24px' }}>
-            {Array.from({ length: totalCategoryPages }).map((_, i) => (
-              <div key={i} onClick={() => setCategoryPage(i)}
-                style={{ width: '10px', height: '10px', borderRadius: '50%', background: categoryPage === i ? '#121358' : 'var(--border-color)', transition: 'background 0.2s', cursor: 'pointer' }} />
-            ))}
+        {category && (
+          <div style={{ display: 'grid', gridTemplateColumns: gridMode ? '1fr 1fr' : '1fr 1fr 1fr', gap: gridMode ? (compactMode ? '12px' : '16px') : '24px', marginTop: gridMode ? '16px' : '24px' }}>
+            {currentDiseases.map(entry => renderDiseaseCard(entry, !gridMode))}
           </div>
         )}
       </div>
