@@ -83,7 +83,7 @@ if (!document.getElementById('cdms-barangay-labels')) {
     }
     .brgy-tooltip-label .brgy-name {
       font-weight: 700;
-      font-size: 11px;
+      font-size: 12px;
       color: #fff;
       text-align: center;
       line-height: 1.2;
@@ -884,7 +884,7 @@ export default function ResidentMap() {
               <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: getRisk(tooltip.totalCases).color, display: 'inline-block' }} />
               {getRisk(tooltip.totalCases).label} · {tooltip.totalCases} case{tooltip.totalCases !== 1 ? 's' : ''}
             </div>
-            <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '7px' }}>
+            <div style={{ fontSize: '14px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '7px' }}>
               Top Diseases
             </div>
             {getTop5(tooltip.diseases).map(([disease, count], i) => (
@@ -960,7 +960,7 @@ export default function ResidentMap() {
 
               <div style={{ borderTop: '1px solid var(--border-color)', marginBottom: '14px' }} />
 
-              <p style={{ margin: '0 0 10px 0', fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <p style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 All Diseases in this Barangay
               </p>
 
@@ -999,7 +999,7 @@ export default function ResidentMap() {
       {/* Legend */}
       <div style={{ marginTop: '16px', display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'flex-start' }}>
         <div>
-          <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Risk Levels</div>
+          <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Risk Levels</div>
           <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
             <LegendItem color="#DC2626" label="High Risk (20+)" />
             <LegendItem color="#f59e0b" label="Medium (10-20)" />
@@ -1009,7 +1009,7 @@ export default function ResidentMap() {
         </div>
         {usedDiseaseColors.length > 0 && (
           <div>
-            <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Top Diseases</div>
+            <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Top Diseases</div>
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
               {usedDiseaseColors.map(({ disease, color }) => (
                 <div key={disease} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: 'var(--text-muted)' }}>

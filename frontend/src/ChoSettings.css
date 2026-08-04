@@ -70,8 +70,13 @@
   font-size: 24px;
 }
 
+.box-icon-wrapper svg {
+  width: 30px;
+  height: 30px;
+}
+
 .box-title-text {
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 600;
   color: var(--text-main);
   margin: 0;
@@ -314,7 +319,7 @@
 }
 
 .security-header-text h3 {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-main);
   margin: 0 0 2px 0;

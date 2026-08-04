@@ -596,7 +596,6 @@ const handleLoginOtpSubmit = async (e) => {
                       <div style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '16px' }}>City Health Office (CHO)</div>
                       <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '2px' }}>Central Systems & Analytics</div>
                     </div>
-                    <span style={{ fontSize: '20px' }}>🏢</span>
                   </button>
 
                   <button type="button" onClick={() => handleRoleSelection('BHW')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px', background: 'rgba(18, 153, 104, 0.08)', border: '1px solid #129968', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
@@ -604,7 +603,6 @@ const handleLoginOtpSubmit = async (e) => {
                       <div style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '16px' }}>Barangay Health Worker</div>
                       <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '2px' }}>Community Surveillance Data Entry</div>
                     </div>
-                    <span style={{ fontSize: '20px' }}>📍</span>
                   </button>
                 </div>
               </>
@@ -623,7 +621,7 @@ const handleLoginOtpSubmit = async (e) => {
                   <button type="button" onClick={() => handleChoSelection('CHO Unit I (Sala)')} style={{ padding: '16px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-main)', fontWeight: '600', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '16px' }}>CHO Unit I (Main)</span>
-                      <span style={{ fontSize: '11px', background: '#1e3a8a', color: '#93c5fd', padding: '2px 6px', borderRadius: '4px' }}>CHO 1 Hub</span>
+                      <span style={{ fontSize: '12px', background: '#1e3a8a', color: '#93c5fd', padding: '2px 6px', borderRadius: '4px' }}>CHO 1 Hub</span>
                     </div>
                     <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '400', display: 'block', marginTop: '6px' }}>
                       City Hall Complex, F.B. Bailon St., Brgy. Sala
@@ -633,7 +631,7 @@ const handleLoginOtpSubmit = async (e) => {
                   <button type="button" onClick={() => handleChoSelection('CHO Unit II (Pulo)')} style={{ padding: '16px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-main)', fontWeight: '600', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '16px' }}>CHO Unit II (Extension)</span>
-                      <span style={{ fontSize: '11px', background: '#1e3a8a', color: '#93c5fd', padding: '2px 6px', borderRadius: '4px' }}>CHO 2 Hub</span>
+                      <span style={{ fontSize: '12px', background: '#1e3a8a', color: '#93c5fd', padding: '2px 6px', borderRadius: '4px' }}>CHO 2 Hub</span>
                     </div>
                     <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '400', display: 'block', marginTop: '6px' }}>
                       National Highway, Brgy. Pulo (Beside Centro Mall)
@@ -665,7 +663,7 @@ const handleLoginOtpSubmit = async (e) => {
                       background: selectedContext === `Brgy. ${b.name}` ? '#129968' : 'transparent', color: selectedContext === `Brgy. ${b.name}` ? '#ffffff' : 'var(--text-main)'
                     }}>
                       <span style={{ fontWeight: selectedContext === `Brgy. ${b.name}` ? '600' : '400' }}>Brgy. {b.name}</span>
-                      <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '4px', background: 'rgba(0,0,0,0.2)', color: selectedContext === `Brgy. ${b.name}` ? '#fff' : 'var(--text-muted)' }}>{b.district}</span>
+                      <span style={{ fontSize: '12px', padding: '2px 6px', borderRadius: '4px', background: 'rgba(0,0,0,0.2)', color: selectedContext === `Brgy. ${b.name}` ? '#fff' : 'var(--text-muted)' }}>{b.district}</span>
                     </div>
                   ))}
                 </div>
@@ -841,7 +839,7 @@ const handleLoginOtpSubmit = async (e) => {
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div style={{ padding: '18px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', textAlign: 'left' }}>
-                    <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '10px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '10px' }}>
                       CHO Unit I (Main - Sala)
                     </div>
                     <div style={{ fontSize: '14px', color: 'var(--text-main)', marginBottom: '6px' }}>
@@ -853,7 +851,7 @@ const handleLoginOtpSubmit = async (e) => {
                   </div>
 
                   <div style={{ padding: '18px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', textAlign: 'left' }}>
-                    <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '10px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '10px' }}>
                       CHO Unit II (Extension - Pulo)
                     </div>
                     <div style={{ fontSize: '14px', color: 'var(--text-main)', marginBottom: '6px' }}>

@@ -110,7 +110,7 @@ function Section({ title, icon, children, danger }) {
       borderRadius: '12px', padding: '24px',
     }}>
       <h3 style={{
-        margin: '0 0 16px', fontSize: '18px', fontWeight: '700',
+        margin: '0 0 16px', fontSize: '14px', fontWeight: '700',
         color: danger ? '#dc2626' : 'var(--text-main)',
         display: 'flex', alignItems: 'center', gap: '8px',
       }}>
@@ -133,7 +133,7 @@ function ResourceCard({ title, desc, type }) {
         display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px',
       }}>
         <span style={{
-          padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '600',
+          padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: '600',
           background: type === 'Video' ? '#fef3c7' : '#dbeafe',
           color: type === 'Video' ? '#92400e' : '#1e40af',
         }}>

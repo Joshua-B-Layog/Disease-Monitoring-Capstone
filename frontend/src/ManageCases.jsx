@@ -204,17 +204,17 @@ const DISEASE_CATEGORIES = [
     diseases: ALL_DISEASE_ENTRIES.filter(d => ['HIV/AIDS', 'Rabies', 'Hepatitis B', 'Leprosy', 'Poliomyelitis'].includes(d.name)),
   },
   {
-    id: 'waterborne', name: 'Water & Foodborne', icon: '💧', color: '#0EA5E9',
+    id: 'waterborne', name: 'Water & Foodborne', icon: resolveIcon('svg:typhoid'), color: '#0EA5E9',
     desc: 'Diseases spread through contaminated water or food',
     diseases: ALL_DISEASE_ENTRIES.filter(d => ['Cholera', 'Typhoid Fever', 'Hepatitis A', 'Diarrhea'].includes(d.name)),
   },
   {
-    id: 'vector', name: 'Vector-borne', icon: '🦟', color: '#D97706',
+    id: 'vector', name: 'Vector-borne', icon: resolveIcon('svg:fever'), color: '#D97706',
     desc: 'Diseases transmitted by mosquitoes and other vectors',
     diseases: ALL_DISEASE_ENTRIES.filter(d => ['Dengue Fever', 'Leptospirosis', 'Malaria'].includes(d.name)),
   },
   {
-    id: 'respiratory', name: 'Respiratory', icon: '🌬️', color: '#3B82F6',
+    id: 'respiratory', name: 'Respiratory', icon: resolveIcon('svg:flu-a'), color: '#3B82F6',
     desc: 'Diseases spread through respiratory droplets and airborne transmission',
     diseases: ALL_DISEASE_ENTRIES.filter(d => ['Acute Respiratory Infection', 'Avian Influenza', 'Covid-19', 'Influenza', 'Influenza A', 'SARS', 'Tuberculosis'].includes(d.name)),
   },
@@ -1794,7 +1794,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
             <div style={{ fontSize: '26px', marginBottom: '6px' }}>{entry.icon}</div>
             <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '4px', lineHeight: '1.25' }}>{entry.name}</div>
-            <div style={{ fontSize: '11px', color: 'var(--text-main)', lineHeight: '1.3', marginBottom: '8px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{entry.desc}</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-main)', lineHeight: '1.3', marginBottom: '8px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{entry.desc}</div>
             <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: entry.color, color: '#fff', borderRadius: '50%', width: '28px', height: '28px', fontSize: '12px', fontWeight: '700' }}>
               {count}
             </div>
@@ -1993,7 +1993,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             <div key={carouselIndex} className="cdms-carousel-slide" style={{ textAlign: 'center' }}>
               {carouselIndex === 0 && (
                 <div>
-                  <h3 style={{ margin: '0 0 6px 0', fontSize: '18px', color: 'var(--text-main)' }}>📋 All Diseases & Categories</h3>
+                  <h3 style={{ margin: '0 0 6px 0', fontSize: '14px', color: 'var(--text-main)' }}>📋 All Diseases & Categories</h3>
                   <p style={{ margin: '0 0 14px 0', fontSize: '13px', color: 'var(--text-muted)' }}>
                     Browse all disease categories below, or use the ◀ ▶ arrows for exclusive diseases and to add a new one.
                   </p>
@@ -2022,7 +2022,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 const exclusiveCat = DISEASE_CATEGORIES.find(c => c.id === 'exclusive');
                 return (
                   <div>
-                    <h3 style={{ margin: '0 0 6px 0', fontSize: '18px', color: 'var(--text-main)' }}>⚠️ Exclusive Diseases</h3>
+                    <h3 style={{ margin: '0 0 6px 0', fontSize: '14px', color: 'var(--text-main)' }}>⚠️ Exclusive Diseases</h3>
                     <p style={{ margin: '0 0 14px 0', fontSize: '13px', color: 'var(--text-muted)' }}>{exclusiveCat?.desc}</p>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', textAlign: 'left', maxWidth: '760px', margin: '0 auto' }}>
                       {(exclusiveCat?.diseases || []).slice(0, 6).map(d => (
@@ -2041,7 +2041,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
                           <div style={{ fontSize: '28px', lineHeight: 1, marginBottom: '8px' }}>{d.icon}</div>
                           <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '4px' }}>{d.name}</div>
-                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: '1.35', marginBottom: '10px' }}>{d.desc}</div>
+                          <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.35', marginBottom: '10px' }}>{d.desc}</div>
                           <div style={{ background: d.color, color: '#fff', borderRadius: '50%', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', margin: '0 auto' }}>
                             {getCaseCount(d)}
                           </div>
@@ -2061,7 +2061,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               })()}
               {carouselIndex === 2 && (
                 <div style={{ maxWidth: '720px', margin: '0 auto', textAlign: 'left' }}>
-                  <h3 style={{ margin: '0 0 12px 0', fontSize: '18px', color: 'var(--text-main)', textAlign: 'center' }}>➕ Add New Disease</h3>
+                  <h3 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--text-main)', textAlign: 'center' }}>➕ Add New Disease</h3>
                   {addDiseaseMsg && (
                     <div style={{ padding: '8px 12px', marginBottom: '10px', borderRadius: '6px', fontSize: '13px', background: addDiseaseMsg.startsWith('Error') ? '#fee2e2' : '#d1f5e9', color: addDiseaseMsg.startsWith('Error') ? '#991b1b' : '#0a5e42' }}>
                       {addDiseaseMsg}
@@ -2283,7 +2283,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '2px' }}>"{req.note}"</div>
                     )}
                   </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', flexShrink: 0 }}>
                     {new Date(req.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
                   </div>
                   <button onClick={() => {
@@ -2336,7 +2336,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       </div>
                     </div>
                   </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', flexShrink: 0 }}>
                     {new Date(item.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
                   </div>
                   <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
@@ -2384,7 +2384,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       </div>
                     </div>
                   </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', flexShrink: 0 }}>
                     {new Date(req.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
                   </div>
                   <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
@@ -2428,7 +2428,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       </div>
                     )}
                   </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', flexShrink: 0 }}>
                     {new Date(reg.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
                   </div>
                   <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
@@ -2475,7 +2475,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       </div>
                     </div>
                   </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', flexShrink: 0 }}>
                     {new Date(msg.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
                   </div>
                   {msg.status === 'new' ? (
@@ -2547,7 +2547,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           ) : (
             outboxItems.map(item => (
               <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)' }}>
-                <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: item.status === 'accepted' ? '#129968' : item.status === 'rejected' ? '#ef4444' : '#D97706', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '11px', flexShrink: 0 }}>
+                <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: item.status === 'accepted' ? '#129968' : item.status === 'rejected' ? '#ef4444' : '#D97706', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '12px', flexShrink: 0 }}>
                   {item.status === 'accepted' ? '✓' : item.status === 'rejected' ? '✕' : '…'}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -2570,7 +2570,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     {item.barangay_name && <span> · {item.item_type === 'edit_request' ? 'Barangay' : 'Assigned to'} {item.barangay_name}</span>}
                   </div>
                 </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', flexShrink: 0 }}>
                   {new Date(item.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
                 </div>
               </div>
@@ -2696,7 +2696,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           </div>
         </div>
 
-        <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right', marginBottom: '6px' }}>
+        <div style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'right', marginBottom: '6px' }}>
           {lastUpdated ? `Updated ${Math.round((now - lastUpdated) / 1000)}s ago` : 'Refreshing...'}
         </div>
 
@@ -2897,14 +2897,14 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         style={{ padding: '5px 8px', background: tableEllipsisOpen ? 'rgba(18,19,88,0.15)' : 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '700', letterSpacing: '2px' }}>...</button>
                       {tableEllipsisOpen && (
                         <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px', width: '160px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 100 }}>
-                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px' }}>Go to page (1–{totalTablePages})</div>
+                          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>Go to page (1–{totalTablePages})</div>
                           <div style={{ display: 'flex', gap: '4px' }}>
                             <input type="number" min="1" max={totalTablePages} value={tableEllipsisInput} placeholder="#"
                               onChange={e => setTableEllipsisInput(e.target.value)}
                               onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(tableEllipsisInput); if (v >= 1 && v <= totalTablePages) { setTablePage(v); setTableEllipsisOpen(false); setTableEllipsisInput(''); } } }}
                               style={{ flex: 1, padding: '5px 6px', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '12px', outline: 'none', width: '100%' }} />
                             <button onClick={() => { const v = parseInt(tableEllipsisInput); if (v >= 1 && v <= totalTablePages) { setTablePage(v); setTableEllipsisOpen(false); setTableEllipsisInput(''); } }}
-                              style={{ padding: '5px 8px', border: '1px solid #121358', borderRadius: '4px', background: '#121358', color: 'white', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>Go</button>
+                              style={{ padding: '5px 8px', border: '1px solid #121358', borderRadius: '4px', background: '#121358', color: 'white', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Go</button>
                           </div>
                         </div>
                       )}
@@ -2992,7 +2992,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 <div style={{ position: 'relative' }}>
                   <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>
                     Patient Full Name
-                      <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '11px', marginLeft: '6px' }}>
+                      <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '12px', marginLeft: '6px' }}>
                       (Type surname to auto-fill past records)
                     </span>
                   </label>
@@ -3013,7 +3013,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
                       padding: '4px',
                     }}>
-                      <div style={{ padding: '6px 12px', fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-color)', marginBottom: '2px' }}>
+                      <div style={{ padding: '6px 12px', fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-color)', marginBottom: '2px' }}>
                         Multiple matching records - click to select
                       </div>
                       {patientLookupResults.map((p, i) => (
@@ -3028,7 +3028,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                         >
                           <span><strong>{p.patient_name}</strong> <span style={{ color: 'var(--text-muted)' }}>- {p.barangay_name || 'N/A'}</span></span>
-                          <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
                             {p.age || '?'}y
                           </span>
                         </div>
@@ -3612,13 +3612,13 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   )}
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <div style={{ flex: 1 }}>
-                      <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-h)', marginBottom: '4px' }}>Latitude (N)</label>
+                      <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-h)', marginBottom: '4px' }}>Latitude (N)</label>
                       <input type="text" placeholder="e.g. 14.2253" style={{ ...inputStyle, border: formErrors.location ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.location ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                         value={formData.lat} onChange={e => setFormData({ ...formData, lat: e.target.value })}
                         readOnly={isBhwReadOnly} />
                     </div>
                     <div style={{ flex: 1 }}>
-                      <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-h)', marginBottom: '4px' }}>Longitude (E)</label>
+                      <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-h)', marginBottom: '4px' }}>Longitude (E)</label>
                       <input type="text" placeholder="e.g. 121.3025" style={{ ...inputStyle, border: formErrors.location ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.location ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                         value={formData.lng} onChange={e => setFormData({ ...formData, lng: e.target.value })}
                         readOnly={isBhwReadOnly} />

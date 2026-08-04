@@ -453,7 +453,7 @@ if (!document.getElementById('cdms-barangay-labels')) {
     }
     .brgy-tooltip-label .brgy-name {
       font-weight: 700;
-      font-size: 11px;
+      font-size: 12px;
       color: #fff;
       text-align: center;
       line-height: 1.2;
@@ -932,14 +932,14 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         padding: '20px 16px', display: 'flex', flexDirection: 'column',
         gap: '16px', overflowY: 'auto',
       }}>
-        <p style={{ margin: 0, fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        <p style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
           Filters
         </p>
 
         {/* Barangay — all 18 hardcoded (hidden for BHW) */}
         {loginRole !== 'BHW' && (
           <div>
-            <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Barangay</label>
+            <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Barangay</label>
             <div style={{ position: 'relative' }} ref={barangayRef}>
               <button
                 onClick={() => setBarangayOpen(!barangayOpen)}
@@ -1015,7 +1015,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         {/* BHW — static barangay display */}
         {loginRole === 'BHW' && loginBarangay && (
           <div>
-            <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Barangay</label>
+            <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Barangay</label>
             <div style={{ padding: '9px 12px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '7px', color: 'var(--text-main)', fontSize: '13px' }}>
               {loginBarangay}
             </div>
@@ -1024,7 +1024,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
 
         {/* Status */}
         <div>
-          <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Status</label>
+          <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Status</label>
           <div style={{ position: 'relative' }} ref={statusRef}>
             <button type="button" onClick={() => setStatusOpen(!statusOpen)}
               style={{ ...SEL, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' }}>
@@ -1049,7 +1049,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
 
         {/* Purok / Blk / Phase */}
         <div>
-          <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Purok / Blk / Phase</label>
+          <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Purok / Blk / Phase</label>
           <div style={{ position: 'relative' }} ref={purokRef}>
             <button
               onClick={() => setPurokOpen(!purokOpen)}
@@ -1104,13 +1104,13 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
 
         {/* Date */}
         <div>
-          <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Date</label>
+          <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Date</label>
           <input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} style={SEL} />
         </div>
 
         {/* Severity — includes Asymptomatic */}
         <div>
-          <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Severity</label>
+          <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Severity</label>
           <div style={{ position: 'relative' }} ref={severityRef}>
             <button type="button" onClick={() => setSeverityOpen(!severityOpen)}
               style={{ ...SEL, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' }}>
@@ -1135,7 +1135,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
 
         {/* Legend */}
         <div style={{ paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
-          <p style={{ margin: '0 0 10px 0', fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Legend</p>
+          <p style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Legend</p>
           {[
             { color: '#DC2626', label: 'High Risk (20+ cases)' },
             { color: '#f59e0b', label: 'Medium Risk (10–19 cases)' },
@@ -1150,7 +1150,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
 
         {/* Active Hotspots counter — based on filtered data */}
         <div style={{ paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
-          <p style={{ margin: '0 0 10px 0', fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Active Hotspots</p>
+          <p style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Active Hotspots</p>
           <div style={{ display: 'flex', gap: '8px' }}>
             {[
               { label: 'High',   count: highCount,   color: '#DC2626' },
@@ -1163,7 +1163,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               </div>
             ))}
           </div>
-          <p style={{ margin: '8px 0 0 0', fontSize: '10px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+          <p style={{ margin: '8px 0 0 0', fontSize: '11.5px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
             Pin color = total cases per barangay. Thresholds: &gt;20 red, 10–20 amber, &lt;10 green.
           </p>
         </div>
@@ -1174,11 +1174,11 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           Reset Filters
         </button>
 
-        <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', paddingTop: '6px' }}>
+        <div style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', paddingTop: '6px' }}>
           {lastUpdated ? `Updated ${Math.round((now - lastUpdated) / 1000)}s ago` : 'Refreshing...'}
         </div>
         {offlineMode && (
-          <div style={{ fontSize: '11px', color: '#F59E0B', textAlign: 'center', padding: '6px 8px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '6px' }}>
+          <div style={{ fontSize: '12px', color: '#F59E0B', textAlign: 'center', padding: '6px 8px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '6px' }}>
             Offline - showing cached data
           </div>
         )}
@@ -1272,7 +1272,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: getRisk(tooltip.totalCases).color, display: 'inline-block' }} />
               {getRisk(tooltip.totalCases).label} · {tooltip.totalCases} case{tooltip.totalCases !== 1 ? 's' : ''}
             </div>
-            <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '7px' }}>
+            <div style={{ fontSize: '14px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '7px' }}>
               Top Diseases
             </div>
             {getTop5(tooltip.diseases).map(([disease, count], i) => (
@@ -1348,7 +1348,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
 
               <div style={{ borderTop: '1px solid var(--border-color)', marginBottom: '14px' }} />
 
-              <p style={{ margin: '0 0 10px 0', fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <p style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 All Diseases in this Barangay
               </p>
 
@@ -1384,7 +1384,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                   );
                 })}
 
-              <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--border-color)', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>
+              <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--border-color)', fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center' }}>
                 Click "Go To →" to open Manage Cases filtered to that disease and barangay
               </div>
             </div>

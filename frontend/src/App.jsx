@@ -451,7 +451,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
   // ── Profile field row helper ──
   const ProfileRow = ({ label, value }) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '16px' }}>
-      <span style={{ fontSize: '11px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
+      <span style={{ fontSize: '14px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
       <span style={{ fontSize: '15px', color: '#0f172a', fontWeight: '500' }}>{value || '—'}</span>
     </div>
   );
@@ -523,7 +523,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                       Notifications {unreadCount > 0 && (
                         <span style={{
                           background: '#ef4444', color: 'white', borderRadius: '10px',
-                          padding: '1px 7px', fontSize: '11px', marginLeft: '6px'
+                          padding: '1px 7px', fontSize: '12px', marginLeft: '6px'
                         }}>{unreadCount}</span>
                       )}
                     </span>
@@ -583,7 +583,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                               {n.message}
                             </div>
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                                 {new Date(n.created_at).toLocaleString('en-PH', {
                                   month: 'short', day: 'numeric',
                                   hour: '2-digit', minute: '2-digit'
@@ -592,7 +592,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                               {n.is_read === 0 && (
                                 <button onClick={() => handleMarkRead(n.id)} style={{
                                   background: 'none', border: 'none', color: '#121358',
-                                  cursor: 'pointer', fontSize: '11px', fontWeight: '600', padding: 0
+                                  cursor: 'pointer', fontSize: '12px', fontWeight: '600', padding: 0
                                 }}>
                                   Mark read
                                 </button>
@@ -621,7 +621,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                                   setShowNotifications(false);
                                 }} style={{
                                   background: 'none', border: 'none', color: '#129968',
-                                  cursor: 'pointer', fontSize: '11px', fontWeight: '600', padding: 0
+                                  cursor: 'pointer', fontSize: '12px', fontWeight: '600', padding: 0
                                 }}>
                                   View →
                                 </button>
@@ -730,7 +730,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
           ) : '⟳'}
           {syncingActive ? 'Syncing...' : `Sync ${pendingSyncCount} item${pendingSyncCount > 1 ? 's' : ''}`}
           {pendingSyncCount > 0 && !syncingActive && (
-            <span style={{ background: '#fff', color: navigator.onLine ? '#129968' : '#D97706', borderRadius: '50%', width: '20px', height: '20px', fontSize: '11px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ background: '#fff', color: navigator.onLine ? '#129968' : '#D97706', borderRadius: '50%', width: '20px', height: '20px', fontSize: '12px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {pendingSyncCount}
             </span>
           )}

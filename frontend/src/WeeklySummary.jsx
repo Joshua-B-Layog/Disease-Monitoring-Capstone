@@ -154,12 +154,12 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
         .metrics { display: flex; gap: 12px; margin: 16px 0 24px 0; }
         .metric-card { flex: 1; text-align: center; padding: 14px 8px; border-radius: 8px; }
         .metric-val { font-size: 28px; font-weight: 700; }
-        .metric-label { font-size: 11px; color: #64748b; margin-top: 2px; }
+        .metric-label { font-size: 12px; color: #64748b; margin-top: 2px; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
         th { background: #1e3a8a; color: white; padding: 9px 12px; text-align: left; font-size: 12px; }
         td { padding: 8px 12px; border-bottom: 1px solid #e5e7eb; }
         tr:nth-child(even) td { background: #f9fafb; }
-        .footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 11px; text-align: center; }
+        .footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 12px; text-align: center; }
         @media print { .no-print { display: none !important; } body { padding: 16px; } }
       </style></head><body>
       <h1>Weekly Disease Summary Report</h1>
@@ -334,7 +334,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
       {/* ── Cases by Barangay ── */}
       <div style={tableContainerStyle}>
         <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ margin: 0, fontSize: '15px', color: 'var(--text-h)' }}>Cases by Barangay</h2>
+          <h2 style={{ margin: 0, fontSize: '14px', color: 'var(--text-h)' }}>Cases by Barangay</h2>
           <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{byBarangay.length} barangay{byBarangay.length !== 1 ? 's' : ''}</span>
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -357,7 +357,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
                   </div>
                 </td>
                 <td style={{ padding: '10px 16px', textAlign: 'center' }}>
-                  <span style={{ padding: '3px 10px', borderRadius: '10px', fontSize: '11px', fontWeight: '600', background: `${getRiskColor(b.count)}22`, color: getRiskColor(b.count) }}>
+                  <span style={{ padding: '3px 10px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', background: `${getRiskColor(b.count)}22`, color: getRiskColor(b.count) }}>
                     {getRiskLabel(b.count)} Risk
                   </span>
                 </td>
@@ -373,7 +373,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
       {/* ── Cases by Disease ── */}
       <div style={tableContainerStyle}>
         <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ margin: 0, fontSize: '15px', color: 'var(--text-h)' }}>Cases by Disease</h2>
+          <h2 style={{ margin: 0, fontSize: '14px', color: 'var(--text-h)' }}>Cases by Disease</h2>
           <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{byDisease.filter(d => d.count > 0).length} diseases with cases</span>
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -408,7 +408,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
         {/* Cases by Severity */}
         <div style={{ ...tableContainerStyle, flex: '1 1 300px', marginBottom: 0, alignSelf: 'flex-start' }}>
           <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-color)' }}>
-            <h2 style={{ margin: 0, fontSize: '15px', color: 'var(--text-h)' }}>Cases by Severity</h2>
+            <h2 style={{ margin: 0, fontSize: '14px', color: 'var(--text-h)' }}>Cases by Severity</h2>
           </div>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
@@ -439,7 +439,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
         {/* Risk Assessment */}
         <div style={{ ...tableContainerStyle, flex: '1 1 300px', marginBottom: 0 }}>
           <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-color)' }}>
-            <h2 style={{ margin: 0, fontSize: '15px', color: 'var(--text-h)' }}>Risk Assessment</h2>
+            <h2 style={{ margin: 0, fontSize: '14px', color: 'var(--text-h)' }}>Risk Assessment</h2>
           </div>
           <div style={{ padding: '12px 16px' }}>
             {byBarangay.filter(b => b.count >= 20).length > 0 && (
@@ -485,7 +485,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
       {/* ── New Cases This Period ── */}
       <div style={tableContainerStyle}>
         <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ margin: 0, fontSize: '15px', color: 'var(--text-h)' }}>New Cases This Period</h2>
+          <h2 style={{ margin: 0, fontSize: '14px', color: 'var(--text-h)' }}>New Cases This Period</h2>
           <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{newCases.length} case{newCases.length !== 1 ? 's' : ''}</span>
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -508,11 +508,11 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
                   <td style={{ padding: '10px 16px', fontSize: '13px' }}>{c.barangay_name || ''}</td>
                   <td style={{ padding: '10px 16px', textAlign: 'center', fontSize: '12px' }}>
                     {c.severity ? (
-                      <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: '600', background: `${getSeverityColor(c.severity)}22`, color: getSeverityColor(c.severity) }}>{c.severity}</span>
+                      <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', background: `${getSeverityColor(c.severity)}22`, color: getSeverityColor(c.severity) }}>{c.severity}</span>
                     ) : <span style={{ color: 'var(--text-muted)' }}>N/A</span>}
                   </td>
                   <td style={{ padding: '10px 16px', textAlign: 'center' }}>
-                    <span style={{ padding: '3px 10px', borderRadius: '10px', fontSize: '11px', fontWeight: '600', background: st.bg, color: st.color }}>{c.status}</span>
+                    <span style={{ padding: '3px 10px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', background: st.bg, color: st.color }}>{c.status}</span>
                   </td>
                   <td style={{ padding: '10px 16px', textAlign: 'right', fontSize: '12px', color: 'var(--text-muted)' }}>{fmtShortDate(c.date_reported)}</td>
                 </tr>
@@ -528,7 +528,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
       {/* ── Weekly Activity Log ── */}
       <div style={tableContainerStyle}>
         <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ margin: 0, fontSize: '15px', color: 'var(--text-h)' }}>Weekly Activity Log</h2>
+          <h2 style={{ margin: 0, fontSize: '14px', color: 'var(--text-h)' }}>Weekly Activity Log</h2>
           <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{auditLogs.length} activit{auditLogs.length !== 1 ? 'ies' : 'y'}</span>
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -547,12 +547,12 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
                   <td style={{ padding: '10px 16px', fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{fmtDateTime(log.created_at)}</td>
                   <td style={{ padding: '10px 16px', fontSize: '13px' }}>{log.user_full_name || log.user_name || 'System'}</td>
                   <td style={{ padding: '10px 16px', textAlign: 'center' }}>
-                    <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: '600', background: log.user_role === 'CHO' ? '#12135822' : log.user_role === 'BHW' ? '#7c3aed22' : '#37415122', color: log.user_role === 'CHO' ? '#121358' : log.user_role === 'BHW' ? '#7c3aed' : '#6b7280' }}>
+                    <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', background: log.user_role === 'CHO' ? '#12135822' : log.user_role === 'BHW' ? '#7c3aed22' : '#37415122', color: log.user_role === 'CHO' ? '#121358' : log.user_role === 'BHW' ? '#7c3aed' : '#6b7280' }}>
                       {log.user_role || 'System'}
                     </span>
                   </td>
                   <td style={{ padding: '10px 16px', textAlign: 'center' }}>
-                    <span style={{ padding: '3px 10px', borderRadius: '10px', fontSize: '11px', fontWeight: '600', background: ab.bg, color: ab.color }}>{log.action}</span>
+                    <span style={{ padding: '3px 10px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', background: ab.bg, color: ab.color }}>{log.action}</span>
                   </td>
                   <td style={{ padding: '10px 16px', textAlign: 'center', fontSize: '12px' }}>{log.entity || ''}</td>
                   <td style={{ padding: '10px 16px', fontSize: '12px', color: 'var(--text-muted)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.details || ''}</td>

@@ -572,14 +572,14 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                     style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)', borderRadius: '6px', background: ellipsisOpen ? 'rgba(18,19,88,0.15)' : 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '16px', fontWeight: '700', letterSpacing: '2px' }}>...</button>
                   {ellipsisOpen && (
                     <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px', width: '160px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 100 }}>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px' }}>Go to page (1–{totalPages})</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>Go to page (1–{totalPages})</div>
                       <div style={{ display: 'flex', gap: '4px' }}>
                         <input type="number" min="1" max={totalPages} value={ellipsisPageInput} placeholder="#"
                           onChange={e => setEllipsisPageInput(e.target.value)}
                           onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(ellipsisPageInput); if (v >= 1 && v <= totalPages) { setCurrentPage(v); setEllipsisOpen(false); setEllipsisPageInput(''); } } }}
                           style={{ flex: 1, padding: '5px 6px', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '12px', outline: 'none', width: '100%' }} />
                         <button onClick={() => { const v = parseInt(ellipsisPageInput); if (v >= 1 && v <= totalPages) { setCurrentPage(v); setEllipsisOpen(false); setEllipsisPageInput(''); } }}
-                          style={{ padding: '5px 8px', border: '1px solid #121358', borderRadius: '4px', background: '#121358', color: 'white', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>Go</button>
+                          style={{ padding: '5px 8px', border: '1px solid #121358', borderRadius: '4px', background: '#121358', color: 'white', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Go</button>
                       </div>
                     </div>
                   )}
@@ -611,7 +611,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
             )}
 
             <form onSubmit={handleSubmit}>
-              <p style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 12px 0' }}>Basic Information</p>
+              <p style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 12px 0' }}>Basic Information</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>First Name *</label>
@@ -681,14 +681,14 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                             style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '14px', color: 'var(--text-muted)', fontStyle: 'italic', borderBottom: '1px solid var(--border-color)' }}>
                             — Select Barangay —
                           </div>
-                          {visibleBarangayAssignOptions.length > 0 && <div style={{ padding: '6px 14px 2px', fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>CHO Unit I</div>}
+                          {visibleBarangayAssignOptions.length > 0 && <div style={{ padding: '6px 14px 2px', fontSize: '14px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>CHO Unit I</div>}
                           {visibleBarangayAssignOptions.filter(b => unitIBarangays.includes(b)).map(b => (
                             <div key={b.id} onClick={() => { setFormData({ ...formData, barangayId: b.id }); setBarangayAssignOpen(false); }}
                               style={{ padding: '8px 14px 8px 18px', cursor: 'pointer', fontSize: '14px', color: formData.barangayId === b.id ? '#3B82F6' : 'var(--text-main)', background: formData.barangayId === b.id ? 'var(--input-bg)' : 'transparent', fontWeight: formData.barangayId === b.id ? '600' : '400' }}>
                               {b.name}
                             </div>
                           ))}
-                          {visibleBarangayAssignOptions.filter(b => unitIIBarangays.includes(b)).length > 0 && <div style={{ padding: '8px 14px 2px', fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>CHO Unit II</div>}
+                          {visibleBarangayAssignOptions.filter(b => unitIIBarangays.includes(b)).length > 0 && <div style={{ padding: '8px 14px 2px', fontSize: '14px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>CHO Unit II</div>}
                           {visibleBarangayAssignOptions.filter(b => unitIIBarangays.includes(b)).map(b => (
                             <div key={b.id} onClick={() => { setFormData({ ...formData, barangayId: b.id }); setBarangayAssignOpen(false); }}
                               style={{ padding: '8px 14px 8px 18px', cursor: 'pointer', fontSize: '14px', color: formData.barangayId === b.id ? '#3B82F6' : 'var(--text-main)', background: formData.barangayId === b.id ? 'var(--input-bg)' : 'transparent', fontWeight: formData.barangayId === b.id ? '600' : '400' }}>
@@ -707,7 +707,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                 </div>
               </div>
 
-              <p style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '20px 0 12px 0' }}>Account Settings</p>
+              <p style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '20px 0 12px 0' }}>Account Settings</p>
 
               {!editingUser && (
                 <div style={{ marginBottom: '14px' }}>
@@ -716,7 +716,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                       onChange={e => setFormData({ ...formData, generateTempPassword: e.target.checked })} />
                     Generate temporary password
                   </label>
-                  <p style={{ margin: '0 0 10px 0', fontSize: '11px', color: 'var(--text-muted)' }}>Password will be emailed to user</p>
+                  <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: 'var(--text-muted)' }}>Password will be emailed to user</p>
                   {!formData.generateTempPassword && (
                     <input type="password" placeholder="Set a password" style={inputStyle}
                       value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} />

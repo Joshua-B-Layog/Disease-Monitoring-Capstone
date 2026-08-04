@@ -709,7 +709,7 @@ export default function PreventionTips() {
         <div style={{
           background: '#129968', padding: '16px 24px', color: '#fff',
         }}>
-          <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>
+          <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '700' }}>
             🩺 Symptom Checker
           </h3>
           <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'rgba(255,255,255,0.85)' }}>
@@ -746,7 +746,7 @@ export default function PreventionTips() {
             return (
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                  <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: 'var(--text-main)' }}>
+                  <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>
                     {disease.icon} {disease.name} - Symptom Check
                   </h4>
                   <button onClick={resetQuiz}

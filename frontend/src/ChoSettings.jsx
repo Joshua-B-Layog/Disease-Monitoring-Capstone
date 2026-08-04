@@ -56,10 +56,10 @@ function OfflineSyncPanel() {
                 {new Date(item.timestamp).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
-            <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '10px', background: statusColor(item.status) + '22', color: statusColor(item.status), fontWeight: '600', textTransform: 'capitalize' }}>
+            <span style={{ fontSize: '12px', padding: '2px 8px', borderRadius: '10px', background: statusColor(item.status) + '22', color: statusColor(item.status), fontWeight: '600', textTransform: 'capitalize' }}>
               {item.status}
             </span>
-            {item.error && <span style={{ fontSize: '11px', color: '#EF4444', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.error}>{item.error}</span>}
+            {item.error && <span style={{ fontSize: '12px', color: '#EF4444', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.error}>{item.error}</span>}
           </div>
         ))}
       </div>
@@ -708,7 +708,7 @@ export default function CHOSettings({
               <NavigationCard title={t('Account Security')} icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="#2563EB"><path d="M19.944,2.642,12,.009,4.056,2.643A3,3,0,0,0,2,5.49V12c0,7.524,9.2,11.679,9.594,11.852l.354.157.368-.122C12.711,23.755,22,20.577,22,12V5.49A3,3,0,0,0,19.944,2.642Z"/></svg>} view="security" />
               <NavigationCard title={t('Notifications')} icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="#D97706"><path d="M20,8c-2.21,0-4-1.79-4-4S17.79,0,20,0s4,1.79,4,4-1.79,4-4,4Zm-8,7.42c.77,0,1.54-.29,2.12-.88l4.67-4.67c-2.73-.56-4.79-2.98-4.79-5.88,0-.34,.04-.67,.09-1H5c-1.81,0-3.38,.97-4.26,2.41L9.88,14.55c.58,.58,1.35,.88,2.12,.88Zm9.76-5.69l-6.23,6.23c-.97,.97-2.26,1.46-3.54,1.46s-2.56-.49-3.54-1.46L.05,7.54c-.01,.15-.05,.3-.05,.46v11c0,2.76,2.24,5,5,5h14c2.76,0,5-2.24,5-5l-.02-10.53c-.64,.57-1.39,1-2.22,1.26Z"/></svg>} view="notifications" />
               <NavigationCard title={t('System Preferences')} icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="#475569"><path d="M21,12a9.143,9.143,0,0,0-.15-1.645L23.893,8.6l-3-5.2L17.849,5.159A9,9,0,0,0,15,3.513V0H9V3.513A9,9,0,0,0,6.151,5.159L3.107,3.4l-3,5.2L3.15,10.355a9.1,9.1,0,0,0,0,3.29L.107,15.4l3,5.2,3.044-1.758A9,9,0,0,0,9,20.487V24h6V20.487a9,9,0,0,0,2.849-1.646L20.893,20.6l3-5.2L20.85,13.645A9.143,9.143,0,0,0,21,12Zm-6,0a3,3,0,1,1-3-3A3,3,0,0,1,15,12Z"/></svg>} view="system" />
-              <NavigationCard title={t('Data Management')} icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="#0891B2"><path d="m22.5 18c0-.46-.089-.895-.218-1.312l1.417-.816-.999-1.732-1.41.813c-.605-.652-1.393-1.126-2.289-1.331v-1.621h-2v1.621c-.896.205-1.685.678-2.289 1.331l-1.41-.813-.999 1.732 1.417.816c-.129.418-.218.853-.218 1.312s.089.895.218 1.312l-1.417.816.999 1.732 1.41-.813c.605.652 1.393 1.126 2.289 1.331v1.621h2v-1.621c.896-.205 1.685-.678 2.289-1.331l1.41.813.999-1.732-1.417-.816c.129-.418.218-.853.218-1.312zm-4.5 1.5c-.827 0-1.5-.673-1.5-1.5s.673-1.5 1.5-1.5 1.5.673 1.5 1.5-.673 1.5-1.5 1.5z"/></svg>} view="data" isFullWidth />
+              <NavigationCard title={t('Data Management')} icon={<svg width="22" height="22" viewBox="12.3 12 11.4 12" fill="#0891B2"><path d="m22.5 18c0-.46-.089-.895-.218-1.312l1.417-.816-.999-1.732-1.41.813c-.605-.652-1.393-1.126-2.289-1.331v-1.621h-2v1.621c-.896.205-1.685.678-2.289 1.331l-1.41-.813-.999 1.732 1.417.816c-.129.418-.218.853-.218 1.312s.089.895.218 1.312l-1.417.816.999 1.732 1.41-.813c.605.652 1.393 1.126 2.289 1.331v1.621h2v-1.621c.896-.205 1.685-.678 2.289-1.331l1.41.813.999-1.732-1.417-.816c.129-.418.218-.853.218-1.312zm-4.5 1.5c-.827 0-1.5-.673-1.5-1.5s.673-1.5 1.5-1.5 1.5.673 1.5 1.5-.673 1.5-1.5 1.5z"/></svg>} view="data" isFullWidth />
             </div>
           </div>
         )}
@@ -1019,7 +1019,7 @@ export default function CHOSettings({
                     <span style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-h)' }}>
                       {sessionData.last_login_device || 'Current Device'}
                     </span>
-                    <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px', background: '#129968', color: 'white' }}>
+                    <span style={{ fontSize: '12px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px', background: '#129968', color: 'white' }}>
                       THIS DEVICE
                     </span>
                   </div>
@@ -1059,7 +1059,7 @@ export default function CHOSettings({
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--text-h)' }}>Manage Sessions</h3>
+                    <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: 'var(--text-h)' }}>Manage Sessions</h3>
                     <button onClick={() => setShowSessionsModal(false)}
                       style={{ background: 'none', border: 'none', fontSize: '22px', color: 'var(--text-muted)', cursor: 'pointer', lineHeight: 1, padding: 0 }}>
                       ×
@@ -1093,7 +1093,7 @@ export default function CHOSettings({
                         <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                         {sessionData.last_login_location || 'Cabuyao, Calabarzon, Philippines'}
                       </div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
                         {formatLoginTime(sessionData.last_login)}
                       </div>
                     </div>
@@ -1116,7 +1116,7 @@ export default function CHOSettings({
                       <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                           {sessionData.previous_login_location || 'Unknown Location'}
                         </div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
                           {formatLoginTime(sessionData.previous_login)}
                         </div>
                       </div>
@@ -1770,7 +1770,7 @@ export default function CHOSettings({
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="#2563EB"><path d="M0,7v-3c0-.552,.448-1,1-1s1,.448,1,1v1.412C4.21,2.067,7.966,0,12,0c6.253,0,11.391,4.69,11.951,10.91,.05,.55-.356,1.036-.906,1.086-.03,.002-.061,.004-.091,.004-.512,0-.948-.391-.995-.91-.467-5.182-4.748-9.09-9.959-9.09-3.559,0-6.878,1.916-8.662,5h1.662c.552,0,1,.448,1,1s-.448,1-1,1H2c-1.103,0-2-.897-2-2ZM22,15h-3c-.553,0-1,.447-1,1s.447,1,1,1h1.662c-1.785,3.084-5.104,5-8.662,5-5.21,0-9.492-3.908-9.959-9.09-.049-.549-.523-.944-1.086-.906C.405,12.054,0,12.54,.049,13.09c.561,6.22,5.699,10.91,11.951,10.91,4.033,0,7.79-2.068,10-5.413v1.413c0,.553,.447,1,1,1s1-.447,1-1v-3c0-1.103-.897-2-2-2ZM14,7c1.105,0,2,.895,2,2v6c0,1.105-.895,2-2,2h-4c-1.105,0-2-.895-2-2v-6c0-1.105,.895-2,2-2h4Zm-1,7c0-.552-.448-1-1-1h-1c-.552,0-1,.448-1,1s.448,1,1,1h1c.552,0,1-.448,1-1Zm1-4c0-.552-.448-1-1-1h-2c-.552,0-1,.448-1,1s.448,1,1,1h2c.552,0,1-.448,1-1Z"/></svg>
                   </div>
                   <div>
-                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: 'var(--text-main)' }}>Offline Sync</h3>
+                    <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>Offline Sync</h3>
                     <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>View offline operation queue and sync history</span>
                   </div>
                 </div>
@@ -1783,7 +1783,7 @@ export default function CHOSettings({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="#DC2626"><path d="M20.5,8.48V3.5h-4.98L12-.02l-3.52,3.52H3.5v4.98L-.02,12l3.52,3.52v4.98h4.98l3.52,3.52,3.52-3.52h4.98v-4.98l3.52-3.52-3.52-3.52Zm-7.5,9.52h-2v-2h2v2Zm0-4h-2V6h2V14Z"/></svg>
                   <div>
-                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#dc2626' }}>Danger Zone</h3>
+                    <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#dc2626' }}>Danger Zone</h3>
                     <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Irreversible actions</span>
                   </div>
                 </div>

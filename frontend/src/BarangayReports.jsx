@@ -478,7 +478,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
 
   const s = {
     card:    { background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' },
-    label:   { fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', letterSpacing: '0.04em', textTransform: 'uppercase' },
+    label:   { fontSize: '14px', fontWeight: '600', color: 'var(--text-muted)', letterSpacing: '0.04em', textTransform: 'uppercase' },
     input:   { padding: '9px 14px', border: '1px solid var(--input-border)', borderRadius: '7px', fontSize: '14px', color: 'var(--text-main)', background: 'var(--input-bg)', outline: 'none', width: '100%', boxSizing: 'border-box' },
     dropBtn: (active) => ({ padding: '9px 14px', border: `1px solid ${active ? '#121358' : 'var(--input-border)'}`, borderRadius: '7px', fontSize: '14px', color: active ? '#121358' : 'var(--text-muted)', background: 'var(--input-bg)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap', fontWeight: active ? '600' : '400' }),
     dropMenu: { position: 'absolute', top: '110%', left: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 200, minWidth: '200px', overflow: 'hidden' },
@@ -497,7 +497,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                 <h3 style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: '700', color: 'var(--text-h)' }}>{viewReport.title}</h3>
                 <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>{viewReport.timestamp}</p>
               </div>
-              <span style={{ fontSize: '11px', fontWeight: '600', padding: '4px 10px', borderRadius: '10px', background: '#e0f2fe', color: '#0369a1' }}>{viewReport.period}</span>
+              <span style={{ fontSize: '12px', fontWeight: '600', padding: '4px 10px', borderRadius: '10px', background: '#e0f2fe', color: '#0369a1' }}>{viewReport.period}</span>
             </div>
 
             <div style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '14px 18px', marginBottom: '20px' }}>
@@ -512,7 +512,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
               )}
             </div>
 
-            <h4 style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               System Activity Log Snapshot
             </h4>
             <div style={{ overflowX: 'auto', marginBottom: '24px' }}>
@@ -520,7 +520,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                 <thead>
                   <tr style={{ borderBottom: '2px solid var(--border-color)' }}>
                 {['Timestamp', 'User', 'Action', 'Entity', 'Details', 'Updated By'].map(h => (
-                      <th key={h} style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                      <th key={h} style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -530,10 +530,10 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                         <td style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{l.created_at ? new Date(l.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</td>
                         <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                           <div style={{ fontWeight: '600', color: 'var(--text-main)', fontSize: '12px' }}>{l.user_id}</div>
-                          <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>{l.user_name}</div>
+                          <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{l.user_name}</div>
                         </td>
                         <td style={{ padding: '8px 12px', textAlign: 'center' }}>
-                          <span style={{ padding: '3px 10px', borderRadius: '10px', fontSize: '11px', fontWeight: '600', ...actionBadgeStyle(l.action) }}>{l.action}</span>
+                          <span style={{ padding: '3px 10px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', ...actionBadgeStyle(l.action) }}>{l.action}</span>
                         </td>
                         <td style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>{l.entity}</td>
                         <td style={{ padding: '8px 12px', color: 'var(--text-muted)', fontSize: '12px' }}>{(l.details || '').replace(/\s*\(User ID:\s*\d+\)/gi, '').replace(/\s*\(Case ID:\s*\d+\)/gi, '')}</td>
@@ -569,14 +569,14 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                           style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)', borderRadius: '6px', background: modalEllipsisOpen ? 'rgba(18,19,88,0.15)' : 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '16px', fontWeight: '700', letterSpacing: '2px' }}>...</button>
                         {modalEllipsisOpen && (
                           <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px', width: '160px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 100 }}>
-                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px' }}>Go to page (1–{modalTotalPages})</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>Go to page (1–{modalTotalPages})</div>
                             <div style={{ display: 'flex', gap: '4px' }}>
                               <input type="number" min="1" max={modalTotalPages} value={modalEllipsisInput} placeholder="#"
                                 onChange={e => setModalEllipsisInput(e.target.value)}
                                 onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(modalEllipsisInput); if (v >= 1 && v <= modalTotalPages) { setModalPage(v); setModalEllipsisOpen(false); setModalEllipsisInput(''); } } }}
                                 style={{ flex: 1, padding: '5px 6px', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '12px', outline: 'none', width: '100%' }} />
                               <button onClick={() => { const v = parseInt(modalEllipsisInput); if (v >= 1 && v <= modalTotalPages) { setModalPage(v); setModalEllipsisOpen(false); setModalEllipsisInput(''); } }}
-                                style={{ padding: '5px 8px', border: '1px solid #1e3a8a', borderRadius: '4px', background: '#1e3a8a', color: 'white', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>Go</button>
+                                style={{ padding: '5px 8px', border: '1px solid #1e3a8a', borderRadius: '4px', background: '#1e3a8a', color: 'white', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Go</button>
                             </div>
                           </div>
                         )}
@@ -778,7 +778,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
         {/* ── Generated Reports Logs ── */}
         <div style={s.card}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: 'var(--text-main)' }}>Generated Reports Logs</h3>
+            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>Generated Reports Logs</h3>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{sortedReportLogs.length} of {reportLogs.length} reports</span>
               <div style={{ position: 'relative' }} ref={reportSortRef}>
@@ -814,7 +814,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
             <div key={file.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', marginBottom: '10px', position: 'relative' }}>
               <div style={{ flex: 1, minWidth: 0, marginRight: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: '600', padding: '2px 8px', borderRadius: '10px', background: '#e0f2fe', color: '#0369a1', flexShrink: 0 }}>
+                  <span style={{ fontSize: '12px', fontWeight: '600', padding: '2px 8px', borderRadius: '10px', background: '#e0f2fe', color: '#0369a1', flexShrink: 0 }}>
                     {file.period || 'Manual'}
                   </span>
                   <p style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>
@@ -827,7 +827,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                     {file.details}
                   </p>
                 )}
-                <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: '#0d9488', fontWeight: '500' }}>
+                <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#0d9488', fontWeight: '500' }}>
                   {(file.snapshotLogs || []).length} log entries captured
                 </p>
               </div>
@@ -866,7 +866,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
 
         {/* ── Quick Stats ── */}
         <div style={s.card}>
-          <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', fontWeight: '700', color: 'var(--text-main)' }}>Quick Stats</h3>
+          <h3 style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>Quick Stats</h3>
           <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: 'var(--text-muted)' }}>{isBHW ? `Brgy. ${myBarangayName}` : choUnit}</p>
 
           {statsLoading ? (
@@ -881,7 +881,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
               ].map(stat => (
                 <div key={stat.label} style={{ background: stat.bg, borderRadius: '8px', padding: '14px', textAlign: 'center' }}>
                   <div style={{ fontSize: '26px', fontWeight: '800', color: stat.color }}>{stat.value}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', fontWeight: '500' }}>{stat.label}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px', fontWeight: '500' }}>{stat.label}</div>
                 </div>
               ))}
             </div>
@@ -893,7 +893,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
               {myBarangays.map(b => (
-                <span key={b} style={{ fontSize: '11px', padding: '3px 9px', background: 'var(--input-bg)', borderRadius: '10px', color: 'var(--text-muted)', fontWeight: '500' }}>{b}</span>
+                <span key={b} style={{ fontSize: '12px', padding: '3px 9px', background: 'var(--input-bg)', borderRadius: '10px', color: 'var(--text-muted)', fontWeight: '500' }}>{b}</span>
               ))}
             </div>
           </div>
@@ -903,7 +903,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
       {/* ── AUDIT LOG TABLE ── */}
       <div style={s.card}>
         <div style={{ marginBottom: '16px' }}>
-          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: 'var(--text-main)' }}>Generated System Logs</h3>
+          <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>Generated System Logs</h3>
         </div>
 
         {/* ── TOOLBAR - Export CSV removed, two-level user filter added ── */}
@@ -1029,7 +1029,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                     style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--text-muted)', padding: '2px 8px', fontWeight: '600', lineHeight: 1 }}>{'>'}</button>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', marginBottom: '4px' }}>
-                  {DAY_NAMES.map(d => <div key={d} style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600', padding: '2px' }}>{d}</div>)}
+                  {DAY_NAMES.map(d => <div key={d} style={{ textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600', padding: '2px' }}>{d}</div>)}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px' }}>
                   {renderCalendar().map((day, i) => {
@@ -1075,7 +1075,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
           </span>
         </div>
 
-        <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right', marginBottom: '6px' }}>
+        <div style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'right', marginBottom: '6px' }}>
           {lastUpdated ? `Updated ${Math.round((now - lastUpdated) / 1000)}s ago` : 'Refreshing...'}
         </div>
 
@@ -1085,7 +1085,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border-color)' }}>
                 {['Timestamp', 'User', 'Action', 'Entity', 'Details', 'Updated By'].map(h => (
-                  <th key={h} style={{ padding: compactMode ? '6px 8px' : '10px 14px', textAlign: 'center', fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>
+                  <th key={h} style={{ padding: compactMode ? '6px 8px' : '10px 14px', textAlign: 'center', fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>
                     {h}
                   </th>
                 ))}
@@ -1152,14 +1152,14 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                     style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)', borderRadius: '6px', background: logEllipsisOpen ? 'rgba(18,19,88,0.15)' : 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '16px', fontWeight: '700', letterSpacing: '2px' }}>...</button>
                   {logEllipsisOpen && (
                     <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px', width: '160px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 100 }}>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px' }}>Go to page (1–{totalLogPages})</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>Go to page (1–{totalLogPages})</div>
                       <div style={{ display: 'flex', gap: '4px' }}>
                         <input type="number" min="1" max={totalLogPages} value={logEllipsisInput} placeholder="#"
                           onChange={e => setLogEllipsisInput(e.target.value)}
                           onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(logEllipsisInput); if (v >= 1 && v <= totalLogPages) { setLogPage(v); setLogEllipsisOpen(false); setLogEllipsisInput(''); } } }}
                           style={{ flex: 1, padding: '5px 6px', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '12px', outline: 'none', width: '100%' }} />
                         <button onClick={() => { const v = parseInt(logEllipsisInput); if (v >= 1 && v <= totalLogPages) { setLogPage(v); setLogEllipsisOpen(false); setLogEllipsisInput(''); } }}
-                          style={{ padding: '5px 8px', border: '1px solid #1e3a8a', borderRadius: '4px', background: '#1e3a8a', color: 'white', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>Go</button>
+                          style={{ padding: '5px 8px', border: '1px solid #1e3a8a', borderRadius: '4px', background: '#1e3a8a', color: 'white', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Go</button>
                       </div>
                     </div>
                   )}

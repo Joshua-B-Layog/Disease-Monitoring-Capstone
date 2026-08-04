@@ -97,7 +97,7 @@ export default function AboutCho() {
           {/* Mission & Vision */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
             <div style={{ background: 'var(--input-bg)', borderRadius: '8px', padding: '16px', border: '1px solid var(--border-color)' }}>
-              <div style={{ fontSize: '13px', fontWeight: '700', color: '#129968', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <div style={{ fontSize: '14px', fontWeight: '700', color: '#129968', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Our Mission
               </div>
               <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.6', color: 'var(--text-main)' }}>
@@ -105,7 +105,7 @@ export default function AboutCho() {
               </p>
             </div>
             <div style={{ background: 'var(--input-bg)', borderRadius: '8px', padding: '16px', border: '1px solid var(--border-color)' }}>
-              <div style={{ fontSize: '13px', fontWeight: '700', color: '#1d4ed8', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <div style={{ fontSize: '14px', fontWeight: '700', color: '#1d4ed8', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Our Vision
               </div>
               <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.6', color: 'var(--text-main)' }}>
@@ -116,7 +116,7 @@ export default function AboutCho() {
 
           {/* Staff */}
           <div style={{ marginBottom: '24px' }}>
-            <h4 style={{ margin: '0 0 12px', fontSize: '15px', fontWeight: '700', color: 'var(--text-main)' }}>
+            <h4 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>
               Staff
             </h4>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', maxWidth: '600px', margin: '0 auto' }}>
@@ -183,7 +183,7 @@ function InfoCard({ label, value }) {
       padding: '12px 16px', background: 'var(--bg-main)', borderRadius: '8px',
       border: '1px solid #f1f5f9',
     }}>
-      <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
+      <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
         {label}
       </div>
       <div style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-main)' }}>

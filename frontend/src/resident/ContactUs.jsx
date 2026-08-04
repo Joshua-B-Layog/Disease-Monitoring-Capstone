@@ -116,7 +116,7 @@ export default function ContactUs() {
           background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '12px',
           padding: '24px',
         }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: '700', color: 'var(--text-main)' }}>
+          <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>
             Send a Message
           </h3>
 
@@ -240,7 +240,7 @@ export default function ContactUs() {
           background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '12px',
           padding: '24px',
         }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: '700', color: 'var(--text-main)' }}>
+          <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>
             Connect with Us
           </h3>
           <p style={{ fontSize: '14px', color: 'var(--text-muted)', marginBottom: '16px' }}>
@@ -275,7 +275,7 @@ export default function ContactUs() {
           background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '12px',
           padding: '24px',
         }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: '700', color: 'var(--text-main)' }}>
+          <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>
             Our Location
           </h3>
           <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
