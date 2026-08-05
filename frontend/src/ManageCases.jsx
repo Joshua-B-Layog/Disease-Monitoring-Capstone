@@ -36,6 +36,40 @@ const TyphoidIcon = ({ color = '#8b5cf6', size = 28 }) => (
   </svg>
 );
 
+const AllDiseasesIcon = ({ color = '#121358', size = 28 }) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
+    <path d="m23.705,18.549c-.896-1.325-2.959-3.549-6.705-3.549s-5.81,2.224-6.705,3.549c-.391.577-.392,1.323,0,1.902.896,1.325,2.96,3.549,6.706,3.549s5.809-2.224,6.705-3.549c.391-.578.391-1.324,0-1.902Zm-6.705,2.951c-1.105,0-2-.895-2-2s.895-2,2-2,2,.895,2,2-.895,2-2,2Zm-8.362.072c-.852-1.262-.851-2.888.001-4.146,1.116-1.651,3.689-4.427,8.361-4.427,3.311,0,5.568,1.395,7,2.796V5c0-2.761-2.239-5-5-5H5C2.239,0,0,2.239,0,5v13c0,2.761,2.239,5,5,5h4.797c-.489-.506-.872-1.004-1.159-1.428Zm2.362-16.572h7c.552,0,1,.448,1,1s-.448,1-1,1h-7c-.552,0-1-.448-1-1s.448-1,1-1Zm0,5h7c.552,0,1,.448,1,1s-.448,1-1,1h-7c-.552,0-1-.448-1-1s.448-1,1-1Zm-4.5-5.5c.828,0,1.5.672,1.5,1.5s-.672,1.5-1.5,1.5-1.5-.672-1.5-1.5.672-1.5,1.5-1.5Zm0,5c.828,0,1.5.672,1.5,1.5s-.672,1.5-1.5,1.5-1.5-.672-1.5-1.5.672-1.5,1.5-1.5Zm0,8c-.828,0-1.5-.672-1.5-1.5s.672-1.5,1.5-1.5,1.5.672,1.5,1.5-.672,1.5-1.5,1.5Z"/>
+  </svg>
+);
+
+const WaterborneIcon = ({ color = '#0EA5E9', size = 28 }) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
+    <path d="M14,24a5.952,5.952,0,0,1-4.242-1.758,6.025,6.025,0,0,1,0-8.484L14,9.261l4.263,4.517a6.029,6.029,0,0,1-.021,8.464h0A5.952,5.952,0,0,1,14,24ZM5,12a4.968,4.968,0,0,1-3.535-1.465,5.022,5.022,0,0,1,0-7.07L5,.007l3.527,3.45a5.02,5.02,0,0,1,.008,7.078A4.965,4.965,0,0,1,5,12Zm15-2a3.973,3.973,0,0,1-2.828-1.172,4.017,4.017,0,0,1,0-5.656L19.982.049,22.86,3.205a4.02,4.02,0,0,1-.032,5.623h0A3.973,3.973,0,0,1,20,10Z"/>
+  </svg>
+);
+
+const VectorborneIcon = ({ color = '#D97706', size = 28 }) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
+    <path d="m23.876,14.461c-.243.889-.819,1.63-1.621,2.086-.527.3-1.111.454-1.702.454-.307,0-.615-.041-.919-.125-1.126-.31-4.501-3.197-6.48-4.895l5.245,6.119c.388.451.602,1.029.602,1.627v1.022c0,.157.075.307.201.401l1.398,1.048c.442.332.532.958.2,1.4-.196.262-.496.4-.801.4-.209,0-.419-.065-.599-.2l-1.4-1.05c-.627-.472-1-1.219-1-2v-1.022c0-.119-.042-.234-.119-.324l-3.881-4.527v4.123c0,.552-.447,1-1,1s-1-.448-1-1v-4.123l-3.879,4.526c-.079.091-.121.206-.121.325v1.022c0,.781-.373,1.529-.998,1.999l-1.402,1.051c-.18.135-.39.2-.599.2-.305,0-.604-.138-.801-.4-.332-.442-.242-1.068.2-1.4l1.4-1.05c.124-.093.199-.243.199-.4v-1.022c0-.598.214-1.176.604-1.628l5.243-6.118c-1.979,1.698-5.354,4.585-6.48,4.895-.304.083-.612.125-.919.125-.591,0-1.175-.153-1.702-.454-.802-.456-1.378-1.197-1.621-2.086-.244-.889-.128-1.82.328-2.621s1.197-1.377,2.086-1.621c.747-.205,2.689-.209,5.462-.219h2.029l-4.982-3.559c-.655-.468-1.047-1.229-1.047-2.034v-.787c0-.131-.054-.26-.146-.354l-1.561-1.561c-.391-.391-.391-1.023,0-1.414S3.316-.098,3.707.293l1.561,1.561c.466.465.732,1.11.732,1.768v.787c0,.161.078.313.209.407l3.831,2.737c-.338-.426-.54-.965-.54-1.551,0-.922.499-1.727,1.242-2.16l.746-3.428c.12-.55.904-.55,1.023,0l.746,3.428c.743.433,1.242,1.238,1.242,2.16,0,.592-.206,1.136-.551,1.565l3.862-2.749c.134-.095.213-.25.21-.415l-.012-.751c-.01-.674.258-1.332.733-1.807l1.55-1.551c.391-.391,1.023-.391,1.414,0,.391.39.391,1.023,0,1.414l-1.551,1.551c-.096.095-.148.227-.146.362l.012.75c.013.822-.379,1.597-1.05,2.075l-4.994,3.555h2.023c2.77-.013,4.714.014,5.462.219.889.244,1.63.82,2.086,1.621s.572,1.732.328,2.621Z"/>
+  </svg>
+);
+
+const VaccineIcon = ({ color = '#129968', size = 28 }) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
+    <path d="m20.499,9h-.002c-.936,0-1.837-.366-2.473-1.002-.66-.658-1.024-1.537-1.024-2.474s.361-1.812,1.019-2.468l2.481-2.428,2.467,2.414c.669.669,1.033,1.548,1.033,2.482s-.364,1.814-1.025,2.475c-.637.636-1.539,1.001-2.476,1.001ZM3.564,5.257l2.163,2.023-.844.844c-1.17,1.17-1.17,3.073,0,4.243l8.707,8.707h6s2.957,2.957,2.957,2.957l1.414-1.414-2.957-2.957v-6s-1.302-1.302-1.302-1.302l-3.207,3.207-1.414-1.414,3.207-3.207-1.586-1.586-3.207,3.207-1.414-1.414,3.207-3.207-1.586-1.586-3.207,3.207-1.414-1.414,3.206-3.206c-1.171-1.162-3.066-1.159-4.233.008l-.913.913-2.178-2.038,2.255-2.305L5.789.124.039,5.999l1.43,1.398,2.095-2.141Z"/>
+  </svg>
+);
+
+const RabiesIcon = ({ color = '#DC2626', size = 28 }) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
+    <path d="m4.96,14.589c.425-.807.605-1.882.494-2.949-.209-1.995-1.349-3.335-2.836-3.335-.084,0-.169.004-.251.013-.111.012-.214.045-.321.071-.024-.129-.04-.26-.046-.39-.057-1.258.5-2.5.5-2.5,0,0-2.65,1.352-2.5,3.5.023.337.092.695.262,1.069-.23.615-.312,1.352-.23,2.138.222,2.12,1.514,3.78,2.942,3.78l.192-.01c.724-.076,1.361-.568,1.794-1.388Z"/>
+    <path d="m8.514,10.922c.071,0,.143-.003.212-.011.796-.083,1.497-.625,1.972-1.526.469-.889.667-2.071.544-3.244-.229-2.194-1.483-3.669-3.119-3.669-.041,0-.081.005-.122.006-.049-1.251.5-2.479.5-2.479,0,0-2.65,1.352-2.5,3.5.001.021.006.042.007.063-.052.069-.113.128-.16.203-.489.772-.691,1.837-.569,2.998.243,2.332,1.665,4.158,3.236,4.158Z"/>
+    <path d="m15.42,10.899c.068.006.134.01.202.01,1.571,0,2.993-1.827,3.236-4.158.121-1.16-.081-2.224-.569-2.998-.102-.161-.22-.302-.343-.435-.007-2.041-2.498-3.318-2.498-3.318,0,0,.549,1.228.5,2.479-1.59.04-2.827,1.488-3.053,3.65-.123,1.174.076,2.356.544,3.244.475.901,1.175,1.443,1.981,1.527Z"/>
+    <path d="m12,13c-4.038,0-8,3.887-8,7.847,0,1.438.553,3.153,3.188,3.153.74,0,1.434-.226,2.167-.464.811-.264,1.649-.536,2.645-.536s1.834.272,2.645.536c.734.238,1.427.464,2.167.464,2.634,0,3.188-1.715,3.188-3.153,0-3.96-3.962-7.847-8-7.847Z"/>
+    <path d="m24,9c.15-2.148-2.5-3.5-2.5-3.5,0,0,.557,1.242.5,2.5-.006.135-.023.269-.049.403-.102-.025-.202-.058-.309-.069-1.613-.18-2.866,1.211-3.085,3.315-.111,1.065.068,2.138.494,2.944.432.818,1.067,1.309,1.777,1.383l.204.012c1.425,0,2.715-1.658,2.936-3.773.083-.787,0-1.525-.232-2.141.172-.376.24-.735.264-1.073Z"/>
+  </svg>
+);
+
 // ── Icon token system: icons are stored as serializable tokens so they survive the DB round-trip ──
 const SVG_ICON_DEFS = [
   { token: 'svg:fever', name: 'Fever', render: () => <FeverIcon color="#ef4444" /> },
@@ -43,6 +77,11 @@ const SVG_ICON_DEFS = [
   { token: 'svg:leptospirosis', name: 'Leptospirosis', render: () => <LeptospirosisIcon color="#129968" /> },
   { token: 'svg:tuberculosis', name: 'Tuberculosis', render: () => <TuberculosisIcon color="#F97316" /> },
   { token: 'svg:typhoid', name: 'Typhoid', render: () => <TyphoidIcon color="#8B5CF6" /> },
+  { token: 'svg:alldiseases', name: 'All Diseases', render: () => <AllDiseasesIcon color="#121358" /> },
+  { token: 'svg:waterborne', name: 'Water & Foodborne', render: () => <WaterborneIcon color="#0EA5E9" /> },
+  { token: 'svg:vectorborne', name: 'Vector-borne', render: () => <VectorborneIcon color="#D97706" /> },
+  { token: 'svg:vaccine', name: 'Vaccine-Preventable', render: () => <VaccineIcon color="#129968" /> },
+  { token: 'svg:rabies', name: 'Rabies', render: () => <RabiesIcon color="#DC2626" /> },
 ];
 
 // Maps each built-in SVG disease to its token
@@ -52,6 +91,7 @@ const SVG_ENTRY_TOKEN = {
   'Leptospirosis': 'svg:leptospirosis',
   'Tuberculosis': 'svg:tuberculosis',
   'Typhoid Fever': 'svg:typhoid',
+  'Rabies': 'svg:rabies',
 };
 
 // Convert any icon (emoji string or SVG JSX element) to its serializable token
@@ -145,7 +185,7 @@ const ALL_DISEASE_ENTRIES = [
   { id: 21, name: 'Meningococcemia',               dbName: 'Meningococcemia', icon: '🧠', color: '#8B5CF6', desc: 'A serious bacterial bloodstream infection that can lead to meningitis and sepsis.' },
   { id: 22, name: 'Pertussis',                     dbName: 'Pertussis', icon: '🤒', color: '#F472B6', desc: 'A highly contagious respiratory infection known as whooping cough, severe in infants.' },
   { id: 23, name: 'Poliomyelitis',                 dbName: 'Poliomyelitis', icon: '🦽', color: '#FCA5A5', desc: 'A viral disease that can cause permanent paralysis, preventable through vaccination.' },
-  { id: 24, name: 'Rabies',                        dbName: 'Rabies', icon: '🐾', color: '#7C3AED', desc: 'A fatal viral disease transmitted through the bite of an infected animal, requiring immediate treatment.' },
+  { id: 24, name: 'Rabies',                        dbName: 'Rabies', icon: <RabiesIcon color="#DC2626" />, color: '#DC2626', desc: 'A fatal viral disease transmitted through the bite of an infected animal, requiring immediate treatment.' },
   { id: 25, name: 'SARS',                          dbName: 'SARS', icon: '😷', color: '#6366F1', desc: 'A severe respiratory illness caused by a coronavirus, with high fever and respiratory distress.' },
   { id: 26, name: 'Sore Eyes',                     dbName: 'Sore Eyes', icon: '👁️', color: '#FCD34D', desc: 'A contagious eye infection causing redness, itching, and discharge, common in children.' },
   { id: 27, name: 'Tuberculosis',                  dbName: 'Tuberculosis', icon: <TuberculosisIcon color="#F97316" />, color: '#F97316', desc: 'An infectious bacterial disease that primarily affects the lungs, requiring long-term treatment.' },
@@ -153,7 +193,8 @@ const ALL_DISEASE_ENTRIES = [
 ];
 
 // Icon picker choices: every disease's own icon (SVG components + emojis) labelled by disease name,
-// keyed by serializable token, with duplicate emoji icons removed (only the first disease using that emoji is kept)
+// keyed by serializable token, with duplicate emoji icons removed (only the first disease using that emoji is kept),
+// plus every SVG logo (category + disease logos) so all of them are always available in the picker
 const DISEASE_ICON_CHOICES = (() => {
   const seen = new Set();
   const out = [];
@@ -162,6 +203,12 @@ const DISEASE_ICON_CHOICES = (() => {
     if (seen.has(token)) continue;
     seen.add(token);
     out.push({ key: token, label: d.name, icon: d.icon });
+  }
+  for (const def of SVG_ICON_DEFS) {
+    if (seen.has(def.token)) continue;
+    if (def.token === 'svg:alldiseases') continue;
+    seen.add(def.token);
+    out.push({ key: def.token, label: def.name, icon: def.render() });
   }
   return out;
 })();
@@ -172,7 +219,7 @@ const EXTRA_ICON_CHOICES = (() => {
   const covered = new Set(
     DISEASE_ICON_CHOICES.filter(c => typeof c.key === 'string' && !c.key.startsWith('svg:')).map(c => c.key)
   );
-  return ['🦠','🦟','🫁','🩺','💊','🧪','🧫','🦷','👁️','🩹','🦻','🧠','🫀','🩸','🦾','🐾','😷','🤒','🏥','🧬','💧','🫧','🌡️','🩼']
+  return ['🦠','🦟','🫁','🩺','💊','🧪','🧫','👁️','🩹','🦻','🧠','🫀','🩸','🦾','🐾','😷','🤒','🏥','🧬','💧','🫧','🌡️','🩼']
     .filter(ic => !covered.has(ic));
 })();
 
@@ -194,22 +241,22 @@ const findDiseaseEntry = (diseaseName) => {
 // ── Disease categories ──
 const DISEASE_CATEGORIES = [
   {
-    id: 'all', name: 'All Diseases', icon: '📋', color: '#121358',
+    id: 'all', name: 'All Diseases', icon: resolveIcon('svg:alldiseases'), color: '#121358',
     desc: 'All 28 tracked communicable diseases in Cabuyao',
     diseases: ALL_DISEASE_ENTRIES,
   },
   {
-    id: 'exclusive', name: 'Exclusive Diseases', icon: '⚠️', color: '#DC2626',
+    id: 'exclusive', name: 'Exclusive Diseases', icon: resolveIcon('svg:rabies'), color: '#DC2626',
     desc: 'Diseases with no known 100% cure in current medical science',
     diseases: ALL_DISEASE_ENTRIES.filter(d => ['HIV/AIDS', 'Rabies', 'Hepatitis B', 'Leprosy', 'Poliomyelitis'].includes(d.name)),
   },
   {
-    id: 'waterborne', name: 'Water & Foodborne', icon: resolveIcon('svg:typhoid'), color: '#0EA5E9',
+    id: 'waterborne', name: 'Water & Foodborne', icon: resolveIcon('svg:waterborne'), color: '#0EA5E9',
     desc: 'Diseases spread through contaminated water or food',
     diseases: ALL_DISEASE_ENTRIES.filter(d => ['Cholera', 'Typhoid Fever', 'Hepatitis A', 'Diarrhea'].includes(d.name)),
   },
   {
-    id: 'vector', name: 'Vector-borne', icon: resolveIcon('svg:fever'), color: '#D97706',
+    id: 'vector', name: 'Vector-borne', icon: resolveIcon('svg:vectorborne'), color: '#D97706',
     desc: 'Diseases transmitted by mosquitoes and other vectors',
     diseases: ALL_DISEASE_ENTRIES.filter(d => ['Dengue Fever', 'Leptospirosis', 'Malaria'].includes(d.name)),
   },
@@ -219,7 +266,7 @@ const DISEASE_CATEGORIES = [
     diseases: ALL_DISEASE_ENTRIES.filter(d => ['Acute Respiratory Infection', 'Avian Influenza', 'Covid-19', 'Influenza', 'Influenza A', 'SARS', 'Tuberculosis'].includes(d.name)),
   },
   {
-    id: 'vaccine', name: 'Vaccine-Preventable', icon: '💉', color: '#129968',
+    id: 'vaccine', name: 'Vaccine-Preventable', icon: resolveIcon('svg:vaccine'), color: '#129968',
     desc: 'Diseases that can be prevented through routine vaccination programs',
     diseases: ALL_DISEASE_ENTRIES.filter(d => ['Chickenpox', 'Diphtheria', 'Measles', 'Pertussis'].includes(d.name)),
   },
