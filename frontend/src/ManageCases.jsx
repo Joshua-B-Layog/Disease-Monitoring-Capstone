@@ -2040,7 +2040,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             <div key={carouselIndex} className="cdms-carousel-slide" style={{ textAlign: 'center' }}>
               {carouselIndex === 0 && (
                 <div>
-                  <h3 style={{ margin: '0 0 6px 0', fontSize: '14px', color: 'var(--text-main)' }}>📋 All Diseases & Categories</h3>
+                  <h3 style={{ margin: '0 0 6px 0', fontSize: '17px', color: 'var(--text-main)' }}>📋 All Diseases & Categories</h3>
                   <p style={{ margin: '0 0 14px 0', fontSize: '13px', color: 'var(--text-muted)' }}>
                     Browse all disease categories below, or use the ◀ ▶ arrows for exclusive diseases and to add a new one.
                   </p>
@@ -2108,7 +2108,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               })()}
               {carouselIndex === 2 && (
                 <div style={{ maxWidth: '720px', margin: '0 auto', textAlign: 'left' }}>
-                  <h3 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--text-main)', textAlign: 'center' }}>➕ Add New Disease</h3>
+                  <h3 style={{ margin: '0 0 12px 0', fontSize: '17px', color: 'var(--text-main)', textAlign: 'center' }}>➕ Add New Disease</h3>
                   {addDiseaseMsg && (
                     <div style={{ padding: '8px 12px', marginBottom: '10px', borderRadius: '6px', fontSize: '13px', background: addDiseaseMsg.startsWith('Error') ? '#fee2e2' : '#d1f5e9', color: addDiseaseMsg.startsWith('Error') ? '#991b1b' : '#0a5e42' }}>
                       {addDiseaseMsg}
