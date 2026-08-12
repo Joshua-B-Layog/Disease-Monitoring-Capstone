@@ -25,6 +25,24 @@ export async function getCachedCases() {
   }
 }
 
+// Upsert a single case into the offline cache (used for offline create/edit so new data is visible immediately)
+export async function upsertCachedCase(caseObj) {
+  try {
+    if (!caseObj || caseObj.case_id == null) return;
+    await db.cases.put(caseObj);
+  } catch (err) {
+    console.warn('[OfflineSync] Failed to upsert case:', err.message);
+  }
+}
+
+export async function removeCachedCase(caseId) {
+  try {
+    await db.cases.delete(caseId);
+  } catch (err) {
+    console.warn('[OfflineSync] Failed to remove case:', err.message);
+  }
+}
+
 // ── Diseases ──
 export async function cacheDiseases(diseases) {
   if (!diseases || diseases.length === 0) return;

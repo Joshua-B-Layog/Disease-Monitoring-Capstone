@@ -24,6 +24,17 @@ export async function getAllQueueItems() {
   return await db.syncQueue.orderBy('id').toArray();
 }
 
+// Remove pending create ops for a temp-id case that was deleted before ever syncing
+export async function removePendingCreatesByCaseId(caseId) {
+  const ops = await getAllQueueItems();
+  const toDelete = ops.filter(op =>
+    op.status === 'pending' &&
+    op.type === 'create' &&
+    String(op.payload?.case_id) === String(caseId)
+  );
+  await Promise.all(toDelete.map(op => db.syncQueue.delete(op.id)));
+}
+
 export async function clearCompleted() {
   await db.syncQueue.where('status').equals('done').delete();
   await db.syncQueue.where('status').equals('error').delete();

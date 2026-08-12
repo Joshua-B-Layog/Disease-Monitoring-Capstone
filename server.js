@@ -1356,7 +1356,7 @@ app.put('/api/cases/:id', (req, res) => {
                                   if (prefs.push_notifications && prefs.updated_case_reported) {
                                     db.query(
                                       'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
-                                      [er.requested_by, erTitle, erMsg, 'info', 'Outbox']
+                                      [er.requested_by, erTitle, erMsg, 'info', 'ManageCases']
                                     );
                                   }
                                 }

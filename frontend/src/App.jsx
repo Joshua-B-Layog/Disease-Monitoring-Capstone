@@ -23,6 +23,21 @@ const getSavedCompact = () => {
   return localStorage.getItem('cdms_compact_mode') === 'true';
 };
 
+const extractDiseaseFromMessage = (message) => {
+  if (!message) return '';
+  let m = message.match(/new case of (.+?) \(/);
+  if (m) return m[1].trim();
+  m = message.match(/the case of .+? \((.+?)\)/);
+  if (m) return m[1].trim();
+  m = message.match(/status for .+? \((.+?)\)/);
+  if (m) return m[1].trim();
+  m = message.match(/^Case for .+? \((.+?)\)/);
+  if (m) return m[1].trim();
+  m = message.match(/regarding (.+?)\.?$/);
+  if (m) return m[1].trim();
+  return '';
+};
+
 const translations = {
   en: { 'Dashboard':'Dashboard','Manage Cases':'Manage Cases','Audit Reports':'Audit Reports','Map View':'Map View','User Accounts':'User Accounts','Settings':'Settings','Logout':'Logout','CHO Profile':'CHO Profile','Specialist':'Specialist','Profile Settings':'Profile Settings','Account Security':'Account Security','Notifications':'Notifications','System Preferences':'System Preferences','Data Management':'Data Management','Save Preferences':'Save Preferences','Save Changes':'Save Changes','Cancel':'Cancel','Edit Profile':'Edit Profile' },
   fil: { 'Dashboard':'Dashboard','Manage Cases':'Pamahalaan ang mga Kaso','Audit Reports':'Mga Ulat ng Pag-audit','Map View':'Pananaw ng Mapa','User Accounts':'Mga Account ng User','Settings':'Mga Setting','Logout':'Mag-logout','CHO Profile':'Profile ng CHO','Specialist':'Specialista','Profile Settings':'Mga Setting ng Profile','Account Security':'Seguridad ng Account','Notifications':'Mga Abiso','System Preferences':'Mga Kagustuhan ng System','Data Management':'Pamamahala ng Data','Save Preferences':'I-save ang Mga Kagustuhan','Save Changes':'I-save ang Mga Pagbabago','Cancel':'Kanselahin','Edit Profile':'I-edit ang Profile' },
@@ -96,17 +111,23 @@ function App() {
 
   useEffect(() => {
     const checkOnline = async () => {
+      let online = false;
       try {
         const res = await fetch(`${API_URL}/api/ping`, { method: 'HEAD', cache: 'no-store' });
-        setIsOnline(res.ok);
+        online = res.ok;
       } catch {
-        setIsOnline(false);
+        online = false;
       }
+      setIsOnline(online);
+      window.dispatchEvent(new CustomEvent('cdms-online-status', { detail: { online } }));
     };
     checkOnline();
     const interval = setInterval(checkOnline, 15000);
     window.addEventListener('online', checkOnline);
-    window.addEventListener('offline', () => setIsOnline(false));
+    window.addEventListener('offline', () => {
+      setIsOnline(false);
+      window.dispatchEvent(new CustomEvent('cdms-online-status', { detail: { online: false } }));
+    });
     return () => {
       clearInterval(interval);
       window.removeEventListener('online', checkOnline);
@@ -137,6 +158,9 @@ function App() {
       );
       setSyncResult(result);
       await refreshPendingCount();
+      if (result.synced > 0 || result.failed > 0) {
+        window.dispatchEvent(new CustomEvent('cdms-data-synced'));
+      }
       if (result.synced > 0 && result.failed === 0) {
         setTimeout(() => setSyncResult(null), 5000);
       }
@@ -600,21 +624,23 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                               {n.link_to && (
                                 <button onClick={() => {
                                   handleMarkRead(n.id);
-                                  if (n.link_to === 'Inbox') {
+                                  const target = (n.link_to || '').replace(/\s+/g, '');
+                                  if (target === 'Inbox') {
                                     const isEditReq = n.title === 'A BHW needs your help';
                                     setPendingInboxView(isEditReq ? 'inbox:edit-requests' : 'inbox');
                                     setActiveTab('Manage Cases');
-                                  } else if (n.link_to === 'Outbox') {
+                                  } else if (target === 'Outbox') {
                                     setPendingInboxView('outbox');
                                     setActiveTab('Manage Cases');
-                                  } else if (n.link_to === 'ManageCases') {
-                                    const match = n.message.match(/case of (.+?) \(/);
-                                    const diseaseName = match ? match[1].trim() : '';
+                                  } else if (target === 'ManageCases') {
+                                    const diseaseName = extractDiseaseFromMessage(n.message);
                                     setCaseFilter({ disease: diseaseName, barangay: '', purok: '' });
                                     setActiveTab('Manage Cases');
-                                  } else if (n.link_to === 'Registrations') {
+                                  } else if (target === 'Registrations') {
                                     setPendingInboxView('inbox:registrations');
                                     setActiveTab('Manage Cases');
+                                  } else if (target === 'MapView') {
+                                    setActiveTab('Map View');
                                   } else {
                                     setActiveTab(n.link_to);
                                   }

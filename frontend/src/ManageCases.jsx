@@ -3,8 +3,8 @@ import axios from 'axios';
 import { API_URL } from './config';
 import './ManageCases.css';
 import cabuyaoBoundaries from './data/cabuyao_barangays.geojson.json';
-import { cacheCases, getCachedCases, cacheBarangays, cacheDiseases, getCachedBarangays, getCachedDiseases, isOnline, cacheInboxItems, getCachedInboxItems, cacheContactMessages, getCachedContactMessages, cacheEditRequests, getCachedEditRequests, cacheOutboxItems, getCachedOutboxItems, cachePendingRegistrations, getCachedPendingRegistrations } from './offlineSync';
-import { enqueueOperation } from './syncEngine';
+import { cacheCases, getCachedCases, cacheBarangays, cacheDiseases, getCachedBarangays, getCachedDiseases, isOnline, cacheInboxItems, getCachedInboxItems, cacheContactMessages, getCachedContactMessages, cacheEditRequests, getCachedEditRequests, cacheOutboxItems, getCachedOutboxItems, cachePendingRegistrations, getCachedPendingRegistrations, upsertCachedCase, removeCachedCase } from './offlineSync';
+import { enqueueOperation, removePendingCreatesByCaseId } from './syncEngine';
 import { getPointInBarangay } from './data/coordinates';
 const FeverIcon = ({ color = '#ef4444', size = 28 }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
@@ -486,6 +486,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const [allCases, setAllCases] = useState([]);
   const [loadingCases, setLoadingCases] = useState(false);
   const [offlineMode, setOfflineMode] = useState(!isOnline());
+  const appOnlineRef = useRef(navigator.onLine);
+  useEffect(() => { appOnlineRef.current = navigator.onLine; }, []);
   const [barangayList, setBarangayList] = useState([]);
   const [allDiseases, setAllDiseases] = useState([]);
   const choUnitBarangays = sessionContext ? CHO_UNIT_BARANGAYS[sessionContext] || [] : [];
@@ -651,6 +653,14 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   // Fetch all cases
   const fetchCases = () => {
     setLoadingCases(true);
+    if (!appOnlineRef.current) {
+      getCachedCases().then(cached => {
+        if (cached.length > 0) setAllCases(cached);
+        setOfflineMode(true);
+        setLoadingCases(false);
+      });
+      return;
+    }
     axios.get(API_URL + '/api/disease_cases')
       .then(res => { setAllCases(res.data); setLoadingCases(false); setLastUpdated(Date.now()); cacheCases(res.data).catch(() => {}); })
       .catch(async () => {
@@ -663,10 +673,34 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   useEffect(() => {
     fetchCases();
     const interval = setInterval(() => {
-      if (!navigator.onLine) return;
+      if (!appOnlineRef.current) return;
       if (view !== 'add' && view !== 'edit') fetchCases();
     }, 30000);
     return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Listen for App-level heartbeat online status + post-sync refresh signals
+  useEffect(() => {
+    const onStatus = (e) => {
+      const online = !!e.detail?.online;
+      const wasOnline = appOnlineRef.current;
+      appOnlineRef.current = online;
+      setOfflineMode(!online);
+      if (!online && wasOnline) fetchCases();
+      if (online && !wasOnline) fetchCases();
+    };
+    const onSynced = () => {
+      appOnlineRef.current = navigator.onLine;
+      setOfflineMode(!navigator.onLine);
+      fetchCases();
+    };
+    window.addEventListener('cdms-online-status', onStatus);
+    window.addEventListener('cdms-data-synced', onSynced);
+    return () => {
+      window.removeEventListener('cdms-online-status', onStatus);
+      window.removeEventListener('cdms-data-synced', onSynced);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1395,21 +1429,33 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   };
 
   // ── DELETE ──
+  // Queue an offline delete and remove the case from the local list + cache immediately
+  const handleOfflineDelete = async (caseId) => {
+    const cid = String(caseId);
+    if (cid.startsWith('temp-')) {
+      await removePendingCreatesByCaseId(caseId);
+    } else {
+      await enqueueOperation({
+        type: 'delete',
+        endpoint: `/api/cases/${caseId}`,
+        method: 'DELETE',
+        payload: { _offlineUserId: loggedUserId, _offlineUserName: loggedUser },
+        userId: loggedUserId,
+        userName: loggedUser,
+      });
+    }
+    setAllCases(prev => prev.filter(c => String(c.case_id) !== cid));
+    await removeCachedCase(caseId);
+    setOfflineMode(true);
+  };
+
   const executeDelete = async () => {
     if (!deleteTarget) return;
     setDeleteLoading(true);
     try {
-      if (!isOnline()) {
-        await enqueueOperation({
-          type: 'delete',
-          endpoint: `/api/cases/${deleteTarget.case_id}`,
-          method: 'DELETE',
-          payload: { _offlineUserId: loggedUserId, _offlineUserName: loggedUser },
-          userId: loggedUserId,
-          userName: loggedUser,
-        });
+      if (!isOnline() || !appOnlineRef.current) {
+        await handleOfflineDelete(deleteTarget.case_id);
         setDeleteTarget(null);
-        setOfflineMode(true);
         return;
       }
       await axios.delete(`${API_URL}/api/cases/${deleteTarget.case_id}`);
@@ -1577,6 +1623,60 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   };
 
   // ── SAVE CASE (Add or Edit) ──
+  // Apply an offline-queued create/edit to the local list + IndexedDB so it's visible immediately
+  const applyLocalOfflineCase = async (op, existing) => {
+    const payload = op.payload || {};
+    const brgy = barangayList.find(b => b.id === payload.barangay_id);
+    if (op.type === 'create') {
+      const localCase = {
+        case_id: payload.case_id,
+        patient_name: payload.patient_name,
+        disease_name: payload.disease_name,
+        age: payload.age,
+        gender: payload.gender,
+        severity: payload.severity,
+        status: payload.status,
+        contact: payload.contact,
+        onset_date: payload.onset_date,
+        address: payload.address,
+        barangay_id: payload.barangay_id,
+        barangay_name: brgy?.name || payload.barangay_name || '',
+        symptoms: payload.symptoms,
+        physician: payload.physician,
+        latitude: payload.latitude,
+        longitude: payload.longitude,
+        user_id: payload.user_id,
+        date_reported: new Date().toISOString(),
+        _pendingSync: true,
+      };
+      setAllCases(prev => [localCase, ...prev]);
+      await upsertCachedCase(localCase);
+    } else if (op.type === 'edit' && existing) {
+      const updated = {
+        ...existing,
+        patient_name: payload.patient_name,
+        disease_name: payload.disease_name,
+        age: payload.age,
+        gender: payload.gender,
+        severity: payload.severity,
+        status: payload.status,
+        contact: payload.contact,
+        onset_date: payload.onset_date,
+        address: payload.address,
+        barangay_id: payload.barangay_id,
+        barangay_name: brgy?.name || existing.barangay_name || '',
+        symptoms: payload.symptoms,
+        physician: payload.physician,
+        latitude: payload.latitude,
+        longitude: payload.longitude,
+        user_id: payload.user_id,
+        _pendingSync: true,
+      };
+      setAllCases(prev => prev.map(c => String(c.case_id) === String(existing.case_id) ? updated : c));
+      await upsertCachedCase(updated);
+    }
+  };
+
   const handleSave = async (e, isDraft = false) => {
     if (e && e.preventDefault) e.preventDefault();
     if (submitLoading) return;
@@ -1640,27 +1740,31 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     };
 
     try {
-      if (!isOnline()) {
+      if (!isOnline() || !appOnlineRef.current) {
         const tempId = 'temp-' + Date.now();
         if (editingCase) {
-          await enqueueOperation({
+          const op = {
             type: 'edit',
             endpoint: `/api/cases/${editingCase.case_id}`,
             method: 'PUT',
             payload,
             userId: loggedUserId,
             userName: loggedUser,
-          });
+          };
+          await enqueueOperation(op);
+          await applyLocalOfflineCase(op, editingCase);
           setSubmitMsg('Case saved offline — will sync when reconnected.');
         } else {
-          await enqueueOperation({
+          const op = {
             type: 'create',
             endpoint: '/api/cases',
             method: 'POST',
             payload: { ...payload, case_id: tempId },
             userId: loggedUserId,
             userName: loggedUser,
-          });
+          };
+          await enqueueOperation(op);
+          await applyLocalOfflineCase(op);
           setSubmitMsg(isDraft ? 'Draft saved offline — will sync when reconnected.' : 'Case saved offline — will sync when reconnected.');
         }
         setOfflineMode(true);
@@ -1696,23 +1800,27 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         const tempId = 'temp-' + Date.now();
         try {
           if (editingCase) {
-            await enqueueOperation({
+            const op = {
               type: 'edit',
               endpoint: `/api/cases/${editingCase.case_id}`,
               method: 'PUT',
               payload,
               userId: loggedUserId,
               userName: loggedUser,
-            });
+            };
+            await enqueueOperation(op);
+            await applyLocalOfflineCase(op, editingCase);
           } else {
-            await enqueueOperation({
+            const op = {
               type: 'create',
               endpoint: '/api/cases',
               method: 'POST',
               payload: { ...payload, case_id: tempId },
               userId: loggedUserId,
               userName: loggedUser,
-            });
+            };
+            await enqueueOperation(op);
+            await applyLocalOfflineCase(op);
           }
           setSubmitMsg('Case saved offline — will sync when reconnected.');
           setOfflineMode(true);
@@ -2863,6 +2971,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                       <td style={{ padding: compactMode ? '7px 8px' : '12px', fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center' }}>
                         #{String(c.case_id).padStart(3, '0')}
+                        {c._pendingSync && (
+                          <span title="Pending sync — will upload when reconnected" style={{ marginLeft: '6px', fontSize: '11px', fontWeight: '600', color: '#D97706' }}>⏳</span>
+                        )}
                       </td>
                       <td style={{ padding: compactMode ? '7px 8px' : '12px', fontSize: '14px', fontWeight: '500', color: 'var(--text-main)', textAlign: 'center' }}>
                         {c.patient_name || 'Unknown'}
@@ -2894,15 +3005,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                               if (confirmDelete) {
                                 setDeleteTarget(c);
                               } else {
-                                if (!isOnline()) {
-                                  enqueueOperation({
-                                    type: 'delete',
-                                    endpoint: `/api/cases/${c.case_id}`,
-                                    method: 'DELETE',
-                                    payload: { _offlineUserId: loggedUserId, _offlineUserName: loggedUser },
-                                    userId: loggedUserId,
-                                    userName: loggedUser,
-                                  }).then(() => { setOfflineMode(true); fetchCases(); });
+                                if (!isOnline() || !appOnlineRef.current) {
+                                  handleOfflineDelete(c.case_id);
                                   return;
                                 }
                                 axios.delete(`${API_URL}/api/cases/${c.case_id}`)
