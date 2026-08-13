@@ -93,6 +93,24 @@ html, body, #root {
   margin: auto;
 }
 
+/* Login card + step transitions */
+@keyframes cdmsLoginIn {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.login-form-container { animation: cdmsLoginIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.login-form-container.cdms-login-step { animation: cdmsLoginIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* Error / warning box shake */
+@keyframes cdmsShake {
+  0%, 100% { transform: translateX(0); }
+  20%      { transform: translateX(-6px); }
+  40%      { transform: translateX(6px); }
+  60%      { transform: translateX(-4px); }
+  80%      { transform: translateX(4px); }
+}
+.cdms-msg-shake { animation: cdmsShake 0.4s ease; }
+
 /* --- Form Elements --- */
 .role-toggle { 
   display: flex; 
@@ -499,4 +517,113 @@ html, body, #root {
 }
 .map-label-tooltip::before {
   display: none !important;
+}
+
+/* =========================================================
+   GLOBAL MOTION / MICRO-INTERACTIONS
+   ========================================================= */
+
+/* Page transition — opacity only (safe for Leaflet) */
+@keyframes cdmsPageFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.app-page-enter { animation: cdmsPageFade 0.25s ease; }
+
+/* Dropdown panel pop-in */
+@keyframes cdmsPopIn {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.cdms-dropdown-panel { animation: cdmsPopIn 0.15s ease; }
+
+/* Button press feedback */
+button:active { transform: scale(0.97); }
+
+/* Notification badge pulse */
+@keyframes cdmsBadgePulse {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+.cdms-badge-pulse { animation: cdmsBadgePulse 0.5s ease; }
+
+/* Online / offline pill flash on status flip */
+@keyframes cdmsStatusFlash {
+  0%   { box-shadow: 0 0 0 0 rgba(245,158,11,0.6); }
+  100% { box-shadow: 0 0 0 10px rgba(245,158,11,0); }
+}
+.cdms-status-flash { animation: cdmsStatusFlash 0.6s ease-out; }
+
+/* =========================================================
+   MODALS / FEEDBACK / SKELETONS
+   ========================================================= */
+
+/* Modal backdrop fade + card pop-in */
+@keyframes cdmsBackdropFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.cdms-modal-backdrop { animation: cdmsBackdropFade 0.2s ease both; }
+
+@keyframes cdmsModalPop {
+  from { opacity: 0; transform: scale(0.92) translateY(12px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.cdms-modal-card { animation: cdmsModalPop 0.25s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* Success / feedback message slide-in */
+@keyframes cdmsMsgIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.cdms-msg-in { animation: cdmsMsgIn 0.3s ease both; }
+
+/* Skeleton loading shimmer */
+@keyframes cdmsShimmer {
+  from { background-position: -400px 0; }
+  to   { background-position: 400px 0; }
+}
+.cdms-skeleton {
+  background: linear-gradient(90deg, var(--input-bg) 25%, var(--bg-surface) 50%, var(--input-bg) 75%);
+  background-size: 800px 100%;
+  animation: cdmsShimmer 1.2s ease-in-out infinite;
+  border-radius: 6px;
+}
+
+/* Theme-aware blue accent button (Export Accounts, etc.) */
+.cdms-export-btn {
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid #93c5fd;
+  color: #93c5fd;
+}
+[data-theme='light'] .cdms-export-btn {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid #1d4ed8;
+  color: #1d4ed8;
+}
+
+/* Respect users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .app-page-enter,
+  .cdms-dropdown-panel,
+  .cdms-badge-pulse,
+  .cdms-status-flash,
+  .cdms-view-in,
+  .cdms-row-in,
+  .cdms-carousel-slide,
+  .cdms-carousel-arrow,
+  .cdms-carousel-peek,
+  .chart-bar-fill,
+  .section-fade-in,
+  .login-form-container,
+  .cdms-msg-shake,
+  .cdms-modal-backdrop,
+  .cdms-modal-card,
+  .cdms-msg-in,
+  .cdms-skeleton {
+    animation: none !important;
+    transition: none !important;
+  }
+  button:active { transform: none; }
 }

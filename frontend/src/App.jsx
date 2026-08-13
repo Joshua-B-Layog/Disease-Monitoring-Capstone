@@ -22,6 +22,13 @@ const getSavedFontScale = () => {
 const getSavedCompact = () => {
   return localStorage.getItem('cdms_compact_mode') === 'true';
 };
+const loadStored = (key, fallback) => {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw !== null) return JSON.parse(raw);
+  } catch (e) {}
+  return fallback;
+};
 
 const extractDiseaseFromMessage = (message) => {
   if (!message) return '';
@@ -86,8 +93,11 @@ function App() {
 
   const [activeTab, setActiveTab]         = useState('Dashboard');  
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [selectedDisease, setSelectedDisease] = useState('Dengue');
-  const [dateRange, setDateRange]         = useState(getWorkWeek);
+  const [selectedDisease, setSelectedDisease] = useState(() => loadStored('cdms_dash_disease', 'Dengue'));
+  const [dateRange, setDateRange]         = useState(() => loadStored('cdms_dash_dates', getWorkWeek()));
+  const [dashPeriod, setDashPeriod]       = useState(() => loadStored('cdms_dash_period', 'weekly'));
+  const [dashQuarter, setDashQuarter]     = useState(() => loadStored('cdms_dash_quarter', Math.floor(new Date().getMonth() / 3) + 1));
+  const [dashYear, setDashYear]           = useState(() => loadStored('cdms_dash_year', new Date().getFullYear()));
   const [caseFilter, setCaseFilter]       = useState({ disease: '', barangay: '', purok: '' });
 
   const [language, setLanguage]           = useState('en');
@@ -103,6 +113,11 @@ function App() {
 
   useEffect(() => { localStorage.setItem('cdms_date_format', dateFormat); }, [dateFormat]);
   useEffect(() => { localStorage.setItem('cdms_confirm_delete', String(confirmDelete)); }, [confirmDelete]);
+  useEffect(() => { localStorage.setItem('cdms_dash_dates', JSON.stringify(dateRange)); }, [dateRange]);
+  useEffect(() => { localStorage.setItem('cdms_dash_disease', JSON.stringify(selectedDisease)); }, [selectedDisease]);
+  useEffect(() => { localStorage.setItem('cdms_dash_period', JSON.stringify(dashPeriod)); }, [dashPeriod]);
+  useEffect(() => { localStorage.setItem('cdms_dash_quarter', JSON.stringify(dashQuarter)); }, [dashQuarter]);
+  useEffect(() => { localStorage.setItem('cdms_dash_year', JSON.stringify(dashYear)); }, [dashYear]);
 
   const [authView, setAuthView]           = useState('login'); 
 
@@ -139,6 +154,7 @@ function App() {
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [syncingActive, setSyncingActive] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
+  const [syncToastKey, setSyncToastKey] = useState(0);
 
   const refreshPendingCount = async () => {
     try {
@@ -154,9 +170,10 @@ function App() {
     try {
       const result = await processSyncQueue(
         () => {},
-        (conflict) => setSyncResult({ type: 'conflict', detail: conflict })
+        (conflict) => { setSyncResult({ type: 'conflict', detail: conflict }); setSyncToastKey(k => k + 1); }
       );
       setSyncResult(result);
+      setSyncToastKey(k => k + 1);
       await refreshPendingCount();
       if (result.synced > 0 || result.failed > 0) {
         window.dispatchEvent(new CustomEvent('cdms-data-synced'));
@@ -166,6 +183,7 @@ function App() {
       }
     } catch (err) {
       setSyncResult({ type: 'error', detail: err.message });
+      setSyncToastKey(k => k + 1);
     }
     setSyncingActive(false);
   };
@@ -355,6 +373,13 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             selectedDisease={selectedDisease}
             setSelectedDisease={setSelectedDisease}
             dateRange={dateRange}
+            setDateRange={setDateRange}
+            dashPeriod={dashPeriod}
+            setDashPeriod={setDashPeriod}
+            dashQuarter={dashQuarter}
+            setDashQuarter={setDashQuarter}
+            dashYear={dashYear}
+            setDashYear={setDashYear}
             setActiveTab={setActiveTab}
             loggedUser={loggedUser}
             dateFormat={dateFormat}
@@ -495,7 +520,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             {/* ── ONLINE/OFFLINE INDICATOR ── */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', background: isOnline ? 'rgba(18,153,104,0.1)' : 'rgba(245,158,11,0.1)', color: isOnline ? '#129968' : '#D97706', border: `1px solid ${isOnline ? 'rgba(18,153,104,0.3)' : 'rgba(245,158,11,0.3)'}` }}>
+            <div key={isOnline ? 'online' : 'offline'} className={isOnline ? '' : 'cdms-status-flash'} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', background: isOnline ? 'rgba(18,153,104,0.1)' : 'rgba(245,158,11,0.1)', color: isOnline ? '#129968' : '#D97706', border: `1px solid ${isOnline ? 'rgba(18,153,104,0.3)' : 'rgba(245,158,11,0.3)'}` }}>
               <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: isOnline ? '#129968' : '#D97706' }}></span>
               {isOnline ? 'Online' : 'Offline'}
             </div>
@@ -518,7 +543,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                   <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
                 </svg>
                 {unreadCount > 0 && (
-                  <span style={{
+                  <span key={unreadCount} className="cdms-badge-pulse" style={{
                     position: 'absolute', top: '2px', right: '2px',
                     background: '#ef4444', color: 'white', borderRadius: '50%',
                     width: '16px', height: '16px', fontSize: '10px', fontWeight: '700',
@@ -532,7 +557,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
 
               {/* DROPDOWN PANEL */}
               {showNotifications && (
-                <div style={{
+                <div className="cdms-dropdown-panel" style={{
                   position: 'absolute', top: '44px', right: 0, width: '360px',
                   background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
                   borderRadius: '12px', boxShadow: '0 12px 32px rgba(0,0,0,0.3)',
@@ -732,7 +757,9 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
         </div>
 
         <div className="content-scroller" style={{ zoom: parseFloat(fontScale) }}>
-          {renderContent()}
+          <div key={`page-${activeTab}`} className="app-page-enter">
+            {renderContent()}
+          </div>
         </div>
       </div>
 
@@ -766,6 +793,8 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
       {/* ── SYNC RESULT TOAST ── */}
       {syncResult && (
         <div
+          key={syncToastKey}
+          className="cdms-msg-in"
           style={{
             position: 'fixed', bottom: '80px', right: '24px', zIndex: 9001,
             padding: '12px 18px', borderRadius: '10px',
@@ -788,6 +817,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
       {/* ── CHO PROFILE MODAL ── */}
       {showProfileModal && (
         <div
+          className="cdms-modal-backdrop"
           onClick={() => setShowProfileModal(false)}
           style={{
             position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
@@ -796,6 +826,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
           }}
         >
           <div
+            className="cdms-modal-card"
             onClick={e => e.stopPropagation()}
             style={{
               background: '#ffffff', borderRadius: '16px', width: '520px', maxWidth: '95vw',

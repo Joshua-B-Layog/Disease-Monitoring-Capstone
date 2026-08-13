@@ -776,7 +776,7 @@ export default function CHOSettings({
                 <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '24px 0' }} />
 
                 {saveMsg && (
-                  <div style={{ background: 'var(--input-bg)', color: saveMsg.startsWith('✅') ? '#0a5e42' : '#991b1b', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px', fontSize: '14px', fontWeight: '500' }}>
+                  <div className={`cdms-msg-in ${saveMsg.startsWith('✅') ? '' : 'cdms-msg-shake'}`} style={{ background: 'var(--input-bg)', color: saveMsg.startsWith('✅') ? '#0a5e42' : '#991b1b', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px', fontSize: '14px', fontWeight: '500' }}>
                     {saveMsg}
                   </div>
                 )}
@@ -1042,6 +1042,7 @@ export default function CHOSettings({
             {/* ── SESSIONS MANAGE MODAL ── */}
             {showSessionsModal && (
               <div
+                className="cdms-modal-backdrop"
                 onClick={() => setShowSessionsModal(false)}
                 style={{
                   position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
@@ -1050,6 +1051,7 @@ export default function CHOSettings({
                 }}
               >
                 <div
+                  className="cdms-modal-card"
                   onClick={e => e.stopPropagation()}
                   style={{
                     background: 'var(--bg-surface)', borderRadius: '16px', width: '520px', maxWidth: '95vw',
@@ -1847,7 +1849,7 @@ export default function CHOSettings({
                   </div>
 
                   {clearSuccess && (
-                    <div style={{
+                    <div className="cdms-msg-in" style={{
                       background:'var(--input-bg)', color:'#0a5e42',
                       padding:'10px', borderRadius:'8px',
                       marginBottom:'16px', fontSize:'13px',

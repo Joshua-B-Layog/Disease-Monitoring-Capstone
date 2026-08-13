@@ -58,6 +58,19 @@
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
+/* ── View / row transition animations ── */
+@keyframes cdmsViewIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.cdms-view-in { animation: cdmsViewIn 0.35s ease both; }
+
+@keyframes cdmsRowIn {
+  from { opacity: 0; transform: translateX(-10px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.cdms-row-in { animation: cdmsRowIn 0.3s ease both; }
+
 /* ── Custom dropdown for Barangay filter ── */
 .mc-custom-dropdown-btn {
   padding: 8px 12px; background: var(--input-bg);
@@ -72,6 +85,7 @@
   max-height: 250px; overflow-y: auto; margin-top: 4px; min-width: 100%;
   background: var(--bg-surface); border: 1px solid var(--border-color);
   border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  animation: cdmsPopIn 0.15s ease;
 }
 .mc-custom-dropdown-item {
   padding: 8px 12px; cursor: pointer; font-size: 13px;

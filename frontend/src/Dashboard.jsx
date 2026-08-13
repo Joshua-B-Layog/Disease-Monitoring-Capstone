@@ -3,6 +3,30 @@ import axios from 'axios';
 import { API_URL } from './config';
 import { cacheCases, getCachedCases, isOnline } from './offlineSync';
 
+// Counts up (or down) to `value` whenever it changes
+const AnimatedNumber = ({ value, style }) => {
+  const [display, setDisplay] = useState(0);
+  const prevRef = useRef(0);
+  useEffect(() => {
+    const from = prevRef.current;
+    const to = Number(value) || 0;
+    prevRef.current = to;
+    if (from === to) { setDisplay(to); return; }
+    let raf;
+    const start = performance.now();
+    const dur = 700;
+    const tick = (now) => {
+      const t = Math.min((now - start) / dur, 1);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setDisplay(Math.round(from + (to - from) * eased));
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return <div style={style}>{display}</div>;
+};
+
 const ALL_DISEASES = [
   'Acute Respiratory Infection','Avian Influenza','Chickenpox','Cholera','Dengue',
   'Diarrhea','Covid-19','Diphtheria','Ebola','Hand Foot and Mouth Disease','Hepatitis A',
@@ -53,17 +77,41 @@ const getWorkWeek = () => {
   };
 };
 
-const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMode, loginRole, loginBarangay, sessionContext }) => {
+const toISO = (d) => d.toISOString().slice(0, 10);
+
+const getPeriodRange = (period, quarter, year) => {
+  const now = new Date();
+  if (period === 'monthly') {
+    return {
+      start: toISO(new Date(now.getFullYear(), now.getMonth(), 1)),
+      end: toISO(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
+    };
+  }
+  if (period === 'quarterly') {
+    const qStart = { 1: 0, 2: 3, 3: 6, 4: 9 }[quarter] || 0;
+    return {
+      start: toISO(new Date(year, qStart, 1)),
+      end: toISO(new Date(year, qStart + 3, 0)),
+    };
+  }
+  if (period === 'yearly') {
+    return { start: `${year}-01-01`, end: `${year}-12-31` };
+  }
+  return getWorkWeek();
+};
+
+const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMode, loginRole, loginBarangay, sessionContext, selectedDisease, setSelectedDisease, dateRange, setDateRange, dashPeriod, setDashPeriod, dashQuarter, setDashQuarter, dashYear, setDashYear }) => {
   const [cases, setCases] = useState([]);
-  const [selectedDisease, setSelectedDisease] = useState('Dengue');
   const [loading, setLoading] = useState(true);
-  const [dateRange, setDateRange] = useState(getWorkWeek);
   const [currentPage, setCurrentPage] = useState(1);
   const [ellipsisOpen, setEllipsisOpen] = useState(false);
   const [ellipsisPageInput, setEllipsisPageInput] = useState('');
   const ellipsisRef = useRef(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const exportRef = useRef(null);
+  const [chartMounted, setChartMounted] = useState(false);
+  const [yearOpen, setYearOpen] = useState(false);
+  const yearRef = useRef(null);
 
   const CHO_UNIT_BARANGAYS = {
     'CHO Unit I (Sala)': [
@@ -111,6 +159,9 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       if (diseaseRef.current && !diseaseRef.current.contains(e.target)) {
         setDiseaseOpen(false);
       }
+      if (yearRef.current && !yearRef.current.contains(e.target)) {
+        setYearOpen(false);
+      }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -125,14 +176,22 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
   useEffect(() => { setCurrentPage(1); }, [dateRange.start, dateRange.end]);
 
+  useEffect(() => {
+    setChartMounted(false);
+    const t = setTimeout(() => setChartMounted(true), 60);
+    return () => clearTimeout(t);
+  }, [dashPeriod, dashQuarter, dashYear]);
+
   const choUnitBarangays = sessionContext ? CHO_UNIT_BARANGAYS[sessionContext] || [] : [];
 
+  const scopedCases = (loginRole === 'BHW' && loginBarangay)
+    ? cases.filter(c => c.barangay_name === loginBarangay)
+    : (loginRole === 'CHO' && choUnitBarangays.length > 0)
+      ? cases.filter(c => choUnitBarangays.includes(c.barangay_name))
+      : cases;
+
   const displayCases = (() => {
-    let filtered = (loginRole === 'BHW' && loginBarangay)
-      ? cases.filter(c => c.barangay_name === loginBarangay)
-      : (loginRole === 'CHO' && choUnitBarangays.length > 0)
-        ? cases.filter(c => choUnitBarangays.includes(c.barangay_name))
-        : cases;
+    let filtered = scopedCases;
     if (dateRange.start) {
       filtered = filtered.filter(c => c.date_reported && c.date_reported.slice(0, 10) >= dateRange.start);
     }
@@ -143,7 +202,19 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   })();
 
   if (loading) {
-    return <div style={{ color: 'var(--text-main)', padding: '40px', textAlign: 'center' }}>Loading dashboard data...</div>;
+    return (
+      <div style={{ color: 'var(--text-main)', padding: '28px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '16px' }}>
+          {[0, 1, 2, 3].map(i => (
+            <div key={i} style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '20px' }}>
+              <div className="cdms-skeleton" style={{ width: '70%', height: '12px', marginBottom: '12px' }} />
+              <div className="cdms-skeleton" style={{ width: '45%', height: '26px' }} />
+            </div>
+          ))}
+        </div>
+        <div className="cdms-skeleton" style={{ width: '100%', height: '260px', borderRadius: '10px' }} />
+      </div>
+    );
   }
 
   // --- STAT CARDS ---
@@ -151,6 +222,8 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   const activeCases = displayCases.filter(c => ['Active', 'Pending', 'Under Treatment'].includes(c.status)).length;
   const recoveredCases = displayCases.filter(c => c.status === 'Recovered').length;
   const deathCases = displayCases.filter(c => c.status === 'Deceased').length;
+
+  const statSignature = `${dashPeriod}|${dashQuarter}|${dashYear}|${dateRange.start || ''}|${dateRange.end || ''}|${selectedDisease}`;
 
   // --- BAR CHART DATA (prefix matching for variants) ---
   const diseaseFilteredCases = displayCases.filter(c => {
@@ -182,6 +255,67 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   const diseaseBars = Object.entries(diseaseCounts)
     .map(([label, count]) => ({ label, count }))
     .sort((a, b) => b.count - a.count);
+
+  // --- PERIOD CHART MODE: quarterly & yearly show month-column chart ---
+  const periodChart = dashPeriod === 'quarterly' || dashPeriod === 'yearly';
+
+  const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const MONTH_FULL  = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const COLUMN_COLORS = ['#DC2626', '#D97706', '#129968', '#3b82f6', '#7c3aed', '#db2777', '#0ea5e9', '#84cc16', '#f59e0b', '#14b8a6', '#ef4444', '#6366f1'];
+
+  const buildMonthBars = (months) => months.map(m => {
+    const key = String(dashYear).padStart(4, '0') + '-' + String(m + 1).padStart(2, '0');
+    const count = displayCases.filter(c => c.date_reported && c.date_reported.slice(0, 7) === key).length;
+    return { label: MONTH_SHORT[m], full: MONTH_FULL[m], count };
+  });
+
+  const qStartMonth = (dashQuarter - 1) * 3;
+  const monthBars = periodChart
+    ? (dashPeriod === 'quarterly'
+        ? buildMonthBars([qStartMonth, qStartMonth + 1, qStartMonth + 2])
+        : buildMonthBars([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]))
+    : [];
+  const monthMax = monthBars.length > 0 ? Math.max(...monthBars.map(b => b.count)) : 1;
+
+  const gridLines = (() => {
+    const step = Math.max(1, Math.ceil(monthMax / 4));
+    const top = step * 4;
+    const lines = [];
+    for (let k = 0; k <= 4; k++) lines.push({ value: k * step, frac: k / 4 });
+    return { lines, top };
+  })();
+
+  const yearOptions = (() => {
+    const years = new Set();
+    cases.forEach(c => {
+      if (c.date_reported) {
+        const y = c.date_reported.slice(0, 4);
+        if (/^\d{4}$/.test(y)) years.add(Number(y));
+      }
+    });
+    const currentYear = new Date().getFullYear();
+    years.add(currentYear);
+    const floor = Math.min(Math.min(...years), 1900);
+    const all = [];
+    for (let y = currentYear; y >= floor; y--) all.push(y);
+    return all;
+  })();
+
+  const exportBars = periodChart ? monthBars : (isBhw ? diseaseBars : sortedBars);
+  const exportTitle = periodChart
+    ? `Monthly Cases (${dashPeriod === 'quarterly' ? `Q${dashQuarter} ` : ''}${dashYear})`
+    : (isBhw ? 'All Diseases - Case Counts' : `${selectedDisease} Cases by Barangay`);
+  const exportHighest = periodChart ? monthMax : (isBhw ? (diseaseBars.length > 0 ? diseaseBars[0].count : 1) : highestCount);
+
+  const yearOptionStyle = (active) => ({
+    padding: '8px 14px', cursor: 'pointer', fontSize: '13px',
+    display: 'flex', alignItems: 'center', gap: '8px', borderRadius: '6px',
+    justifyContent: 'flex-start',
+    background: active ? 'rgba(96,165,250,0.18)' : 'transparent',
+    color: active ? 'var(--accent, #93bbfc)' : 'var(--text-main)',
+    fontWeight: active ? '600' : '400',
+    borderLeft: active ? '3px solid var(--accent, #60a5fa)' : '3px solid transparent',
+  });
 
   // --- PAGINATION ---
   const totalPages = Math.ceil(displayCases.length / CASES_PER_PAGE);
@@ -242,9 +376,9 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
   // --- EXPORT: WORD ---
   const handleExportWord = () => {
-    const eBars = isBhw ? diseaseBars : sortedBars;
-    const eTitle = isBhw ? 'All Diseases - Case Counts' : `${selectedDisease} Cases by Barangay`;
-    const eHighest = isBhw ? (diseaseBars.length > 0 ? diseaseBars[0].count : 1) : highestCount;
+    const eBars = exportBars;
+    const eTitle = exportTitle;
+    const eHighest = exportHighest;
     const html = `
       <html><head><meta charset="utf-8"><title>CDMS Report</title>
       <style>
@@ -305,9 +439,9 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
   // --- EXPORT: PPT ---
   const handleExportPPT = () => {
-    const eBars = isBhw ? diseaseBars : sortedBars;
-    const eTitle = isBhw ? 'All Diseases - Case Counts' : `${selectedDisease} Cases by Barangay`;
-    const eHighest = isBhw ? (diseaseBars.length > 0 ? diseaseBars[0].count : 1) : highestCount;
+    const eBars = exportBars;
+    const eTitle = exportTitle;
+    const eHighest = exportHighest;
     const html = `
       <html><head><meta charset="utf-8"><title>CDMS Slide Export</title>
       <style>
@@ -363,9 +497,9 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
   // --- PRINT ---
   const handlePrint = () => {
-    const eBars = isBhw ? diseaseBars : sortedBars;
-    const eTitle = isBhw ? 'All Diseases - Case Counts' : `${selectedDisease} Cases by Barangay`;
-    const eHighest = isBhw ? (diseaseBars.length > 0 ? diseaseBars[0].count : 1) : highestCount;
+    const eBars = exportBars;
+    const eTitle = exportTitle;
+    const eHighest = exportHighest;
     const rows = displayCases.map(c =>
       `<tr>
         <td>#${String(c.case_id).padStart(3,'0')}</td>
@@ -455,10 +589,10 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           { label: 'Active', value: activeCases, color: '#D97706' },
           { label: 'Recovered', value: recoveredCases, color: '#0D7A4E' },
           { label: 'Deaths', value: deathCases, color: '#DC2626' },
-        ].map(card => (
-            <div key={card.label} style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' }}>
+        ].map((card, i) => (
+            <div key={`${card.label}-${statSignature}`} className="cdms-view-in" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', animationDelay: `${i * 80}ms` }}>
             <div style={{ color: 'var(--text-muted)', fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{card.label}</div>
-            <div style={{ color: card.color, fontSize: '32px', fontWeight: '700', marginTop: '6px' }}>{card.value}</div>
+            <AnimatedNumber value={card.value} style={{ color: card.color, fontSize: '32px', fontWeight: '700', marginTop: '6px' }} />
           </div>
         ))}
       </div>
@@ -467,11 +601,61 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '16px' }}>
 
         {/* BAR CHART */}
-          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' }}>
+          <div key={`chart-${statSignature}`} className="cdms-view-in" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', display: 'flex', flexDirection: 'column' }}>
           <h4 style={{ color: 'var(--text-main)', margin: '0 0 16px 0', fontSize: '14px', fontWeight: '600' }}>
-            {isBhw ? 'All Diseases - Case Counts' : `${selectedDisease} Cases by Barangay`}
+            {exportTitle}
           </h4>
-          {isBhw ? (
+          {periodChart ? (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', height: '210px' }}>
+                  <div style={{ width: '26px', height: '210px', position: 'relative', fontSize: '10px', color: 'var(--text-muted)' }}>
+                    {gridLines.lines.map(l => {
+                      const topPx = 26 + (1 - l.frac) * 184;
+                      return <span key={l.value} style={{ position: 'absolute', right: 6, top: `${(topPx / 210) * 100}%`, transform: 'translateY(-50%)' }}>{l.value}</span>;
+                    })}
+                  </div>
+                  <div style={{ flex: 1, position: 'relative', height: '210px' }}>
+                    {gridLines.lines.map(l => {
+                      const topPx = 26 + (1 - l.frac) * 184;
+                      return <div key={l.value} style={{ position: 'absolute', left: 0, right: 0, top: `${(topPx / 210) * 100}%`, borderTop: '1px dashed var(--border-color)' }} />;
+                    })}
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'flex-end', gap: '12px' }}>
+                      {monthBars.map((b, i) => {
+                        const h = chartMounted ? Math.max((b.count / gridLines.top) * 184, b.count > 0 ? 4 : 2) : 0;
+                        return (
+                          <div key={b.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
+                            <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '4px', opacity: chartMounted ? 1 : 0, transition: 'opacity 0.5s ease 0.2s' }}>{b.count}</div>
+                            <div style={{
+                              width: '100%', maxWidth: '48px',
+                              background: COLUMN_COLORS[i % COLUMN_COLORS.length],
+                              height: `${h}px`, borderRadius: '6px 6px 0 0',
+                              transition: 'height 0.7s cubic-bezier(0.22, 1, 0.36, 1)',
+                              boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                            }} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                  <div style={{ width: '26px' }} />
+                  {monthBars.map(b => (
+                    <div key={b.label} style={{ flex: 1, textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{b.label}</div>
+                  ))}
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 14px', marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}>
+                {monthBars.map((b, i) => (
+                  <span key={b.label} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                    <span style={{ width: '11px', height: '11px', borderRadius: '3px', background: COLUMN_COLORS[i % COLUMN_COLORS.length] }} />
+                    {b.full}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : periodChart || isBhw ? (
             <div style={{ maxHeight: '480px', overflowY: 'auto', paddingRight: '4px' }}>
               {diseaseBars.map((bar, i) => {
                 const dHighest = diseaseBars.length > 0 ? diseaseBars[0].count : 1;
@@ -526,7 +710,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         </div>
 
         {/* FILTER & CONTROLS - FIX: date inputs no longer overflow */}
-          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div key={`filters-${statSignature}`} className="cdms-view-in" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <h4 style={{ color: 'var(--text-main)', margin: '0', fontSize: '14px', fontWeight: '600' }}>Filter & Controls</h4>
 
           {!isBhw && <div>
@@ -540,7 +724,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                 <span style={{ marginLeft: '6px', opacity: 0.6, transition: 'transform 0.2s', display: 'inline-block', transform: diseaseOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
               </button>
               {diseaseOpen && (
-                <div style={{
+                <div className="cdms-dropdown-panel" style={{
                   position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
                   maxHeight: '250px', overflowY: 'auto', marginTop: '4px',
                   background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
@@ -567,23 +751,154 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             </div>
           </div>}
 
-          {/* ── FIX: Date range - stacked so neither overflows ── */}
+          {/* ── Period + Date range ── */}
           <div>
             <label style={{ color: 'var(--text-muted)', fontSize: '12px', display: 'block', marginBottom: '4px' }}>Date Range</label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <input
-                type="date"
-                value={dateRange.start}
-                onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '12px', boxSizing: 'border-box' }}
-              />
-              <input
-                type="date"
-                value={dateRange.end}
-                onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-                style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '12px', boxSizing: 'border-box' }}
-              />
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {['weekly', 'monthly', 'quarterly', 'yearly'].map(p => (
+                <button
+                  key={p}
+                  onClick={() => {
+                    setDashPeriod(p);
+                    setDateRange(getPeriodRange(p, dashQuarter, dashYear));
+                  }}
+                  style={{
+                    flex: 1, padding: '6px 4px', borderRadius: '6px', cursor: 'pointer',
+                    fontSize: '12px', fontWeight: '500', textTransform: 'capitalize', minWidth: '56px',
+                    background: dashPeriod === p ? '#121358' : 'var(--input-bg)',
+                    color: dashPeriod === p ? 'white' : 'var(--text-muted)',
+                    border: '1px solid var(--border-color)',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+                  onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                >
+                  {p}
+                </button>
+              ))}
             </div>
+
+            {dashPeriod === 'quarterly' && (
+              <>
+                <label style={{ color: 'var(--text-muted)', fontSize: '12px', display: 'block', marginBottom: '4px', marginTop: '10px' }}>Quarter</label>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  {[1, 2, 3, 4].map(q => (
+                    <button
+                      key={q}
+                      onClick={() => { setDashQuarter(q); setDateRange(getPeriodRange('quarterly', q, dashYear)); }}
+                      style={{
+                        flex: 1, padding: '6px 4px', borderRadius: '6px', cursor: 'pointer',
+                        fontSize: '12px', fontWeight: '600',
+                        background: dashQuarter === q ? '#129968' : 'var(--input-bg)',
+                        color: dashQuarter === q ? 'white' : 'var(--text-muted)',
+                        border: '1px solid var(--border-color)',
+                      }}
+                    >
+                      Q{q}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ position: 'relative', marginTop: '6px' }} ref={yearRef}>
+                  <button
+                    onClick={() => setYearOpen(!yearOpen)}
+                    style={{
+                      width: '100%', padding: '9px 12px',
+                      background: 'var(--input-bg)', border: `1px solid ${yearOpen ? '#60a5fa' : 'var(--border-color)'}`,
+                      borderRadius: '7px', color: 'var(--text-main)',
+                      fontSize: '13px', cursor: 'pointer', textAlign: 'left',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxSizing: 'border-box',
+                    }}
+                  >
+                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dashPeriod === 'custom' ? 'Custom dates…' : dashYear}</span>
+                    <span style={{ fontSize: '10px', opacity: 0.6, flexShrink: 0, marginLeft: '8px', transition: 'transform 0.2s', display: 'inline-block', transform: yearOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                  </button>
+                  {yearOpen && (
+                    <div className="cdms-dropdown-panel" style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, maxHeight: '250px', overflowY: 'auto', marginTop: '4px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 12px 32px rgba(0,0,0,0.3)', padding: '4px', textAlign: 'left' }}>
+                      <div
+                        onClick={() => { setDashPeriod('custom'); setYearOpen(false); }}
+                        style={yearOptionStyle(dashPeriod === 'custom')}
+                        onMouseEnter={e => { if (dashPeriod !== 'custom') { e.currentTarget.style.background = 'rgba(96,165,250,0.25)'; e.currentTarget.style.color = 'var(--text-main)'; } }}
+                        onMouseLeave={e => { if (dashPeriod !== 'custom') { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-main)'; } }}
+                      >
+                        <span style={{ flex: 1 }}>Custom dates…</span>
+                        {dashPeriod === 'custom' && <span style={{ color: '#60a5fa', fontSize: '12px' }}>✓</span>}
+                      </div>
+                      {yearOptions.map(y => (
+                        <div
+                          key={y}
+                          onClick={() => { setDashYear(y); setDateRange(getPeriodRange('quarterly', dashQuarter, y)); setYearOpen(false); }}
+                          style={yearOptionStyle(dashYear === y)}
+                          onMouseEnter={e => { if (dashYear !== y) { e.currentTarget.style.background = 'rgba(96,165,250,0.25)'; e.currentTarget.style.color = 'var(--text-main)'; } }}
+                          onMouseLeave={e => { if (dashYear !== y) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-main)'; } }}
+                        >
+                          <span style={{ flex: 1 }}>{y}</span>
+                          {dashYear === y && <span style={{ color: '#60a5fa', fontSize: '12px' }}>✓</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            {dashPeriod === 'yearly' && (
+              <div style={{ position: 'relative', marginTop: '10px' }} ref={yearRef}>
+                <button
+                  onClick={() => setYearOpen(!yearOpen)}
+                  style={{
+                    width: '100%', padding: '9px 12px',
+                    background: 'var(--input-bg)', border: `1px solid ${yearOpen ? '#60a5fa' : 'var(--border-color)'}`,
+                    borderRadius: '7px', color: 'var(--text-main)',
+                    fontSize: '13px', cursor: 'pointer', textAlign: 'left',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxSizing: 'border-box',
+                  }}
+                >
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dashPeriod === 'custom' ? 'Custom dates…' : dashYear}</span>
+                  <span style={{ fontSize: '10px', opacity: 0.6, flexShrink: 0, marginLeft: '8px', transition: 'transform 0.2s', display: 'inline-block', transform: yearOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                </button>
+                {yearOpen && (
+                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, maxHeight: '250px', overflowY: 'auto', marginTop: '4px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 12px 32px rgba(0,0,0,0.3)', padding: '4px', textAlign: 'left' }}>
+                    <div
+                      onClick={() => { setDashPeriod('custom'); setYearOpen(false); }}
+                      style={yearOptionStyle(dashPeriod === 'custom')}
+                      onMouseEnter={e => { if (dashPeriod !== 'custom') { e.currentTarget.style.background = 'rgba(96,165,250,0.25)'; e.currentTarget.style.color = 'var(--text-main)'; } }}
+                      onMouseLeave={e => { if (dashPeriod !== 'custom') { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-main)'; } }}
+                    >
+                      <span style={{ flex: 1 }}>Custom dates…</span>
+                      {dashPeriod === 'custom' && <span style={{ color: '#60a5fa', fontSize: '12px' }}>✓</span>}
+                    </div>
+                    {yearOptions.map(y => (
+                      <div
+                        key={y}
+                        onClick={() => { setDashYear(y); setDateRange(getPeriodRange('yearly', 0, y)); setYearOpen(false); }}
+                        style={yearOptionStyle(dashYear === y)}
+                        onMouseEnter={e => { if (dashYear !== y) { e.currentTarget.style.background = 'rgba(96,165,250,0.25)'; e.currentTarget.style.color = 'var(--text-main)'; } }}
+                        onMouseLeave={e => { if (dashYear !== y) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-main)'; } }}
+                      >
+                        <span style={{ flex: 1 }}>{y}</span>
+                        {dashYear === y && <span style={{ color: '#60a5fa', fontSize: '12px' }}>✓</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {(dashPeriod === 'weekly' || dashPeriod === 'monthly' || dashPeriod === 'custom') && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '8px' }}>
+                <input
+                  type="date"
+                  value={dateRange.start}
+                  onChange={(e) => { setDateRange({ ...dateRange, start: e.target.value }); setDashPeriod('custom'); }}
+                  style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '12px', boxSizing: 'border-box' }}
+                />
+                <input
+                  type="date"
+                  value={dateRange.end}
+                  onChange={(e) => { setDateRange({ ...dateRange, end: e.target.value }); setDashPeriod('custom'); }}
+                  style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '12px', boxSizing: 'border-box' }}
+                />
+              </div>
+            )}
           </div>
 
           {/* EXPORT dropdown */}

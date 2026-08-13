@@ -960,7 +960,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                 }}>▼</span>
               </button>
               {barangayOpen && (
-                <div style={{
+                <div className="cdms-dropdown-panel" style={{
                   position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
                   maxHeight: '250px', overflowY: 'auto', marginTop: '4px',
                   background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
@@ -1032,7 +1032,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               <span style={{ fontSize: '10px', opacity: 0.6, transition: 'transform 0.2s', transform: statusOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
             </button>
             {statusOpen && (
-              <div style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', zIndex: 100, overflow: 'hidden' }}>
+              <div className="cdms-dropdown-panel" style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', zIndex: 100, overflow: 'hidden' }}>
                 {['All Status', 'Active', 'Pending', 'Under Treatment', 'Recovered', 'Deceased'].map(s => (
                   <button key={s} type="button"
                     onClick={() => { setFilterStatus(s); setStatusOpen(false); }}
@@ -1070,7 +1070,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               }}>▼</span>
             </button>
             {purokOpen && (
-              <div style={{
+              <div className="cdms-dropdown-panel" style={{
                 position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
                 maxHeight: '200px', overflowY: 'auto', marginTop: '4px',
                 background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
@@ -1118,7 +1118,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               <span style={{ fontSize: '10px', opacity: 0.6, transition: 'transform 0.2s', transform: severityOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
             </button>
             {severityOpen && (
-              <div style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', zIndex: 100, overflow: 'hidden' }}>
+              <div className="cdms-dropdown-panel" style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', zIndex: 100, overflow: 'hidden' }}>
                 {['All Severities', 'Mild', 'Moderate', 'Severe', 'Asymptomatic'].map(s => (
                   <button key={s} type="button"
                     onClick={() => { setFilterSeverity(s); setSeverityOpen(false); }}

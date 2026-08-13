@@ -490,8 +490,8 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
 
       {/* ── VIEW MODAL ── */}
       {viewReport && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-          <div style={{ background: 'var(--bg-surface)', borderRadius: '14px', padding: '36px', width: '680px', maxWidth: '95vw', boxShadow: '0 24px 60px rgba(0,0,0,0.2)', maxHeight: '80vh', overflowY: 'auto' }}>
+        <div className="cdms-modal-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+          <div className="cdms-modal-card" style={{ background: 'var(--bg-surface)', borderRadius: '14px', padding: '36px', width: '680px', maxWidth: '95vw', boxShadow: '0 24px 60px rgba(0,0,0,0.2)', maxHeight: '80vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
               <div>
                 <h3 style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: '700', color: 'var(--text-h)' }}>{viewReport.title}</h3>
@@ -520,7 +520,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                 <thead>
                   <tr style={{ borderBottom: '2px solid var(--border-color)' }}>
                 {['Timestamp', 'User', 'Action', 'Entity', 'Details', 'Updated By'].map(h => (
-                      <th key={h} style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                      <th key={h} style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -533,7 +533,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                           <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{l.user_name}</div>
                         </td>
                         <td style={{ padding: '8px 12px', textAlign: 'center' }}>
-                          <span style={{ padding: '3px 10px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', ...actionBadgeStyle(l.action) }}>{l.action}</span>
+                          <span style={{ padding: '3px 10px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', whiteSpace: 'nowrap', display: 'inline-block', ...actionBadgeStyle(l.action) }}>{l.action}</span>
                         </td>
                         <td style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>{l.entity}</td>
                         <td style={{ padding: '8px 12px', color: 'var(--text-muted)', fontSize: '12px' }}>{(l.details || '').replace(/\s*\(User ID:\s*\d+\)/gi, '').replace(/\s*\(Case ID:\s*\d+\)/gi, '')}</td>
@@ -625,8 +625,8 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
 
       {/* ── GENERATE REPORT MODAL ── */}
       {showGenModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-          <div style={{ background: 'var(--bg-surface)', borderRadius: '14px', padding: '36px', width: '520px', maxWidth: '95vw', boxShadow: '0 24px 60px rgba(0,0,0,0.2)' }}>
+        <div className="cdms-modal-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+          <div className="cdms-modal-card" style={{ background: 'var(--bg-surface)', borderRadius: '14px', padding: '36px', width: '520px', maxWidth: '95vw', boxShadow: '0 24px 60px rgba(0,0,0,0.2)' }}>
             <h3 style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: '700', color: 'var(--text-h)' }}>Generate New Report</h3>
             <p style={{ margin: '0 0 24px 0', fontSize: '14px', color: 'var(--text-muted)' }}>
               A snapshot of the current system activity log will be saved with this report.
@@ -1118,7 +1118,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                       </div>
                     </td>
                     <td style={{ padding: compactMode ? '7px 8px' : '13px 14px', textAlign: 'center' }}>
-                      <span style={{ padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: '600', ...actionBadgeStyle(log.action) }}>
+                      <span style={{ padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: '600', whiteSpace: 'nowrap', display: 'inline-block', ...actionBadgeStyle(log.action) }}>
                         {log.action}
                       </span>
                     </td>

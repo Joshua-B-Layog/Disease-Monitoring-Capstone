@@ -2345,7 +2345,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         )}
 
         {category && (
-          <div style={{ display: 'grid', gridTemplateColumns: gridMode ? '1fr 1fr' : '1fr 1fr 1fr', gap: gridMode ? (compactMode ? '12px' : '16px') : '24px', marginTop: gridMode ? '16px' : '24px' }}>
+          <div key={`disease-grid-${selectedCategory}`} className="cdms-view-in" style={{ display: 'grid', gridTemplateColumns: gridMode ? '1fr 1fr' : '1fr 1fr 1fr', gap: gridMode ? (compactMode ? '12px' : '16px') : '24px', marginTop: gridMode ? '16px' : '24px' }}>
             {currentDiseases.map(entry => renderDiseaseCard(entry, !gridMode))}
           </div>
         )}
@@ -2422,8 +2422,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             ) : myEditRequests.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No edit requests.</div>
             ) : (
-              myEditRequests.map(req => (
-                <div key={req.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)' }}>
+              myEditRequests.map((req, idx) => (
+                <div key={req.id} className="cdms-row-in" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)', animationDelay: `${Math.min(idx, 10) * 45}ms` }}>
                   <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: req.status === 'accepted' ? '#129968' : req.status === 'rejected' ? '#ef4444' : '#D97706', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '14px', flexShrink: 0 }}>
                     {req.status === 'accepted' ? '✓' : req.status === 'rejected' ? '✕' : '…'}
                   </div>
@@ -2462,8 +2462,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             ) : inboxItems.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Inbox is empty.</div>
             ) : (
-              inboxItems.map(item => (
-                <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)' }}>
+              inboxItems.map((item, idx) => (
+                <div key={item.id} className="cdms-row-in" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)', animationDelay: `${Math.min(idx, 10) * 45}ms` }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '14.4px', color: 'var(--text-muted)', lineHeight: 1, textAlign: 'left' }}>
                       {item.from_user_role === 'BHW'
@@ -2517,8 +2517,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             ) : editRequests.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No edit requests from BHWs.</div>
             ) : (
-              editRequests.map(req => (
-                <div key={req.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)' }}>
+              editRequests.map((req, idx) => (
+                <div key={req.id} className="cdms-row-in" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)', animationDelay: `${Math.min(idx, 10) * 45}ms` }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '14.4px', color: 'var(--text-muted)', lineHeight: 1, textAlign: 'left' }}>
                       From BHW ({req.from_barangay_name || 'Unknown Barangay'})
@@ -2565,8 +2565,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             ) : pendingRegistrations.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No pending BHW registrations.</div>
             ) : (
-              pendingRegistrations.map(reg => (
-                <div key={reg.user_id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)' }}>
+              pendingRegistrations.map((reg, idx) => (
+                <div key={reg.user_id} className="cdms-row-in" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)', animationDelay: `${Math.min(idx, 10) * 45}ms` }}>
                   <div className="inbox-avatar-circle" style={{ background: '#D97706' }}>
                     {(reg.full_name || 'U').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
                   </div>
@@ -2609,8 +2609,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             ) : contactMessages.filter(m => m.status === 'new' || m.status === 'pending').length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No messages from residents.</div>
             ) : (
-              contactMessages.filter(m => m.status === 'new' || m.status === 'pending').map(msg => (
-                <div key={msg.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)', background: msg.status === 'pending' ? 'rgba(245,158,11,0.06)' : 'rgba(13,148,136,0.04)' }}>
+              contactMessages.filter(m => m.status === 'new' || m.status === 'pending').map((msg, idx) => (
+                <div key={msg.id} className="cdms-row-in" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)', background: msg.status === 'pending' ? 'rgba(245,158,11,0.06)' : 'rgba(13,148,136,0.04)', animationDelay: `${Math.min(idx, 10) * 45}ms` }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '14.4px', color: 'var(--text-muted)', lineHeight: 1, textAlign: 'left' }}>
                       From Resident{msg.barangay ? ` (${msg.barangay})` : msg.target_cho_unit ? ` (${msg.target_cho_unit})` : ''}
@@ -2700,8 +2700,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           {outboxItems.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Outbox is empty.</div>
           ) : (
-            outboxItems.map(item => (
-              <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)' }}>
+            outboxItems.map((item, idx) => (
+              <div key={item.id} className="cdms-row-in" style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)', animationDelay: `${Math.min(idx, 10) * 45}ms` }}>
                 <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: item.status === 'accepted' ? '#129968' : item.status === 'rejected' ? '#ef4444' : '#D97706', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '12px', flexShrink: 0 }}>
                   {item.status === 'accepted' ? '✓' : item.status === 'rejected' ? '✕' : '…'}
                 </div>
@@ -2741,11 +2741,11 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   // ═══════════════════════════════════
   if (view === 'list') {
     return (
-      <div style={{ padding: compactMode ? '14px' : '28px', color: 'var(--text-main)', fontSize: `calc(14px * ${fs})` }}>
+      <div key={`list-view-${selectedDisease?.dbName || 'all'}`} className="cdms-view-in" style={{ padding: compactMode ? '14px' : '28px', color: 'var(--text-main)', fontSize: `calc(14px * ${fs})` }}>
         {/* DELETE MODAL */}
         {deleteTarget && (
-          <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-            <div style={{ background: 'var(--bg-surface)', borderRadius: '16px', padding: '40px 32px', width: '420px', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+          <div className="cdms-modal-backdrop" style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+            <div className="cdms-modal-card" style={{ background: 'var(--bg-surface)', borderRadius: '16px', padding: '40px 32px', width: '420px', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
               <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px auto' }}>
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
@@ -2923,7 +2923,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 <span style={{ fontSize: '10px', opacity: 0.6, transition: 'transform 0.2s', transform: statusOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
               </button>
               {statusOpen && (
-                <div style={{ position: 'absolute', top: '105%', left: 0, minWidth: '180px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', zIndex: 100, overflow: 'hidden' }}>
+                <div className="cdms-dropdown-panel" style={{ position: 'absolute', top: '105%', left: 0, minWidth: '180px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', zIndex: 100, overflow: 'hidden' }}>
                   {['All Status', ...['Active', 'Pending', 'Under Treatment', 'Recovered', 'Deceased', 'Draft'].sort()].map(s => (
                     <button key={s} type="button"
                       onClick={() => { setFilterStatus(s); setStatusOpen(false); setTablePage(1); }}
@@ -2943,7 +2943,19 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           </div>
 
           {loadingCases ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading cases from database...</div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <tbody>
+                {[0, 1, 2, 3, 4].map(r => (
+                  <tr key={r} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                    {[0, 1, 2, 3, 4, 5, 6, 7].map(c => (
+                      <td key={c} style={{ padding: compactMode ? '7px 8px' : '12px', textAlign: 'center' }}>
+                        <div className="cdms-skeleton" style={{ width: c === 1 ? '55%' : '70%', height: '16px', margin: '0 auto' }} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
@@ -2955,7 +2967,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   ))}
                 </tr>
               </thead>
-              <tbody>
+              <tbody key={`rows-${selectedDisease?.dbName || 'all'}-${tablePage}-${searchQuery}-${filterBarangay}-${filterStatus}-${filterPurok}`}>
                 {paginatedCases.length === 0 ? (
                   <tr>
                     <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '14px' }}>
@@ -2965,8 +2977,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     </td>
                   </tr>
                 ) : (
-                  paginatedCases.map(c => (
-                    <tr key={c.case_id} style={{ borderBottom: '1px solid var(--border-color)', opacity: c.status === 'Draft' ? 0.6 : 1 }}
+                  paginatedCases.map((c, rowIdx) => (
+                    <tr key={c.case_id} className="cdms-row-in" style={{ borderBottom: '1px solid var(--border-color)', opacity: c.status === 'Draft' ? 0.6 : 1, animationDelay: `${Math.min(rowIdx, 10) * 45}ms` }}
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--input-bg)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                       <td style={{ padding: compactMode ? '7px 8px' : '12px', fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center' }}>
@@ -3115,19 +3127,19 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           </div>
 
           {submitMsg && (
-            <div style={{ background: submitMsg.startsWith('Error') ? '#fee2e2' : '#d1f5e9', color: submitMsg.startsWith('Error') ? '#991b1b' : '#0a5e42', padding: '12px', borderRadius: '8px', marginBottom: '20px', textAlign: 'center', fontSize: '14px', fontWeight: '500' }}>
+            <div className={`cdms-msg-in ${submitMsg.startsWith('Error') ? 'cdms-msg-shake' : ''}`} style={{ background: submitMsg.startsWith('Error') ? '#fee2e2' : '#d1f5e9', color: submitMsg.startsWith('Error') ? '#991b1b' : '#0a5e42', padding: '12px', borderRadius: '8px', marginBottom: '20px', textAlign: 'center', fontSize: '14px', fontWeight: '500' }}>
               {submitMsg.startsWith('Error') ? '❌' : '✅'} {submitMsg}
             </div>
           )}
 
           {autoSaveToast && (
-            <div style={{ background: '#fef3c7', color: '#92400e', padding: '8px 16px', borderRadius: '8px', marginBottom: '12px', textAlign: 'center', fontSize: '13px', fontWeight: '500' }}>
+            <div className="cdms-msg-in" style={{ background: '#fef3c7', color: '#92400e', padding: '8px 16px', borderRadius: '8px', marginBottom: '12px', textAlign: 'center', fontSize: '13px', fontWeight: '500' }}>
               💾 {autoSaveToast}
             </div>
           )}
 
           {editRequestSuccess && (
-            <div style={{ background: 'rgba(18,153,104,0.1)', color: '#3cb882', padding: '12px', borderRadius: '8px', marginBottom: '20px', textAlign: 'center', fontSize: '14px', fontWeight: '500' }}>
+            <div className="cdms-msg-in" style={{ background: 'rgba(18,153,104,0.1)', color: '#3cb882', padding: '12px', borderRadius: '8px', marginBottom: '20px', textAlign: 'center', fontSize: '14px', fontWeight: '500' }}>
               ✅ {editRequestSuccess} - It has been sent to the CHO for editing
             </div>
           )}
@@ -3845,8 +3857,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
         {/* Routing modal */}
         {routingStep && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)' }}>
-            <div style={{ background: 'var(--bg-surface)', borderRadius: '12px', padding: '28px', maxWidth: '480px', width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }}>
+          <div className="cdms-modal-backdrop" style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)' }}>
+            <div className="cdms-modal-card" style={{ background: 'var(--bg-surface)', borderRadius: '12px', padding: '28px', maxWidth: '480px', width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }}>
               {routingStep === 'confirm' && (
                 <>
                   <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', color: 'var(--text-main)' }}>

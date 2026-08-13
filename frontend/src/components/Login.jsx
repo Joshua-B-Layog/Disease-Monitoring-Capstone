@@ -573,7 +573,7 @@ const handleLoginOtpSubmit = async (e) => {
         </div>
 
         <div className="login-right">
-          <div className="login-form-container">
+          <div key={step} className={step === 'role' ? 'login-form-container' : 'login-form-container cdms-login-step'}>
             
             <div className="brand-logo" style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '30px' }}>
               <div className="circle-logo" style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#121358', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}><ChoLogoIcon size={32} /></div>
@@ -651,7 +651,7 @@ const handleLoginOtpSubmit = async (e) => {
                 </div>
 
                 {loginError && (
-                  <div style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(239,68,68,0.35)' }}>
+                  <div className="cdms-msg-shake" style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(239,68,68,0.35)' }}>
                     {loginError}
                   </div>
                 )}
@@ -687,7 +687,7 @@ const handleLoginOtpSubmit = async (e) => {
 
                 <form onSubmit={handleFormSubmit}>
                   {loginError && (
-                    <div style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(239,68,68,0.35)' }}>
+                    <div className="cdms-msg-shake" style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(239,68,68,0.35)' }}>
                       {loginError}
                     </div>
                   )}
@@ -774,7 +774,7 @@ const handleLoginOtpSubmit = async (e) => {
     </div>
     <form onSubmit={handleLoginOtpSubmit}>
       {otpError && (
-        <div style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(239,68,68,0.35)' }}>
+        <div className="cdms-msg-shake" style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(239,68,68,0.35)' }}>
           {otpError}
         </div>
       )}
@@ -911,12 +911,12 @@ const handleLoginOtpSubmit = async (e) => {
 
                 <form onSubmit={handleRecoverySubmit}>
                   {loginError && (
-                    <div style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(239,68,68,0.35)', textAlign: 'left' }}>
+                    <div className="cdms-msg-shake" style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(239,68,68,0.35)', textAlign: 'left' }}>
                       {loginError}
                     </div>
                   )}
                   {recoverySuccess && (
-                    <div style={{ backgroundColor: 'var(--input-bg)', color: '#0369a1', padding: '12px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(14,165,233,0.35)', textAlign: 'left' }}>
+                    <div className="cdms-msg-in" style={{ backgroundColor: 'var(--input-bg)', color: '#0369a1', padding: '12px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(14,165,233,0.35)', textAlign: 'left' }}>
                       {recoverySuccess}
                     </div>
                   )}
@@ -953,12 +953,12 @@ const handleLoginOtpSubmit = async (e) => {
 
                     <form onSubmit={handleSignupSubmit}>
                         {signupError && (
-                            <div style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(239,68,68,0.35)', textAlign: 'left' }}>
+                            <div className="cdms-msg-shake" style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(239,68,68,0.35)', textAlign: 'left' }}>
                                 {signupError}
                             </div>
                         )}
                         {signupSuccess && (
-                            <div style={{ backgroundColor: 'var(--input-bg)', color: '#0a5e42', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(18,153,104,0.35)', textAlign: 'left' }}>
+                            <div className="cdms-msg-in" style={{ backgroundColor: 'var(--input-bg)', color: '#0a5e42', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(18,153,104,0.35)', textAlign: 'left' }}>
                                 {signupSuccess}
                             </div>
                         )}
