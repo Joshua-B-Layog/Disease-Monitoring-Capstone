@@ -603,6 +603,134 @@ button:active { transform: scale(0.97); }
   color: #1d4ed8;
 }
 
+/* City Health Office branding panel (login-left loop screen) */
+.login-branding {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 48px;
+  box-sizing: border-box;
+  background: linear-gradient(150deg, #0b0f3d 0%, #121358 45%, #1a1f6e 100%);
+  overflow: hidden;
+  color: #fff;
+}
+.login-branding-dots {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.13) 1px, transparent 1.6px);
+  background-size: 26px 26px;
+  opacity: 0.55;
+  pointer-events: none;
+}
+.login-branding-watermark {
+  position: absolute;
+  right: -24px;
+  bottom: -16px;
+  opacity: 0.08;
+  pointer-events: none;
+}
+.login-branding-content {
+  position: relative;
+  z-index: 1;
+  max-width: 460px;
+  animation: cdmsBrandingIn 0.7s ease both;
+}
+@keyframes cdmsBrandingIn {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.login-branding-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 16px 6px 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #93c5fd;
+  margin-bottom: 24px;
+}
+.login-branding-badge-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.login-branding-title {
+  font-size: 36px;
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  color: #fff;
+  margin: 0 0 6px 0;
+}
+.login-branding-subtitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: #93c5fd;
+  margin: 0 0 20px 0;
+  padding-left: 12px;
+  border-left: 3px solid #dc2626;
+}
+.login-branding-desc {
+  font-size: 14px;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.75);
+  margin: 0 0 28px 0;
+}
+.login-branding-features {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.login-branding-feature {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, 0.92);
+}
+.login-branding-feature-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.login-branding-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 16px 48px 22px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.55);
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.28), rgba(220, 38, 38, 0.28));
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+.login-branding-bottom-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #3b82f6, #dc2626);
+}
+
 /* Respect users who prefer reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .app-page-enter,
@@ -621,7 +749,8 @@ button:active { transform: scale(0.97); }
   .cdms-modal-backdrop,
   .cdms-modal-card,
   .cdms-msg-in,
-  .cdms-skeleton {
+  .cdms-skeleton,
+  .login-branding-content {
     animation: none !important;
     transition: none !important;
   }

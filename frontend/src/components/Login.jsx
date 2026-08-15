@@ -54,11 +54,59 @@ const ANIM_SCENES = [
   { bounds: FEATURE_BOUNDS['Sala'],                 highlight: 'Sala',                 label: 'Sala' },
 ];
 
-function AnimatedMapView({ setFade }) {
+const BRANDING_FEATURES = [
+  { text: 'Real-time communicable disease surveillance', color: '#3b82f6' },
+  { text: 'Barangay-level case mapping across 18 barangays', color: '#dc2626' },
+  { text: 'Automated alerts, referrals & weekly summaries', color: '#3b82f6' },
+  { text: 'Offline-ready field data collection', color: '#dc2626' },
+];
+
+function CityHealthBranding() {
+  return (
+    <div className="login-branding">
+      <div className="login-branding-dots" />
+      <div className="login-branding-watermark">
+        <ChoLogoIcon size={280} />
+      </div>
+
+      <div className="login-branding-content">
+        <div className="login-branding-badge">
+          <div className="login-branding-badge-logo"><ChoLogoIcon size={22} /></div>
+          <span>CITY HEALTH OFFICE</span>
+        </div>
+
+        <h1 className="login-branding-title">City Health Office</h1>
+        <p className="login-branding-subtitle">Cabuyao City, Laguna, Philippines</p>
+        <p className="login-branding-desc">
+          The City Health Office of Cabuyao monitors communicable diseases in real time, mapping every case
+          down to barangay and purok level to guide prompt community health response across the city.
+        </p>
+
+        <div className="login-branding-features">
+          {BRANDING_FEATURES.map((f, i) => (
+            <div key={i} className="login-branding-feature">
+              <span className="login-branding-feature-dot" style={{ background: f.color }} />
+              <span>{f.text}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="login-branding-bottom">
+        <span>City of Cabuyao · City Health Office</span>
+        <div className="login-branding-bottom-bar" />
+      </div>
+    </div>
+  );
+}
+
+function AnimatedMapView({ setFade, active, onSequenceComplete }) {
     const map = useMap();
     const [sceneIdx, setSceneIdx] = useState(0);
     const idxRef = useRef(0);
     const mountedRef = useRef(true);
+    const onCompleteRef = useRef(onSequenceComplete);
+    useEffect(() => { onCompleteRef.current = onSequenceComplete; }, [onSequenceComplete]);
 
     useEffect(() => {
       mountedRef.current = true;
@@ -66,32 +114,42 @@ function AnimatedMapView({ setFade }) {
     }, []);
 
     useEffect(() => {
+      if (!active) {
+        idxRef.current = 0;
+        setSceneIdx(0);
+        return;
+      }
+
+      idxRef.current = 0;
       setSceneIdx(0);
       map.fitBounds(L.latLngBounds(ANIM_SCENES[0].bounds), { padding: [40, 40], maxZoom: 12 });
-    }, []);
 
-    useEffect(() => {
       const advance = () => {
         if (!mountedRef.current) return;
-        setFade(0);
-
         setTimeout(() => {
           if (!mountedRef.current) return;
-          idxRef.current = (idxRef.current + 1) % ANIM_SCENES.length;
+          if (idxRef.current + 1 >= ANIM_SCENES.length) {
+            setFade(0);
+            setTimeout(() => {
+              if (onCompleteRef.current) onCompleteRef.current();
+            }, 450);
+            return;
+          }
+          idxRef.current += 1;
           const scene = ANIM_SCENES[idxRef.current];
           setSceneIdx(idxRef.current);
-          map.fitBounds(L.latLngBounds(scene.bounds), { padding: [20, 20], maxZoom: 15, animate: true, duration: 1.5 });
-
+          setFade(0.35);
+          map.flyToBounds(L.latLngBounds(scene.bounds), { padding: [20, 20], maxZoom: 15, duration: 1.6 });
           setTimeout(() => {
             if (mountedRef.current) setFade(1);
-          }, 600);
-        }, 700);
+          }, 1000);
+        }, 400);
       };
 
       const first = setTimeout(advance, 3000);
       const id = setInterval(advance, 7000);
-      return () => { mountedRef.current = false; clearTimeout(first); clearInterval(id); };
-    }, []);
+      return () => { clearTimeout(first); clearInterval(id); };
+    }, [active, map]);
 
     const currentScene = ANIM_SCENES[sceneIdx];
 
@@ -108,9 +166,9 @@ function AnimatedMapView({ setFade }) {
               return { fillColor: '#121358', fillOpacity: 0.3, color: '#ffffff', weight: 2.5 };
             }
             return {
-              fillColor: '#ffffff',
-              fillOpacity: isOverview ? 0.1 : 0.02,
-              color: isOverview ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)',
+              fillColor: isOverview ? '#94a3b8' : '#ffffff',
+              fillOpacity: isOverview ? 0.4 : 0.02,
+              color: isOverview ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.15)',
               weight: isOverview ? 1.5 : 0.5,
             };
           }}
@@ -148,6 +206,7 @@ function AnimatedMapView({ setFade }) {
     const [selectedRole, setSelectedRole] = useState('CHO'); 
     const [selectedContext, setSelectedContext] = useState(''); 
     const [mapFade, setMapFade] = useState(1);
+    const [leftPanel, setLeftPanel] = useState(0); // 0 = City Health branding, 1 = animated map
     
     // Login Form States
     const [email, setEmail] = useState('');
@@ -226,6 +285,17 @@ function AnimatedMapView({ setFade }) {
       document.addEventListener('mousedown', handler);
       return () => document.removeEventListener('mousedown', handler);
     }, []);
+
+    // ── LEFT SIDE LOOP: City Health branding ↔ full map sequence ──
+    useEffect(() => {
+      if (leftPanel !== 0) return;
+      const id = setTimeout(() => setLeftPanel(1), 7000);
+      return () => clearTimeout(id);
+    }, [leftPanel]);
+
+    useEffect(() => {
+      if (leftPanel === 1) setMapFade(1);
+    }, [leftPanel]);
 
 
 
@@ -552,23 +622,28 @@ const handleLoginOtpSubmit = async (e) => {
         </button>
 
         <div className="login-left">
-          <div style={{ position: 'absolute', inset: 0, opacity: mapFade, transition: 'opacity 0.7s ease-in-out' }}>
-            <MapContainer
-              center={CABUYAO_CENTER}
-              zoom={12}
-              zoomControl={false}
-              scrollWheelZoom={false}
-              dragging={false}
-              touchZoom={false}
-              doubleClickZoom={false}
-              attributionControl={false}
-              style={{ width: '100%', height: '100%', background: 'transparent' }}
-            >
-              <TileLayer
-                url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-              />
-              <AnimatedMapView setFade={setMapFade} />
-            </MapContainer>
+          <div style={{ position: 'absolute', inset: 0, opacity: leftPanel === 0 ? 1 : 0, transition: 'opacity 0.7s ease-in-out', pointerEvents: 'none' }}>
+            <CityHealthBranding />
+          </div>
+          <div style={{ position: 'absolute', inset: 0, opacity: leftPanel === 1 ? 1 : 0, transition: 'opacity 0.7s ease-in-out' }}>
+            <div style={{ position: 'absolute', inset: 0, opacity: mapFade, transition: 'opacity 0.7s ease-in-out' }}>
+              <MapContainer
+                center={CABUYAO_CENTER}
+                zoom={12}
+                zoomControl={false}
+                scrollWheelZoom={false}
+                dragging={false}
+                touchZoom={false}
+                doubleClickZoom={false}
+                attributionControl={false}
+                style={{ width: '100%', height: '100%', background: 'transparent' }}
+              >
+                <TileLayer
+                  url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+                />
+                <AnimatedMapView setFade={setMapFade} active={leftPanel === 1} onSequenceComplete={() => setLeftPanel(0)} />
+              </MapContainer>
+            </div>
           </div>
         </div>
 

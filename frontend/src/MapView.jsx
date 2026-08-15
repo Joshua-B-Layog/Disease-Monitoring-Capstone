@@ -490,44 +490,39 @@ function PulseMarkers({ barangayData, onHover, onLeave, onClick }) {
   const map = useMap();
   const markersRef = useRef([]);
 
+  const createPinIcon = (b, size) => {
+    const { color, ring } = getRisk(b.totalCases);
+    const w = size;
+    const h = Math.round(size * 44 / 34);
+    const labelRaw = b.purok && b.purok !== 'Unspecified' ? b.purok : (b.barangayName || b.barangay || '');
+    const label = labelRaw.length > 22 ? labelRaw.slice(0, 21) + '…' : labelRaw;
+    const labelH = 20;
+    const totalH = h + labelH;
+
+    return L.divIcon({
+      className: '',
+      html: `
+        <div style="position:relative;width:${w}px;height:${totalH}px;cursor:pointer;">
+          <div style="position:absolute;left:50%;top:${h - 5}px;width:16px;height:16px;transform:translate(-50%,-50%);border-radius:50%;background:${ring};animation:cdmsPulse 2s ease-out infinite;"></div>
+          <svg width="${w}" height="${h}" viewBox="0 0 34 44" style="position:absolute;top:0;left:0;display:block;filter:drop-shadow(0 3px 4px rgba(0,0,0,0.5));">
+            <path d="M17 0C7.6 0 0 7.6 0 17c0 12 17 27 17 27s17-15 17-27C34 7.6 26.4 0 17 0z" fill="${color}"/>
+            <circle cx="17" cy="17" r="11" fill="#ffffff"/>
+            <text x="17" y="21" text-anchor="middle" font-size="12" font-weight="800" fill="${color}" font-family="system-ui,-apple-system,sans-serif">${b.totalCases}</text>
+          </svg>
+          <div style="position:absolute;left:50%;top:${h + 1}px;transform:translateX(-50%);background:rgba(15,23,42,0.85);border:1px solid rgba(255,255,255,0.18);color:#fff;font-size:9.5px;font-weight:600;padding:2px 7px;border-radius:8px;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis;line-height:1.2;text-shadow:0 1px 2px rgba(0,0,0,0.3);">${label}</div>
+        </div>`,
+      iconSize: [w, totalH],
+      iconAnchor: [w / 2, h],
+    });
+  };
+
   useEffect(() => {
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
 
     barangayData.forEach(b => {
-      const { color, ring } = getRisk(b.totalCases);
       const size = Math.max(24, Math.min(54, 20 + b.totalCases * 1.5));
-      const inner = Math.round(size * 0.2);
-
-      const icon = L.divIcon({
-        className: '',
-        html: `
-          <div style="position:relative;width:${size}px;height:${size}px;">
-            <div style="
-              position:absolute;inset:0;border-radius:50%;
-              background:${ring};
-              animation:cdmsPulse 2s ease-out infinite;
-            "></div>
-            <div style="
-              position:absolute;
-              top:${inner}px;left:${inner}px;
-              right:${inner}px;bottom:${inner}px;
-              border-radius:50%;
-              background:${color};
-              box-shadow:0 0 0 3px white, 0 2px 10px rgba(0,0,0,0.4);
-              cursor:pointer;
-            "></div>
-            <div style="
-              position:absolute;inset:0;
-              display:flex;align-items:center;justify-content:center;
-              font-size:${size < 32 ? 9 : 11}px;
-              font-weight:800;color:#fff;
-              pointer-events:none;z-index:2;
-            ">${b.totalCases}</div>
-          </div>`,
-        iconSize: [size, size],
-        iconAnchor: [size / 2, size / 2],
-      });
+      const icon = createPinIcon(b, size);
 
       const m = L.marker(b.coords, { icon, zIndexOffset: 1000 }).addTo(map);
       m.on('mouseover', () => onHover(b));
@@ -709,6 +704,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const statusRef = useRef(null);
   const [severityOpen, setSeverityOpen] = useState(false);
   const severityRef = useRef(null);
+  const [mapLayer, setMapLayer] = useState('HD'); // 'SD' = street map (Carto), 'HD' = satellite (Esri)
   const geoJsonLayerRef = useRef(null);
   const barangayDataRef = useRef(barangayData);
   useEffect(() => { barangayDataRef.current = barangayData; }, [barangayData]);
@@ -1198,10 +1194,18 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           maxBounds={CABUYAO_BOUNDS}
           maxBoundsViscosity={0.6}
           style={{ width: '100%', height: '100%' }}>
-          <TileLayer
-            attribution='&copy; OpenStreetMap contributors &copy; CARTO'
-            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-          />
+          {mapLayer === 'SD' ? (
+            <TileLayer
+              attribution='&copy; OpenStreetMap contributors &copy; CARTO'
+              url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+            />
+          ) : (
+            <TileLayer
+              attribution='Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              maxZoom={19}
+            />
+          )}
           <ZoomToBarangay barangay={filterBarangay} loginRole={loginRole} loginBarangay={loginBarangay} sessionContext={sessionContext} cases={allCases} />
           <ZoomListener onZoom={setMapZoom} filterBarangay={filterBarangay} autoDetectedBrgy={autoDetectedBrgy} setAutoDetectedBrgy={setAutoDetectedBrgy} loginRole={loginRole} />
           {loginRole !== 'BHW' && (filterBarangay === 'All Barangays' && !showAutoPurok) ? (
@@ -1256,6 +1260,33 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
             />
           )}
         </MapContainer>
+
+        {/* SD / HD BASE LAYER TOGGLE */}
+        <div style={{
+          position: 'absolute', bottom: '16px', left: '16px', zIndex: 1000,
+          display: 'flex', gap: '4px', padding: '4px',
+          background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
+          borderRadius: '10px', boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
+        }}>
+          <button onClick={() => setMapLayer('SD')}
+            style={{
+              padding: '6px 14px', border: 'none', borderRadius: '7px', cursor: 'pointer',
+              fontSize: '12px', fontWeight: '700',
+              background: mapLayer === 'SD' ? '#1e3a8a' : 'transparent',
+              color: mapLayer === 'SD' ? '#fff' : 'var(--text-muted)',
+            }}>
+            SD Map
+          </button>
+          <button onClick={() => setMapLayer('HD')}
+            style={{
+              padding: '6px 14px', border: 'none', borderRadius: '7px', cursor: 'pointer',
+              fontSize: '12px', fontWeight: '700',
+              background: mapLayer === 'HD' ? '#1e3a8a' : 'transparent',
+              color: mapLayer === 'HD' ? '#fff' : 'var(--text-muted)',
+            }}>
+            HD Map
+          </button>
+        </div>
 
         {/* HOVER TOOLTIP */}
         {tooltip && (
