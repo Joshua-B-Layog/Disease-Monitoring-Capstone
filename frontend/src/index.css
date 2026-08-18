@@ -17,8 +17,9 @@
   --table-header-padding: 10px 12px;
   --gap-size: 20px;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --sans: 'Segoe UI', system-ui, sans-serif;
+  --heading: 'Bahnschrift', 'Segoe UI', system-ui, sans-serif;
+  --black: 'Bahnschrift', 'Segoe UI', system-ui, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
 
   font: calc(18px * var(--app-font-scale))/145% var(--sans);
@@ -83,6 +84,7 @@ body {
 h1,
 h2 {
   font-family: var(--heading);
+  font-stretch: condensed;
   font-weight: 500;
   color: var(--text-h);
 }

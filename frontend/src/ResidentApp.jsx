@@ -5,6 +5,8 @@ import AboutCho from './resident/AboutCho';
 import ContactUs from './resident/ContactUs';
 import Help from './resident/Help';
 import PreventionTips from './resident/PreventionTips';
+import ChoLogoIcon from './assets/ChoLogo';
+import './resident.css';
 
 const SECTIONS = [
   { key: 'map', label: 'Map' },
@@ -75,7 +77,7 @@ export default function ResidentApp() {
       height: '100vh',
       overflowY: 'auto',
       background: 'var(--bg-main)',
-      fontFamily: 'system-ui, -apple-system, sans-serif',
+      fontFamily: "'Segoe UI', system-ui, sans-serif",
       color: 'var(--text-main)',
       transition: 'background 0.3s, color 0.3s',
     }}>
@@ -100,11 +102,9 @@ export default function ResidentApp() {
             onClick={() => scrollToSection('map')}>
             <div style={{
               width: '36px', height: '36px', borderRadius: '8px',
-              background: 'rgba(255,255,255,0.2)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '20px',
             }}>
-              🏥
+              <ChoLogoIcon size={36} />
             </div>
             <span style={{ color: '#fff', fontWeight: '700', fontSize: '18px', letterSpacing: '0.02em' }}>
               Cabuyao Health

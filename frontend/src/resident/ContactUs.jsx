@@ -103,7 +103,7 @@ export default function ContactUs() {
   const currentLoc = locations[locationView];
 
   return (
-    <div>
+    <div className="resident-page">
       <h2 style={{ margin: '0 0 24px', fontSize: '24px', fontWeight: '700' }}>
         Contact Us
       </h2>

@@ -2056,24 +2056,24 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>
           Dashboard / Manage Cases {category ? `/ ${category.name}` : ''}
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
-          <div>
-            {category ? (
-              <div>
-                <h2 style={{ margin: '0 0 4px 0', fontSize: '22px' }}>{category.icon} {category.name}</h2>
-                <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '14px' }}>
-                  Select a disease to view, add, or manage cases
-                </p>
-              </div>
-            ) : (
-              <div>
-                <h2 style={{ margin: '0 0 4px 0', fontSize: '22px' }}>Select a Disease to Manage</h2>
-                <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '14px' }}>
-                  Choose a category then a disease program
-                </p>
-              </div>
-            )}
-          </div>
+        <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+          {category ? (
+            <div>
+              <h2 style={{ margin: '0 0 4px 0', fontSize: '22px' }}>{category.icon} {category.name}</h2>
+              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '14px' }}>
+                Select a disease to view, add, or manage cases
+              </p>
+            </div>
+          ) : (
+            <div>
+              <h2 style={{ margin: '0 0 4px 0', fontSize: '22px' }}>Select a Disease to Manage</h2>
+              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '14px' }}>
+                Choose a category then a disease program
+              </p>
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start', marginBottom: '24px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
             <div style={{ display: 'flex', gap: '10px' }}>
               <div onClick={() => { setView('inbox'); setInboxSubTab('referrals'); }}

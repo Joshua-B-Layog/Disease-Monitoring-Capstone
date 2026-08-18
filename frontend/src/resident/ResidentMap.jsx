@@ -78,7 +78,7 @@ if (!document.getElementById('cdms-barangay-labels')) {
       border-radius: 6px !important;
       padding: 4px 7px !important;
       box-shadow: 0 1px 4px rgba(0,0,0,0.3) !important;
-      font-family: system-ui, -apple-system, sans-serif !important;
+      font-family: 'Segoe UI', system-ui, sans-serif !important;
       pointer-events: none !important;
     }
     .brgy-tooltip-label .brgy-name {
@@ -446,7 +446,7 @@ function PulseMarkers({ barangayData, onHover, onLeave, onClick }) {
           <svg width="${w}" height="${h}" viewBox="0 0 34 44" style="position:absolute;top:0;left:0;display:block;filter:drop-shadow(0 3px 4px rgba(0,0,0,0.5));">
             <path d="M17 0C7.6 0 0 7.6 0 17c0 12 17 27 17 27s17-15 17-27C34 7.6 26.4 0 17 0z" fill="${color}"/>
             <circle cx="17" cy="17" r="11" fill="#ffffff"/>
-            <text x="17" y="21" text-anchor="middle" font-size="12" font-weight="800" fill="${color}" font-family="system-ui,-apple-system,sans-serif">${b.totalCases}</text>
+            <text x="17" y="21" text-anchor="middle" font-size="12" font-weight="800" fill="${color}" font-family="Segoe UI,system-ui,sans-serif">${b.totalCases}</text>
           </svg>
           <div style="position:absolute;left:50%;top:${h + 1}px;transform:translateX(-50%);background:rgba(15,23,42,0.85);border:1px solid rgba(255,255,255,0.18);color:#fff;font-size:9.5px;font-weight:600;padding:2px 7px;border-radius:8px;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis;line-height:1.2;text-shadow:0 1px 2px rgba(0,0,0,0.3);">${label}</div>
         </div>`,
@@ -723,7 +723,7 @@ export default function ResidentMap() {
   }
 
   return (
-    <div>
+    <div className="resident-page">
       <h2 style={{ margin: '0 0 16px', fontSize: '24px', fontWeight: '700' }}>
         Disease Map
       </h2>

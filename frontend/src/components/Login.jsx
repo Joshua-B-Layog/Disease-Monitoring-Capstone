@@ -55,7 +55,7 @@ const ANIM_SCENES = [
 ];
 
 const BRANDING_FEATURES = [
-  { text: 'Real-time communicable disease surveillance', color: '#3b82f6' },
+  { text: 'Continuous communicable disease surveillance', color: '#3b82f6' },
   { text: 'Barangay-level case mapping across 18 barangays', color: '#dc2626' },
   { text: 'Automated alerts, referrals & weekly summaries', color: '#3b82f6' },
   { text: 'Offline-ready field data collection', color: '#dc2626' },

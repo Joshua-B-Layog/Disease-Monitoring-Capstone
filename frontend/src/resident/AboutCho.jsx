@@ -51,7 +51,7 @@ export default function AboutCho() {
   const [selected, setSelected] = useState(CHO_UNITS[0]);
 
   return (
-    <div>
+    <div className="resident-page">
       <h2 style={{ margin: '0 0 8px', fontSize: '24px', fontWeight: '700' }}>
         About the City Health Office
       </h2>

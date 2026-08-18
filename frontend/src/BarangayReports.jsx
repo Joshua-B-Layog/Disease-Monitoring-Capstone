@@ -693,8 +693,8 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
       )}
 
       {/* ── PAGE HEADER ── */}
-      <div style={{ marginBottom: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <div style={{ marginBottom: '20px', textAlign: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
           <h2 style={{ margin: '0 0 2px 0', fontSize: '22px', fontWeight: '700', color: 'var(--text-h)' }}>Audit Reports</h2>
           {offlineMode && (
             <span style={{ fontSize: '12px', color: '#D97706', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '6px', padding: '4px 10px' }}>
@@ -702,7 +702,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
             </span>
           )}
         </div>
-        <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
+        <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center' }}>
           {isBHW ? `Brgy. ${myBarangayName}` : choUnit} - Monitoring {myBarangays.length} barangay{myBarangays.length !== 1 ? 's' : ''}
         </p>
       </div>

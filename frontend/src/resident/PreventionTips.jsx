@@ -601,7 +601,7 @@ export default function PreventionTips() {
   };
 
   return (
-    <div>
+    <div className="resident-page">
       <h2 style={{ margin: '0 0 24px', fontSize: '24px', fontWeight: '700' }}>
         Prevention Tips
       </h2>
