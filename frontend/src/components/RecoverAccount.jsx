@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_URL } from '../config';
+import BackButton from './BackButton';
 
 export default function RecoverAccount() {
   const navigate = useNavigate();
@@ -71,7 +72,9 @@ export default function RecoverAccount() {
 
           {/* ADD YOUR OTP_VERIFY AND NEW_PASSWORD STEPS HERE SIMILAR TO YOUR PREVIOUS CODE */}
           
-          <p onClick={() => navigate('/login')} style={backLink}>← Back to Login</p>
+          <div style={{ textAlign: 'center', marginTop: '20px' }}>
+            <BackButton onClick={() => navigate('/login')} color="#129968">Back to Login</BackButton>
+          </div>
         </div>
       </div>
     </div>
@@ -86,4 +89,3 @@ const inputStyle = { width: '100%', padding: '12px', marginBottom: '15px', borde
 const actionBtn = { width: '100%', padding: '12px', background: '#129968', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' };
 const activeBtn = { flex: 1, padding: '10px', background: '#129968', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' };
 const inactiveBtn = { flex: 1, padding: '10px', background: '#1f2937', color: '#9ca3af', border: 'none', borderRadius: '6px', cursor: 'pointer' };
-const backLink = { color: '#129968', cursor: 'pointer', textAlign: 'center', marginTop: '20px', fontSize: '15px' };

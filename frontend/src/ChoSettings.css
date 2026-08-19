@@ -95,24 +95,6 @@
   gap: 24px;
 }
 
-.back-to-settings-btn {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  width: fit-content;
-  padding: 0;
-  margin-bottom: 8px;
-}
-
-.back-to-settings-btn:hover {
-  color: var(--text-main);
-}
-
 .sub-view-title {
   font-size: 22px;
   font-weight: 700;

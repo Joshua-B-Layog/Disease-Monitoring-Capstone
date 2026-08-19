@@ -60,10 +60,10 @@
 
 /* ── View / row transition animations ── */
 @keyframes cdmsViewIn {
-  from { opacity: 0; transform: translateY(14px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
-.cdms-view-in { animation: cdmsViewIn 0.35s ease both; }
+.cdms-view-in { animation: cdmsViewIn 0.3s ease both; }
 
 @keyframes cdmsRowIn {
   from { opacity: 0; transform: translateX(-10px); }

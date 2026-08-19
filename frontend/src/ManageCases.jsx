@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { API_URL } from './config';
+import BackButton from './components/BackButton';
 import './ManageCases.css';
 import cabuyaoBoundaries from './data/cabuyao_barangays.geojson.json';
 import { cacheCases, getCachedCases, cacheBarangays, cacheDiseases, getCachedBarangays, getCachedDiseases, isOnline, cacheInboxItems, getCachedInboxItems, cacheContactMessages, getCachedContactMessages, cacheEditRequests, getCachedEditRequests, cacheOutboxItems, getCachedOutboxItems, cachePendingRegistrations, getCachedPendingRegistrations, upsertCachedCase, removeCachedCase } from './offlineSync';
@@ -2027,10 +2028,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               <h2 style={{ margin: '0 0 4px 0', fontSize: '22px' }}>Other Categories</h2>
               <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '15px' }}>All disease categories in the system</p>
             </div>
-            <button onClick={() => setBrowseAllCategories(false)}
-              style={{ padding: '8px 18px', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', fontSize: '15px' }}>
-              ← Back
-            </button>
+            <BackButton onClick={() => setBrowseAllCategories(false)}>Back</BackButton>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: compactMode ? '12px' : '16px' }}>
             {gridCategories.map(cat => renderCategoryCard(cat))}
@@ -2055,10 +2053,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               <h2 style={{ margin: '0 0 4px 0', fontSize: '22px' }}>⚠️ Other Exclusive Diseases</h2>
               <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '15px' }}>{exclusiveCat?.desc}</p>
             </div>
-            <button onClick={() => setBrowseAllExclusive(false)}
-              style={{ padding: '8px 18px', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', fontSize: '15px' }}>
-              ← Back
-            </button>
+            <BackButton onClick={() => setBrowseAllExclusive(false)}>Back</BackButton>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: compactMode ? '12px' : '16px' }}>
             {(exclusiveCat?.diseases || []).map(d => renderDiseaseCard(d, false))}
@@ -2108,10 +2103,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               </div>
             </div>
             {category && (
-              <button onClick={() => { setSelectedCategory(null); setCategoryPage(0); setDiseasePage(0); setCarouselIndex(0); setBrowseAllCategories(false); setBrowseAllExclusive(false); }}
-                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '15px', padding: '2px 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                ← Back to Categories
-              </button>
+              <BackButton onClick={() => { setSelectedCategory(null); setCategoryPage(0); setDiseasePage(0); setCarouselIndex(0); setBrowseAllCategories(false); setBrowseAllExclusive(false); }}>Back to Categories</BackButton>
             )}
             {category && showDiseasePagination && (
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -2386,10 +2378,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '4px' }}>Dashboard / Manage Cases / Inbox</div>
             <h2 style={{ margin: 0, fontSize: '22px' }}> Inbox</h2>
           </div>
-          <button onClick={() => setView('categories')}
-            style={{ padding: '8px 18px', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', fontSize: '15px' }}>
-            ← Back
-          </button>
+          <BackButton onClick={() => setView('categories')}>Back</BackButton>
         </div>
         {/* Sub-tabs */}
         <div style={{ display: 'flex', gap: '0', marginBottom: '12px', borderBottom: '1px solid var(--border-color)' }}>
@@ -2732,10 +2721,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '4px' }}>Dashboard / Manage Cases / Outbox</div>
             <h2 style={{ margin: 0, fontSize: '22px' }}> Outbox</h2>
           </div>
-          <button onClick={() => setView('categories')}
-            style={{ padding: '8px 18px', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', fontSize: '15px' }}>
-            ← Back
-          </button>
+          <BackButton onClick={() => setView('categories')}>Back</BackButton>
         </div>
         <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
           {outboxItems.length === 0 ? (
@@ -2785,7 +2771,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       <div key={`list-view-${selectedDisease?.dbName || 'all'}`} className="cdms-view-in" style={{ padding: compactMode ? '14px' : '28px', color: 'var(--text-main)', fontSize: `calc(15px * ${fs})` }}>
         {/* DELETE MODAL */}
         {deleteTarget && (
-          <div className="cdms-modal-backdrop" style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+          <div className="cdms-modal-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
             <div className="cdms-modal-card" style={{ background: 'var(--bg-surface)', borderRadius: '16px', padding: '40px 32px', width: '420px', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
               <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px auto' }}>
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -2810,7 +2796,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               </p>
               <div style={{ display: 'flex', borderTop: '1px solid var(--border-color)', paddingTop: '20px', gap: '0' }}>
                 <button onClick={() => setDeleteTarget(null)} disabled={deleteLoading}
-                  style={{ flex: 1, padding: '14px', background: 'transparent', border: 'none', borderRight: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '16px', fontWeight: '500', color: 'var(--text-main)', borderRadius: '0 0 0 16px' }}>
+                  style={{ flex: 1, padding: '14px', background: 'var(--input-bg)', border: 'none', borderRight: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '16px', fontWeight: '500', color: 'var(--text-main)', borderRadius: '0 0 0 16px' }}>
                   Cancel
                 </button>
                 <button onClick={executeDelete} disabled={deleteLoading}
@@ -2879,10 +2865,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               )}
             </div>
 
-            <button onClick={() => { setView('categories'); setSelectedDisease(null); setSearchQuery(''); }}
-              style={{ padding: '8px 18px', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', fontSize: '15px' }}>
-              ← Back
-            </button>
+            <BackButton onClick={() => { setView('categories'); setSelectedDisease(null); setSearchQuery(''); }}>Back</BackButton>
             {loginRole !== 'CHO' && (
               <button onClick={openAdd}
                 style={{ padding: '8px 18px', background: '#129968', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
@@ -3150,10 +3133,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
     return (
       <div style={{ padding: compactMode ? '14px' : '28px', fontSize: `calc(15px * ${fs})` }}>
-        <button onClick={() => { setView('list'); setFilterPurok('All Puroks'); }}
-          style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', marginBottom: '20px', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          ← Back to {selectedDisease?.name} Cases
-        </button>
+        <BackButton onClick={() => { setView('list'); setFilterPurok('All Puroks'); }} style={{ marginBottom: '20px' }}>Back to {selectedDisease?.name} Cases</BackButton>
 
         <div style={{ background: 'var(--bg-surface)', borderRadius: '12px', padding: '40px', color: 'var(--text-main)', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', maxWidth: '900px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '32px' }}>
@@ -3871,10 +3851,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         style={{ padding: '10px 28px', borderRadius: '6px', border: 'none', background: editRequestNote.trim() ? '#0d9488' : '#64748b', color: 'white', cursor: editRequestNote.trim() ? 'pointer' : 'not-allowed', fontWeight: '600', fontSize: '15px' }}>
                         Send
                       </button>
-                      <button type="button" onClick={() => setShowEditRequestForm(false)}
-                        style={{ padding: '10px 20px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', cursor: 'pointer', fontWeight: '500' }}>
-                        Back
-                      </button>
+                      <BackButton onClick={() => setShowEditRequestForm(false)}>Back</BackButton>
                     </div>
                   )}
                 </>

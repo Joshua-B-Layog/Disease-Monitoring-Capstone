@@ -2,6 +2,7 @@
   import { API_URL } from '../config';
   import ChoLogoIcon from '../assets/ChoLogo';
   import { getCachedUsers, upsertCachedUser } from '../offlineSync';
+import BackButton from './BackButton';
 import L from 'leaflet';
 import { MapContainer, TileLayer, useMap, GeoJSON } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -687,7 +688,7 @@ const handleLoginOtpSubmit = async (e) => {
             {step === 'cho_select' && (
               <>
                 <div className="login-header" style={{ marginBottom: '25px', textAlign: 'left' }}>
-                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#129968', cursor: 'pointer', fontSize: '15px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back</button>
+                  <BackButton onClick={handleBackNavigation} color="#129968" style={{ marginBottom: '10px' }}>Back</BackButton>
                   <h2 style={{ fontSize: '26px', color: 'var(--text-main)', marginBottom: '6px' }}>Select Health Unit</h2>
                   <p style={{ color: 'var(--text-muted)' }}>Identify your current administrative station hub.</p>
                 </div>
@@ -720,7 +721,7 @@ const handleLoginOtpSubmit = async (e) => {
             {step === 'bhw_select' && (
               <>
                 <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
-                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#129968', cursor: 'pointer', fontSize: '15px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back</button>
+                  <BackButton onClick={handleBackNavigation} color="#129968" style={{ marginBottom: '10px' }}>Back</BackButton>
                   <h2 style={{ fontSize: '26px', color: 'var(--text-main)', marginBottom: '6px' }}>Assigned Locality</h2>
                   <p style={{ color: 'var(--text-muted)' }}>Select your designated community operations sector.</p>
                 </div>
@@ -753,9 +754,7 @@ const handleLoginOtpSubmit = async (e) => {
             {step === 'auth' && (
               <>
                 <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
-                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#129968', cursor: 'pointer', fontSize: '15px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>
-                    ← Scope: {selectedContext}
-                  </button>
+                  <BackButton onClick={handleBackNavigation} color="#129968" style={{ marginBottom: '10px' }}>Scope: {selectedContext}</BackButton>
                   <h2 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '8px' }}>Sign-In</h2>
                   <p style={{ color: 'var(--text-muted)' }}>Please insert your account.</p>
                 </div>
@@ -905,7 +904,7 @@ const handleLoginOtpSubmit = async (e) => {
             {step === 'cho_contact' && (
               <>
                 <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
-                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#129968', cursor: 'pointer', fontSize: '15px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back</button>
+                  <BackButton onClick={handleBackNavigation} color="#129968" style={{ marginBottom: '10px' }}>Back</BackButton>
                   <h2 style={{ fontSize: '26px', color: 'var(--text-main)', marginBottom: '8px' }}>CHO Account Access</h2>
                   <p style={{ color: 'var(--text-muted)', lineHeight: '1.6' }}>
                     For security purposes, City Health Office accounts cannot be created through self-registration. Please contact your CHO unit directly to request an account.
@@ -938,9 +937,7 @@ const handleLoginOtpSubmit = async (e) => {
                   </div>
                 </div>
 
-                <button type="button" onClick={() => setStep('role')} style={{ marginTop: '24px', width: '100%', padding: '12px', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)', cursor: 'pointer', fontSize: '15px', fontWeight: '500' }}>
-                  Back to Cabuyao Health Portal
-                </button>
+                <BackButton onClick={() => setStep('role')} style={{ marginTop: '24px', width: '100%', justifyContent: 'center' }}>Back to Portal</BackButton>
               </>
             )}
 
@@ -949,7 +946,7 @@ const handleLoginOtpSubmit = async (e) => {
             {step === 'signup_role' && (
               <>
                 <div className="login-header" style={{ marginBottom: '30px', textAlign: 'left' }}>
-                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#129968', cursor: 'pointer', fontSize: '15px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back</button>
+                  <BackButton onClick={handleBackNavigation} color="#129968" style={{ marginBottom: '10px' }}>Back</BackButton>
                   <h2 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '8px' }}>Create Account</h2>
                   <p style={{ color: 'var(--text-muted)' }}>Select your registration type to proceed.</p>
                 </div>
@@ -979,7 +976,7 @@ const handleLoginOtpSubmit = async (e) => {
             {step === 'forgot_password' && (
               <>
                 <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
-                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#129968', cursor: 'pointer', fontSize: '15px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back to Login</button>
+                  <BackButton onClick={handleBackNavigation} color="#129968" style={{ marginBottom: '10px' }}>Back to Login</BackButton>
                   <h2 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '8px' }}>Recover Account</h2>
                   <p style={{ color: 'var(--text-muted)' }}>Enter your email or username to receive a password reset link.</p>
                 </div>
@@ -1021,7 +1018,7 @@ const handleLoginOtpSubmit = async (e) => {
             {step === 'signup' && (
                 <>
                     <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
-                        <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#129968', cursor: 'pointer', fontSize: '15px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back</button>
+                        <BackButton onClick={handleBackNavigation} color="#129968" style={{ marginBottom: '10px' }}>Back</BackButton>
                         <h2 style={{ fontSize: '26px', color: 'var(--text-main)', marginBottom: '6px' }}>Create Account</h2>
                         <p style={{ color: 'var(--text-muted)' }}>Register a new account for surveillance database entry.</p>
                     </div>

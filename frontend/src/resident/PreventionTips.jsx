@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import BackButton from '../components/BackButton';
 
 const DISEASES = [
   {
@@ -749,10 +750,7 @@ export default function PreventionTips() {
                   <h4 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: 'var(--text-main)' }}>
                     {disease.icon} {disease.name} - Symptom Check
                   </h4>
-                  <button onClick={resetQuiz}
-                    style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '15px' }}>
-                    ← Pick another disease
-                  </button>
+                  <BackButton onClick={resetQuiz}>Pick another disease</BackButton>
                 </div>
                 <p style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '16px' }}>
                   Answer Yes or No to each question ({answeredCount}/{disease.symptoms.length} answered).

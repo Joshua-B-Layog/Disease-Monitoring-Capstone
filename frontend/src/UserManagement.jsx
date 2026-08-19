@@ -815,7 +815,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
             </p>
             <div style={{ display: 'flex', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
               <button onClick={() => { setDeleteTarget(null); setBulkDeleteMode(false); }} disabled={deleteLoading}
-                style={{ flex: 1, padding: '14px', background: 'transparent', border: 'none', borderRight: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '16px', fontWeight: '500', color: 'var(--text-main)' }}>
+                style={{ flex: 1, padding: '14px', background: 'var(--input-bg)', border: 'none', borderRight: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '16px', fontWeight: '500', color: 'var(--text-main)' }}>
                 Cancel
               </button>
               <button onClick={executeDelete} disabled={deleteLoading}

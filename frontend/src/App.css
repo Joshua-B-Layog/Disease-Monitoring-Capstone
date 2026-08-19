@@ -173,6 +173,32 @@ html, body, #root {
 
 .form-input::placeholder { color: var(--text-muted); }
 
+/* ── Reusable Back Button ── */
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 500;
+  min-width: 44px;
+  min-height: 44px;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.back-btn:hover {
+  opacity: 0.75;
+  transform: translateX(-2px);
+}
+.back-btn:focus-visible {
+  outline: 2px solid #3B82F6;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 /* Figma Green Submit Button */
 .submit-btn { 
   width: 100%; 
@@ -228,12 +254,15 @@ html, body, #root {
   align-items: center; 
   gap: 15px; 
   font-family: var(--heading);
+  border-left: 3px solid transparent;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
 .menu-item.active { 
-  background-color: #2F578A; 
+  background-color: #152E56; 
   color: #FFFFFF; 
-  border-right: 4px solid #2F578A; 
+  border-left: 10px solid #3B82F6; 
+  box-shadow: inset 5px 0 12px -3px rgba(59, 130, 246, 0.4);
 }
 
 .menu-item:hover:not(.active) { 

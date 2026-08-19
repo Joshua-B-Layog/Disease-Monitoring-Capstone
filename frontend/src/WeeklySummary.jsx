@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { API_URL } from './config';
+import BackButton from './components/BackButton';
 import { cacheWeeklySummary, getCachedWeeklySummary } from './offlineSync';
 
 export default function WeeklySummary({ userId, loginRole, compactMode, fontScale, onBack }) {
@@ -267,9 +268,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
           {onBack && (
-            <button onClick={onBack} style={{ padding: '6px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '15px', fontWeight: '600', flexShrink: 0, marginTop: '2px' }}>
-              ← Back
-            </button>
+            <BackButton onClick={onBack} style={{ flexShrink: 0, marginTop: '2px' }}>Back</BackButton>
           )}
           <div>
             <h1 style={{ margin: 0, fontSize: '22px', color: 'var(--text-h)' }}>Weekly Disease Summary Report</h1>

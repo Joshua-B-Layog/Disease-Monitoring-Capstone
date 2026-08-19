@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API_URL } from './config';
+import BackButton from './components/BackButton';
 import { getAllQueueItems, clearCompleted } from './syncEngine';
 import { cacheUserProfile, getCachedUserProfile, getCachedBarangays, isOnline } from './offlineSync';
 import './ChoSettings.css';
@@ -809,10 +810,7 @@ export default function CHOSettings({
         {/* ── PROFILE SETTINGS VIEW ── */}
         {currentView === 'profile' && (
           <div className="detail-view-container">
-            <button className="back-to-settings-btn" onClick={() => { setCurrentView('menu'); setSaveMsg(''); }}
-              style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', fontWeight: '500', color: 'var(--text-main)', marginBottom: '24px' }}>
-              <span style={{ marginRight: '8px', fontSize: '22px' }}>←</span> Back to Settings
-            </button>
+            <BackButton onClick={() => { setCurrentView('menu'); setSaveMsg(''); }} style={{ marginBottom: '24px' }}>Back to Settings</BackButton>
 
             {profileLoading ? (
               <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading profile...</div>
@@ -925,9 +923,7 @@ export default function CHOSettings({
         {/* ── ACCOUNT SECURITY VIEW ── */}
         {currentView === 'security' && (
           <div className="detail-view-container security-view-view">
-            <button className="back-to-settings-btn" onClick={() => { setCurrentView('menu'); setPasswordMsg(''); setTwoFaMsg(''); }}>
-              ← Back to Settings
-            </button>
+            <BackButton onClick={() => { setCurrentView('menu'); setPasswordMsg(''); setTwoFaMsg(''); }}>Back to Settings</BackButton>
 
             {/* ── 1. CHANGE PASSWORD ── */}
             <div className="security-section-card">
@@ -1352,9 +1348,7 @@ export default function CHOSettings({
         {/* ── NOTIFICATIONS VIEW ── */}
         {currentView === 'notifications' && (
           <div className="detail-view-container security-view-view">
-            <button className="back-to-settings-btn" onClick={() => setCurrentView('menu')}>
-              ← Back to Settings
-            </button>
+            <BackButton onClick={() => setCurrentView('menu')}>Back to Settings</BackButton>
 
             {[
               {
@@ -1504,7 +1498,7 @@ export default function CHOSettings({
         {/* ── SYSTEM PREFERENCES VIEW ── */}
         {currentView === 'system' && (
           <div className="detail-view-container security-view-view">
-            <button className="back-to-settings-btn" onClick={() => {
+            <BackButton onClick={() => {
               if (systemPrefsSnapshot) {
                 if (theme !== systemPrefsSnapshot.theme) toggleTheme();
                 if (systemPrefs.fontSize !== systemPrefsSnapshot.fontSize) {
@@ -1527,7 +1521,7 @@ export default function CHOSettings({
                 });
               }
               setCurrentView('menu');
-            }}>← Back to Settings</button>
+            }}>Back to Settings</BackButton>
 
             <div className="security-section-card">
               <div className="security-card-header">
@@ -1681,7 +1675,7 @@ export default function CHOSettings({
         {/* ── DATA MANAGEMENT VIEW ── */}
         {currentView === 'data' && (
           <div className="detail-view-container security-view-view">
-            <button className="back-to-settings-btn" onClick={() => setCurrentView('menu')}>← Back to Settings</button>
+            <BackButton onClick={() => setCurrentView('menu')}>Back to Settings</BackButton>
 
             {/* Storage Overview */}
             <div className="security-section-card">

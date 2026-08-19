@@ -119,7 +119,8 @@ export default function ResidentApp() {
                   padding: '8px 18px',
                   borderRadius: '8px',
                   border: 'none',
-                  background: isActive(s.key) ? 'rgba(255,255,255,0.2)' : 'transparent',
+                  borderBottom: isActive(s.key) ? '2px solid #3B82F6' : '2px solid transparent',
+                  background: isActive(s.key) ? 'rgba(59,130,246,0.15)' : 'transparent',
                   color: '#fff',
                   fontSize: '15px',
                   fontWeight: isActive(s.key) ? '600' : '400',
@@ -167,8 +168,12 @@ export default function ResidentApp() {
                 style={{
                   display: 'block', width: '100%', textAlign: 'left',
                   padding: '10px 16px',
-                  background: isActive(s.key) ? 'rgba(255,255,255,0.15)' : 'transparent',
-                  border: 'none', color: '#fff', fontSize: '15px', cursor: 'pointer',
+                  background: isActive(s.key) ? 'rgba(59,130,246,0.15)' : 'transparent',
+                  border: 'none',
+                  borderLeft: isActive(s.key) ? '3px solid #3B82F6' : '3px solid transparent',
+                  color: '#fff', fontSize: '15px', fontWeight: isActive(s.key) ? '600' : '400',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
                 }}>
                 {s.label}
               </button>
