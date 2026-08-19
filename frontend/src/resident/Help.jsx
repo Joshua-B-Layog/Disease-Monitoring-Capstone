@@ -3,7 +3,7 @@ import { useState } from 'react';
 export default function Help() {
   return (
     <div className="resident-page">
-      <h2 style={{ margin: '0 0 24px', fontSize: '24px', fontWeight: '700' }}>
+      <h2 style={{ margin: '0 0 24px', fontSize: '26px', fontWeight: '700' }}>
         Help & Resources
       </h2>
 
@@ -11,7 +11,7 @@ export default function Help() {
 
         {/* Section 1: User Guides & Tutorials */}
         <Section title="User Guides & Video Tutorials" icon="📚">
-          <p style={{ fontSize: '14px', color: 'var(--text-muted)', margin: '0 0 16px' }}>
+          <p style={{ fontSize: '15px', color: 'var(--text-muted)', margin: '0 0 16px' }}>
             Learn how to use the Cabuyao Disease Monitoring System and understand disease prevention.
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
@@ -39,7 +39,7 @@ export default function Help() {
           <div style={{ marginTop: '14px', textAlign: 'center' }}>
             <span style={{
               padding: '8px 20px', background: 'var(--input-bg)', borderRadius: '6px',
-              fontSize: '13px', color: 'var(--text-muted)', cursor: 'pointer', display: 'inline-block',
+              fontSize: '15px', color: 'var(--text-muted)', cursor: 'pointer', display: 'inline-block',
             }}>
               Contact Support: chosupport@cabuyao.gov.ph
             </span>
@@ -48,7 +48,7 @@ export default function Help() {
 
         {/* Section 2: General Disease Symptoms */}
         <Section title="Common Disease Symptoms" icon="🩺">
-          <p style={{ fontSize: '14px', color: 'var(--text-muted)', margin: '0 0 16px' }}>
+          <p style={{ fontSize: '15px', color: 'var(--text-muted)', margin: '0 0 16px' }}>
             If you or a family member experience any of these symptoms, consult a health professional.
           </p>
           <div style={{
@@ -60,9 +60,9 @@ export default function Help() {
                 padding: '12px 14px', background: 'var(--bg-main)', borderRadius: '8px',
                 border: '1px solid #f1f5f9',
               }}>
-                <div style={{ fontSize: '20px', marginBottom: '4px' }}>{s.icon}</div>
-                <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-main)' }}>{s.name}</div>
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{s.desc}</div>
+                <div style={{ fontSize: '22px', marginBottom: '4px' }}>{s.icon}</div>
+                <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)' }}>{s.name}</div>
+                <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '2px' }}>{s.desc}</div>
               </div>
             ))}
           </div>
@@ -75,11 +75,11 @@ export default function Help() {
             padding: '16px 20px', marginBottom: '12px',
           }}>
             <p style={{
-              margin: '0 0 12px', fontSize: '14px', fontWeight: '600', color: 'var(--warning-text)',
+              margin: '0 0 12px', fontSize: '15px', fontWeight: '600', color: 'var(--warning-text)',
             }}>
               Seek immediate medical care if you experience:
             </p>
-            <ul style={{ margin: 0, paddingLeft: '20px', color: 'var(--warning-text)', fontSize: '14px', lineHeight: '2' }}>
+            <ul style={{ margin: 0, paddingLeft: '20px', color: 'var(--warning-text)', fontSize: '15px', lineHeight: '2' }}>
               {SEVERE_WARNINGS.map((w, i) => (
                 <li key={i}><strong>{w}</strong></li>
               ))}
@@ -89,10 +89,10 @@ export default function Help() {
             textAlign: 'center', padding: '12px', background: 'var(--success-bg)',
             borderRadius: '8px', border: '1px solid var(--success-border)',
           }}>
-            <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--success-text)' }}>
+            <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--success-text)' }}>
               🚑 If you have any of these symptoms, GO TO THE HOSPITAL IMMEDIATELY.
             </div>
-            <div style={{ fontSize: '13px', color: 'var(--success-text)', marginTop: '4px' }}>
+            <div style={{ fontSize: '15px', color: 'var(--success-text)', marginTop: '4px' }}>
               Call 911 or your local emergency hotline.
             </div>
           </div>
@@ -110,7 +110,7 @@ function Section({ title, icon, children, danger }) {
       borderRadius: '12px', padding: '24px',
     }}>
       <h3 style={{
-        margin: '0 0 16px', fontSize: '14px', fontWeight: '700',
+        margin: '0 0 16px', fontSize: '15px', fontWeight: '700',
         color: danger ? '#dc2626' : 'var(--text-main)',
         display: 'flex', alignItems: 'center', gap: '8px',
       }}>
@@ -133,15 +133,15 @@ function ResourceCard({ title, desc, type }) {
         display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px',
       }}>
         <span style={{
-          padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: '600',
+          padding: '2px 8px', borderRadius: '4px', fontSize: '15px', fontWeight: '600',
           background: type === 'Video' ? '#fef3c7' : '#dbeafe',
           color: type === 'Video' ? '#92400e' : '#1e40af',
         }}>
           {type}
         </span>
       </div>
-      <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-main)' }}>{title}</div>
-      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{desc}</div>
+      <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)' }}>{title}</div>
+      <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '2px' }}>{desc}</div>
     </div>
   );
 }

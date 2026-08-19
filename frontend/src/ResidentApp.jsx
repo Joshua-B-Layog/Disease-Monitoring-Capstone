@@ -77,7 +77,7 @@ export default function ResidentApp() {
       height: '100vh',
       overflowY: 'auto',
       background: 'var(--bg-main)',
-      fontFamily: "'Segoe UI', system-ui, sans-serif",
+      fontFamily: 'var(--sans)',
       color: 'var(--text-main)',
       transition: 'background 0.3s, color 0.3s',
     }}>
@@ -106,7 +106,7 @@ export default function ResidentApp() {
             }}>
               <ChoLogoIcon size={36} />
             </div>
-            <span style={{ color: '#fff', fontWeight: '700', fontSize: '18px', letterSpacing: '0.02em' }}>
+            <span style={{ color: '#fff', fontWeight: '700', fontSize: '18px' }}>
               Cabuyao Health
             </span>
           </div>
@@ -121,7 +121,7 @@ export default function ResidentApp() {
                   border: 'none',
                   background: isActive(s.key) ? 'rgba(255,255,255,0.2)' : 'transparent',
                   color: '#fff',
-                  fontSize: '14px',
+                  fontSize: '15px',
                   fontWeight: isActive(s.key) ? '600' : '400',
                   cursor: 'pointer',
                   transition: 'all 0.2s',
@@ -150,7 +150,7 @@ export default function ResidentApp() {
           <button onClick={() => setMenuOpen(!menuOpen)}
             style={{
               display: 'none',
-              background: 'none', border: 'none', color: '#fff', fontSize: '24px', cursor: 'pointer',
+              background: 'none', border: 'none', color: '#fff', fontSize: '26px', cursor: 'pointer',
             }}>
             {menuOpen ? '✕' : '☰'}
           </button>
@@ -168,7 +168,7 @@ export default function ResidentApp() {
                   display: 'block', width: '100%', textAlign: 'left',
                   padding: '10px 16px',
                   background: isActive(s.key) ? 'rgba(255,255,255,0.15)' : 'transparent',
-                  border: 'none', color: '#fff', fontSize: '14px', cursor: 'pointer',
+                  border: 'none', color: '#fff', fontSize: '15px', cursor: 'pointer',
                 }}>
                 {s.label}
               </button>
@@ -178,7 +178,7 @@ export default function ResidentApp() {
                 display: 'block', width: '100%', textAlign: 'left',
                 padding: '10px 16px',
                 background: 'transparent', border: 'none',
-                color: 'rgba(255,255,255,0.8)', fontSize: '13px', cursor: 'pointer',
+                color: 'rgba(255,255,255,0.8)', fontSize: '15px', cursor: 'pointer',
               }}>
               {theme === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode'}
             </button>
@@ -238,17 +238,17 @@ export default function ResidentApp() {
             background: 'rgba(220,38,38,0.5 )', border: 'none',
             borderRadius: '12px', padding: '16px 24px', marginBottom: '24px',
           }}>
-            <div style={{ color: '#fff', fontWeight: '700', fontSize: '16px', marginBottom: '4px' }}>
+            <div style={{               color: '#fff', fontWeight: '700', fontSize: '15px', marginBottom: '4px' }}>
               National Emergency Hotline
             </div>
-            <div style={{ fontSize: '24px', fontWeight: '800', color: '#fff', letterSpacing: '0.05em' }}>
+            <div style={{ fontSize: '26px', fontWeight: '800', color: '#fff', letterSpacing: '0.05em' }}>
               911
             </div>
-            <div style={{ fontSize: '13px', marginTop: '4px', color: 'rgba(255,255,255,0.75)' }}>
+            <div style={{ fontSize: '15px', marginTop: '4px', color: 'rgba(255,255,255,0.75)' }}>
               DOH Emergency: 1555 &nbsp;|&nbsp; Red Cross: 143 &nbsp;|&nbsp; PNP: 117
             </div>
           </div>
-          <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)' }}>
+          <div style={{ fontSize: '15px', color: 'rgba(255,255,255,0.7)' }}>
             © 2026 City Health Office of Cabuyao, Laguna. All rights reserved.
           </div>
         </div>

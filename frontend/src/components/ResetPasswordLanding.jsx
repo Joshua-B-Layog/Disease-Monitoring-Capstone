@@ -78,7 +78,7 @@ export default function ResetPasswordLanding() {
         <h2 style={{ color: '#ffffff', fontSize: '26px', fontWeight: '700', margin: '0 0 8px 0' }}>
           Set New Password
         </h2>
-        <p style={{ color: '#9CA3AF', fontSize: '14px', margin: '0 0 28px 0' }}>
+        <p style={{ color: '#9CA3AF', fontSize: '15px', margin: '0 0 28px 0' }}>
           Enter your new password below for:
           <br />
           <span style={{ color: '#129968', fontWeight: '500' }}>{email}</span>
@@ -87,14 +87,14 @@ export default function ResetPasswordLanding() {
         {/* Status Messages */}
         {status.msg && (
           <div style={{
-            padding: '12px 16px', borderRadius: '8px', marginBottom: '20px', fontSize: '14px',
+            padding: '12px 16px', borderRadius: '8px', marginBottom: '20px', fontSize: '15px',
             background: status.type === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(18,153,104,0.1)',
             border: `1px solid ${status.type === 'error' ? '#ef4444' : '#129968'}`,
             color: status.type === 'error' ? '#ef4444' : '#129968'
           }}>
             {status.type === 'success' ? '✅ ' : '❌ '}{status.msg}
             {done && (
-              <span style={{ display: 'block', fontSize: '12px', marginTop: '4px', color: '#9CA3AF' }}>
+              <span style={{ display: 'block', fontSize: '15px', marginTop: '4px', color: '#9CA3AF' }}>
                 Redirecting to login...
               </span>
             )}
@@ -107,7 +107,7 @@ export default function ResetPasswordLanding() {
             {/* New Password */}
             <div style={{ marginBottom: '20px' }}>
               <label style={{
-                display: 'block', color: '#9CA3AF', fontSize: '13px',
+                display: 'block', color: '#9CA3AF', fontSize: '15px',
                 fontWeight: '500', marginBottom: '8px'
               }}>
                 New Password
@@ -122,7 +122,7 @@ export default function ResetPasswordLanding() {
                   style={{
                     width: '100%', padding: '12px 44px 12px 14px',
                     background: '#0F172A', border: '1px solid #334155',
-                    borderRadius: '8px', color: '#ffffff', fontSize: '14px',
+                    borderRadius: '8px', color: '#ffffff', fontSize: '15px',
                     boxSizing: 'border-box', outline: 'none'
                   }}
                 />
@@ -149,7 +149,7 @@ export default function ResetPasswordLanding() {
             {/* Confirm Password */}
             <div style={{ marginBottom: '28px' }}>
               <label style={{
-                display: 'block', color: '#9CA3AF', fontSize: '13px',
+                display: 'block', color: '#9CA3AF', fontSize: '15px',
                 fontWeight: '500', marginBottom: '8px'
               }}>
                 Confirm New Password
@@ -164,7 +164,7 @@ export default function ResetPasswordLanding() {
                   style={{
                     width: '100%', padding: '12px 44px 12px 14px',
                     background: '#0F172A', border: '1px solid #334155',
-                    borderRadius: '8px', color: '#ffffff', fontSize: '14px',
+                    borderRadius: '8px', color: '#ffffff', fontSize: '15px',
                     boxSizing: 'border-box', outline: 'none'
                   }}
                 />
@@ -190,7 +190,7 @@ export default function ResetPasswordLanding() {
               {/* Live match indicator */}
               {confirmPassword && (
                 <p style={{
-                  fontSize: '12px', marginTop: '6px',
+                  fontSize: '15px', marginTop: '6px',
                   color: newPassword === confirmPassword ? '#129968' : '#ef4444'
                 }}>
                   {newPassword === confirmPassword ? '✓ Passwords match' : '✗ Passwords do not match'}

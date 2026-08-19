@@ -35,10 +35,8 @@
   border-radius: 6px;
   background-color: var(--input-bg);
   color: var(--text-main);
-  font-size: 14px;
+  font-size: 15px;
 }
-
-.btn-primary-generate {
   background-color: #129968;
   color: #fff;
   font-weight: 600;
@@ -46,7 +44,7 @@
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 15px;
   white-space: nowrap;
 }
 
@@ -98,13 +96,13 @@
 
 .report-item-meta p {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-main);
 }
 .report-item-meta small {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 15px;
 }
 
 .action-btn-group {
@@ -114,7 +112,7 @@
 
 .btn-action-outline {
   padding: 6px 16px;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 500;
   background: var(--bg-surface);
   border: 1px solid var(--input-border);
@@ -159,7 +157,7 @@
 
 .stat-square-card p {
   margin: 0;
-  font-size: 12px;
+  font-size: 15px;
   color: var(--text-muted);
   font-weight: 500;
 }
@@ -181,7 +179,7 @@
 
 .table-top-header h3 {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text-main);
 }
@@ -206,7 +204,7 @@
   border-radius: 6px;
   background-color: var(--input-bg);
   color: var(--text-main);
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .sm-toolbar-select {
@@ -215,7 +213,7 @@
   border-radius: 6px;
   background-color: var(--input-bg);
   color: var(--text-main);
-  font-size: 13px;
+  font-size: 15px;
 }
 
 /* Base Table Layout */
@@ -229,24 +227,23 @@
   padding: 14px 12px;
   border-bottom: 2px solid var(--border-color);
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
 }
 
 .audit-log-table td {
   padding: 14px 12px;
   border-bottom: 1px solid var(--border-color);
   color: var(--text-main);
-  font-size: 14px;
+  font-size: 15px;
 }
 
 /* Badges */
 .status-badge {
   padding: 4px 10px;
   border-radius: 9999px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   display: inline-block;
 }

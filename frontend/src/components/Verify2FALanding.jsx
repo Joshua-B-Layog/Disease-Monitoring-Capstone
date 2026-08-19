@@ -55,7 +55,7 @@ export default function Verify2FALanding() {
             <h2 style={{ color: '#ffffff', fontSize: '22px', fontWeight: '700', margin: '0 0 8px 0' }}>
               Verifying your email...
             </h2>
-            <p style={{ color: '#9CA3AF', fontSize: '14px', margin: 0 }}>
+            <p style={{ color: '#9CA3AF', fontSize: '15px', margin: 0 }}>
               Please wait a moment.
             </p>
           </>
@@ -67,7 +67,7 @@ export default function Verify2FALanding() {
             <h2 style={{ color: '#ffffff', fontSize: '22px', fontWeight: '700', margin: '0 0 12px 0' }}>
               Two-Factor Authentication Enabled
             </h2>
-            <p style={{ color: '#9CA3AF', fontSize: '14px', margin: '0 0 24px 0', lineHeight: '1.6' }}>
+            <p style={{ color: '#9CA3AF', fontSize: '15px', margin: '0 0 24px 0', lineHeight: '1.6' }}>
               {message}
               <br />
               From now on, you'll receive a 6-digit code by email every time you log in.
@@ -91,7 +91,7 @@ export default function Verify2FALanding() {
             <h2 style={{ color: '#ffffff', fontSize: '22px', fontWeight: '700', margin: '0 0 12px 0' }}>
               Verification Failed
             </h2>
-            <p style={{ color: '#ef4444', fontSize: '14px', margin: '0 0 24px 0' }}>
+            <p style={{ color: '#ef4444', fontSize: '15px', margin: '0 0 24px 0' }}>
               {message}
             </p>
             <button

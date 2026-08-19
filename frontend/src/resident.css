@@ -1,23 +1,39 @@
 /* =========================================================
    RESIDENT PORTAL — Typography rules
-   Bahnschrift for headings/buttons/labels
-   Segoe UI for body (inherited from global * reset)
+   Bahnschrift SemiBold Condensed for headings/buttons/labels
+   Tw Cen MT Condensed for body (inherited from global reset)
    ========================================================= */
 
 /* Headings */
-.resident-page h2,
-.resident-page h3,
+.resident-page h2 {
+  font-family: var(--heading);
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.resident-page h3 {
+  font-family: var(--heading);
+  font-size: 18px;
+  font-weight: 600;
+}
+
 .resident-page h4 {
   font-family: var(--heading);
-  font-stretch: condensed;
-  letter-spacing: 0.02em;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* Body text */
+.resident-page p {
+  font-family: var(--sans);
+  font-size: 15px;
 }
 
 /* Buttons */
 .resident-page button {
   font-family: var(--heading);
-  font-stretch: condensed;
-  letter-spacing: 0.03em;
+  font-size: 15px;
+  font-weight: 600;
 }
 
 /* Links styled as buttons or labels */
@@ -25,13 +41,14 @@
 .resident-page .badge,
 .resident-page .tag {
   font-family: var(--heading);
-  font-stretch: condensed;
-  letter-spacing: 0.03em;
+  font-size: 15px;
+  font-weight: 600;
 }
 
-/* Form inputs stay Segoe UI (inherited) */
+/* Form inputs */
 .resident-page input,
 .resident-page textarea,
 .resident-page select {
   font-family: var(--sans);
+  font-size: 15px;
 }

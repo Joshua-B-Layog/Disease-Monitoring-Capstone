@@ -110,6 +110,7 @@ function App() {
   const [pendingInboxView, setPendingInboxView] = useState(null);
   const [compactMode, setCompactMode] = useState(getSavedCompact);
   const [openProfileView, setOpenProfileView] = useState(false);
+  const [openSecurityView, setOpenSecurityView] = useState(false);
 
   useEffect(() => { localStorage.setItem('cdms_date_format', dateFormat); }, [dateFormat]);
   useEffect(() => { localStorage.setItem('cdms_confirm_delete', String(confirmDelete)); }, [confirmDelete]);
@@ -431,6 +432,8 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             compactMode={compactMode}
             openProfileView={openProfileView}
             onProfileViewOpened={() => setOpenProfileView(false)}
+            openSecurityView={openSecurityView}
+            onSecurityViewOpened={() => setOpenSecurityView(false)}
           />
         );
       case 'Weekly Summary':
@@ -500,7 +503,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
   // ── Profile field row helper ──
   const ProfileRow = ({ label, value }) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '16px' }}>
-      <span style={{ fontSize: '14px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
+      <span style={{ fontSize: '15px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
       <span style={{ fontSize: '15px', color: '#0f172a', fontWeight: '500' }}>{value || '—'}</span>
     </div>
   );
@@ -513,14 +516,14 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
         <div className="top-nav">
           <div className="nav-title" style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             <h2 style={{ margin: 0 }}>{activeTab}</h2>
-            <small style={{ color: '#129968', fontSize: '12px', fontWeight: '500' }}>
+            <small style={{ color: '#129968', fontSize: '15px', fontWeight: '500' }}>
               Scope: {sessionContext} ({loginRole})
             </small>
           </div>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             {/* ── ONLINE/OFFLINE INDICATOR ── */}
-            <div key={isOnline ? 'online' : 'offline'} className={isOnline ? '' : 'cdms-status-flash'} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', background: isOnline ? 'rgba(18,153,104,0.1)' : 'rgba(245,158,11,0.1)', color: isOnline ? '#129968' : '#D97706', border: `1px solid ${isOnline ? 'rgba(18,153,104,0.3)' : 'rgba(245,158,11,0.3)'}` }}>
+            <div key={isOnline ? 'online' : 'offline'} className={isOnline ? '' : 'cdms-status-flash'} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '20px', fontSize: '15px', fontWeight: '600', background: isOnline ? 'rgba(18,153,104,0.1)' : 'rgba(245,158,11,0.1)', color: isOnline ? '#129968' : '#D97706', border: `1px solid ${isOnline ? 'rgba(18,153,104,0.3)' : 'rgba(245,158,11,0.3)'}` }}>
               <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: isOnline ? '#129968' : '#D97706' }}></span>
               {isOnline ? 'Online' : 'Offline'}
             </div>
@@ -546,7 +549,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                   <span key={unreadCount} className="cdms-badge-pulse" style={{
                     position: 'absolute', top: '2px', right: '2px',
                     background: '#ef4444', color: 'white', borderRadius: '50%',
-                    width: '16px', height: '16px', fontSize: '10px', fontWeight: '700',
+                    width: '16px', height: '16px', fontSize: '13px', fontWeight: '700',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     paddingTop: '1px'
                   }}>
@@ -572,14 +575,14 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                       Notifications {unreadCount > 0 && (
                         <span style={{
                           background: '#ef4444', color: 'white', borderRadius: '10px',
-                          padding: '1px 7px', fontSize: '12px', marginLeft: '6px'
+                          padding: '1px 7px', fontSize: '15px', marginLeft: '6px'
                         }}>{unreadCount}</span>
                       )}
                     </span>
                     {notifications.length > 0 && (
                       <button onClick={handleDismissAll} style={{
                         background: 'none', border: 'none', color: '#ef4444',
-                        cursor: 'pointer', fontSize: '12px', fontWeight: '600'
+                        cursor: 'pointer', fontSize: '15px', fontWeight: '600'
                       }}>
                         Clear All
                       </button>
@@ -591,7 +594,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                     {notifications.length === 0 ? (
                       <div style={{
                         padding: '32px', textAlign: 'center',
-                        color: 'var(--text-muted)', fontSize: '14px'
+                        color: 'var(--text-muted)', fontSize: '15px'
                       }}>
                         <div style={{ fontSize: '32px', marginBottom: '8px' }}>🔔</div>
                         No notifications yet
@@ -620,19 +623,19 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                           {/* Content */}
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{
-                              fontSize: '13px', fontWeight: n.is_read === 0 ? '600' : '400',
+                              fontSize: '15px', fontWeight: n.is_read === 0 ? '600' : '400',
                               color: 'var(--text-main)', marginBottom: '3px'
                             }}>
                               {n.title}
                             </div>
                             <div style={{
-                              fontSize: '12px', color: 'var(--text-muted)',
+                              fontSize: '15px', color: 'var(--text-muted)',
                               lineHeight: '1.4', marginBottom: '6px'
                             }}>
                               {n.message}
                             </div>
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                              <span style={{ fontSize: '15px', color: 'var(--text-muted)' }}>
                                 {new Date(n.created_at).toLocaleString('en-PH', {
                                   month: 'short', day: 'numeric',
                                   hour: '2-digit', minute: '2-digit'
@@ -641,7 +644,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                               {n.is_read === 0 && (
                                 <button onClick={() => handleMarkRead(n.id)} style={{
                                   background: 'none', border: 'none', color: '#121358',
-                                  cursor: 'pointer', fontSize: '12px', fontWeight: '600', padding: 0
+                                  cursor: 'pointer', fontSize: '15px', fontWeight: '600', padding: 0
                                 }}>
                                   Mark read
                                 </button>
@@ -650,29 +653,37 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                                 <button onClick={() => {
                                   handleMarkRead(n.id);
                                   const target = (n.link_to || '').replace(/\s+/g, '');
-                                  if (target === 'Inbox') {
-                                    const isEditReq = n.title === 'A BHW needs your help';
-                                    setPendingInboxView(isEditReq ? 'inbox:edit-requests' : 'inbox');
-                                    setActiveTab('Manage Cases');
-                                  } else if (target === 'Outbox') {
-                                    setPendingInboxView('outbox');
-                                    setActiveTab('Manage Cases');
-                                  } else if (target === 'ManageCases') {
-                                    const diseaseName = extractDiseaseFromMessage(n.message);
-                                    setCaseFilter({ disease: diseaseName, barangay: '', purok: '' });
-                                    setActiveTab('Manage Cases');
-                                  } else if (target === 'Registrations') {
-                                    setPendingInboxView('inbox:registrations');
-                                    setActiveTab('Manage Cases');
-                                  } else if (target === 'MapView') {
-                                    setActiveTab('Map View');
-                                  } else {
-                                    setActiveTab(n.link_to);
-                                  }
+                                   if (target === 'Inbox') {
+                                     const isEditReq = n.title === 'A BHW needs your help';
+                                     const isPwChangeReq = n.title === 'Password Change Request';
+                                     if (isEditReq || isPwChangeReq) {
+                                       setPendingInboxView('inbox:edit-requests');
+                                     } else {
+                                       setPendingInboxView('inbox');
+                                     }
+                                     setActiveTab('Manage Cases');
+                                   } else if (target === 'Outbox') {
+                                     setPendingInboxView('outbox');
+                                     setActiveTab('Manage Cases');
+                                   } else if (target === 'ManageCases') {
+                                     const diseaseName = extractDiseaseFromMessage(n.message);
+                                     setCaseFilter({ disease: diseaseName, barangay: '', purok: '' });
+                                     setActiveTab('Manage Cases');
+                                   } else if (target === 'Registrations') {
+                                     setPendingInboxView('inbox:registrations');
+                                     setActiveTab('Manage Cases');
+                                   } else if (target === 'Settings') {
+                                     setActiveTab('Settings');
+                                     setOpenSecurityView(true);
+                                   } else if (target === 'MapView') {
+                                     setActiveTab('Map View');
+                                   } else {
+                                     setActiveTab(n.link_to);
+                                   }
                                   setShowNotifications(false);
                                 }} style={{
                                   background: 'none', border: 'none', color: '#129968',
-                                  cursor: 'pointer', fontSize: '12px', fontWeight: '600', padding: 0
+                                  cursor: 'pointer', fontSize: '15px', fontWeight: '600', padding: 0
                                 }}>
                                   View →
                                 </button>
@@ -698,8 +709,8 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
 
             {/* ── LIVE CLOCK ── */}
             <div style={{
-              fontSize: '13px', fontWeight: '500', color: 'rgba(255,255,255,0.7)',
-              fontFamily: 'ui-monospace, Consolas, monospace', letterSpacing: '0.03em', whiteSpace: 'nowrap',
+              fontSize: '15px', fontWeight: '500', color: 'rgba(255,255,255,0.7)',
+              fontFamily: 'ui-monospace, Consolas, monospace', whiteSpace: 'nowrap',
             }}>
               {clock.toLocaleTimeString('en', {
                 timeZone: timeZone.split(' (')[0],
@@ -725,7 +736,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                     style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
                   />
                 ) : (
-                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '12px' }}>
+                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '15px' }}>
                     {getInitials()}
                   </span>
                 )}
@@ -774,7 +785,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             padding: '10px 18px', borderRadius: '24px',
             background: syncingActive ? '#6366F1' : navigator.onLine ? '#129968' : '#D97706',
             color: '#fff', border: 'none', cursor: syncingActive ? 'wait' : 'pointer',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.25)', fontSize: '13px', fontWeight: '600',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.25)', fontSize: '15px', fontWeight: '600',
             transition: 'all 0.2s'
           }}
         >
@@ -783,7 +794,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
           ) : '⟳'}
           {syncingActive ? 'Syncing...' : `Sync ${pendingSyncCount} item${pendingSyncCount > 1 ? 's' : ''}`}
           {pendingSyncCount > 0 && !syncingActive && (
-            <span style={{ background: '#fff', color: navigator.onLine ? '#129968' : '#D97706', borderRadius: '50%', width: '20px', height: '20px', fontSize: '12px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ background: '#fff', color: navigator.onLine ? '#129968' : '#D97706', borderRadius: '50%', width: '20px', height: '20px', fontSize: '15px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {pendingSyncCount}
             </span>
           )}
@@ -801,7 +812,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             background: syncResult.type === 'error' ? '#FEF2F2' : syncResult.type === 'conflict' ? '#FFFBEB' : '#F0FDF4',
             border: `1px solid ${syncResult.type === 'error' ? '#FECACA' : syncResult.type === 'conflict' ? '#FDE68A' : '#baf0d7'}`,
             color: syncResult.type === 'error' ? '#DC2626' : syncResult.type === 'conflict' ? '#D97706' : '#129968',
-            fontSize: '13px', fontWeight: '500', maxWidth: '340px',
+            fontSize: '15px', fontWeight: '500', maxWidth: '340px',
             boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
           }}
         >
@@ -856,7 +867,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                 <h2 style={{ margin: '0 0 4px 0', color: '#ffffff', fontSize: '22px', fontWeight: '700' }}>
                   {loggedUser || 'System Officer'}
                 </h2>
-                <p style={{ margin: 0, color: 'rgba(255,255,255,0.75)', fontSize: '14px' }}>
+                <p style={{ margin: 0, color: 'rgba(255,255,255,0.75)', fontSize: '15px' }}>
                   {loginRole === 'BHW' ? `BHW - ${sessionContext}` : `${loginRole} Specialist - ${sessionContext}`}
                 </p>
               </div>
@@ -865,7 +876,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             {/* ── Profile details body ── */}
             <div style={{ padding: '28px 32px' }}>
               {profileLoading ? (
-                <div style={{ textAlign: 'center', padding: '24px', color: '#64748b', fontSize: '14px' }}>
+                <div style={{ textAlign: 'center', padding: '24px', color: '#64748b', fontSize: '15px' }}>
                   Loading profile...
                 </div>
               ) : profileData ? (
@@ -880,7 +891,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                   </div>
                 </>
               ) : (
-                <div style={{ textAlign: 'center', padding: '16px', color: '#64748b', fontSize: '14px' }}>
+                <div style={{ textAlign: 'center', padding: '16px', color: '#64748b', fontSize: '15px' }}>
                   Could not load profile details.
                 </div>
               )}
@@ -891,7 +902,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                   onClick={() => { setShowProfileModal(false); setActiveTab('Settings'); setOpenProfileView(true); }}
                   style={{
                     flex: 1, padding: '12px', background: '#129968', color: '#fff',
-                    border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600',
+                    border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: '600',
                     cursor: 'pointer',
                   }}
                 >
@@ -901,7 +912,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                   onClick={() => setShowProfileModal(false)}
                   style={{
                     padding: '12px 24px', background: '#f1f5f9', color: '#475569',
-                    border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px',
+                    border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '15px',
                     cursor: 'pointer',
                   }}
                 >

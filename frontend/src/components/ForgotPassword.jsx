@@ -44,13 +44,13 @@ export default function ForgotPasswordModal({ onClose }) {
         
         <h2 style={{ color: 'var(--text-h)', marginBottom: '16px' }}>Account Recovery</h2>
         
-        {message && <div style={{ color: '#129968', background: 'var(--accent-bg)', padding: '10px', borderRadius: '6px', marginBottom: '16px', fontSize: '14px' }}>{message}</div>}
-        {error && <div style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)', padding: '10px', borderRadius: '6px', marginBottom: '16px', fontSize: '14px' }}>{error}</div>}
+        {message && <div style={{ color: '#129968', background: 'var(--accent-bg)', padding: '10px', borderRadius: '6px', marginBottom: '16px', fontSize: '15px' }}>{message}</div>}
+        {error && <div style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)', padding: '10px', borderRadius: '6px', marginBottom: '16px', fontSize: '15px' }}>{error}</div>}
 
         <form onSubmit={handleSubmit}>
-          <p style={{ fontSize: '14px', marginBottom: '16px' }}>Enter your email address or username to receive a password reset link.</p>
+          <p style={{ fontSize: '15px', marginBottom: '16px' }}>Enter your email address or username to receive a password reset link.</p>
           
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: 'var(--text-h)', marginBottom: '6px' }}>Account Identifier</label>
+          <label style={{ display: 'block', fontSize: '15px', fontWeight: '500', color: 'var(--text-h)', marginBottom: '6px' }}>Account Identifier</label>
           <input 
             type="text" 
             placeholder="Username or Email"

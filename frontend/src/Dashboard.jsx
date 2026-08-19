@@ -308,7 +308,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   const exportHighest = periodChart ? monthMax : (isBhw ? (diseaseBars.length > 0 ? diseaseBars[0].count : 1) : highestCount);
 
   const yearOptionStyle = (active) => ({
-    padding: '8px 14px', cursor: 'pointer', fontSize: '13px',
+    padding: '8px 14px', cursor: 'pointer', fontSize: '15px',
     display: 'flex', alignItems: 'center', gap: '8px', borderRadius: '6px',
     justifyContent: 'flex-start',
     background: active ? 'rgba(96,165,250,0.18)' : 'transparent',
@@ -561,7 +561,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         <div style={{ padding: compactMode ? '14px' : '24px', display: 'flex', flexDirection: 'column', gap: compactMode ? '12px' : '20px', fontSize: `calc(14px * ${fontScale || '1'})` }}>
 
       {offlineMode && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '13px', color: '#D97706' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '15px', color: '#D97706' }}>
           <span style={{ fontSize: '16px' }}>⚠</span>
           Offline - showing cached data. Will refresh when reconnected.
         </div>
@@ -569,13 +569,13 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
       {/* ── WELCOME BANNER ── */}
       <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px 16px' : '20px 24px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-        <div style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: '500' }}>
+        <div style={{ color: 'var(--text-muted)', fontSize: '15px', fontWeight: '500' }}>
           {new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening'}
         </div>
         <div style={{ color: 'var(--text-main)', fontSize: '22px', fontWeight: '700', marginTop: '2px' }}>
           Welcome back, {loggedUser || 'User'}
         </div>
-        <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '4px' }}>
+        <div style={{ color: 'var(--text-muted)', fontSize: '15px', marginTop: '4px' }}>
           {loginRole === 'CHO' ? `City Health Officer - ${sessionContext || ''}` : `Barangay Health Worker - ${loginBarangay || ''}`}
           <span style={{ margin: '0 8px' }}>•</span>
           {new Date().toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
@@ -591,7 +591,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           { label: 'Deaths', value: deathCases, color: '#DC2626' },
         ].map((card, i) => (
             <div key={`${card.label}-${statSignature}`} className="cdms-view-in" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', animationDelay: `${i * 80}ms` }}>
-            <div style={{ color: 'var(--text-muted)', fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{card.label}</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: '15px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{card.label}</div>
             <AnimatedNumber value={card.value} style={{ color: card.color, fontSize: '32px', fontWeight: '700', marginTop: '6px' }} />
           </div>
         ))}
@@ -602,14 +602,14 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
         {/* BAR CHART */}
           <div key={`chart-${statSignature}`} className="cdms-view-in" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', display: 'flex', flexDirection: 'column' }}>
-          <h4 style={{ color: 'var(--text-main)', margin: '0 0 16px 0', fontSize: '14px', fontWeight: '600' }}>
+          <h4 style={{ color: 'var(--text-main)', margin: '0 0 16px 0', fontSize: '15px', fontWeight: '600' }}>
             {exportTitle}
           </h4>
           {periodChart ? (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', height: '210px' }}>
-                  <div style={{ width: '26px', height: '210px', position: 'relative', fontSize: '10px', color: 'var(--text-muted)' }}>
+                  <div style={{ width: '26px', height: '210px', position: 'relative', fontSize: '13px', color: 'var(--text-muted)' }}>
                     {gridLines.lines.map(l => {
                       const topPx = 26 + (1 - l.frac) * 184;
                       return <span key={l.value} style={{ position: 'absolute', right: 6, top: `${(topPx / 210) * 100}%`, transform: 'translateY(-50%)' }}>{l.value}</span>;
@@ -625,7 +625,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                         const h = chartMounted ? Math.max((b.count / gridLines.top) * 184, b.count > 0 ? 4 : 2) : 0;
                         return (
                           <div key={b.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
-                            <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '4px', opacity: chartMounted ? 1 : 0, transition: 'opacity 0.5s ease 0.2s' }}>{b.count}</div>
+                            <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '4px', opacity: chartMounted ? 1 : 0, transition: 'opacity 0.5s ease 0.2s' }}>{b.count}</div>
                             <div style={{
                               width: '100%', maxWidth: '48px',
                               background: COLUMN_COLORS[i % COLUMN_COLORS.length],
@@ -642,13 +642,13 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                 <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
                   <div style={{ width: '26px' }} />
                   {monthBars.map(b => (
-                    <div key={b.label} style={{ flex: 1, textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{b.label}</div>
+                    <div key={b.label} style={{ flex: 1, textAlign: 'center', fontSize: '13px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{b.label}</div>
                   ))}
                 </div>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 14px', marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}>
                 {monthBars.map((b, i) => (
-                  <span key={b.label} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                  <span key={b.label} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px', color: 'var(--text-muted)' }}>
                     <span style={{ width: '11px', height: '11px', borderRadius: '3px', background: COLUMN_COLORS[i % COLUMN_COLORS.length] }} />
                     {b.full}
                   </span>
@@ -661,7 +661,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                 const dHighest = diseaseBars.length > 0 ? diseaseBars[0].count : 1;
                 return (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                    <span style={{ minWidth: '180px', fontSize: '13px', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <span style={{ minWidth: '180px', fontSize: '15px', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {bar.label}
                     </span>
                     <div style={{ flex: 1, background: 'var(--input-bg)', height: '24px', borderRadius: '6px', overflow: 'hidden', position: 'relative' }}>
@@ -670,7 +670,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                         background: i === 0 ? '#DC2626' : bar.count >= 10 ? '#D97706' : bar.count > 0 ? '#129968' : '#3b82f6',
                         height: '100%', borderRadius: '6px', transition: 'width 0.4s ease',
                         display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-                        paddingRight: '8px', color: '#fff', fontWeight: '700', fontSize: '14px',
+                        paddingRight: '8px', color: '#fff', fontWeight: '700', fontSize: '15px',
                         boxSizing: 'border-box'
                       }}>
                         {bar.count > 0 ? bar.count : ''}
@@ -681,14 +681,14 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
               })}
             </div>
           ) : sortedBars.length === 0 ? (
-            <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '20px 0' }}>
+            <div style={{ color: 'var(--text-muted)', fontSize: '15px', padding: '20px 0' }}>
               No cases found for {selectedDisease}.
             </div>
           ) : (
             <div style={{ maxHeight: '240px', overflowY: 'auto', paddingRight: '4px' }}>
               {sortedBars.map((bar, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                  <span style={{ minWidth: '180px', fontSize: '13px', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <span style={{ minWidth: '180px', fontSize: '15px', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {bar.label}
                   </span>
                   <div style={{ flex: 1, background: 'var(--input-bg)', height: '24px', borderRadius: '6px', overflow: 'hidden', position: 'relative' }}>
@@ -697,7 +697,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                       background: i === 0 ? '#DC2626' : bar.count >= 10 ? '#D97706' : bar.count > 0 ? '#129968' : '#3b82f6',
                       height: '100%', borderRadius: '6px', transition: 'width 0.4s ease',
                       display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-                      paddingRight: '8px', color: '#fff', fontWeight: '700', fontSize: '14px',
+                      paddingRight: '8px', color: '#fff', fontWeight: '700', fontSize: '15px',
                       boxSizing: 'border-box'
                     }}>
                       {bar.count > 0 ? bar.count : ''}
@@ -711,14 +711,14 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
         {/* FILTER & CONTROLS - FIX: date inputs no longer overflow */}
           <div key={`filters-${statSignature}`} className="cdms-view-in" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <h4 style={{ color: 'var(--text-main)', margin: '0', fontSize: '14px', fontWeight: '600' }}>Filter & Controls</h4>
+          <h4 style={{ color: 'var(--text-main)', margin: '0', fontSize: '15px', fontWeight: '600' }}>Filter & Controls</h4>
 
           {!isBhw && <div>
-            <label style={{ color: 'var(--text-muted)', fontSize: '12px', display: 'block', marginBottom: '4px' }}>Disease</label>
+            <label style={{ color: 'var(--text-muted)', fontSize: '15px', display: 'block', marginBottom: '4px' }}>Disease</label>
             <div style={{ position: 'relative' }} ref={diseaseRef}>
               <button
                 onClick={() => setDiseaseOpen(!diseaseOpen)}
-                style={{ width: '100%', padding: '7px 10px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                style={{ width: '100%', padding: '7px 10px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '15px', boxSizing: 'border-box', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
               >
                 <span>{selectedDisease}</span>
                 <span style={{ marginLeft: '6px', opacity: 0.6, transition: 'transform 0.2s', display: 'inline-block', transform: diseaseOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
@@ -735,7 +735,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                       key={d}
                       onClick={() => { setSelectedDisease(d); setDiseaseOpen(false); }}
                       style={{
-                        padding: '7px 10px', cursor: 'pointer', fontSize: '13px',
+                        padding: '7px 10px', cursor: 'pointer', fontSize: '15px',
                         background: selectedDisease === d ? 'var(--input-bg)' : 'transparent',
                         color: 'var(--text-main)',
                         fontWeight: selectedDisease === d ? '600' : '400',
@@ -753,7 +753,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
           {/* ── Period + Date range ── */}
           <div>
-            <label style={{ color: 'var(--text-muted)', fontSize: '12px', display: 'block', marginBottom: '4px' }}>Date Range</label>
+            <label style={{ color: 'var(--text-muted)', fontSize: '15px', display: 'block', marginBottom: '4px' }}>Date Range</label>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               {['weekly', 'monthly', 'quarterly', 'yearly'].map(p => (
                 <button
@@ -764,7 +764,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                   }}
                   style={{
                     flex: 1, padding: '6px 4px', borderRadius: '6px', cursor: 'pointer',
-                    fontSize: '12px', fontWeight: '500', textTransform: 'capitalize', minWidth: '56px',
+                    fontSize: '15px', fontWeight: '500', textTransform: 'capitalize', minWidth: '56px',
                     background: dashPeriod === p ? '#121358' : 'var(--input-bg)',
                     color: dashPeriod === p ? 'white' : 'var(--text-muted)',
                     border: '1px solid var(--border-color)',
@@ -779,7 +779,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
             {dashPeriod === 'quarterly' && (
               <>
-                <label style={{ color: 'var(--text-muted)', fontSize: '12px', display: 'block', marginBottom: '4px', marginTop: '10px' }}>Quarter</label>
+                <label style={{ color: 'var(--text-muted)', fontSize: '15px', display: 'block', marginBottom: '4px', marginTop: '10px' }}>Quarter</label>
                 <div style={{ display: 'flex', gap: '6px' }}>
                   {[1, 2, 3, 4].map(q => (
                     <button
@@ -787,7 +787,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                       onClick={() => { setDashQuarter(q); setDateRange(getPeriodRange('quarterly', q, dashYear)); }}
                       style={{
                         flex: 1, padding: '6px 4px', borderRadius: '6px', cursor: 'pointer',
-                        fontSize: '12px', fontWeight: '600',
+                        fontSize: '15px', fontWeight: '600',
                         background: dashQuarter === q ? '#129968' : 'var(--input-bg)',
                         color: dashQuarter === q ? 'white' : 'var(--text-muted)',
                         border: '1px solid var(--border-color)',
@@ -804,12 +804,12 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                       width: '100%', padding: '9px 12px',
                       background: 'var(--input-bg)', border: `1px solid ${yearOpen ? '#60a5fa' : 'var(--border-color)'}`,
                       borderRadius: '7px', color: 'var(--text-main)',
-                      fontSize: '13px', cursor: 'pointer', textAlign: 'left',
+                      fontSize: '15px', cursor: 'pointer', textAlign: 'left',
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxSizing: 'border-box',
                     }}
                   >
                     <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dashPeriod === 'custom' ? 'Custom dates…' : dashYear}</span>
-                    <span style={{ fontSize: '10px', opacity: 0.6, flexShrink: 0, marginLeft: '8px', transition: 'transform 0.2s', display: 'inline-block', transform: yearOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                    <span style={{ fontSize: '13px', opacity: 0.6, flexShrink: 0, marginLeft: '8px', transition: 'transform 0.2s', display: 'inline-block', transform: yearOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                   </button>
                   {yearOpen && (
                     <div className="cdms-dropdown-panel" style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, maxHeight: '250px', overflowY: 'auto', marginTop: '4px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 12px 32px rgba(0,0,0,0.3)', padding: '4px', textAlign: 'left' }}>
@@ -820,7 +820,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                         onMouseLeave={e => { if (dashPeriod !== 'custom') { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-main)'; } }}
                       >
                         <span style={{ flex: 1 }}>Custom dates…</span>
-                        {dashPeriod === 'custom' && <span style={{ color: '#60a5fa', fontSize: '12px' }}>✓</span>}
+                        {dashPeriod === 'custom' && <span style={{ color: '#60a5fa', fontSize: '15px' }}>✓</span>}
                       </div>
                       {yearOptions.map(y => (
                         <div
@@ -831,7 +831,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                           onMouseLeave={e => { if (dashYear !== y) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-main)'; } }}
                         >
                           <span style={{ flex: 1 }}>{y}</span>
-                          {dashYear === y && <span style={{ color: '#60a5fa', fontSize: '12px' }}>✓</span>}
+                          {dashYear === y && <span style={{ color: '#60a5fa', fontSize: '15px' }}>✓</span>}
                         </div>
                       ))}
                     </div>
@@ -848,12 +848,12 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                     width: '100%', padding: '9px 12px',
                     background: 'var(--input-bg)', border: `1px solid ${yearOpen ? '#60a5fa' : 'var(--border-color)'}`,
                     borderRadius: '7px', color: 'var(--text-main)',
-                    fontSize: '13px', cursor: 'pointer', textAlign: 'left',
+                    fontSize: '15px', cursor: 'pointer', textAlign: 'left',
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxSizing: 'border-box',
                   }}
                 >
                   <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dashPeriod === 'custom' ? 'Custom dates…' : dashYear}</span>
-                  <span style={{ fontSize: '10px', opacity: 0.6, flexShrink: 0, marginLeft: '8px', transition: 'transform 0.2s', display: 'inline-block', transform: yearOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                  <span style={{ fontSize: '13px', opacity: 0.6, flexShrink: 0, marginLeft: '8px', transition: 'transform 0.2s', display: 'inline-block', transform: yearOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                 </button>
                 {yearOpen && (
                   <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, maxHeight: '250px', overflowY: 'auto', marginTop: '4px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 12px 32px rgba(0,0,0,0.3)', padding: '4px', textAlign: 'left' }}>
@@ -864,7 +864,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                       onMouseLeave={e => { if (dashPeriod !== 'custom') { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-main)'; } }}
                     >
                       <span style={{ flex: 1 }}>Custom dates…</span>
-                      {dashPeriod === 'custom' && <span style={{ color: '#60a5fa', fontSize: '12px' }}>✓</span>}
+                      {dashPeriod === 'custom' && <span style={{ color: '#60a5fa', fontSize: '15px' }}>✓</span>}
                     </div>
                     {yearOptions.map(y => (
                       <div
@@ -875,7 +875,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                         onMouseLeave={e => { if (dashYear !== y) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-main)'; } }}
                       >
                         <span style={{ flex: 1 }}>{y}</span>
-                        {dashYear === y && <span style={{ color: '#60a5fa', fontSize: '12px' }}>✓</span>}
+                        {dashYear === y && <span style={{ color: '#60a5fa', fontSize: '15px' }}>✓</span>}
                       </div>
                     ))}
                   </div>
@@ -889,13 +889,13 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                   type="date"
                   value={dateRange.start}
                   onChange={(e) => { setDateRange({ ...dateRange, start: e.target.value }); setDashPeriod('custom'); }}
-                  style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '12px', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '15px', boxSizing: 'border-box' }}
                 />
                 <input
                   type="date"
                   value={dateRange.end}
                   onChange={(e) => { setDateRange({ ...dateRange, end: e.target.value }); setDashPeriod('custom'); }}
-                  style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '12px', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '15px', boxSizing: 'border-box' }}
                 />
               </div>
             )}
@@ -905,7 +905,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           <div style={{ position: 'relative' }} ref={exportRef}>
             <button
               onClick={() => setShowExportMenu(!showExportMenu)}
-              style={{ width: '100%', padding: '8px', background: '#121358', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '500', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+              style={{ width: '100%', padding: '8px', background: '#121358', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '15px', fontWeight: '500', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
               onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
               onMouseLeave={e => e.currentTarget.style.opacity = '1'}
             >
@@ -922,7 +922,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                   <button
                     key={item.label}
                     onClick={item.action}
-                    style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'transparent', border: 'none', color: 'var(--text-main)', cursor: 'pointer', textAlign: 'left', fontSize: '13px', borderBottom: '1px solid var(--border-color)' }}
+                    style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'transparent', border: 'none', color: 'var(--text-main)', cursor: 'pointer', textAlign: 'left', fontSize: '15px', borderBottom: '1px solid var(--border-color)' }}
                     onMouseEnter={e => e.target.style.background = 'var(--input-bg)'}
                     onMouseLeave={e => e.target.style.background = 'transparent'}
                   >
@@ -936,14 +936,14 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           {/* PRINT */}
           <button
             onClick={handlePrint}
-            style={{ width: '100%', padding: '8px', background: '#0a5e42', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}
+            style={{ width: '100%', padding: '8px', background: '#0a5e42', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '15px', fontWeight: '500' }}
             onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
             onMouseLeave={e => e.currentTarget.style.opacity = '1'}
           >
             🖨️ Print Report
           </button>
 
-          <div style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', paddingTop: '4px' }}>
+          <div style={{ fontSize: '15px', color: 'var(--text-muted)', textAlign: 'center', paddingTop: '4px' }}>
             {lastUpdated ? `Updated ${Math.round((now - lastUpdated) / 1000)}s ago` : 'Refreshing...'}
           </div>
         </div>
@@ -952,15 +952,15 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       {/* ── RECENT CASE REPORTS ── */}
           <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h4 style={{ color: 'var(--text-main)', margin: 0, fontSize: '14px', fontWeight: '600' }}>
+          <h4 style={{ color: 'var(--text-main)', margin: 0, fontSize: '15px', fontWeight: '600' }}>
             Recent Case Reports
-            <span style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: '400', marginLeft: '8px' }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: '15px', fontWeight: '400', marginLeft: '8px' }}>
               ({displayCases.length} total)
             </span>
           </h4>
           <button
             onClick={() => setActiveTab('Manage Cases')}
-            style={{ padding: '6px 14px', background: '#129968', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}
+            style={{ padding: '6px 14px', background: '#129968', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '15px', fontWeight: '500' }}
             onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
             onMouseLeave={e => e.currentTarget.style.opacity = '1'}
           >
@@ -974,7 +974,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             <tr>
               {['ID', 'Patient Name', 'Age', 'Barangay', 'Disease', 'Date Reported', 'Severity', 'Status'].map(h => (
                 <th key={h} style={{
-                  textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px',
+                  textAlign: 'center', color: 'var(--text-muted)', fontSize: '15px',
                   fontWeight: '600', padding: compactMode ? '6px 8px' : '10px 12px', borderBottom: '1px solid var(--border-color)',
                   textTransform: 'uppercase', letterSpacing: '0.05em'
                 }}>
@@ -986,15 +986,15 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           <tbody>
             {paginatedCases.map((c) => (
               <tr key={c.case_id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center' }}>#{String(c.case_id).padStart(3, '0')}</td>
-                <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-main)', fontSize: '14px', fontWeight: '500', textAlign: 'center' }}>{c.patient_name || 'Unknown'}</td>
-                <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-main)', fontSize: '13px', textAlign: 'center' }}>{c.age || '--'}</td>
-                <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-main)', fontSize: '13px', textAlign: 'center' }}>{c.barangay_name || `ID: ${c.barangay_id}`}</td>
-                <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-main)', fontSize: '13px', textAlign: 'center' }}>{c.disease_name || '--'}</td>
-                <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-main)', fontSize: '13px', textAlign: 'center', whiteSpace: 'nowrap' }}>{formatDateStr(c.date_reported, dateFormat)}</td>
-                <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-main)', fontSize: '13px', textAlign: 'center' }}>{c.severity || 'N/A'}</td>
+                <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-muted)', fontSize: '15px', textAlign: 'center' }}>#{String(c.case_id).padStart(3, '0')}</td>
+                <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500', textAlign: 'center' }}>{c.patient_name || 'Unknown'}</td>
+                <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-main)', fontSize: '15px', textAlign: 'center' }}>{c.age || '--'}</td>
+                <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-main)', fontSize: '15px', textAlign: 'center' }}>{c.barangay_name || `ID: ${c.barangay_id}`}</td>
+                <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-main)', fontSize: '15px', textAlign: 'center' }}>{c.disease_name || '--'}</td>
+                <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-main)', fontSize: '15px', textAlign: 'center', whiteSpace: 'nowrap' }}>{formatDateStr(c.date_reported, dateFormat)}</td>
+                <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-main)', fontSize: '15px', textAlign: 'center' }}>{c.severity || 'N/A'}</td>
                 <td style={{ padding: compactMode ? '7px 8px' : '12px', textAlign: 'center' }}>
-                  <span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '500', ...getStatusStyle(c.status) }}>
+                  <span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '15px', fontWeight: '500', ...getStatusStyle(c.status) }}>
                     {c.status}
                   </span>
                 </td>
@@ -1005,14 +1005,14 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
         {/* Pagination */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}>
-          <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
+          <span style={{ color: 'var(--text-muted)', fontSize: '15px' }}>
             Showing {(currentPage - 1) * CASES_PER_PAGE + 1}–{Math.min(currentPage * CASES_PER_PAGE, displayCases.length)} of {displayCases.length} cases
           </span>
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
             <button
               onClick={() => setCurrentPage(1)}
               disabled={currentPage === 1}
-              style={{ padding: '5px 8px', background: currentPage === 1 ? 'var(--input-bg)' : '#121358', color: currentPage === 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: '700' }}
+              style={{ padding: '5px 8px', background: currentPage === 1 ? 'var(--input-bg)' : '#121358', color: currentPage === 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontSize: '15px', fontWeight: '700' }}
               onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
               onMouseLeave={e => e.currentTarget.style.opacity = '1'}
             >
@@ -1021,7 +1021,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             <button
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              style={{ padding: '5px 12px', background: currentPage === 1 ? 'var(--input-bg)' : '#121358', color: currentPage === 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontSize: '13px' }}
+              style={{ padding: '5px 12px', background: currentPage === 1 ? 'var(--input-bg)' : '#121358', color: currentPage === 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontSize: '15px' }}
               onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
               onMouseLeave={e => e.currentTarget.style.opacity = '1'}
             >
@@ -1031,17 +1031,17 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
               p === '...' ? (
                 <div key={`e${i}`} ref={ellipsisRef} style={{ position: 'relative', display: 'inline-flex' }}>
                   <button onClick={() => setEllipsisOpen(o => !o)}
-                    style={{ padding: '5px 8px', background: ellipsisOpen ? 'rgba(18,19,88,0.15)' : 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '700', letterSpacing: '2px' }}>...</button>
+                    style={{ padding: '5px 8px', background: ellipsisOpen ? 'rgba(18,19,88,0.15)' : 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '15px', fontWeight: '700', letterSpacing: '2px' }}>...</button>
                   {ellipsisOpen && (
                     <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px', width: '160px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 100 }}>
-                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>Go to page (1–{totalPages})</div>
+                      <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>Go to page (1–{totalPages})</div>
                       <div style={{ display: 'flex', gap: '4px' }}>
                         <input type="number" min="1" max={totalPages} value={ellipsisPageInput} placeholder="#"
                           onChange={e => setEllipsisPageInput(e.target.value)}
                           onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(ellipsisPageInput); if (v >= 1 && v <= totalPages) { setCurrentPage(v); setEllipsisOpen(false); setEllipsisPageInput(''); } } }}
-                          style={{ flex: 1, padding: '5px 6px', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '12px', outline: 'none', width: '100%' }} />
+                          style={{ flex: 1, padding: '5px 6px', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px', outline: 'none', width: '100%' }} />
                         <button onClick={() => { const v = parseInt(ellipsisPageInput); if (v >= 1 && v <= totalPages) { setCurrentPage(v); setEllipsisOpen(false); setEllipsisPageInput(''); } }}
-                          style={{ padding: '5px 8px', border: '1px solid #121358', borderRadius: '4px', background: '#121358', color: 'white', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Go</button>
+                          style={{ padding: '5px 8px', border: '1px solid #121358', borderRadius: '4px', background: '#121358', color: 'white', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>Go</button>
                       </div>
                     </div>
                   )}
@@ -1050,7 +1050,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                 <button
                   key={p}
                   onClick={() => setCurrentPage(p)}
-                  style={{ padding: '5px 10px', background: p === currentPage ? '#121358' : 'transparent', color: p === currentPage ? 'white' : 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', minWidth: '32px' }}
+                  style={{ padding: '5px 10px', background: p === currentPage ? '#121358' : 'transparent', color: p === currentPage ? 'white' : 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '15px', minWidth: '32px' }}
                   onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                   onMouseLeave={e => e.currentTarget.style.opacity = '1'}
                 >
@@ -1061,7 +1061,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             <button
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              style={{ padding: '5px 12px', background: currentPage === totalPages ? 'var(--input-bg)' : '#121358', color: currentPage === totalPages ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontSize: '13px' }}
+              style={{ padding: '5px 12px', background: currentPage === totalPages ? 'var(--input-bg)' : '#121358', color: currentPage === totalPages ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontSize: '15px' }}
               onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
               onMouseLeave={e => e.currentTarget.style.opacity = '1'}
             >
@@ -1070,7 +1070,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             <button
               onClick={() => setCurrentPage(totalPages)}
               disabled={currentPage === totalPages}
-              style={{ padding: '5px 8px', background: currentPage === totalPages ? 'var(--input-bg)' : '#121358', color: currentPage === totalPages ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: '700' }}
+              style={{ padding: '5px 8px', background: currentPage === totalPages ? 'var(--input-bg)' : '#121358', color: currentPage === totalPages ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontSize: '15px', fontWeight: '700' }}
               onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
               onMouseLeave={e => e.currentTarget.style.opacity = '1'}
             >

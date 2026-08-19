@@ -78,7 +78,7 @@ if (!document.getElementById('cdms-barangay-labels')) {
       border-radius: 6px !important;
       padding: 4px 7px !important;
       box-shadow: 0 1px 4px rgba(0,0,0,0.3) !important;
-      font-family: 'Segoe UI', system-ui, sans-serif !important;
+      font-family: 'Tw Cen MT Condensed', 'Segoe UI', system-ui, sans-serif !important;
       pointer-events: none !important;
     }
     .brgy-tooltip-label .brgy-name {
@@ -446,7 +446,7 @@ function PulseMarkers({ barangayData, onHover, onLeave, onClick }) {
           <svg width="${w}" height="${h}" viewBox="0 0 34 44" style="position:absolute;top:0;left:0;display:block;filter:drop-shadow(0 3px 4px rgba(0,0,0,0.5));">
             <path d="M17 0C7.6 0 0 7.6 0 17c0 12 17 27 17 27s17-15 17-27C34 7.6 26.4 0 17 0z" fill="${color}"/>
             <circle cx="17" cy="17" r="11" fill="#ffffff"/>
-            <text x="17" y="21" text-anchor="middle" font-size="12" font-weight="800" fill="${color}" font-family="Segoe UI,system-ui,sans-serif">${b.totalCases}</text>
+            <text x="17" y="21" text-anchor="middle" font-size="12" font-weight="800" fill="${color}" font-family="Tw Cen MT Condensed,system-ui,sans-serif">${b.totalCases}</text>
           </svg>
           <div style="position:absolute;left:50%;top:${h + 1}px;transform:translateX(-50%);background:rgba(15,23,42,0.85);border:1px solid rgba(255,255,255,0.18);color:#fff;font-size:9.5px;font-weight:600;padding:2px 7px;border-radius:8px;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis;line-height:1.2;text-shadow:0 1px 2px rgba(0,0,0,0.3);">${label}</div>
         </div>`,
@@ -556,7 +556,7 @@ const getTop5 = (diseases) =>
 
 function LegendItem({ color, label }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-muted)' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '15px', color: 'var(--text-muted)' }}>
       <div style={{ width: '14px', height: '14px', borderRadius: '3px', background: color, opacity: 0.6 }} />
       {label}
     </div>
@@ -724,14 +724,14 @@ export default function ResidentMap() {
 
   return (
     <div className="resident-page">
-      <h2 style={{ margin: '0 0 16px', fontSize: '24px', fontWeight: '700' }}>
+      <h2 style={{ margin: '0 0 16px', fontSize: '26px', fontWeight: '700' }}>
         Disease Map
       </h2>
-<p style={{ margin: '0 0 20px', color: 'var(--text-main)', fontSize: '14px' }}>
+<p style={{ margin: '0 0 20px', color: 'var(--text-main)', fontSize: '15px' }}>
   Hover over a barangay for a quick summary. Click for full disease breakdown. Zoom in (≥17) to see purok-level pulse markers.
 </p>
       {offlineMode && (
-        <div style={{ padding: '8px 14px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '13px', color: '#F59E0B' }}>
+        <div style={{ padding: '8px 14px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '15px', color: '#F59E0B' }}>
           Offline - showing cached data. Will refresh when reconnected.
         </div>
       )}
@@ -745,7 +745,7 @@ export default function ResidentMap() {
         }}>
           <div>
             <strong style={{ fontSize: '16px' }}>{selectedBrgy}</strong>
-            <span style={{ marginLeft: '12px', fontSize: '14px', color: 'var(--text-muted)' }}>
+            <span style={{ marginLeft: '12px', fontSize: '15px', color: 'var(--text-muted)' }}>
               {brgyCases} case{brgyCases !== 1 ? 's' : ''}
             </span>
           </div>
@@ -764,9 +764,9 @@ export default function ResidentMap() {
           value={searchQuery}
           onChange={e => { setSearchQuery(e.target.value); handleSearch(e.target.value); }}
           onKeyDown={e => { if (e.key === 'Enter') handleSearch(); }}
-          style={{ flex: 1, padding: '12px 16px', border: '1px solid var(--border-color)', borderRadius: '10px', fontSize: '14px', outline: 'none', boxSizing: 'border-box', background: 'var(--bg-surface)', color: 'var(--text-main)' }}
+          style={{ flex: 1, padding: '12px 16px', border: '1px solid var(--border-color)', borderRadius: '10px', fontSize: '15px', outline: 'none', boxSizing: 'border-box', background: 'var(--bg-surface)', color: 'var(--text-main)' }}
         />
-        <button onClick={handleSearch} style={{ padding: '12px 24px', background: '#10B981', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', fontSize: '14px', whiteSpace: 'nowrap' }}>
+        <button onClick={handleSearch} style={{ padding: '12px 24px', background: '#10B981', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', fontSize: '15px', whiteSpace: 'nowrap' }}>
           Search
         </button>
       </div>
@@ -775,14 +775,14 @@ export default function ResidentMap() {
       {searchMatches.length > 1 && (
         <div style={{ marginBottom: '12px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
           {searchMatches.map(b => (
-            <button key={b} onClick={() => zoomToBrgy(b)} style={{ padding: '6px 14px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '20px', fontSize: '13px', color: 'var(--text-main)', cursor: 'pointer' }}>
+            <button key={b} onClick={() => zoomToBrgy(b)} style={{ padding: '6px 14px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '20px', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer' }}>
               {b}
             </button>
           ))}
         </div>
       )}
       {searchMatches.length === 0 && searchQuery.trim() && (
-        <div style={{ marginBottom: '12px', fontSize: '13px', color: '#ef4444' }}>No barangay found matching "{searchQuery}".</div>
+        <div style={{ marginBottom: '12px', fontSize: '15px', color: '#ef4444' }}>No barangay found matching "{searchQuery}".</div>
       )}
 
       {/* Map area */}
@@ -883,7 +883,7 @@ export default function ResidentMap() {
           <button onClick={() => setMapLayer('SD')}
             style={{
               padding: '6px 14px', border: 'none', borderRadius: '7px', cursor: 'pointer',
-              fontSize: '12px', fontWeight: '700',
+              fontSize: '15px', fontWeight: '700',
               background: mapLayer === 'SD' ? '#1e3a8a' : 'transparent',
               color: mapLayer === 'SD' ? '#fff' : 'var(--text-muted)',
             }}>
@@ -892,7 +892,7 @@ export default function ResidentMap() {
           <button onClick={() => setMapLayer('HD')}
             style={{
               padding: '6px 14px', border: 'none', borderRadius: '7px', cursor: 'pointer',
-              fontSize: '12px', fontWeight: '700',
+              fontSize: '15px', fontWeight: '700',
               background: mapLayer === 'HD' ? '#1e3a8a' : 'transparent',
               color: mapLayer === 'HD' ? '#fff' : 'var(--text-muted)',
             }}>
@@ -911,22 +911,22 @@ export default function ResidentMap() {
             <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '3px' }}>
               {tooltip.barangayName}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '15px', color: 'var(--text-muted)', marginBottom: '10px' }}>
               <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: getRisk(tooltip.totalCases).color, display: 'inline-block' }} />
               {getRisk(tooltip.totalCases).label} · {tooltip.totalCases} case{tooltip.totalCases !== 1 ? 's' : ''}
             </div>
-            <div style={{ fontSize: '14px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '7px' }}>
+            <div style={{ fontSize: '15px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '7px' }}>
               Top Diseases
             </div>
             {getTop5(tooltip.diseases).map(([disease, count], i) => (
               <div key={disease} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
-                <span style={{ fontSize: '13px', color: 'var(--text-main)' }}>
+                <span style={{ fontSize: '15px', color: 'var(--text-main)' }}>
                   <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>{i + 1}.</span>{disease}
                 </span>
-                <span style={{ fontSize: '12px', fontWeight: '700', color: '#10b981', marginLeft: '12px' }}>{count}</span>
+                <span style={{ fontSize: '15px', fontWeight: '700', color: '#10b981', marginLeft: '12px' }}>{count}</span>
               </div>
             ))}
-            <div style={{ marginTop: '8px', fontSize: '10px', color: 'var(--text-muted)', fontStyle: 'italic' }}>Click pin for full details</div>
+            <div style={{ marginTop: '8px', fontSize: '15px', color: 'var(--text-muted)', fontStyle: 'italic' }}>Click pin for full details</div>
           </div>
         )}
 
@@ -949,10 +949,10 @@ export default function ResidentMap() {
               boxShadow: '0 8px 20px rgba(0,0,0,0.35)',
               pointerEvents: 'none',
             }}>
-              <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '4px' }}>
+              <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '4px' }}>
                 {diseaseName} <span style={{ color: '#10b981', fontWeight: '700' }}>({count})</span>
               </div>
-              <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+              <div style={{ fontSize: '15px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
                 {getDiseaseCause(diseaseName)}
               </div>
             </div>
@@ -975,23 +975,23 @@ export default function ResidentMap() {
               {/* Header */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
                 <div>
-                  <h3 style={{ margin: '0 0 5px 0', fontSize: '20px', fontWeight: '700', color: 'var(--text-main)' }}>{popup.barangayName}</h3>
+                  <h3 style={{ margin: '0 0 5px 0', fontSize: '22px', fontWeight: '700', color: 'var(--text-main)' }}>{popup.barangayName}</h3>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
                     <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: getRisk(popup.totalCases).color, display: 'inline-block' }} />
-                    <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                    <span style={{ fontSize: '15px', color: 'var(--text-muted)' }}>
                       {getRisk(popup.totalCases).label} · {popup.totalCases} total case{popup.totalCases !== 1 ? 's' : ''}
                     </span>
                   </div>
                 </div>
                 <button onClick={() => setPopup(null)}
-                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '24px', lineHeight: 1, padding: 0 }}>
+                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '26px', lineHeight: 1, padding: 0 }}>
                   ×
                 </button>
               </div>
 
               <div style={{ borderTop: '1px solid var(--border-color)', marginBottom: '14px' }} />
 
-              <p style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <p style={{ margin: '0 0 10px 0', fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 All Diseases in this Barangay
               </p>
 
@@ -1008,16 +1008,16 @@ export default function ResidentMap() {
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '9px', flex: 1, minWidth: 0 }}>
                         {isTop && (
-                          <span style={{ fontSize: '9px', background: '#121358', color: 'white', padding: '2px 6px', borderRadius: '10px', fontWeight: '700', flexShrink: 0 }}>
+                          <span style={{ fontSize: '15px', background: '#121358', color: 'white', padding: '2px 6px', borderRadius: '10px', fontWeight: '700', flexShrink: 0 }}>
                             TOP {i + 1}
                           </span>
                         )}
-                        <span style={{ fontSize: '13px', color: 'var(--text-main)', fontWeight: isTop ? '600' : '400', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: '15px', color: 'var(--text-main)', fontWeight: isTop ? '600' : '400', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {disease}
                         </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, marginLeft: '10px' }}>
-                        <span style={{ fontSize: '14px', fontWeight: '700', color: '#10b981' }}>{count}</span>
+                        <span style={{ fontSize: '15px', fontWeight: '700', color: '#10b981' }}>{count}</span>
                       </div>
                     </div>
                   );
@@ -1030,7 +1030,7 @@ export default function ResidentMap() {
       {/* Legend */}
       <div style={{ marginTop: '16px', display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'flex-start' }}>
         <div>
-          <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Risk Levels</div>
+          <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Risk Levels</div>
           <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
             <LegendItem color="#DC2626" label="High Risk (20+)" />
             <LegendItem color="#f59e0b" label="Medium (10-20)" />
@@ -1040,10 +1040,10 @@ export default function ResidentMap() {
         </div>
         {usedDiseaseColors.length > 0 && (
           <div>
-            <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Top Diseases</div>
+            <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Top Diseases</div>
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
               {usedDiseaseColors.map(({ disease, color }) => (
-                <div key={disease} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                <div key={disease} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '15px', color: 'var(--text-muted)' }}>
                   <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: color, flexShrink: 0 }} />
                   {disease}
                 </div>

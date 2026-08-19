@@ -267,33 +267,33 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
           {onBack && (
-            <button onClick={onBack} style={{ padding: '6px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '13px', fontWeight: '600', flexShrink: 0, marginTop: '2px' }}>
+            <button onClick={onBack} style={{ padding: '6px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '15px', fontWeight: '600', flexShrink: 0, marginTop: '2px' }}>
               ← Back
             </button>
           )}
           <div>
             <h1 style={{ margin: 0, fontSize: '22px', color: 'var(--text-h)' }}>Weekly Disease Summary Report</h1>
-            <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>
+            <p style={{ margin: '4px 0 0 0', fontSize: '15px', color: 'var(--text-muted)' }}>
               {scopeLabel} | Period: {fmtDate(dateRange.start)} - {fmtDate(dateRange.end)}
             </p>
-            <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+            <p style={{ margin: '2px 0 0 0', fontSize: '15px', color: 'var(--text-muted)' }}>
               Prepared by: {data.generatedBy} | Generated: {fmtDateTime(data.generatedAt)}
             </p>
           </div>
         </div>
         {offlineMode && (
-          <div style={{ padding: '8px 14px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '13px', color: '#D97706' }}>
+          <div style={{ padding: '8px 14px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '15px', color: '#D97706' }}>
             Offline — showing last cached report
           </div>
         )}
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {/* Date Range */}
           <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-            style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '12px' }} />
-          <span style={{ color: 'var(--text-muted)', alignSelf: 'center', fontSize: '12px' }}>to</span>
+            style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px' }} />
+          <span style={{ color: 'var(--text-muted)', alignSelf: 'center', fontSize: '15px' }}>to</span>
           <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
-            style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '12px' }} />
-          <button onClick={fetchData} style={{ padding: '6px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
+            style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px' }} />
+          <button onClick={fetchData} style={{ padding: '6px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '15px', fontWeight: '600' }}>
             Generate
           </button>
           {/* Export */}
@@ -307,57 +307,57 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
       <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
         <div style={{ ...cardStyle, borderLeft: '3px solid #121358' }}>
           <div style={{ fontSize: '28px', fontWeight: '700', color: '#121358' }}>{summary.total_cases}</div>
-          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>Total Cases</div>
+          <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '2px' }}>Total Cases</div>
         </div>
         <div style={{ ...cardStyle, borderLeft: '3px solid #DC2626' }}>
           <div style={{ fontSize: '28px', fontWeight: '700', color: '#DC2626' }}>{summary.new_this_week}</div>
-          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>New This Period</div>
+          <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '2px' }}>New This Period</div>
         </div>
         <div style={{ ...cardStyle, borderLeft: '3px solid #D97706' }}>
           <div style={{ fontSize: '28px', fontWeight: '700', color: '#D97706' }}>{summary.active_cases}</div>
-          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>Active</div>
+          <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '2px' }}>Active</div>
         </div>
         <div style={{ ...cardStyle, borderLeft: '3px solid #129968' }}>
           <div style={{ fontSize: '28px', fontWeight: '700', color: '#129968' }}>{summary.recovered}</div>
-          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>Recovered</div>
+          <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '2px' }}>Recovered</div>
         </div>
         <div style={{ ...cardStyle, borderLeft: '3px solid #991b1b' }}>
           <div style={{ fontSize: '28px', fontWeight: '700', color: '#991b1b' }}>{summary.deceased}</div>
-          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>Deceased</div>
+          <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '2px' }}>Deceased</div>
         </div>
         <div style={{ ...cardStyle, borderLeft: '3px solid #DC2626' }}>
           <div style={{ fontSize: '28px', fontWeight: '700', color: highRiskCount > 0 ? '#DC2626' : '#129968' }}>{highRiskCount}</div>
-          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>High-Risk Areas</div>
+          <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '2px' }}>High-Risk Areas</div>
         </div>
       </div>
 
       {/* ── Cases by Barangay ── */}
       <div style={tableContainerStyle}>
         <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ margin: 0, fontSize: '14px', color: 'var(--text-h)' }}>Cases by Barangay</h2>
-          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{byBarangay.length} barangay{byBarangay.length !== 1 ? 's' : ''}</span>
+          <h2 style={{ margin: 0, fontSize: '15px', color: 'var(--text-h)' }}>Cases by Barangay</h2>
+          <span style={{ fontSize: '15px', color: 'var(--text-muted)' }}>{byBarangay.length} barangay{byBarangay.length !== 1 ? 's' : ''}</span>
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: 'var(--bg-main)' }}>
-              <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600' }}>Barangay</th>
-              <th style={{ padding: '10px 16px', textAlign: 'right', fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600' }}>Count</th>
-              <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600', width: '40%' }}>Distribution</th>
-              <th style={{ padding: '10px 16px', textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600' }}>Risk Level</th>
+              <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: '15px', color: 'var(--text-muted)', fontWeight: '600' }}>Barangay</th>
+              <th style={{ padding: '10px 16px', textAlign: 'right', fontSize: '15px', color: 'var(--text-muted)', fontWeight: '600' }}>Count</th>
+              <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: '15px', color: 'var(--text-muted)', fontWeight: '600', width: '40%' }}>Distribution</th>
+              <th style={{ padding: '10px 16px', textAlign: 'center', fontSize: '15px', color: 'var(--text-muted)', fontWeight: '600' }}>Risk Level</th>
             </tr>
           </thead>
           <tbody>
             {byBarangay.map(b => (
               <tr key={b.barangay_name} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                <td style={{ padding: '10px 16px', fontSize: '13px' }}>{b.barangay_name}</td>
-                <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: '700', fontSize: '14px' }}>{b.count}</td>
+                <td style={{ padding: '10px 16px', fontSize: '15px' }}>{b.barangay_name}</td>
+                <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: '700', fontSize: '15px' }}>{b.count}</td>
                 <td style={{ padding: '10px 16px' }}>
                   <div style={{ background: 'var(--border-color)', borderRadius: '4px', height: '18px', overflow: 'hidden' }}>
                     <div style={{ width: `${(b.count / maxBarangayCount) * 100}%`, background: getRiskColor(b.count), height: '100%', borderRadius: '4px', transition: 'width 0.5s ease' }} />
                   </div>
                 </td>
                 <td style={{ padding: '10px 16px', textAlign: 'center' }}>
-                  <span style={{ padding: '3px 10px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', background: `${getRiskColor(b.count)}22`, color: getRiskColor(b.count) }}>
+                  <span style={{ padding: '3px 10px', borderRadius: '10px', fontSize: '15px', fontWeight: '600', background: `${getRiskColor(b.count)}22`, color: getRiskColor(b.count) }}>
                     {getRiskLabel(b.count)} Risk
                   </span>
                 </td>
@@ -373,22 +373,22 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
       {/* ── Cases by Disease ── */}
       <div style={tableContainerStyle}>
         <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ margin: 0, fontSize: '14px', color: 'var(--text-h)' }}>Cases by Disease</h2>
-          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{byDisease.filter(d => d.count > 0).length} diseases with cases</span>
+          <h2 style={{ margin: 0, fontSize: '15px', color: 'var(--text-h)' }}>Cases by Disease</h2>
+          <span style={{ fontSize: '15px', color: 'var(--text-muted)' }}>{byDisease.filter(d => d.count > 0).length} diseases with cases</span>
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: 'var(--bg-main)' }}>
-              <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600' }}>Disease</th>
-              <th style={{ padding: '10px 16px', textAlign: 'right', fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600' }}>Count</th>
-              <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600', width: '40%' }}>Distribution</th>
+              <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: '15px', color: 'var(--text-muted)', fontWeight: '600' }}>Disease</th>
+              <th style={{ padding: '10px 16px', textAlign: 'right', fontSize: '15px', color: 'var(--text-muted)', fontWeight: '600' }}>Count</th>
+              <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: '15px', color: 'var(--text-muted)', fontWeight: '600', width: '40%' }}>Distribution</th>
             </tr>
           </thead>
           <tbody>
             {byDisease.filter(d => d.count > 0).map(d => (
               <tr key={d.disease_name} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                <td style={{ padding: '10px 16px', fontSize: '13px' }}>{d.disease_name}</td>
-                <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: '700', fontSize: '14px' }}>{d.count}</td>
+                <td style={{ padding: '10px 16px', fontSize: '15px' }}>{d.disease_name}</td>
+                <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: '700', fontSize: '15px' }}>{d.count}</td>
                 <td style={{ padding: '10px 16px' }}>
                   <div style={{ background: 'var(--border-color)', borderRadius: '4px', height: '18px', overflow: 'hidden' }}>
                     <div style={{ width: `${(d.count / maxDiseaseCount) * 100}%`, background: d.count / maxDiseaseCount >= 0.7 ? '#DC2626' : d.count / maxDiseaseCount >= 0.35 ? '#D97706' : '#129968', height: '100%', borderRadius: '4px', transition: 'width 0.5s ease' }} />
@@ -408,13 +408,13 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
         {/* Cases by Severity */}
         <div style={{ ...tableContainerStyle, flex: '1 1 300px', marginBottom: 0, alignSelf: 'flex-start' }}>
           <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-color)' }}>
-            <h2 style={{ margin: 0, fontSize: '14px', color: 'var(--text-h)' }}>Cases by Severity</h2>
+            <h2 style={{ margin: 0, fontSize: '15px', color: 'var(--text-h)' }}>Cases by Severity</h2>
           </div>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--bg-main)' }}>
-                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600' }}>Severity</th>
-                <th style={{ padding: '10px 16px', textAlign: 'right', fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600' }}>Count</th>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: '15px', color: 'var(--text-muted)', fontWeight: '600' }}>Severity</th>
+                <th style={{ padding: '10px 16px', textAlign: 'right', fontSize: '15px', color: 'var(--text-muted)', fontWeight: '600' }}>Count</th>
               </tr>
             </thead>
             <tbody>
@@ -423,10 +423,10 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
                   <td style={{ padding: '10px 16px' }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
                       <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: getSeverityColor(s.severity), flexShrink: 0 }} />
-                      <span style={{ fontSize: '13px' }}>{s.severity}</span>
+                      <span style={{ fontSize: '15px' }}>{s.severity}</span>
                     </span>
                   </td>
-                  <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: '700', fontSize: '14px' }}>{s.count}</td>
+                  <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: '700', fontSize: '15px' }}>{s.count}</td>
                 </tr>
               ))}
               {bySeverity.length === 0 && (
@@ -439,38 +439,38 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
         {/* Risk Assessment */}
         <div style={{ ...tableContainerStyle, flex: '1 1 300px', marginBottom: 0 }}>
           <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-color)' }}>
-            <h2 style={{ margin: 0, fontSize: '14px', color: 'var(--text-h)' }}>Risk Assessment</h2>
+            <h2 style={{ margin: 0, fontSize: '15px', color: 'var(--text-h)' }}>Risk Assessment</h2>
           </div>
           <div style={{ padding: '12px 16px' }}>
             {byBarangay.filter(b => b.count >= 20).length > 0 && (
               <div style={{ marginBottom: '12px' }}>
-                <div style={{ fontSize: '12px', fontWeight: '700', color: '#DC2626', marginBottom: '6px' }}>HIGH RISK (20+ cases)</div>
+                <div style={{ fontSize: '15px', fontWeight: '700', color: '#DC2626', marginBottom: '6px' }}>HIGH RISK (20+ cases)</div>
                 {byBarangay.filter(b => b.count >= 20).map(b => (
                   <div key={b.barangay_name} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', background: '#DC262615', borderRadius: '6px', marginBottom: '4px', borderLeft: '3px solid #DC2626' }}>
-                    <span style={{ fontSize: '13px' }}>{b.barangay_name}</span>
-                    <span style={{ fontSize: '13px', fontWeight: '700', color: '#DC2626' }}>{b.count} cases</span>
+                    <span style={{ fontSize: '15px' }}>{b.barangay_name}</span>
+                    <span style={{ fontSize: '15px', fontWeight: '700', color: '#DC2626' }}>{b.count} cases</span>
                   </div>
                 ))}
               </div>
             )}
             {byBarangay.filter(b => b.count >= 10 && b.count < 20).length > 0 && (
               <div style={{ marginBottom: '12px' }}>
-                <div style={{ fontSize: '12px', fontWeight: '700', color: '#D97706', marginBottom: '6px' }}>MEDIUM RISK (10-19 cases)</div>
+                <div style={{ fontSize: '15px', fontWeight: '700', color: '#D97706', marginBottom: '6px' }}>MEDIUM RISK (10-19 cases)</div>
                 {byBarangay.filter(b => b.count >= 10 && b.count < 20).map(b => (
                   <div key={b.barangay_name} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', background: '#D9770615', borderRadius: '6px', marginBottom: '4px', borderLeft: '3px solid #D97706' }}>
-                    <span style={{ fontSize: '13px' }}>{b.barangay_name}</span>
-                    <span style={{ fontSize: '13px', fontWeight: '700', color: '#D97706' }}>{b.count} cases</span>
+                    <span style={{ fontSize: '15px' }}>{b.barangay_name}</span>
+                    <span style={{ fontSize: '15px', fontWeight: '700', color: '#D97706' }}>{b.count} cases</span>
                   </div>
                 ))}
               </div>
             )}
             {byBarangay.filter(b => b.count < 10).length > 0 && (
               <div>
-                <div style={{ fontSize: '12px', fontWeight: '700', color: '#129968', marginBottom: '6px' }}>LOW RISK (&lt;10 cases)</div>
+                <div style={{ fontSize: '15px', fontWeight: '700', color: '#129968', marginBottom: '6px' }}>LOW RISK (&lt;10 cases)</div>
                 {byBarangay.filter(b => b.count < 10).map(b => (
                   <div key={b.barangay_name} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', background: '#12996815', borderRadius: '6px', marginBottom: '4px', borderLeft: '3px solid #129968' }}>
-                    <span style={{ fontSize: '13px' }}>{b.barangay_name}</span>
-                    <span style={{ fontSize: '13px', fontWeight: '700', color: '#129968' }}>{b.count} cases</span>
+                    <span style={{ fontSize: '15px' }}>{b.barangay_name}</span>
+                    <span style={{ fontSize: '15px', fontWeight: '700', color: '#129968' }}>{b.count} cases</span>
                   </div>
                 ))}
               </div>
@@ -485,14 +485,14 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
       {/* ── New Cases This Period ── */}
       <div style={tableContainerStyle}>
         <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ margin: 0, fontSize: '14px', color: 'var(--text-h)' }}>New Cases This Period</h2>
-          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{newCases.length} case{newCases.length !== 1 ? 's' : ''}</span>
+          <h2 style={{ margin: 0, fontSize: '15px', color: 'var(--text-h)' }}>New Cases This Period</h2>
+          <span style={{ fontSize: '15px', color: 'var(--text-muted)' }}>{newCases.length} case{newCases.length !== 1 ? 's' : ''}</span>
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: 'var(--bg-main)' }}>
               {['ID', 'Patient Name', 'Age', 'Disease', 'Barangay', 'Severity', 'Status', 'Date'].map(h => (
-                <th key={h} style={{ padding: '10px 16px', textAlign: h === 'Patient Name' || h === 'Disease' || h === 'Barangay' ? 'left' : h === 'Date' ? 'right' : 'center', fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600' }}>{h}</th>
+                <th key={h} style={{ padding: '10px 16px', textAlign: h === 'Patient Name' || h === 'Disease' || h === 'Barangay' ? 'left' : h === 'Date' ? 'right' : 'center', fontSize: '15px', color: 'var(--text-muted)', fontWeight: '600' }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -501,20 +501,20 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
               const st = getStatusBadge(c.status);
               return (
                 <tr key={c.case_id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '10px 16px', fontSize: '12px', fontFamily: 'monospace', textAlign: 'center' }}>#{String(c.case_id).padStart(3, '0')}</td>
-                  <td style={{ padding: '10px 16px', fontSize: '13px' }}>{c.patient_name || ''}</td>
-                  <td style={{ padding: '10px 16px', textAlign: 'center', fontSize: '13px' }}>{c.age || '--'}</td>
-                  <td style={{ padding: '10px 16px', fontSize: '13px' }}>{c.disease_name || ''}</td>
-                  <td style={{ padding: '10px 16px', fontSize: '13px' }}>{c.barangay_name || ''}</td>
-                  <td style={{ padding: '10px 16px', textAlign: 'center', fontSize: '12px' }}>
+                  <td style={{ padding: '10px 16px', fontSize: '15px', fontFamily: 'monospace', textAlign: 'center' }}>#{String(c.case_id).padStart(3, '0')}</td>
+                  <td style={{ padding: '10px 16px', fontSize: '15px' }}>{c.patient_name || ''}</td>
+                  <td style={{ padding: '10px 16px', textAlign: 'center', fontSize: '15px' }}>{c.age || '--'}</td>
+                  <td style={{ padding: '10px 16px', fontSize: '15px' }}>{c.disease_name || ''}</td>
+                  <td style={{ padding: '10px 16px', fontSize: '15px' }}>{c.barangay_name || ''}</td>
+                  <td style={{ padding: '10px 16px', textAlign: 'center', fontSize: '15px' }}>
                     {c.severity ? (
-                      <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', background: `${getSeverityColor(c.severity)}22`, color: getSeverityColor(c.severity) }}>{c.severity}</span>
+                      <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '15px', fontWeight: '600', background: `${getSeverityColor(c.severity)}22`, color: getSeverityColor(c.severity) }}>{c.severity}</span>
                     ) : <span style={{ color: 'var(--text-muted)' }}>N/A</span>}
                   </td>
                   <td style={{ padding: '10px 16px', textAlign: 'center' }}>
-                    <span style={{ padding: '3px 10px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', background: st.bg, color: st.color }}>{c.status}</span>
+                    <span style={{ padding: '3px 10px', borderRadius: '10px', fontSize: '15px', fontWeight: '600', background: st.bg, color: st.color }}>{c.status}</span>
                   </td>
-                  <td style={{ padding: '10px 16px', textAlign: 'right', fontSize: '12px', color: 'var(--text-muted)' }}>{fmtShortDate(c.date_reported)}</td>
+                  <td style={{ padding: '10px 16px', textAlign: 'right', fontSize: '15px', color: 'var(--text-muted)' }}>{fmtShortDate(c.date_reported)}</td>
                 </tr>
               );
             })}
@@ -528,14 +528,14 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
       {/* ── Weekly Activity Log ── */}
       <div style={tableContainerStyle}>
         <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ margin: 0, fontSize: '14px', color: 'var(--text-h)' }}>Weekly Activity Log</h2>
-          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{auditLogs.length} activit{auditLogs.length !== 1 ? 'ies' : 'y'}</span>
+          <h2 style={{ margin: 0, fontSize: '15px', color: 'var(--text-h)' }}>Weekly Activity Log</h2>
+          <span style={{ fontSize: '15px', color: 'var(--text-muted)' }}>{auditLogs.length} activit{auditLogs.length !== 1 ? 'ies' : 'y'}</span>
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: 'var(--bg-main)' }}>
               {['Timestamp', 'User', 'Role', 'Action', 'Entity', 'Details'].map(h => (
-                <th key={h} style={{ padding: '10px 16px', textAlign: h === 'Details' ? 'left' : h === 'Timestamp' ? 'left' : 'center', fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600' }}>{h}</th>
+                <th key={h} style={{ padding: '10px 16px', textAlign: h === 'Details' ? 'left' : h === 'Timestamp' ? 'left' : 'center', fontSize: '15px', color: 'var(--text-muted)', fontWeight: '600' }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -544,18 +544,18 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
               const ab = getActionBadge(log.action);
               return (
                 <tr key={log.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '10px 16px', fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{fmtDateTime(log.created_at)}</td>
-                  <td style={{ padding: '10px 16px', fontSize: '13px' }}>{log.user_full_name || log.user_name || 'System'}</td>
+                  <td style={{ padding: '10px 16px', fontSize: '15px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{fmtDateTime(log.created_at)}</td>
+                  <td style={{ padding: '10px 16px', fontSize: '15px' }}>{log.user_full_name || log.user_name || 'System'}</td>
                   <td style={{ padding: '10px 16px', textAlign: 'center' }}>
-                    <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', background: log.user_role === 'CHO' ? '#12135822' : log.user_role === 'BHW' ? '#7c3aed22' : '#37415122', color: log.user_role === 'CHO' ? '#121358' : log.user_role === 'BHW' ? '#7c3aed' : '#6b7280' }}>
+                    <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '15px', fontWeight: '600', background: log.user_role === 'CHO' ? '#12135822' : log.user_role === 'BHW' ? '#7c3aed22' : '#37415122', color: log.user_role === 'CHO' ? '#121358' : log.user_role === 'BHW' ? '#7c3aed' : '#6b7280' }}>
                       {log.user_role || 'System'}
                     </span>
                   </td>
                   <td style={{ padding: '10px 16px', textAlign: 'center' }}>
-                    <span style={{ padding: '3px 10px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', background: ab.bg, color: ab.color }}>{log.action}</span>
+                    <span style={{ padding: '3px 10px', borderRadius: '10px', fontSize: '15px', fontWeight: '600', background: ab.bg, color: ab.color }}>{log.action}</span>
                   </td>
-                  <td style={{ padding: '10px 16px', textAlign: 'center', fontSize: '12px' }}>{log.entity || ''}</td>
-                  <td style={{ padding: '10px 16px', fontSize: '12px', color: 'var(--text-muted)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.details || ''}</td>
+                  <td style={{ padding: '10px 16px', textAlign: 'center', fontSize: '15px' }}>{log.entity || ''}</td>
+                  <td style={{ padding: '10px 16px', fontSize: '15px', color: 'var(--text-muted)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.details || ''}</td>
                 </tr>
               );
             })}
@@ -567,7 +567,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
       </div>
 
       {/* ── Footer ── */}
-      <div style={{ marginTop: '20px', padding: '16px', textAlign: 'center', borderTop: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '12px' }}>
+      <div style={{ marginTop: '20px', padding: '16px', textAlign: 'center', borderTop: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '15px' }}>
         Cabuyao City Disease Monitoring System - Prepared by {data.generatedBy} ({scopeLabel})
       </div>
     </div>
@@ -580,16 +580,16 @@ function ExportMenu({ onPrint, onWord, onCSV }) {
 
   return (
     <div style={{ position: 'relative', display: 'inline-block' }}>
-      <button onClick={() => setOpen(!open)} style={{ padding: '6px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '12px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
+      <button onClick={() => setOpen(!open)} style={{ padding: '6px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '15px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
         Export ▾
       </button>
       {open && (
         <>
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10 }} onClick={() => setOpen(false)} />
           <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 4px 16px rgba(0,0,0,0.3)', zIndex: 20, minWidth: '150px', overflow: 'hidden' }}>
-            <button onClick={() => { onPrint(); setOpen(false); }} style={{ display: 'block', width: '100%', padding: '10px 16px', textAlign: 'left', background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', fontSize: '13px', borderBottom: '1px solid var(--border-color)' }}>Print / Save as PDF</button>
-            <button onClick={() => { onWord(); setOpen(false); }} style={{ display: 'block', width: '100%', padding: '10px 16px', textAlign: 'left', background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', fontSize: '13px', borderBottom: '1px solid var(--border-color)' }}>Word (.doc)</button>
-            <button onClick={() => { onCSV(); setOpen(false); }} style={{ display: 'block', width: '100%', padding: '10px 16px', textAlign: 'left', background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', fontSize: '13px' }}>CSV (.csv)</button>
+            <button onClick={() => { onPrint(); setOpen(false); }} style={{ display: 'block', width: '100%', padding: '10px 16px', textAlign: 'left', background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', fontSize: '15px', borderBottom: '1px solid var(--border-color)' }}>Print / Save as PDF</button>
+            <button onClick={() => { onWord(); setOpen(false); }} style={{ display: 'block', width: '100%', padding: '10px 16px', textAlign: 'left', background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', fontSize: '15px', borderBottom: '1px solid var(--border-color)' }}>Word (.doc)</button>
+            <button onClick={() => { onCSV(); setOpen(false); }} style={{ display: 'block', width: '100%', padding: '10px 16px', textAlign: 'left', background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', fontSize: '15px' }}>CSV (.csv)</button>
           </div>
         </>
       )}

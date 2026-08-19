@@ -348,6 +348,21 @@ db.query(`CREATE TABLE IF NOT EXISTS case_edit_requests (
   });
 });
 
+// Create password_change_requests table for BHW → CHO password change workflow
+db.query(`CREATE TABLE IF NOT EXISTS password_change_requests (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  user_name VARCHAR(255),
+  status ENUM('pending','accepted','rejected') DEFAULT 'pending',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  resolved_at TIMESTAMP NULL,
+  is_read TINYINT(1) DEFAULT 0,
+  FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+)`, (err) => {
+  if (err) console.error('Error creating password_change_requests table:', err.message);
+  else console.log('Password change requests table created/verified');
+});
+
 // Migration: add status column to users table for BHW registration approval
 db.query("SHOW COLUMNS FROM users LIKE 'status'", (e, r) => {
   if (!e && r && r.length === 0) {
@@ -1251,6 +1266,154 @@ app.put('/api/case-edit-requests/:id/read', (req, res) => {
   );
 });
 
+// ══════════════════════════════════════════════════════════════
+// PASSWORD CHANGE REQUESTS (BHW → CHO)
+// ══════════════════════════════════════════════════════════════
+
+// POST /api/password-change-request — BHW requests password change
+app.post('/api/password-change-request', (req, res) => {
+  const { user_id, user_name } = req.body;
+  if (!user_id) return res.status(400).json({ error: 'user_id is required.' });
+
+  // Check for existing pending request
+  db.query(
+    "SELECT id FROM password_change_requests WHERE user_id = ? AND status = 'pending'",
+    [user_id],
+    (checkErr, existing) => {
+      if (checkErr) return res.status(500).json({ error: checkErr.message });
+      if (existing && existing.length > 0) {
+        return res.status(409).json({ error: 'You already have a pending password change request.' });
+      }
+
+      db.query(
+        'INSERT INTO password_change_requests (user_id, user_name) VALUES (?, ?)',
+        [user_id, user_name || 'Unknown'],
+        (err, result) => {
+          if (err) return res.status(500).json({ error: err.message });
+
+          // Notify all active CHO users (bypass preferences — same as case edit requests)
+          db.query(
+            `SELECT user_id FROM users WHERE role = 'CHO' AND is_active = 1`,
+            [],
+            (nErr, users) => {
+              if (!nErr && users && users.length > 0) {
+                const msg = `${user_name || 'A BHW'} is requesting a password change. Please review and approve or reject this request.`;
+                users.forEach(u => {
+                  db.query(
+                    'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
+                    [u.user_id, 'Password Change Request', msg, 'info', 'Inbox']
+                  );
+                });
+              }
+            }
+          );
+
+          res.json({ message: 'Password change request sent.', request_id: result.insertId });
+        }
+      );
+    }
+  );
+});
+
+// GET /api/password-change-requests — Fetch password change requests
+app.get('/api/password-change-requests', (req, res) => {
+  const { user_id, pending_only } = req.query;
+  let sql = 'SELECT * FROM password_change_requests WHERE 1=1';
+  const params = [];
+  if (user_id) {
+    sql += ' AND user_id = ?';
+    params.push(user_id);
+  }
+  if (pending_only === 'true') {
+    sql += " AND status = 'pending'";
+  }
+  sql += ' ORDER BY created_at DESC';
+  db.query(sql, params, (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(results);
+  });
+});
+
+// PUT /api/password-change-requests/:id/accept — CHO accepts
+app.put('/api/password-change-requests/:id/accept', (req, res) => {
+  const { id } = req.params;
+  db.query(
+    "UPDATE password_change_requests SET status = 'accepted', resolved_at = NOW() WHERE id = ? AND status = 'pending'",
+    [id],
+    (err, result) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (result.affectedRows === 0) return res.status(404).json({ error: 'Request not found or already resolved.' });
+
+      // Notify the BHW
+      db.query('SELECT user_id, user_name FROM password_change_requests WHERE id = ?', [id], (sErr, rows) => {
+        if (!sErr && rows && rows.length > 0) {
+          const r = rows[0];
+          db.query(
+            'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
+            [r.user_id, 'Password Change Approved', 'Your password change request has been approved. Go to Settings → Account Security to set your new password.', 'info', 'Settings']
+          );
+        }
+      });
+
+      res.json({ message: 'Request accepted.' });
+    }
+  );
+});
+
+// PUT /api/password-change-requests/:id/reject — CHO rejects
+app.put('/api/password-change-requests/:id/reject', (req, res) => {
+  const { id } = req.params;
+  db.query(
+    "UPDATE password_change_requests SET status = 'rejected', resolved_at = NOW() WHERE id = ? AND status = 'pending'",
+    [id],
+    (err, result) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (result.affectedRows === 0) return res.status(404).json({ error: 'Request not found or already resolved.' });
+
+      // Notify the BHW
+      db.query('SELECT user_id FROM password_change_requests WHERE id = ?', [id], (sErr, rows) => {
+        if (!sErr && rows && rows.length > 0) {
+          db.query(
+            'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
+            [rows[0].user_id, 'Password Change Rejected', 'Your password change request has been rejected by the CHO.', 'info', 'Settings']
+          );
+        }
+      });
+
+      res.json({ message: 'Request rejected.' });
+    }
+  );
+});
+
+// PUT /api/password-change-requests/:id/read — BHW marks as read
+app.put('/api/password-change-requests/:id/read', (req, res) => {
+  const { id } = req.params;
+  db.query('UPDATE password_change_requests SET is_read = 1 WHERE id = ?', [id], (err, result) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (result.affectedRows === 0) return res.status(404).json({ error: 'Request not found.' });
+    res.json({ message: 'Marked as read.' });
+  });
+});
+
+// PUT /api/users/:id/set-password — BHW sets new password after approval (no current password check)
+app.put('/api/users/:id/set-password', (req, res) => {
+  const { id } = req.params;
+  const { newPassword } = req.body;
+  if (!newPassword || newPassword.length < 6) {
+    return res.status(400).json({ error: 'New password must be at least 6 characters.' });
+  }
+
+  db.query('UPDATE users SET password = ? WHERE user_id = ?', [newPassword, id], (err, result) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (result.affectedRows === 0) return res.status(404).json({ error: 'User not found.' });
+
+    // Mark any accepted request as fully resolved
+    db.query("UPDATE password_change_requests SET status = 'accepted' WHERE user_id = ? AND status = 'accepted'", [id]);
+
+    res.json({ message: 'Password updated successfully.' });
+  });
+});
+
 // ROUTE: Update existing case
 app.put('/api/cases/:id', (req, res) => {
     const { id } = req.params;
@@ -1412,7 +1575,7 @@ app.put('/api/cases/:id', (req, res) => {
 // ROUTE: Admin-edit a user account
 app.put('/api/users/:id', async (req, res) => {
     const { id } = req.params;
-    const { firstName, lastName, username, email, mobile, barangayId, isActive, role, loggedUserId } = req.body;
+    const { firstName, lastName, username, email, mobile, barangayId, isActive, role, loggedUserId, newPassword } = req.body;
     const fullName = `${firstName.trim()} ${lastName.trim()}`;
 
     // Check for duplicates excluding current user
@@ -1464,6 +1627,42 @@ app.put('/api/users/:id', async (req, res) => {
             return res.status(404).json({ error: 'User not found.' });
         }
         console.log("User updated:", id);
+        // If newPassword provided (CHO changing BHW password), update it and email the user
+        const afterUpdate = () => {
+          if (newPassword && newPassword.trim()) {
+            db.query('UPDATE users SET password = ? WHERE user_id = ?', [newPassword.trim(), id], (pwErr) => {
+              if (pwErr) {
+                console.error('Error updating password:', pwErr.message);
+                return res.status(500).json({ error: 'User updated but password change failed.' });
+              }
+              // Send email notification to the BHW
+              db.query('SELECT email, full_name FROM users WHERE user_id = ?', [id], (eErr, eRows) => {
+                if (!eErr && eRows && eRows.length > 0 && eRows[0].email) {
+                  const userEmail = eRows[0].email;
+                  const userName = eRows[0].full_name;
+                  sendBrevoEmail(userEmail, 'Your Password Has Been Updated - Cabuyao CDMS',
+                    `<div style="font-family:Segoe UI,sans-serif;padding:24px;">
+                      <h2 style="color:#121358;">Your Password Has Been Updated</h2>
+                      <p>Hello ${userName},</p>
+                      <p>Your password has been updated by the City Health Office.</p>
+                      <div style="background:#f8f9fa;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:16px 0;">
+                        <p style="margin:0;color:#64748b;font-size:13px;">Your new password:</p>
+                        <p style="margin:4px 0 0;font-size:18px;font-weight:bold;color:#121358;letter-spacing:1px;">${newPassword.trim()}</p>
+                      </div>
+                      <p style="color:#64748b;font-size:13px;">Please log in and change your password for security.</p>
+                      <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;" />
+                      <p style="color:#94a3b8;font-size:11px;">Cabuyao Disease Monitoring System</p>
+                    </div>`
+                  ).catch(e => console.error('Email notification failed:', e.message));
+                }
+              });
+              res.status(200).json({ message: 'User updated and password changed. BHW has been notified via email.' });
+            });
+          } else {
+            res.status(200).json({ message: 'User updated successfully.' });
+          }
+        };
+
         if (loggedUserId) {
           db.query('SELECT full_name, role, assigned_barangay_id FROM users WHERE user_id = ?', [loggedUserId], (aErr, aRes) => {
             if (!aErr && aRes.length > 0) {
@@ -1473,16 +1672,18 @@ app.put('/api/users/:id', async (req, res) => {
               const choUnit = (adminRole === 'CHO') ? 'CHO Unit I' : null;
               db.query('SELECT name FROM barangays WHERE id = ?', [admin.assigned_barangay_id], (bErr, bRes) => {
                 const brgy = (!bErr && bRes.length > 0) ? bRes[0].name : null;
-                createAuditLog(loggedUserId, adminName, adminRole, choUnit, brgy, 'Updated', 'User Account', `Updated account details for ${fullName} (User ID: ${id})`);
+                createAuditLog(loggedUserId, adminName, adminRole, choUnit, brgy, 'Updated', 'User Account', `Updated account details for ${fullName} (User ID: ${id})${newPassword ? ' + password changed' : ''}`);
+                afterUpdate();
               });
             } else {
               createAuditLog(null, 'CHO Admin', 'CHO', null, null, 'Updated', 'User Account', `Updated account details for ${fullName} (User ID: ${id})`);
+              afterUpdate();
             }
           });
         } else {
           createAuditLog(null, 'CHO Admin', 'CHO', null, null, 'Updated', 'User Account', `Updated account details for ${fullName} (User ID: ${id})`);
+          afterUpdate();
         }
-        res.status(200).json({ message: 'User updated successfully.' });
     });
 });
 

@@ -17,12 +17,22 @@
   --table-header-padding: 10px 12px;
   --gap-size: 20px;
 
-  --sans: 'Segoe UI', system-ui, sans-serif;
-  --heading: 'Bahnschrift', 'Segoe UI', system-ui, sans-serif;
-  --black: 'Bahnschrift', 'Segoe UI', system-ui, sans-serif;
+  --sans: "Tw Cen MT", sans-serif;
+  --heading: "Bahnschrift SemiBold Condensed", "Bahnschrift", sans-serif;
+  --black: "Bahnschrift SemiBold Condensed", "Bahnschrift", sans-serif;
   --mono: ui-monospace, Consolas, monospace;
 
-  font: calc(18px * var(--app-font-scale))/145% var(--sans);
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-md: 16px;
+  --text-lg: 18px;
+  --text-xl: 22px;
+  --text-2xl: 26px;
+  --text-3xl: 32px;
+  --text-4xl: 64px;
+
+  font: calc(18px * var(--app-font-scale))/150% var(--sans);
   letter-spacing: 0.18px;
   color-scheme: light dark;
   color: var(--text);
@@ -84,27 +94,26 @@ body {
 h1,
 h2 {
   font-family: var(--heading);
-  font-stretch: condensed;
   font-weight: 500;
   color: var(--text-h);
 }
 
 h1 {
-  font-size: 56px;
+  font-size: 64px;
   letter-spacing: -1.68px;
   margin: 32px 0;
   @media (max-width: 1024px) {
-    font-size: 36px;
+    font-size: 40px;
     margin: 20px 0;
   }
 }
 h2 {
-  font-size: 24px;
+  font-size: 28px;
   line-height: 118%;
-  letter-spacing: -0.24px;
+  letter-spacing: -0.1px;
   margin: 0 0 8px;
   @media (max-width: 1024px) {
-    font-size: 20px;
+    font-size: 22px;
   }
 }
 p {

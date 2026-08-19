@@ -52,10 +52,10 @@ export default function AboutCho() {
 
   return (
     <div className="resident-page">
-      <h2 style={{ margin: '0 0 8px', fontSize: '24px', fontWeight: '700' }}>
+      <h2 style={{ margin: '0 0 8px', fontSize: '26px', fontWeight: '700' }}>
         About the City Health Office
       </h2>
-      <p style={{ margin: '0 0 24px', color: 'var(--text-muted)', fontSize: '14px' }}>
+      <p style={{ margin: '0 0 24px', color: 'var(--text-muted)', fontSize: '15px' }}>
         Cabuyao City Health Office is divided into two units. Select a unit below to learn more.
       </p>
 
@@ -87,8 +87,8 @@ export default function AboutCho() {
           background: 'linear-gradient(180deg, #121358 0%, #2F578A 100%)',
           padding: '24px', color: '#fff',
         }}>
-          <h3 style={{ margin: '0 0 4px', fontSize: '20px', fontWeight: '700' }}>{selected.name}</h3>
-          <p style={{ margin: 0, fontStyle: 'italic', color: 'rgba(255,255,255,0.85)', fontSize: '14px' }}>
+          <h3 style={{ margin: '0 0 4px', fontSize: '22px', fontWeight: '700' }}>{selected.name}</h3>
+          <p style={{ margin: 0, fontStyle: 'italic', color: 'rgba(255,255,255,0.85)', fontSize: '15px' }}>
             "{selected.motto}"
           </p>
         </div>
@@ -97,18 +97,18 @@ export default function AboutCho() {
           {/* Mission & Vision */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
             <div style={{ background: 'var(--input-bg)', borderRadius: '8px', padding: '16px', border: '1px solid var(--border-color)' }}>
-              <div style={{ fontSize: '14px', fontWeight: '700', color: '#129968', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <div style={{ fontSize: '15px', fontWeight: '700', color: '#129968', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Our Mission
               </div>
-              <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.6', color: 'var(--text-main)' }}>
+              <p style={{ margin: 0, fontSize: '15px', lineHeight: '1.6', color: 'var(--text-main)' }}>
                 {selected.mission}
               </p>
             </div>
             <div style={{ background: 'var(--input-bg)', borderRadius: '8px', padding: '16px', border: '1px solid var(--border-color)' }}>
-              <div style={{ fontSize: '14px', fontWeight: '700', color: '#1d4ed8', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <div style={{ fontSize: '15px', fontWeight: '700', color: '#1d4ed8', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Our Vision
               </div>
-              <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.6', color: 'var(--text-main)' }}>
+              <p style={{ margin: 0, fontSize: '15px', lineHeight: '1.6', color: 'var(--text-main)' }}>
                 {selected.vision}
               </p>
             </div>
@@ -116,7 +116,7 @@ export default function AboutCho() {
 
           {/* Staff */}
           <div style={{ marginBottom: '24px' }}>
-            <h4 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>
+            <h4 style={{ margin: '0 0 12px', fontSize: '15px', fontWeight: '700', color: 'var(--text-main)' }}>
               Staff
             </h4>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', maxWidth: '600px', margin: '0 auto' }}>
@@ -129,13 +129,13 @@ export default function AboutCho() {
                   <div style={{
                     width: '36px', height: '36px', borderRadius: '50%',
                     background: '#129968', display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', color: '#fff', fontWeight: '700', fontSize: '13px', flexShrink: 0,
+                    justifyContent: 'center', color: '#fff', fontWeight: '700', fontSize: '15px', flexShrink: 0,
                   }}>
                     {s.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
                   </div>
                   <div>
-                    <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-main)' }}>{s.name}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{s.role}</div>
+                    <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)' }}>{s.name}</div>
+                    <div style={{ fontSize: '15px', color: 'var(--text-muted)' }}>{s.role}</div>
                   </div>
                 </div>
               ))}
@@ -157,14 +157,14 @@ export default function AboutCho() {
 
           {/* Covered barangays */}
           <div style={{ marginTop: '20px' }}>
-            <h4 style={{ margin: '0 0 8px', fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>
+            <h4 style={{ margin: '0 0 8px', fontSize: '15px', fontWeight: '700', color: 'var(--text-main)' }}>
               Covered Barangays
             </h4>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
               {selected.coveredBarangays.map((b, i) => (
                 <span key={i} style={{
                   padding: '4px 12px', background: 'var(--input-bg)', borderRadius: '20px',
-                  fontSize: '13px', color: 'var(--text-muted)',
+                  fontSize: '15px', color: 'var(--text-muted)',
                 }}>
                   {b}
                 </span>
@@ -183,10 +183,10 @@ function InfoCard({ label, value }) {
       padding: '12px 16px', background: 'var(--bg-main)', borderRadius: '8px',
       border: '1px solid #f1f5f9',
     }}>
-      <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
+      <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
         {label}
       </div>
-      <div style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-main)' }}>
+      <div style={{ fontSize: '15px', fontWeight: '500', color: 'var(--text-main)' }}>
         {value}
       </div>
     </div>

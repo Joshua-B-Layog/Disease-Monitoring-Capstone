@@ -448,7 +448,7 @@ if (!document.getElementById('cdms-barangay-labels')) {
       border-radius: 6px !important;
       padding: 4px 7px !important;
       box-shadow: 0 1px 4px rgba(0,0,0,0.3) !important;
-      font-family: 'Segoe UI', system-ui, sans-serif !important;
+      font-family: 'Tw Cen MT Condensed', 'Segoe UI', system-ui, sans-serif !important;
       pointer-events: none !important;
     }
     .brgy-tooltip-label .brgy-name {
@@ -507,7 +507,7 @@ function PulseMarkers({ barangayData, onHover, onLeave, onClick }) {
           <svg width="${w}" height="${h}" viewBox="0 0 34 44" style="position:absolute;top:0;left:0;display:block;filter:drop-shadow(0 3px 4px rgba(0,0,0,0.5));">
             <path d="M17 0C7.6 0 0 7.6 0 17c0 12 17 27 17 27s17-15 17-27C34 7.6 26.4 0 17 0z" fill="${color}"/>
             <circle cx="17" cy="17" r="11" fill="#ffffff"/>
-            <text x="17" y="21" text-anchor="middle" font-size="12" font-weight="800" fill="${color}" font-family="Segoe UI,system-ui,sans-serif">${b.totalCases}</text>
+            <text x="17" y="21" text-anchor="middle" font-size="12" font-weight="800" fill="${color}" font-family="Tw Cen MT Condensed,system-ui,sans-serif">${b.totalCases}</text>
           </svg>
           <div style="position:absolute;left:50%;top:${h + 1}px;transform:translateX(-50%);background:rgba(15,23,42,0.85);border:1px solid rgba(255,255,255,0.18);color:#fff;font-size:9.5px;font-weight:600;padding:2px 7px;border-radius:8px;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis;line-height:1.2;text-shadow:0 1px 2px rgba(0,0,0,0.3);">${label}</div>
         </div>`,
@@ -913,7 +913,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     width: '100%', padding: '9px 12px',
     background: 'var(--input-bg)', border: '1px solid var(--border-color)',
     borderRadius: '7px', color: 'var(--text-main)',
-    fontSize: '13px', boxSizing: 'border-box',
+    fontSize: '15px', boxSizing: 'border-box',
   };
 
   const showAutoPurok = loginRole !== 'BHW' && filterBarangay === 'All Barangays' && mapZoom >= PUROK_ZOOM_THRESHOLD && autoDetectedBrgy;
@@ -928,14 +928,14 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         padding: '20px 16px', display: 'flex', flexDirection: 'column',
         gap: '16px', overflowY: 'auto',
       }}>
-        <p style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        <p style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
           Filters
         </p>
 
         {/* Barangay — all 18 hardcoded (hidden for BHW) */}
         {loginRole !== 'BHW' && (
           <div>
-            <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Barangay</label>
+            <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Barangay</label>
             <div style={{ position: 'relative' }} ref={barangayRef}>
               <button
                 onClick={() => setBarangayOpen(!barangayOpen)}
@@ -943,14 +943,14 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                   width: '100%', padding: '9px 12px',
                   background: 'var(--input-bg)', border: `1px solid ${barangayOpen ? '#60a5fa' : 'var(--border-color)'}`,
                   borderRadius: '7px', color: 'var(--text-main)',
-                  fontSize: '13px', cursor: 'pointer', textAlign: 'left',
+                  fontSize: '15px', cursor: 'pointer', textAlign: 'left',
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   boxSizing: 'border-box',
                 }}
               >
                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{filterBarangay}</span>
                 <span style={{
-                  fontSize: '10px', opacity: 0.6, flexShrink: 0, marginLeft: '8px',
+                  fontSize: '13px', opacity: 0.6, flexShrink: 0, marginLeft: '8px',
                   transition: 'transform 0.2s', display: 'inline-block',
                   transform: barangayOpen ? 'rotate(180deg)' : 'rotate(0deg)',
                 }}>▼</span>
@@ -966,7 +966,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                   <div
                     onClick={() => { setFilterBarangay('All Barangays'); setAutoDetectedBrgy(null); setBarangayOpen(false); }}
                     style={{
-                      padding: '8px 14px', cursor: 'pointer', fontSize: '13px',
+                      padding: '8px 14px', cursor: 'pointer', fontSize: '15px',
                       display: 'flex', alignItems: 'center', gap: '8px',
                       borderRadius: '6px',
                       justifyContent: 'flex-start',
@@ -979,14 +979,14 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                     onMouseLeave={e => { e.currentTarget.style.background = filterBarangay === 'All Barangays' ? 'rgba(96,165,250,0.18)' : 'transparent'; e.currentTarget.style.color = filterBarangay === 'All Barangays' ? 'var(--accent, #93bbfc)' : 'var(--text-main)'; }}
                   >
                     <span style={{ flex: 1 }}>All Barangays</span>
-                    {filterBarangay === 'All Barangays' && <span style={{ color: '#60a5fa', fontSize: '12px' }}>✓</span>}
+                    {filterBarangay === 'All Barangays' && <span style={{ color: '#60a5fa', fontSize: '13px' }}>✓</span>}
                   </div>
                   {scopedBarangayOptions.map(b => (
                     <div
                       key={b}
                       onClick={() => { setFilterBarangay(b); setAutoDetectedBrgy(null); setBarangayOpen(false); }}
                       style={{
-                        padding: '8px 14px', cursor: 'pointer', fontSize: '13px',
+                        padding: '8px 14px', cursor: 'pointer', fontSize: '15px',
                         display: 'flex', alignItems: 'center', gap: '8px',
                         borderRadius: '6px',
                         justifyContent: 'flex-start',
@@ -999,7 +999,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                       onMouseLeave={e => { e.currentTarget.style.background = filterBarangay === b ? 'rgba(96,165,250,0.18)' : 'transparent'; e.currentTarget.style.color = filterBarangay === b ? 'var(--accent, #93bbfc)' : 'var(--text-main)'; }}
                     >
                       <span style={{ flex: 1 }}>{b}</span>
-                      {filterBarangay === b && <span style={{ color: '#60a5fa', fontSize: '12px' }}>✓</span>}
+                      {filterBarangay === b && <span style={{ color: '#60a5fa', fontSize: '13px' }}>✓</span>}
                     </div>
                   ))}
                 </div>
@@ -1011,8 +1011,8 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         {/* BHW — static barangay display */}
         {loginRole === 'BHW' && loginBarangay && (
           <div>
-            <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Barangay</label>
-            <div style={{ padding: '9px 12px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '7px', color: 'var(--text-main)', fontSize: '13px' }}>
+            <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Barangay</label>
+            <div style={{ padding: '9px 12px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '7px', color: 'var(--text-main)', fontSize: '15px' }}>
               {loginBarangay}
             </div>
           </div>
@@ -1020,19 +1020,19 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
 
         {/* Status */}
         <div>
-          <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Status</label>
+          <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Status</label>
           <div style={{ position: 'relative' }} ref={statusRef}>
             <button type="button" onClick={() => setStatusOpen(!statusOpen)}
               style={{ ...SEL, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' }}>
               <span>{filterStatus}</span>
-              <span style={{ fontSize: '10px', opacity: 0.6, transition: 'transform 0.2s', transform: statusOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+              <span style={{ fontSize: '13px', opacity: 0.6, transition: 'transform 0.2s', transform: statusOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
             </button>
             {statusOpen && (
               <div className="cdms-dropdown-panel" style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', zIndex: 100, overflow: 'hidden' }}>
                 {['All Status', 'Active', 'Pending', 'Under Treatment', 'Recovered', 'Deceased'].map(s => (
                   <button key={s} type="button"
                     onClick={() => { setFilterStatus(s); setStatusOpen(false); }}
-                    style={{ display: 'block', width: '100%', padding: '10px 14px', background: filterStatus === s ? 'var(--input-bg)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: filterStatus === s ? '600' : '400' }}
+                    style={{ display: 'block', width: '100%', padding: '10px 14px', background: filterStatus === s ? 'var(--input-bg)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: filterStatus === s ? '600' : '400' }}
                     onMouseEnter={e => { if (filterStatus !== s) e.target.style.background = 'var(--input-bg)'; }}
                     onMouseLeave={e => { if (filterStatus !== s) e.target.style.background = 'transparent'; }}>
                     {s}
@@ -1045,7 +1045,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
 
         {/* Purok / Blk / Phase */}
         <div>
-          <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Purok / Blk / Phase</label>
+          <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Purok / Blk / Phase</label>
           <div style={{ position: 'relative' }} ref={purokRef}>
             <button
               onClick={() => setPurokOpen(!purokOpen)}
@@ -1053,14 +1053,14 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                 width: '100%', padding: '9px 12px',
                 background: 'var(--input-bg)', border: `1px solid ${purokOpen ? '#60a5fa' : 'var(--border-color)'}`,
                 borderRadius: '7px', color: 'var(--text-main)',
-                fontSize: '13px', cursor: 'pointer', textAlign: 'left',
+                fontSize: '15px', cursor: 'pointer', textAlign: 'left',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 boxSizing: 'border-box',
               }}
             >
               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{filterPurok}</span>
               <span style={{
-                fontSize: '10px', opacity: 0.6, flexShrink: 0, marginLeft: '8px',
+                fontSize: '13px', opacity: 0.6, flexShrink: 0, marginLeft: '8px',
                 transition: 'transform 0.2s', display: 'inline-block',
                 transform: purokOpen ? 'rotate(180deg)' : 'rotate(0deg)',
               }}>▼</span>
@@ -1078,7 +1078,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                     key={p}
                     onClick={() => { setFilterPurok(p); setPurokOpen(false); }}
                     style={{
-                      padding: '8px 14px', cursor: 'pointer', fontSize: '13px',
+                      padding: '8px 14px', cursor: 'pointer', fontSize: '15px',
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                       borderRadius: '6px',
                       background: filterPurok === p ? 'rgba(96,165,250,0.18)' : 'transparent',
@@ -1090,7 +1090,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                     onMouseLeave={e => { e.currentTarget.style.background = filterPurok === p ? 'rgba(96,165,250,0.18)' : 'transparent'; }}
                   >
                     <span style={{ flex: 1 }}>{p}</span>
-                    {filterPurok === p && <span style={{ color: '#60a5fa', fontSize: '12px' }}>✓</span>}
+                    {filterPurok === p && <span style={{ color: '#60a5fa', fontSize: '13px' }}>✓</span>}
                   </div>
                 ))}
               </div>
@@ -1100,25 +1100,25 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
 
         {/* Date */}
         <div>
-          <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Date</label>
+          <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Date</label>
           <input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} style={SEL} />
         </div>
 
         {/* Severity — includes Asymptomatic */}
         <div>
-          <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Severity</label>
+          <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Severity</label>
           <div style={{ position: 'relative' }} ref={severityRef}>
             <button type="button" onClick={() => setSeverityOpen(!severityOpen)}
               style={{ ...SEL, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' }}>
               <span>{filterSeverity}</span>
-              <span style={{ fontSize: '10px', opacity: 0.6, transition: 'transform 0.2s', transform: severityOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+              <span style={{ fontSize: '13px', opacity: 0.6, transition: 'transform 0.2s', transform: severityOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
             </button>
             {severityOpen && (
               <div className="cdms-dropdown-panel" style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', zIndex: 100, overflow: 'hidden' }}>
                 {['All Severities', 'Mild', 'Moderate', 'Severe', 'Asymptomatic'].map(s => (
                   <button key={s} type="button"
                     onClick={() => { setFilterSeverity(s); setSeverityOpen(false); }}
-                    style={{ display: 'block', width: '100%', padding: '10px 14px', background: filterSeverity === s ? 'var(--input-bg)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '13px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: filterSeverity === s ? '600' : '400' }}
+                    style={{ display: 'block', width: '100%', padding: '10px 14px', background: filterSeverity === s ? 'var(--input-bg)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: filterSeverity === s ? '600' : '400' }}
                     onMouseEnter={e => { if (filterSeverity !== s) e.target.style.background = 'var(--input-bg)'; }}
                     onMouseLeave={e => { if (filterSeverity !== s) e.target.style.background = 'transparent'; }}>
                     {s}
@@ -1131,7 +1131,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
 
         {/* Legend */}
         <div style={{ paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
-          <p style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Legend</p>
+          <p style={{ margin: '0 0 10px 0', fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Legend</p>
           {[
             { color: '#DC2626', label: 'High Risk (20+ cases)' },
             { color: '#f59e0b', label: 'Medium Risk (10–19 cases)' },
@@ -1139,14 +1139,14 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           ].map(l => (
             <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: '9px', marginBottom: '8px' }}>
               <span style={{ width: '11px', height: '11px', borderRadius: '50%', background: l.color, flexShrink: 0, display: 'inline-block' }} />
-              <span style={{ fontSize: '12px', color: 'var(--text-main)' }}>{l.label}</span>
+              <span style={{ fontSize: '13px', color: 'var(--text-main)' }}>{l.label}</span>
             </div>
           ))}
         </div>
 
         {/* Active Hotspots counter — based on filtered data */}
         <div style={{ paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
-          <p style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Active Hotspots</p>
+          <p style={{ margin: '0 0 10px 0', fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Active Hotspots</p>
           <div style={{ display: 'flex', gap: '8px' }}>
             {[
               { label: 'High',   count: highCount,   color: '#DC2626' },
@@ -1155,26 +1155,26 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
             ].map(({ label, count, color }) => (
               <div key={label} style={{ flex: 1, background: 'var(--input-bg)', borderRadius: '8px', padding: '10px 4px', textAlign: 'center', border: `1px solid ${color}33` }}>
                 <div style={{ fontSize: '22px', fontWeight: '800', color }}>{count}</div>
-                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>{label}</div>
+                <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px' }}>{label}</div>
               </div>
             ))}
           </div>
-          <p style={{ margin: '8px 0 0 0', fontSize: '11.5px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+          <p style={{ margin: '8px 0 0 0', fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
             Pin color = total cases per barangay. Thresholds: &gt;20 red, 10–20 amber, &lt;10 green.
           </p>
         </div>
 
         <button
           onClick={() => { setAutoDetectedBrgy(null); setFilterBarangay('All Barangays'); setFilterStatus('All Status'); setFilterDate(''); setFilterSeverity('All Severities'); }}
-          style={{ padding: '11px', background: '#DC2626', color: 'white', border: 'none', borderRadius: '7px', cursor: 'pointer', fontWeight: '600', fontSize: '13px', marginTop: 'auto' }}>
+          style={{ padding: '11px', background: '#DC2626', color: 'white', border: 'none', borderRadius: '7px', cursor: 'pointer', fontWeight: '600', fontSize: '15px', marginTop: 'auto' }}>
           Reset Filters
         </button>
 
-        <div style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', paddingTop: '6px' }}>
+        <div style={{ fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center', paddingTop: '6px' }}>
           {lastUpdated ? `Updated ${Math.round((now - lastUpdated) / 1000)}s ago` : 'Refreshing...'}
         </div>
         {offlineMode && (
-          <div style={{ fontSize: '12px', color: '#F59E0B', textAlign: 'center', padding: '6px 8px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '6px' }}>
+          <div style={{ fontSize: '13px', color: '#F59E0B', textAlign: 'center', padding: '6px 8px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '6px' }}>
             Offline - showing cached data
           </div>
         )}
@@ -1271,7 +1271,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           <button onClick={() => setMapLayer('SD')}
             style={{
               padding: '6px 14px', border: 'none', borderRadius: '7px', cursor: 'pointer',
-              fontSize: '12px', fontWeight: '700',
+              fontSize: '13px', fontWeight: '700',
               background: mapLayer === 'SD' ? '#1e3a8a' : 'transparent',
               color: mapLayer === 'SD' ? '#fff' : 'var(--text-muted)',
             }}>
@@ -1280,7 +1280,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           <button onClick={() => setMapLayer('HD')}
             style={{
               padding: '6px 14px', border: 'none', borderRadius: '7px', cursor: 'pointer',
-              fontSize: '12px', fontWeight: '700',
+              fontSize: '13px', fontWeight: '700',
               background: mapLayer === 'HD' ? '#1e3a8a' : 'transparent',
               color: mapLayer === 'HD' ? '#fff' : 'var(--text-muted)',
             }}>
@@ -1299,22 +1299,22 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
             <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '3px' }}>
               {tooltip.barangayName}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '10px' }}>
               <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: getRisk(tooltip.totalCases).color, display: 'inline-block' }} />
               {getRisk(tooltip.totalCases).label} · {tooltip.totalCases} case{tooltip.totalCases !== 1 ? 's' : ''}
             </div>
-            <div style={{ fontSize: '14px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '7px' }}>
+            <div style={{ fontSize: '15px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '7px' }}>
               Top Diseases
             </div>
             {getTop5(tooltip.diseases).map(([disease, count], i) => (
               <div key={disease} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
-                <span style={{ fontSize: '13px', color: 'var(--text-main)' }}>
+                <span style={{ fontSize: '15px', color: 'var(--text-main)' }}>
                   <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>{i + 1}.</span>{disease}
                 </span>
-                <span style={{ fontSize: '12px', fontWeight: '700', color: '#10b981', marginLeft: '12px' }}>{count}</span>
+                <span style={{ fontSize: '13px', fontWeight: '700', color: '#10b981', marginLeft: '12px' }}>{count}</span>
               </div>
             ))}
-            <div style={{ marginTop: '8px', fontSize: '10px', color: 'var(--text-muted)', fontStyle: 'italic' }}>Click pin for full details</div>
+            <div style={{ marginTop: '8px', fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic' }}>Click pin for full details</div>
           </div>
         )}
 
@@ -1337,10 +1337,10 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               boxShadow: '0 8px 20px rgba(0,0,0,0.35)',
               pointerEvents: 'none',
             }}>
-              <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '4px' }}>
+              <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '4px' }}>
                 {diseaseName} <span style={{ color: '#10b981', fontWeight: '700' }}>({count})</span>
               </div>
-              <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+              <div style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
                 {getDiseaseCause(diseaseName)}
               </div>
             </div>
@@ -1366,7 +1366,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                   <h3 style={{ margin: '0 0 5px 0', fontSize: '20px', fontWeight: '700', color: 'var(--text-main)' }}>{popup.barangayName}</h3>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
                     <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: getRisk(popup.totalCases).color, display: 'inline-block' }} />
-                    <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                    <span style={{ fontSize: '15px', color: 'var(--text-muted)' }}>
                       {getRisk(popup.totalCases).label} · {popup.totalCases} total case{popup.totalCases !== 1 ? 's' : ''}
                     </span>
                   </div>
@@ -1379,7 +1379,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
 
               <div style={{ borderTop: '1px solid var(--border-color)', marginBottom: '14px' }} />
 
-              <p style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <p style={{ margin: '0 0 10px 0', fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 All Diseases in this Barangay
               </p>
 
@@ -1396,18 +1396,18 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '9px', flex: 1, minWidth: 0 }}>
                         {isTop && (
-                          <span style={{ fontSize: '9px', background: '#121358', color: 'white', padding: '2px 6px', borderRadius: '10px', fontWeight: '700', flexShrink: 0 }}>
+                          <span style={{ fontSize: '13px', background: '#121358', color: 'white', padding: '2px 6px', borderRadius: '10px', fontWeight: '700', flexShrink: 0 }}>
                             TOP {i + 1}
                           </span>
                         )}
-                        <span style={{ fontSize: '13px', color: 'var(--text-main)', fontWeight: isTop ? '600' : '400', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: '15px', color: 'var(--text-main)', fontWeight: isTop ? '600' : '400', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {disease}
                         </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, marginLeft: '10px' }}>
-                        <span style={{ fontSize: '14px', fontWeight: '700', color: '#10b981' }}>{count}</span>
+                        <span style={{ fontSize: '15px', fontWeight: '700', color: '#10b981' }}>{count}</span>
                         <button onClick={() => goToDisease(popup.barangay || popup.barangayName, disease, popup.purok)}
-                          style={{ padding: '5px 12px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', whiteSpace: 'nowrap' }}>
+                          style={{ padding: '5px 12px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap' }}>
                           Go To →
                         </button>
                       </div>
@@ -1415,7 +1415,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                   );
                 })}
 
-              <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--border-color)', fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center' }}>
+              <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--border-color)', fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center' }}>
                 Click "Go To →" to open Manage Cases filtered to that disease and barangay
               </div>
             </div>

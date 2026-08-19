@@ -38,7 +38,7 @@ export default function RecoverAccount() {
       <div style={rightPaneStyle}>
         <div style={cardWrapperStyle}>
           <h2 style={{ color: 'white', marginBottom: '8px' }}>Recover Account</h2>
-          <p style={{ color: '#9ca3af', marginBottom: '20px', fontSize: '14px' }}>
+          <p style={{ color: '#9ca3af', marginBottom: '20px', fontSize: '15px' }}>
             {method === 'email' 
               ? "Enter your registered email to receive recovery instructions." 
               : "Enter your mobile number to receive an OTP code."}
@@ -50,7 +50,7 @@ export default function RecoverAccount() {
             <button onClick={() => setMethod('mobile')} style={method === 'mobile' ? activeBtn : inactiveBtn}>Mobile</button>
           </div>
 
-          {status.msg && <div style={{ color: status.type === 'error' ? '#ef4444' : '#129968', marginBottom: '15px', fontSize: '14px' }}>{status.msg}</div>}
+          {status.msg && <div style={{ color: status.type === 'error' ? '#ef4444' : '#129968', marginBottom: '15px', fontSize: '15px' }}>{status.msg}</div>}
 
           {/* STEP 1: REQUEST */}
           {step === 'request' && (
@@ -86,4 +86,4 @@ const inputStyle = { width: '100%', padding: '12px', marginBottom: '15px', borde
 const actionBtn = { width: '100%', padding: '12px', background: '#129968', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' };
 const activeBtn = { flex: 1, padding: '10px', background: '#129968', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' };
 const inactiveBtn = { flex: 1, padding: '10px', background: '#1f2937', color: '#9ca3af', border: 'none', borderRadius: '6px', cursor: 'pointer' };
-const backLink = { color: '#129968', cursor: 'pointer', textAlign: 'center', marginTop: '20px', fontSize: '14px' };
+const backLink = { color: '#129968', cursor: 'pointer', textAlign: 'center', marginTop: '20px', fontSize: '15px' };

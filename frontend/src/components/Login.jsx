@@ -652,7 +652,7 @@ const handleLoginOtpSubmit = async (e) => {
             
             <div className="brand-logo" style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '30px' }}>
               <div className="circle-logo" style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#121358', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}><ChoLogoIcon size={32} /></div>
-              <div className="brand-text" style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--text-main)' }}>
+              <div className="brand-text" style={{ fontSize: '26px', fontWeight: 'bold', color: 'var(--text-main)' }}>
                 Cabuyao Health
               </div>
             </div>
@@ -669,14 +669,14 @@ const handleLoginOtpSubmit = async (e) => {
                   <button type="button" onClick={() => handleRoleSelection('CHO')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px', background: 'rgba(18, 19, 88, 0.15)', border: '1px solid #121358', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
                     <div>
                       <div style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '16px' }}>City Health Office (CHO)</div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '2px' }}>Central Systems & Analytics</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '15px', marginTop: '2px' }}>Central Systems & Analytics</div>
                     </div>
                   </button>
 
                   <button type="button" onClick={() => handleRoleSelection('BHW')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px', background: 'rgba(18, 153, 104, 0.08)', border: '1px solid #129968', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
                     <div>
                       <div style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '16px' }}>Barangay Health Worker</div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '2px' }}>Community Surveillance Data Entry</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '15px', marginTop: '2px' }}>Community Surveillance Data Entry</div>
                     </div>
                   </button>
                 </div>
@@ -687,7 +687,7 @@ const handleLoginOtpSubmit = async (e) => {
             {step === 'cho_select' && (
               <>
                 <div className="login-header" style={{ marginBottom: '25px', textAlign: 'left' }}>
-                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#129968', cursor: 'pointer', fontSize: '14px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back</button>
+                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#129968', cursor: 'pointer', fontSize: '15px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back</button>
                   <h2 style={{ fontSize: '26px', color: 'var(--text-main)', marginBottom: '6px' }}>Select Health Unit</h2>
                   <p style={{ color: 'var(--text-muted)' }}>Identify your current administrative station hub.</p>
                 </div>
@@ -696,9 +696,9 @@ const handleLoginOtpSubmit = async (e) => {
                   <button type="button" onClick={() => handleChoSelection('CHO Unit I (Sala)')} style={{ padding: '16px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-main)', fontWeight: '600', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '16px' }}>CHO Unit I (Main)</span>
-                      <span style={{ fontSize: '12px', background: '#1e3a8a', color: '#93c5fd', padding: '2px 6px', borderRadius: '4px' }}>CHO 1 Hub</span>
+                      <span style={{ fontSize: '15px', background: '#1e3a8a', color: '#93c5fd', padding: '2px 6px', borderRadius: '4px' }}>CHO 1 Hub</span>
                     </div>
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '400', display: 'block', marginTop: '6px' }}>
+                    <span style={{ fontSize: '15px', color: 'var(--text-muted)', fontWeight: '400', display: 'block', marginTop: '6px' }}>
                       City Hall Complex, F.B. Bailon St., Brgy. Sala
                     </span>
                   </button>
@@ -706,9 +706,9 @@ const handleLoginOtpSubmit = async (e) => {
                   <button type="button" onClick={() => handleChoSelection('CHO Unit II (Pulo)')} style={{ padding: '16px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-main)', fontWeight: '600', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '16px' }}>CHO Unit II (Extension)</span>
-                      <span style={{ fontSize: '12px', background: '#1e3a8a', color: '#93c5fd', padding: '2px 6px', borderRadius: '4px' }}>CHO 2 Hub</span>
+                      <span style={{ fontSize: '15px', background: '#1e3a8a', color: '#93c5fd', padding: '2px 6px', borderRadius: '4px' }}>CHO 2 Hub</span>
                     </div>
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '400', display: 'block', marginTop: '6px' }}>
+                    <span style={{ fontSize: '15px', color: 'var(--text-muted)', fontWeight: '400', display: 'block', marginTop: '6px' }}>
                       National Highway, Brgy. Pulo (Beside Centro Mall)
                     </span>
                   </button>
@@ -720,13 +720,13 @@ const handleLoginOtpSubmit = async (e) => {
             {step === 'bhw_select' && (
               <>
                 <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
-                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#129968', cursor: 'pointer', fontSize: '14px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back</button>
+                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#129968', cursor: 'pointer', fontSize: '15px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back</button>
                   <h2 style={{ fontSize: '26px', color: 'var(--text-main)', marginBottom: '6px' }}>Assigned Locality</h2>
                   <p style={{ color: 'var(--text-muted)' }}>Select your designated community operations sector.</p>
                 </div>
 
                 {loginError && (
-                  <div className="cdms-msg-shake" style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(239,68,68,0.35)' }}>
+                  <div className="cdms-msg-shake" style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '15px', border: '1px solid rgba(239,68,68,0.35)' }}>
                     {loginError}
                   </div>
                 )}
@@ -738,7 +738,7 @@ const handleLoginOtpSubmit = async (e) => {
                       background: selectedContext === `Brgy. ${b.name}` ? '#129968' : 'transparent', color: selectedContext === `Brgy. ${b.name}` ? '#ffffff' : 'var(--text-main)'
                     }}>
                       <span style={{ fontWeight: selectedContext === `Brgy. ${b.name}` ? '600' : '400' }}>Brgy. {b.name}</span>
-                      <span style={{ fontSize: '12px', padding: '2px 6px', borderRadius: '4px', background: 'rgba(0,0,0,0.2)', color: selectedContext === `Brgy. ${b.name}` ? '#fff' : 'var(--text-muted)' }}>{b.district}</span>
+                      <span style={{ fontSize: '15px', padding: '2px 6px', borderRadius: '4px', background: 'rgba(0,0,0,0.2)', color: selectedContext === `Brgy. ${b.name}` ? '#fff' : 'var(--text-muted)' }}>{b.district}</span>
                     </div>
                   ))}
                 </div>
@@ -753,7 +753,7 @@ const handleLoginOtpSubmit = async (e) => {
             {step === 'auth' && (
               <>
                 <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
-                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#129968', cursor: 'pointer', fontSize: '14px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>
+                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#129968', cursor: 'pointer', fontSize: '15px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>
                     ← Scope: {selectedContext}
                   </button>
                   <h2 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '8px' }}>Sign-In</h2>
@@ -762,13 +762,13 @@ const handleLoginOtpSubmit = async (e) => {
 
                 <form onSubmit={handleFormSubmit}>
                   {loginError && (
-                    <div className="cdms-msg-shake" style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(239,68,68,0.35)' }}>
+                    <div className="cdms-msg-shake" style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '15px', border: '1px solid rgba(239,68,68,0.35)' }}>
                       {loginError}
                     </div>
                   )}
 
                   <div className="form-group" style={{ textAlign: 'left' }}>
-                    <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontSize: '14px', fontWeight: '500' }}>Username or Email address</label>
+                    <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Username or Email address</label>
                     <input 
                       type="text"
                       className="form-input" 
@@ -780,7 +780,7 @@ const handleLoginOtpSubmit = async (e) => {
                   </div>
                   
                   <div className="form-group" style={{ marginTop: '20px', textAlign: 'left' }}>
-                    <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontSize: '14px', fontWeight: '500' }}>Password</label>
+                    <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Password</label>
                     
                     <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                       <input 
@@ -817,7 +817,7 @@ const handleLoginOtpSubmit = async (e) => {
                   </div>
 
                   <div className="form-options" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '20px 0' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)', cursor: 'pointer', fontSize: '14px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)', cursor: 'pointer', fontSize: '15px' }}>
                       <input 
                         type="checkbox" 
                         checked={rememberMe}
@@ -826,7 +826,7 @@ const handleLoginOtpSubmit = async (e) => {
                       /> 
                       Remember me
                     </label>
-                    <span onClick={() => setStep('forgot_password')} style={{ color: '#129968', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}>
+                    <span onClick={() => setStep('forgot_password')} style={{ color: '#129968', cursor: 'pointer', fontSize: '15px', fontWeight: '500' }}>
                       Forgot password?
                     </span>
                   </div>
@@ -849,12 +849,12 @@ const handleLoginOtpSubmit = async (e) => {
     </div>
     <form onSubmit={handleLoginOtpSubmit}>
       {otpError && (
-        <div className="cdms-msg-shake" style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(239,68,68,0.35)' }}>
+        <div className="cdms-msg-shake" style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '15px', border: '1px solid rgba(239,68,68,0.35)' }}>
           {otpError}
         </div>
       )}
       <div className="form-group" style={{ textAlign: 'left' }}>
-        <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontSize: '14px', fontWeight: '500' }}>
+        <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>
           Verification Code
         </label>
         <input
@@ -864,7 +864,7 @@ const handleLoginOtpSubmit = async (e) => {
           maxLength="6"
           value={loginOtp}
           onChange={(e) => setLoginOtp(e.target.value.replace(/\D/g, ''))}
-          style={{ letterSpacing: '6px', textAlign: 'center', fontSize: '20px', fontWeight: 'bold' }}
+          style={{ letterSpacing: '6px', textAlign: 'center', fontSize: '22px', fontWeight: 'bold' }}
           required
           autoFocus
         />
@@ -893,7 +893,7 @@ const handleLoginOtpSubmit = async (e) => {
             setOtpError('Failed to resend code. Please try again.');
           }
         }}
-        style={{ color: '#129968', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
+        style={{ color: '#129968', cursor: 'pointer', fontSize: '15px', fontWeight: '500' }}
       >
         Resend Code
       </span>
@@ -905,7 +905,7 @@ const handleLoginOtpSubmit = async (e) => {
             {step === 'cho_contact' && (
               <>
                 <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
-                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#129968', cursor: 'pointer', fontSize: '14px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back</button>
+                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#129968', cursor: 'pointer', fontSize: '15px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back</button>
                   <h2 style={{ fontSize: '26px', color: 'var(--text-main)', marginBottom: '8px' }}>CHO Account Access</h2>
                   <p style={{ color: 'var(--text-muted)', lineHeight: '1.6' }}>
                     For security purposes, City Health Office accounts cannot be created through self-registration. Please contact your CHO unit directly to request an account.
@@ -914,31 +914,31 @@ const handleLoginOtpSubmit = async (e) => {
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div style={{ padding: '18px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', textAlign: 'left' }}>
-                    <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '10px' }}>
+                    <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '10px' }}>
                       CHO Unit I (Main - Sala)
                     </div>
-                    <div style={{ fontSize: '14px', color: 'var(--text-main)', marginBottom: '6px' }}>
+                    <div style={{ fontSize: '15px', color: 'var(--text-main)', marginBottom: '6px' }}>
                       📞 Contact Number: <span style={{ color: '#129968', fontWeight: '600' }}>09478891074</span>
                     </div>
-                    <div style={{ fontSize: '14px', color: 'var(--text-main)' }}>
+                    <div style={{ fontSize: '15px', color: 'var(--text-main)' }}>
                       ✉️ Email: <span style={{ color: '#129968', fontWeight: '600' }}>idkwutishappen@gmail.com</span>
                     </div>
                   </div>
 
                   <div style={{ padding: '18px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', textAlign: 'left' }}>
-                    <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '10px' }}>
+                    <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '10px' }}>
                       CHO Unit II (Extension - Pulo)
                     </div>
-                    <div style={{ fontSize: '14px', color: 'var(--text-main)', marginBottom: '6px' }}>
+                    <div style={{ fontSize: '15px', color: 'var(--text-main)', marginBottom: '6px' }}>
                       📞 Contact Number: <span style={{ color: '#129968', fontWeight: '600' }}>09558411426</span>
                     </div>
-                    <div style={{ fontSize: '14px', color: 'var(--text-main)' }}>
+                    <div style={{ fontSize: '15px', color: 'var(--text-main)' }}>
                       ✉️ Email: <span style={{ color: '#129968', fontWeight: '600' }}>jhon@gmail.com</span>
                     </div>
                   </div>
                 </div>
 
-                <button type="button" onClick={() => setStep('role')} style={{ marginTop: '24px', width: '100%', padding: '12px', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}>
+                <button type="button" onClick={() => setStep('role')} style={{ marginTop: '24px', width: '100%', padding: '12px', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)', cursor: 'pointer', fontSize: '15px', fontWeight: '500' }}>
                   Back to Cabuyao Health Portal
                 </button>
               </>
@@ -949,7 +949,7 @@ const handleLoginOtpSubmit = async (e) => {
             {step === 'signup_role' && (
               <>
                 <div className="login-header" style={{ marginBottom: '30px', textAlign: 'left' }}>
-                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#129968', cursor: 'pointer', fontSize: '14px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back</button>
+                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#129968', cursor: 'pointer', fontSize: '15px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back</button>
                   <h2 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '8px' }}>Create Account</h2>
                   <p style={{ color: 'var(--text-muted)' }}>Select your registration type to proceed.</p>
                 </div>
@@ -958,17 +958,17 @@ const handleLoginOtpSubmit = async (e) => {
                   <button type="button" onClick={() => { setSignupRole('BHW'); setStep('signup'); }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px', background: 'rgba(18, 153, 104, 0.08)', border: '1px solid #129968', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
                     <div>
                       <div style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '16px' }}>Barangay Health Worker</div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '2px' }}>Community Surveillance Data Entry</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '15px', marginTop: '2px' }}>Community Surveillance Data Entry</div>
                     </div>
-                    <span style={{ fontSize: '20px' }}>📍</span>
+                    <span style={{ fontSize: '22px' }}>📍</span>
                   </button>
 
                   <button type="button" onClick={() => setStep('cho_contact')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px', background: 'rgba(18, 19, 88, 0.15)', border: '1px solid #121358', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
                     <div>
                       <div style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '16px' }}>City Health Office (CHO)</div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '2px' }}>Central Systems & Analytics</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '15px', marginTop: '2px' }}>Central Systems & Analytics</div>
                     </div>
-                    <span style={{ fontSize: '20px' }}>🏢</span>
+                    <span style={{ fontSize: '22px' }}>🏢</span>
                   </button>
                 </div>
               </>
@@ -979,25 +979,25 @@ const handleLoginOtpSubmit = async (e) => {
             {step === 'forgot_password' && (
               <>
                 <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
-                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#129968', cursor: 'pointer', fontSize: '14px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back to Login</button>
+                  <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#129968', cursor: 'pointer', fontSize: '15px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back to Login</button>
                   <h2 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '8px' }}>Recover Account</h2>
                   <p style={{ color: 'var(--text-muted)' }}>Enter your email or username to receive a password reset link.</p>
                 </div>
 
                 <form onSubmit={handleRecoverySubmit}>
                   {loginError && (
-                    <div className="cdms-msg-shake" style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(239,68,68,0.35)', textAlign: 'left' }}>
+                    <div className="cdms-msg-shake" style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '15px', border: '1px solid rgba(239,68,68,0.35)', textAlign: 'left' }}>
                       {loginError}
                     </div>
                   )}
                   {recoverySuccess && (
-                    <div className="cdms-msg-in" style={{ backgroundColor: 'var(--input-bg)', color: '#0369a1', padding: '12px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(14,165,233,0.35)', textAlign: 'left' }}>
+                    <div className="cdms-msg-in" style={{ backgroundColor: 'var(--input-bg)', color: '#0369a1', padding: '12px', borderRadius: '6px', marginBottom: '15px', fontSize: '15px', border: '1px solid rgba(14,165,233,0.35)', textAlign: 'left' }}>
                       {recoverySuccess}
                     </div>
                   )}
 
                   <div className="form-group" style={{ textAlign: 'left' }}>
-                    <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontSize: '14px', fontWeight: '500' }}>
+                    <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>
                       Username or registered email address
                     </label>
                     <input 
@@ -1021,26 +1021,26 @@ const handleLoginOtpSubmit = async (e) => {
             {step === 'signup' && (
                 <>
                     <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
-                        <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#129968', cursor: 'pointer', fontSize: '14px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back</button>
+                        <button type="button" onClick={handleBackNavigation} style={{ background: 'none', border: 'none', color: '#129968', cursor: 'pointer', fontSize: '15px', fontWeight: '500', marginBottom: '10px', padding: 0 }}>← Back</button>
                         <h2 style={{ fontSize: '26px', color: 'var(--text-main)', marginBottom: '6px' }}>Create Account</h2>
                         <p style={{ color: 'var(--text-muted)' }}>Register a new account for surveillance database entry.</p>
                     </div>
 
                     <form onSubmit={handleSignupSubmit}>
                         {signupError && (
-                            <div className="cdms-msg-shake" style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(239,68,68,0.35)', textAlign: 'left' }}>
+                            <div className="cdms-msg-shake" style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '15px', border: '1px solid rgba(239,68,68,0.35)', textAlign: 'left' }}>
                                 {signupError}
                             </div>
                         )}
                         {signupSuccess && (
-                            <div className="cdms-msg-in" style={{ backgroundColor: 'var(--input-bg)', color: '#0a5e42', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '14px', border: '1px solid rgba(18,153,104,0.35)', textAlign: 'left' }}>
+                            <div className="cdms-msg-in" style={{ backgroundColor: 'var(--input-bg)', color: '#0a5e42', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '15px', border: '1px solid rgba(18,153,104,0.35)', textAlign: 'left' }}>
                                 {signupSuccess}
                             </div>
                         )}
 
                         {/* Full Name */}
                         <div className="form-group" style={{ textAlign: 'left' }}>
-                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '13px', fontWeight: '500' }}>Full Name</label>
+                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Full Name</label>
                             <input
                                 type="text"
                                 className="form-input"
@@ -1053,7 +1053,7 @@ const handleLoginOtpSubmit = async (e) => {
 
                         {/* Username */}
                         <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
-                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '13px', fontWeight: '500' }}>Username</label>
+                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Username</label>
                             <input
                                 type="text"
                                 className="form-input"
@@ -1066,7 +1066,7 @@ const handleLoginOtpSubmit = async (e) => {
 
                         {/* Email */}
                         <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
-                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '13px', fontWeight: '500' }}>Email Address</label>
+                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Email Address</label>
                             <input
                                 type="email"
                                 className="form-input"
@@ -1079,7 +1079,7 @@ const handleLoginOtpSubmit = async (e) => {
 
                         {/* Mobile Number */}
                         <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
-                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '13px', fontWeight: '500' }}>Mobile Number</label>
+                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Mobile Number</label>
                             <input
                                 type="text"
                                 className="form-input"
@@ -1092,7 +1092,7 @@ const handleLoginOtpSubmit = async (e) => {
 
                         {/* Assigned Station */}
                         <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
-                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '13px', fontWeight: '500' }}>
+                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>
                                 Assigned Barangay
                             </label>
                             <div style={{ position: 'relative' }} ref={signupBarangayRef}>
@@ -1103,12 +1103,12 @@ const handleLoginOtpSubmit = async (e) => {
                                         width: '100%', height: '42px', background: 'var(--input-bg)', color: 'var(--text-main)',
                                         border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0 10px',
                                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                        cursor: 'pointer', textAlign: 'left', fontSize: '14px'
+                                        cursor: 'pointer', textAlign: 'left', fontSize: '15px'
                                     }}
                                 >
                                     <span>{barangayList.find(b => String(b.id) === String(signupContext))?.name || '- Select your barangay -'}</span>
                                     <span style={{
-                                        fontSize: '24px', opacity: 0.6, marginLeft: '8px',
+                                        fontSize: '26px', opacity: 0.6, marginLeft: '8px',
                                         transition: 'transform 0.2s', display: 'inline-block',
                                         transform: signupBarangayOpen ? 'rotate(180deg)' : 'rotate(0deg)'
                                     }}>▼</span>
@@ -1126,7 +1126,7 @@ const handleLoginOtpSubmit = async (e) => {
                                                 key={b.id}
                                                 onClick={() => { setSignupContext(String(b.id)); setSignupBarangayOpen(false); }}
                                                 style={{
-                                                    padding: '9px 12px', cursor: 'pointer', fontSize: '14px', borderRadius: '6px',
+                                                    padding: '9px 12px', cursor: 'pointer', fontSize: '15px', borderRadius: '6px',
                                                     background: String(signupContext) === String(b.id) ? 'rgba(18,153,104,0.15)' : 'transparent',
                                                     color: String(signupContext) === String(b.id) ? '#129968' : 'var(--text-main)',
                                                     fontWeight: String(signupContext) === String(b.id) ? '600' : '400'
@@ -1144,7 +1144,7 @@ const handleLoginOtpSubmit = async (e) => {
 
                         {/* Password */}
                         <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
-                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '13px', fontWeight: '500' }}>Password</label>
+                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Password</label>
                             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                                 <input
                                     type={showSignupPassword ? 'text' : 'password'}
@@ -1177,7 +1177,7 @@ const handleLoginOtpSubmit = async (e) => {
 
                         {/* Confirm Password */}
                         <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
-                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '13px', fontWeight: '500' }}>Confirm Password</label>
+                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Confirm Password</label>
                             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                                 <input
                                     type={showSignupConfirm ? 'text' : 'password'}
@@ -1207,7 +1207,7 @@ const handleLoginOtpSubmit = async (e) => {
                                 </button>
                             </div>
                             {signupConfirmPassword && (
-                                <p style={{ fontSize: '12px', marginTop: '5px', color: signupPassword === signupConfirmPassword ? '#129968' : '#ef4444' }}>
+                                <p style={{ fontSize: '15px', marginTop: '5px', color: signupPassword === signupConfirmPassword ? '#129968' : '#ef4444' }}>
                                     {signupPassword === signupConfirmPassword ? '✓ Passwords match' : '✗ Passwords do not match'}
                                 </p>
                             )}
@@ -1219,7 +1219,7 @@ const handleLoginOtpSubmit = async (e) => {
                                     strong: { color: '#129968', text: '✓ Strong password' },
                                 };
                                 const s = styles[strength];
-                                return <p style={{ fontSize: '12px', marginTop: '5px', color: s.color }}>{s.text}</p>;
+                                return <p style={{ fontSize: '15px', marginTop: '5px', color: s.color }}>{s.text}</p>;
                             })()}
                         </div>
 
@@ -1232,7 +1232,7 @@ const handleLoginOtpSubmit = async (e) => {
 
             {/* SHARED FOOTER ROUTING */}
             {step !== 'signup' && step !== 'forgot_password' && step !== 'cho_contact' && step !== 'signup_role' ? (
-              <div style={{ marginTop: '30px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px' }}>
+              <div style={{ marginTop: '30px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '15px' }}>
                 Don't have an account? <span onClick={() => {
                   if (step === 'role') {
                     setStep('signup_role');
@@ -1254,7 +1254,7 @@ const handleLoginOtpSubmit = async (e) => {
               </div>
             ) : (
               step !== 'role' && step !== 'cho_contact' && (
-                <div style={{ marginTop: '30px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px' }}>
+                <div style={{ marginTop: '30px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '15px' }}>
                   Already registered? <span onClick={() => setStep('role')} style={{ color: '#129968', cursor: 'pointer', fontWeight: '500' }}>Sign In here</span>
                 </div>
               )

@@ -35,7 +35,7 @@
 }
 
 .map-view-label {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 500;
   color: var(--text-muted);
 }
@@ -46,7 +46,7 @@
   padding: 10px 12px;
   border-radius: 6px;
   border: 1px solid var(--input-border);
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-main);
   background-color: var(--input-bg);
   outline: none;
@@ -80,7 +80,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-muted);
 }
 
@@ -88,7 +88,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-muted);
   margin-bottom: 10px;
 }
@@ -125,7 +125,7 @@
   border: none;
   border-radius: 6px;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 15px;
   cursor: pointer;
   text-align: center;
   transition: background-color 0.2s;
@@ -142,7 +142,7 @@
   border: none;
   border-radius: 6px;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 15px;
   cursor: pointer;
   text-align: center;
   transition: background-color 0.2s;
@@ -190,7 +190,7 @@
   padding: 8px 16px;
   border-radius: 6px;
   font-weight: 500;
-  font-size: 14px;
+  font-size: 15px;
   cursor: pointer;
   box-shadow: 0 2px 4px rgba(0,0,0,0.08);
 }
@@ -213,7 +213,7 @@
 
 .map-view-risk-card-title {
   display: block;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-muted);
   margin-bottom: 8px;
@@ -233,7 +233,7 @@
 }
 
 .map-view-risk-text {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-main);
 }
 
@@ -251,7 +251,7 @@
   padding: 12px;
   border-radius: 8px;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 15px;
   cursor: pointer;
   transition: background 0.2s;
 }
@@ -264,7 +264,7 @@
   padding: 12px;
   border-radius: 8px;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 15px;
   cursor: pointer;
   transition: background 0.2s;
 }
@@ -287,7 +287,7 @@
   padding: 8px 16px;
   border-radius: 6px;
   font-weight: 500;
-  font-size: 14px;
+  font-size: 15px;
   cursor: pointer;
   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
@@ -311,7 +311,7 @@
 }
 
 .risk-card-title {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--text-muted);
   margin-bottom: 4px;
@@ -321,6 +321,6 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-main);
 }
