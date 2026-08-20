@@ -317,6 +317,38 @@ useEffect(() => {
     return () => clearInterval(interval);
   }, []);
 
+  // ── Session idle timeout (30 min) ──
+  const [idleWarning, setIdleWarning] = useState(false);
+  const idleTimerRef = useRef(null);
+  const warningTimerRef = useRef(null);
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const IDLE_LIMIT = 30 * 60 * 1000;
+    const WARNING_AT = 25 * 60 * 1000;
+
+    const resetTimers = () => {
+      setIdleWarning(false);
+      clearTimeout(idleTimerRef.current);
+      clearTimeout(warningTimerRef.current);
+      warningTimerRef.current = setTimeout(() => setIdleWarning(true), WARNING_AT);
+      idleTimerRef.current = setTimeout(() => {
+        setIdleWarning(false);
+        handleLogout();
+      }, IDLE_LIMIT);
+    };
+
+    const events = ['mousemove', 'keydown', 'click', 'scroll'];
+    events.forEach(e => window.addEventListener(e, resetTimers));
+    resetTimers();
+
+    return () => {
+      events.forEach(e => window.removeEventListener(e, resetTimers));
+      clearTimeout(idleTimerRef.current);
+      clearTimeout(warningTimerRef.current);
+    };
+  }, [isLoggedIn]);
+
   const handleProfilePhotoChange = (dataUrl) => {
     setProfilePhoto(dataUrl);
     if (dataUrl) {
@@ -401,6 +433,16 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
       case 'Map View':
         return <MapView setActiveTab={setActiveTab} setCaseFilter={setCaseFilter} fontScale={fontScale} compactMode={compactMode} loginRole={loginRole} loginBarangay={loggedUserBarangay} sessionContext={sessionContext} />;
       case 'User Accounts': 
+        if (loginRole !== 'CHO') {
+          return (
+            <div style={{ padding: '40px', textAlign: 'center' }}>
+              <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
+              <h2 style={{ fontSize: '22px', fontWeight: '700', color: 'var(--text-main)', margin: '0 0 8px' }}>Access Denied</h2>
+              <p style={{ fontSize: '15px', color: 'var(--text-muted)', margin: '0 0 20px' }}>User Accounts management is restricted to CHO personnel.</p>
+              <button onClick={() => setActiveTab('Dashboard')} style={{ padding: '10px 24px', background: '#129968', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: '600' }}>← Back to Dashboard</button>
+            </div>
+          );
+        }
         return <UserManagement dateFormat={dateFormat} confirmDelete={confirmDelete} fontScale={fontScale} compactMode={compactMode} loggedUserId={loggedUserId} />;
       case 'Audit Reports':
         return <BarangayReports dateFormat={dateFormat} activeUser={{ role: loginRole, context: sessionContext }} fontScale={fontScale} compactMode={compactMode} loggedUserId={loggedUserId} />;
@@ -473,6 +515,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
     setLoggedUser('');
     setLoggedUserId(null);
     localStorage.removeItem('cdms_session');
+    localStorage.removeItem('cdms_active_tab');
     window.location.reload();
   };
 
@@ -925,6 +968,20 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── IDLE TIMEOUT WARNING MODAL ── */}
+      {idleWarning && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}>
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '32px', maxWidth: '400px', textAlign: 'center' }}>
+            <div style={{ fontSize: '36px', marginBottom: '12px' }}>⏱️</div>
+            <h3 style={{ fontSize: '20px', fontWeight: '700', margin: '0 0 8px', color: 'var(--text-main)' }}>Session Timeout Warning</h3>
+            <p style={{ fontSize: '15px', color: 'var(--text-muted)', margin: '0 0 20px' }}>You will be logged out in 5 minutes due to inactivity. Move your mouse or press a key to stay signed in.</p>
+            <button onClick={() => setIdleWarning(false)} style={{ padding: '10px 28px', background: '#129968', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: '600' }}>
+              Stay Signed In
+            </button>
           </div>
         </div>
       )}

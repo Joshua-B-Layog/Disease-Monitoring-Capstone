@@ -549,11 +549,22 @@ const DISEASES = [
   },
 ];
 
+const DISEASE_CATEGORY = {
+  'Dengue': 'Vector-borne', 'Malaria': 'Vector-borne', 'Leptospirosis': 'Vector-borne',
+  'Cholera': 'Waterborne', 'Diarrhea': 'Waterborne', 'Typhoid Fever': 'Waterborne', 'Hepatitis A': 'Waterborne', 'Poliomyelitis': 'Waterborne',
+  'Covid-19': 'Airborne', 'Tuberculosis': 'Airborne', 'Measles': 'Airborne', 'Influenza': 'Airborne', 'Influenza A': 'Airborne', 'SARS': 'Airborne', 'Pertussis': 'Airborne', 'Diphtheria': 'Airborne', 'Acute Respiratory Infection': 'Airborne', 'Meningococcemia': 'Airborne', 'Chickenpox': 'Airborne',
+  'Hepatitis B': 'Blood-borne', 'Hepatitis C': 'Blood-borne', 'HIV/AIDS': 'Blood-borne',
+  'Rabies': 'Contact', 'Ebola': 'Contact', 'Hand Foot and Mouth Disease': 'Contact', 'Sore Eyes': 'Contact', 'Leprosy': 'Contact', 'Avian Influenza': 'Contact',
+};
+
+const CATEGORIES = ['All', 'Vector-borne', 'Waterborne', 'Airborne', 'Blood-borne', 'Contact'];
+
 export default function PreventionTips() {
   const [expanded, setExpanded] = useState(null);
   const [search, setSearch] = useState('');
+  const [catFilter, setCatFilter] = useState('All');
 
-  useEffect(() => { setExpanded(null); }, [search]);
+  useEffect(() => { setExpanded(null); }, [search, catFilter]);
 
   const [scStep, setScStep] = useState('pick'); // pick | quiz | result
   const [scDisease, setScDisease] = useState(null);
@@ -562,7 +573,8 @@ export default function PreventionTips() {
   const quizRef = useRef(null);
 
   const filtered = DISEASES.filter(d =>
-    d.name.toLowerCase().includes(search.toLowerCase())
+    d.name.toLowerCase().includes(search.toLowerCase()) &&
+    (catFilter === 'All' || DISEASE_CATEGORY[d.name] === catFilter)
   );
 
   const startQuiz = (disease) => {
@@ -614,10 +626,36 @@ export default function PreventionTips() {
         onChange={e => setSearch(e.target.value)}
         style={{
           width: '100%', padding: '12px 16px', border: '1px solid var(--border-color)',
-          borderRadius: '10px', fontSize: '15px', marginBottom: '20px',
+          borderRadius: '10px', fontSize: '15px', marginBottom: '12px',
           outline: 'none', boxSizing: 'border-box',
         }}
       />
+
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '20px' }}>
+        {CATEGORIES.map(cat => (
+          <button
+            key={cat}
+            onClick={() => setCatFilter(cat)}
+            style={{
+              padding: '6px 16px', borderRadius: '20px', fontSize: '13px', fontWeight: '600',
+              cursor: 'pointer', transition: 'all 0.2s ease',
+              background: catFilter === cat ? '#129968' : 'transparent',
+              color: catFilter === cat ? '#fff' : 'var(--text-muted)',
+              border: `1px solid ${catFilter === cat ? '#129968' : 'var(--border-color)'}`,
+            }}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-muted)', fontSize: '15px' }}>
+          <div style={{ fontSize: '36px', marginBottom: '12px' }}>🔍</div>
+          <div style={{ fontWeight: '600', marginBottom: '4px' }}>No diseases found</div>
+          <div>Try a different search term or category.</div>
+        </div>
+      )}
 
 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px', alignItems: 'start' }}>
     {filtered.map((disease, idx) => (

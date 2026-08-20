@@ -882,10 +882,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     if (loginRole === 'CHO' && sessionContext) {
       params.cho_unit = sessionContext;
     }
-    console.log('[fetchEditRequests] loginRole:', loginRole, 'sessionContext:', sessionContext, 'params:', params);
     axios.get(`${API_URL}/api/case-edit-requests`, { params })
       .then(res => { 
-        console.log('[fetchEditRequests] response:', res.data);
         setEditRequests(res.data); 
         setEditRequestsLoading(false); 
         cacheEditRequests(res.data).catch(() => {});
@@ -1706,8 +1704,6 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     setSubmitLoading(true);
     setSubmitMsg('');
 
-    console.log('[handleSave] submitting. address:', formData.address, 'barangayId:', formData.barangayId, 'loginRole:', loginRole, 'loginBarangay:', loginBarangay);
-
     if (!formData.barangayId) {
       setFormErrors({ barangayId: true });
       setSubmitMsg('Error: Please select an assigned barangay.');
@@ -1720,7 +1716,15 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       if (!formData.patientName.trim()) errors.patientName = true;
       if (!formData.diseaseType) errors.diseaseType = true;
       if (!formData.age) errors.age = true;
+      else {
+        const ageNum = Number(formData.age);
+        if (isNaN(ageNum) || ageNum < 0 || ageNum > 120) errors.age = true;
+      }
       if (!formData.contact.trim()) errors.contact = true;
+      else {
+        const phoneClean = formData.contact.replace(/[\s\-()]/g, '');
+        if (!/^(09\d{9}|\+639\d{9}|639\d{9})$/.test(phoneClean)) errors.contact = true;
+      }
       if (!formData.address.trim()) errors.address = true;
       if (!formData.onsetDate) errors.onsetDate = true;
       if (!formData.physician.trim()) errors.physician = true;
@@ -1728,7 +1732,10 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       if (!formData.lat || !formData.lng) errors.location = true;
       if (Object.keys(errors).length > 0) {
         setFormErrors(errors);
-        setSubmitMsg('Error: Please fill in all required fields highlighted in red.');
+        const msgs = [];
+        if (errors.age) msgs.push('Age must be 0–120');
+        if (errors.contact) msgs.push('Use valid PH phone (e.g., 09123456789)');
+        setSubmitMsg(msgs.length > 0 ? `Error: ${msgs.join('. ')}.` : 'Error: Please fill in all required fields highlighted in red.');
         setSubmitLoading(false);
         return;
       }
@@ -3175,7 +3182,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 </h4>
                 <div style={{ position: 'relative' }}>
                   <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>
-                    Patient Full Name
+                    Patient Full Name <span style={{ color: '#ef4444' }}>*</span>
                       <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '15px', marginLeft: '6px' }}>
                       (Type surname to auto-fill past records)
                     </span>
@@ -3222,10 +3229,11 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Age</label>
+                    <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Age <span style={{ color: '#ef4444' }}>*</span></label>
                     <input type="number" min="0" max="120" placeholder="25" style={{ ...inputStyle, border: formErrors.age ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.age ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                       value={formData.age} onChange={e => setFormData({ ...formData, age: e.target.value })}
                       readOnly={isBhwReadOnly} />
+                    {formErrors.age && <span style={{ fontSize: '13px', color: '#ef4444', marginTop: '3px', display: 'block' }}>Age must be between 0 and 120</span>}
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Gender</label>
@@ -3258,13 +3266,14 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   </div>
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Contact No.</label>
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Contact No. <span style={{ color: '#ef4444' }}>*</span></label>
                   <input type="text" placeholder="0918-234-2331" style={{ ...inputStyle, border: formErrors.contact ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.contact ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                     value={formData.contact} onChange={e => setFormData({ ...formData, contact: e.target.value })}
                     readOnly={isBhwReadOnly} />
+                  {formErrors.contact && <span style={{ fontSize: '13px', color: '#ef4444', marginTop: '3px', display: 'block' }}>Enter a valid PH number (e.g., 09123456789)</span>}
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Address</label>
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Address <span style={{ color: '#ef4444' }}>*</span></label>
                   <input type="text" placeholder="123 Rizal St, San Isidro Cabuyao" style={inputStyle}
                     value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })}
                     readOnly={isBhwReadOnly}
@@ -3616,7 +3625,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   Clinical Information
                 </h4>
                 <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Disease Type</label>
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Disease Type <span style={{ color: '#ef4444' }}>*</span></label>
                   {isBhwReadOnly ? (
                     <div style={{ padding: '8px 12px', background: 'var(--input-bg, #f1f5f9)', borderRadius: '6px', fontSize: '15px', color: 'var(--text-main)' }}>
                       {formData.diseaseType || 'Not set'}
@@ -3736,7 +3745,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   )}
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Date of Onset</label>
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Date of Onset <span style={{ color: '#ef4444' }}>*</span></label>
                   <div style={{ position: 'relative', cursor: 'pointer' }}
                     onClick={() => {
                       const el = document.getElementById('onset-date-input');
@@ -3764,7 +3773,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   </div>
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Attending Physician</label>
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Attending Physician <span style={{ color: '#ef4444' }}>*</span></label>
                   <input type="text" placeholder="Dr. Jose Reyes, MD" style={{ ...inputStyle, border: formErrors.physician ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.physician ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                     value={formData.physician} onChange={e => setFormData({ ...formData, physician: e.target.value })}
                     readOnly={isBhwReadOnly} />
@@ -3774,7 +3783,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
             {/* Symptoms full width */}
             <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Symptoms & Observations</label>
+              <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Symptoms & Observations <span style={{ color: '#ef4444' }}>*</span></label>
               <textarea placeholder="e.g. Fever (39.5°C), Severe Headache, Muscle and Joint Pain..." rows="3"
                 style={{ ...inputStyle, resize: 'vertical', border: formErrors.symptoms ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.symptoms ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                 value={formData.symptoms} onChange={e => setFormData({ ...formData, symptoms: e.target.value })}

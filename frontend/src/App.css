@@ -177,6 +177,7 @@ html, body, #root {
 .back-btn {
   display: inline-flex;
   align-items: center;
+  align-self: flex-start;
   gap: 8px;
   padding: 6px 14px;
   background: var(--bg-surface);

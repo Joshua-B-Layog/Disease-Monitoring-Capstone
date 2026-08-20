@@ -110,6 +110,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   const [showExportMenu, setShowExportMenu] = useState(false);
   const exportRef = useRef(null);
   const [chartMounted, setChartMounted] = useState(false);
+  const [hoveredBar, setHoveredBar] = useState(null);
   const [yearOpen, setYearOpen] = useState(false);
   const yearRef = useRef(null);
 
@@ -204,8 +205,8 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   if (loading) {
     return (
       <div style={{ color: 'var(--text-main)', padding: '28px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '16px' }}>
-          {[0, 1, 2, 3].map(i => (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '16px', marginBottom: '16px' }}>
+          {[0, 1, 2, 3, 4, 5].map(i => (
             <div key={i} style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '20px' }}>
               <div className="cdms-skeleton" style={{ width: '70%', height: '12px', marginBottom: '12px' }} />
               <div className="cdms-skeleton" style={{ width: '45%', height: '26px' }} />
@@ -222,6 +223,58 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   const activeCases = displayCases.filter(c => ['Active', 'Pending', 'Under Treatment'].includes(c.status)).length;
   const recoveredCases = displayCases.filter(c => c.status === 'Recovered').length;
   const deathCases = displayCases.filter(c => c.status === 'Deceased').length;
+
+  // --- TREND COMPARISON: previous period ---
+  const prevDateRange = (() => {
+    if (!dateRange.start || !dateRange.end) return null;
+    const s = new Date(dateRange.start);
+    const e = new Date(dateRange.end);
+    const diff = e - s;
+    const prevEnd = new Date(s.getTime() - 1);
+    const prevStart = new Date(prevEnd.getTime() - diff);
+    return { start: prevStart.toISOString().slice(0, 10), end: prevEnd.toISOString().slice(0, 10) };
+  })();
+  const prevCases = prevDateRange
+    ? scopedCases.filter(c => {
+        if (!c.date_reported) return false;
+        const d = c.date_reported.slice(0, 10);
+        return d >= prevDateRange.start && d <= prevDateRange.end;
+      })
+    : [];
+  const prevTotal = prevCases.length;
+  const prevActive = prevCases.filter(c => ['Active', 'Pending', 'Under Treatment'].includes(c.status)).length;
+  const prevRecovered = prevCases.filter(c => c.status === 'Recovered').length;
+  const prevDeaths = prevCases.filter(c => c.status === 'Deceased').length;
+
+  const trendDelta = (curr, prev) => {
+    if (prev === 0) return curr > 0 ? { pct: '+100', up: true } : { pct: '0', up: false };
+    const d = ((curr - prev) / prev) * 100;
+    return { pct: `${d >= 0 ? '+' : ''}${Math.round(d)}`, up: d > 0 };
+  };
+
+  // --- CASES TODAY ---
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const casesToday = displayCases.filter(c => c.date_reported && c.date_reported.slice(0, 10) === todayStr).length;
+
+  // --- TOP AFFECTED BARANGAY ---
+  const topBarangayName = (() => {
+    const counts = {};
+    displayCases.forEach(c => { if (c.barangay_name) counts[c.barangay_name] = (counts[c.barangay_name] || 0) + 1; });
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    return sorted.length > 0 ? { name: sorted[0][0], count: sorted[0][1] } : null;
+  })();
+
+  const topDiseaseName = (() => {
+    const counts = {};
+    displayCases.forEach(c => {
+      if (c.disease_name) {
+        const matched = findBestDisease(c.disease_name);
+        if (matched) counts[matched] = (counts[matched] || 0) + 1;
+      }
+    });
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    return sorted.length > 0 ? { name: sorted[0][0], count: sorted[0][1] } : null;
+  })();
 
   const statSignature = `${dashPeriod}|${dashQuarter}|${dashYear}|${dateRange.start || ''}|${dateRange.end || ''}|${selectedDisease}`;
 
@@ -583,16 +636,26 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       </div>
 
       {/* ── STAT CARDS ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: compactMode ? '10px' : '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: compactMode ? '10px' : '16px' }}>
         {[
-          { label: 'Total Cases', value: totalCases, color: '#3B82F6' },
-          { label: 'Active', value: activeCases, color: '#D97706' },
-          { label: 'Recovered', value: recoveredCases, color: '#0D7A4E' },
-          { label: 'Deaths', value: deathCases, color: '#DC2626' },
+          { label: 'Total Cases', value: totalCases, color: '#3B82F6', trend: trendDelta(totalCases, prevTotal), invertTrend: false },
+          { label: 'Active', value: activeCases, color: '#D97706', trend: trendDelta(activeCases, prevActive), invertTrend: true },
+          { label: 'Recovered', value: recoveredCases, color: '#0D7A4E', trend: trendDelta(recoveredCases, prevRecovered), invertTrend: false },
+          { label: 'Deaths', value: deathCases, color: '#DC2626', trend: trendDelta(deathCases, prevDeaths), invertTrend: true },
+          { label: 'Cases Today', value: casesToday, color: '#6366F1', trend: null },
+          isBhw
+            ? { label: 'Top Disease', value: topDiseaseName ? topDiseaseName.count : 0, color: '#0EA5E9', trend: null, subtitle: topDiseaseName ? topDiseaseName.name : 'N/A' }
+            : { label: 'Top Barangay', value: topBarangayName ? topBarangayName.count : 0, color: '#0EA5E9', trend: null, subtitle: topBarangayName ? topBarangayName.name : 'N/A' },
         ].map((card, i) => (
             <div key={`${card.label}-${statSignature}`} className="cdms-view-in" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', animationDelay: `${i * 80}ms` }}>
             <div style={{ color: 'var(--text-muted)', fontSize: '15px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{card.label}</div>
             <AnimatedNumber value={card.value} style={{ color: card.color, fontSize: '32px', fontWeight: '700', marginTop: '6px' }} />
+            {card.subtitle && <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={card.subtitle}>{card.subtitle}</div>}
+            {card.trend && (
+              <div style={{ fontSize: '13px', marginTop: '4px', fontWeight: '600', color: card.invertTrend ? (card.trend.up ? '#DC2626' : '#0D7A4E') : (card.trend.up ? '#0D7A4E' : '#DC2626') }}>
+                {card.trend.up ? '▲' : '▼'} {card.trend.pct}% vs prev. period
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -606,7 +669,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             {exportTitle}
           </h4>
           {periodChart ? (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', height: '210px' }}>
                   <div style={{ width: '26px', height: '210px', position: 'relative', fontSize: '13px', color: 'var(--text-muted)' }}>
@@ -623,15 +686,20 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'flex-end', gap: '12px' }}>
                       {monthBars.map((b, i) => {
                         const h = chartMounted ? Math.max((b.count / gridLines.top) * 184, b.count > 0 ? 4 : 2) : 0;
+                        const barPct = totalCases > 0 ? Math.round((b.count / totalCases) * 100) : 0;
                         return (
                           <div key={b.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
                             <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '4px', opacity: chartMounted ? 1 : 0, transition: 'opacity 0.5s ease 0.2s' }}>{b.count}</div>
-                            <div style={{
-                              width: '100%', maxWidth: '48px',
-                              background: COLUMN_COLORS[i % COLUMN_COLORS.length],
+                            <div
+                              onMouseEnter={() => setHoveredBar({ label: b.full, count: b.count, pct: barPct, idx: i })}
+                              onMouseLeave={() => setHoveredBar(null)}
+                              style={{
+                              width: '100%', maxWidth: '48px', cursor: 'default',
+                              background: hoveredBar && hoveredBar.idx === i ? COLUMN_COLORS[i % COLUMN_COLORS.length] : COLUMN_COLORS[i % COLUMN_COLORS.length],
+                              filter: hoveredBar && hoveredBar.idx === i ? 'brightness(1.15)' : 'none',
                               height: `${h}px`, borderRadius: '6px 6px 0 0',
-                              transition: 'height 0.7s cubic-bezier(0.22, 1, 0.36, 1)',
-                              boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                              transition: 'height 0.7s cubic-bezier(0.22, 1, 0.36, 1), filter 0.15s ease',
+                              boxShadow: hoveredBar && hoveredBar.idx === i ? `0 4px 12px ${COLUMN_COLORS[i % COLUMN_COLORS.length]}66` : '0 2px 6px rgba(0,0,0,0.15)',
                             }} />
                           </div>
                         );
@@ -645,6 +713,12 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                     <div key={b.label} style={{ flex: 1, textAlign: 'center', fontSize: '13px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{b.label}</div>
                   ))}
                 </div>
+                {hoveredBar && (
+                  <div style={{ position: 'absolute', bottom: '44px', left: '50%', transform: 'translateX(-50%)', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px 14px', boxShadow: '0 4px 16px rgba(0,0,0,0.2)', fontSize: '13px', color: 'var(--text-main)', pointerEvents: 'none', whiteSpace: 'nowrap', zIndex: 10 }}>
+                    <div style={{ fontWeight: '700', marginBottom: '2px' }}>{hoveredBar.label}</div>
+                    <div>{hoveredBar.count} cases ({hoveredBar.pct}%)</div>
+                  </div>
+                )}
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 14px', marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}>
                 {monthBars.map((b, i) => (

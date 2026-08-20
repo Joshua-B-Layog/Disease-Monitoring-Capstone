@@ -10,6 +10,7 @@ export default defineConfig({
       includeAssets: ['favicon.svg', 'icons.svg', 'cdms-icon.svg'],
       manifest: false,
       workbox: {
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         globPatterns: ['**/*.{js,css,html,svg,png,woff,woff2}'],
         runtimeCaching: [
           {

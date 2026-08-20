@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import html2pdf from 'html2pdf.js';
+import * as XLSX from 'xlsx';
 import { API_URL } from './config';
 import { cacheCases, getCachedCases, cacheAuditLogs, getCachedAuditLogs, cacheGeneratedReports, getCachedGeneratedReports } from './offlineSync';
 
@@ -185,7 +187,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
       details: genForm.details,
       cho_unit: reportScope,
       snapshotLogs: periodLogs,
-      created_by: null, // pass loggedUserId here if you have it available as a prop
+      created_by: loggedUserId,
     })
     .then(() => {
       fetchGeneratedReports();
@@ -241,16 +243,78 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
     setShowDownloadMenu(null);
   };
 
+  const handleDownloadPDF = (report) => {
+    const rows = (report.snapshotLogs || []).map(l =>
+      `<tr><td>${l.created_at ? new Date(l.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</td><td>${l.user_id || ''}</td><td>${l.user_name || ''}</td><td>${l.action}</td><td>${l.entity}</td><td>${l.details}</td></tr>`
+    ).join('');
+    const htmlStr = `<html><head><meta charset="utf-8"><title>${report.title}</title>
+    <style>
+      body{font-family:Arial,sans-serif;padding:32px;font-size:13px;color:#111;}
+      h1{color:#1e3a8a;font-size:20px;margin-bottom:4px;}
+      p{color:#555;margin:0 0 20px 0;font-size:12px;}
+      table{width:100%;border-collapse:collapse;margin-top:12px;}
+      th{background:#1e3a8a;color:white;padding:9px 10px;text-align:left;font-size:12px;}
+      td{padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;}
+      tr:nth-child(even) td{background:#f9fafb;}
+    </style></head><body>
+    <h1>${report.title}</h1>
+    <p><strong>Period:</strong> ${report.period} &nbsp;|&nbsp; <strong>Category:</strong> ${report.entity} &nbsp;|&nbsp; <strong>Generated:</strong> ${report.timestamp}</p>
+    <table>
+      <thead><tr><th>Timestamp</th><th>User ID</th><th>Name</th><th>Action</th><th>Entity</th><th>Details</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    </body></html>`;
+    const element = document.createElement('div');
+    element.innerHTML = htmlStr;
+    element.style.position = 'fixed';
+    element.style.left = '-9999px';
+    document.body.appendChild(element);
+    html2pdf().set({ margin: 0.5, filename: `${report.title.replace(/\s+/g, '_')}.pdf`, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'letter' } }).from(element).save().then(() => { document.body.removeChild(element); });
+    setShowDownloadMenu(null);
+  };
+
+  const handleDownloadExcel = (report) => {
+    const wb = XLSX.utils.book_new();
+    const metaRows = [
+      ['Report Title', report.title],
+      ['Period', report.period],
+      ['Category', report.entity],
+      ['Generated', report.timestamp],
+      ['Log Entries', (report.snapshotLogs || []).length],
+    ];
+    const metaSheet = XLSX.utils.aoa_to_sheet(metaRows);
+    XLSX.utils.book_append_sheet(wb, metaSheet, 'Summary');
+    const logData = (report.snapshotLogs || []).map(l => ({
+      'Timestamp': l.created_at ? new Date(l.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '',
+      'User ID': l.user_id || '',
+      'Name': l.user_name || '',
+      'Action': l.action,
+      'Entity': l.entity,
+      'Details': l.details,
+    }));
+    const logSheet = XLSX.utils.json_to_sheet(logData);
+    XLSX.utils.book_append_sheet(wb, logSheet, 'Logs');
+    XLSX.writeFile(wb, `${report.title.replace(/\s+/g, '_')}.xlsx`);
+    setShowDownloadMenu(null);
+  };
+
+  // ── Delete confirmation ──
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+
   // ── View modal ──
   const [viewReport, setViewReport] = useState(null);
 
   const handleDeleteReport = (id) => {
-    axios.delete(`${API_URL}/api/generated-reports/${id}`)
+    setDeleteConfirm(id);
+  };
+
+  const confirmDeleteReport = () => {
+    if (!deleteConfirm) return;
+    axios.delete(`${API_URL}/api/generated-reports/${deleteConfirm}`)
       .then(() => {
-        setReportLogs(prev => prev.filter(r => r.id !== id));
-        setViewReport(null);
-        setModalShowAll(false);
-        setModalPage(1);
+        setReportLogs(prev => prev.filter(r => r.id !== deleteConfirm));
+        setDeleteConfirm(null);
+        if (viewReport && viewReport.id === deleteConfirm) { setViewReport(null); setModalShowAll(false); setModalPage(1); }
       })
       .catch(err => alert('Delete failed: ' + (err.response?.data?.error || err.message)));
   };
@@ -845,6 +909,16 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                         onMouseEnter={e => e.target.style.background = 'var(--input-bg)'} onMouseLeave={e => e.target.style.background = 'transparent'}>
                         📄 Word (.doc)
                       </button>
+                      <button onClick={() => handleDownloadPDF(file)}
+                        style={{ display: 'block', width: '100%', padding: '10px 16px', background: 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer' }}
+                        onMouseEnter={e => e.target.style.background = 'var(--input-bg)'} onMouseLeave={e => e.target.style.background = 'transparent'}>
+                        📕 PDF (.pdf)
+                      </button>
+                      <button onClick={() => handleDownloadExcel(file)}
+                        style={{ display: 'block', width: '100%', padding: '10px 16px', background: 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer' }}
+                        onMouseEnter={e => e.target.style.background = 'var(--input-bg)'} onMouseLeave={e => e.target.style.background = 'transparent'}>
+                        📊 Excel (.xlsx)
+                      </button>
                       <button onClick={() => handleDownloadCSV(file)}
                         style={{ display: 'block', width: '100%', padding: '10px 16px', background: 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer' }}
                         onMouseEnter={e => e.target.style.background = 'var(--input-bg)'} onMouseLeave={e => e.target.style.background = 'transparent'}>
@@ -904,6 +978,21 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
       <div style={s.card}>
         <div style={{ marginBottom: '16px' }}>
           <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: 'var(--text-main)' }}>Generated System Logs</h3>
+        </div>
+
+        {/* ── AUDIT SUMMARY CHIPS ── */}
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '16px' }}>
+          {[
+            { label: 'Total', count: filteredAuditLogs.length, color: '#1e3a8a', bg: '#eff6ff' },
+            { label: 'Created', count: filteredAuditLogs.filter(l => l.action === 'Created').length, color: '#129968', bg: '#dcf7eb' },
+            { label: 'Updated', count: filteredAuditLogs.filter(l => l.action === 'Updated').length, color: '#2563eb', bg: '#dbeafe' },
+            { label: 'Deleted', count: filteredAuditLogs.filter(l => l.action === 'Deleted').length, color: '#dc2626', bg: '#fee2e2' },
+            { label: 'Logged In', count: filteredAuditLogs.filter(l => l.action === 'Logged In').length, color: '#7c3aed', bg: '#f3e8ff' },
+          ].map(chip => (
+            <span key={chip.label} style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 12px', borderRadius: '16px', fontSize: '13px', fontWeight: '600', color: chip.color, background: chip.bg }}>
+              {chip.label}: {chip.count}
+            </span>
+          ))}
         </div>
 
         {/* ── TOOLBAR - Export CSV removed, two-level user filter added ── */}
@@ -1182,6 +1271,24 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}
+          onClick={() => setDeleteConfirm(null)}>
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '28px 32px', maxWidth: '400px', width: '90%', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}
+            onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 10px', fontSize: '18px', fontWeight: '700', color: 'var(--text-main)' }}>Delete Report?</h3>
+            <p style={{ margin: '0 0 20px', fontSize: '15px', color: 'var(--text-muted)', lineHeight: '1.5' }}>This action cannot be undone. The report and all its snapshot data will be permanently removed.</p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button onClick={() => setDeleteConfirm(null)}
+                style={{ padding: '8px 18px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '15px', cursor: 'pointer', color: 'var(--text-main)' }}>Cancel</button>
+              <button onClick={confirmDeleteReport}
+                style={{ padding: '8px 18px', background: '#dc2626', border: 'none', borderRadius: '6px', fontSize: '15px', fontWeight: '600', color: '#fff', cursor: 'pointer' }}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

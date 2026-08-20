@@ -579,6 +579,7 @@ export default function ResidentMap() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchMatches, setSearchMatches] = useState([]);
   const [mapLayer, setMapLayer] = useState('HD'); // 'SD' = street map (Carto), 'HD' = satellite (Esri)
+  const [showOverview, setShowOverview] = useState(true);
   const geoJsonLayerRef = useRef(null);
   const barangayDataRef = useRef(barangayData);
   useEffect(() => { barangayDataRef.current = barangayData; }, [barangayData]);
@@ -722,6 +723,22 @@ export default function ResidentMap() {
     });
   }
 
+  // ── City-wide summary stats ──
+  const totalCases = allCases.length;
+  const sortedBarangays = [...barangayData].sort((a, b) => b.totalCases - a.totalCases);
+  const mostAffected = sortedBarangays[0] || null;
+  const affectedBrgyCount = sortedBarangays.filter(b => b.totalCases > 0).length;
+  const activeCases = allCases.filter(c => {
+    const s = (c.status || '').toLowerCase();
+    return s === 'active' || s === 'under treatment';
+  }).length;
+  const cityDiseaseMap = {};
+  allCases.forEach(c => { const dn = (c.disease_name || 'Unknown').trim(); cityDiseaseMap[dn] = (cityDiseaseMap[dn] || 0) + 1; });
+  const topDiseasesSorted = Object.entries(cityDiseaseMap).sort((a, b) => b[1] - a[1]);
+  const topDiseaseCitywide = topDiseasesSorted[0] || null;
+  const top8Diseases = topDiseasesSorted.slice(0, 8);
+  const maxDiseaseCount = top8Diseases.length ? top8Diseases[0][1] : 1;
+
   return (
     <div className="resident-page">
       <h2 style={{ margin: '0 0 16px', fontSize: '26px', fontWeight: '700' }}>
@@ -730,6 +747,96 @@ export default function ResidentMap() {
 <p style={{ margin: '0 0 20px', color: 'var(--text-main)', fontSize: '15px' }}>
   Hover over a barangay for a quick summary. Click for full disease breakdown. Zoom in (≥17) to see purok-level pulse markers.
 </p>
+
+      {/* City Health Overview */}
+      <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '12px', marginBottom: '20px', overflow: 'hidden' }}>
+        <button onClick={() => setShowOverview(!showOverview)}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-main)' }}>
+          <span style={{ fontWeight: '700', fontSize: '18px' }}>🏥 City Health Overview</span>
+          <span style={{ fontSize: '18px', color: 'var(--text-muted)' }}>{showOverview ? '▲' : '▼'}</span>
+        </button>
+
+        {showOverview && (
+          <div style={{ padding: '0 20px 20px' }}>
+            {/* Stat cards */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
+              {[
+                { label: 'Total Cases', value: totalCases, color: '#1e3a8a', bg: '#eff6ff' },
+                { label: 'Most Affected', value: mostAffected ? mostAffected.barangayName : '—', sub: mostAffected ? `${mostAffected.totalCases} cases` : '', color: '#dc2626', bg: '#fef2f2' },
+                { label: 'Top Disease', value: topDiseaseCitywide ? topDiseaseCitywide[0] : '—', sub: topDiseaseCitywide ? `${topDiseaseCitywide[1]} cases` : '', color: '#7c3aed', bg: '#f5f3ff' },
+                { label: 'Active Cases', value: activeCases, color: '#f59e0b', bg: '#fffbeb' },
+                { label: 'Affected Barangays', value: `${affectedBrgyCount} / ${ALL_BARANGAYS.length}`, color: '#10b981', bg: '#ecfdf5' },
+              ].map(card => (
+                <div key={card.label} style={{ flex: '1 1 160px', background: card.bg, borderRadius: '10px', padding: '16px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '26px', fontWeight: '800', color: card.color, lineHeight: '1.2' }}>{card.value}</div>
+                  {card.sub && <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px' }}>{card.sub}</div>}
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#475569', marginTop: '4px' }}>{card.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Barangay Risk Classification Table */}
+            {sortedBarangays.length > 0 && (
+              <div style={{ marginBottom: '20px' }}>
+                <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Barangay Risk Classification</div>
+                <div style={{ maxHeight: '300px', overflowY: 'auto', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '15px' }}>
+                    <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+                      <tr style={{ background: 'var(--input-bg)' }}>
+                        <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: '600', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>#</th>
+                        <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: '600', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>Barangay</th>
+                        <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: '600', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>Cases</th>
+                        <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: '600', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>Risk Level</th>
+                        <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: '600', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>Top Disease</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedBarangays.map((b, i) => {
+                        const risk = getRisk(b.totalCases);
+                        const topD = getTop5(b.diseases)[0];
+                        return (
+                          <tr key={b.barangayName} style={{ background: i % 2 === 0 ? 'transparent' : 'var(--input-bg)' }}>
+                            <td style={{ padding: '7px 10px', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>{i + 1}</td>
+                            <td style={{ padding: '7px 10px', borderBottom: '1px solid var(--border-color)', fontWeight: '600', color: 'var(--text-main)' }}>{b.barangayName}</td>
+                            <td style={{ padding: '7px 10px', borderBottom: '1px solid var(--border-color)', textAlign: 'center', fontWeight: '700', color: 'var(--text-main)' }}>{b.totalCases}</td>
+                            <td style={{ padding: '7px 10px', borderBottom: '1px solid var(--border-color)', textAlign: 'center' }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '2px 10px', borderRadius: '12px', fontSize: '13px', fontWeight: '600', color: risk.color, background: risk.ring }}>
+                                <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: risk.color }} />
+                                {risk.label.replace(' Risk', '')}
+                              </span>
+                            </td>
+                            <td style={{ padding: '7px 10px', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '14px' }}>
+                              {topD ? `${topD[0]} (${topD[1]})` : '—'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Top Diseases Distribution */}
+            {top8Diseases.length > 0 && (
+              <div>
+                <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Top Diseases City-Wide</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {top8Diseases.map(([disease, count]) => (
+                    <div key={disease} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ width: '180px', fontSize: '14px', color: 'var(--text-main)', fontWeight: '500', textAlign: 'right', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{disease}</span>
+                      <div style={{ flex: 1, height: '18px', background: 'var(--input-bg)', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div style={{ width: `${(count / maxDiseaseCount) * 100}%`, height: '100%', background: getDiseaseColor(disease), borderRadius: '4px', minWidth: '2px' }} />
+                      </div>
+                      <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)', width: '30px', textAlign: 'right' }}>{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
       {offlineMode && (
         <div style={{ padding: '8px 14px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '15px', color: '#F59E0B' }}>
           Offline - showing cached data. Will refresh when reconnected.

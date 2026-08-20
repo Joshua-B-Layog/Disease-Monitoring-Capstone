@@ -879,7 +879,6 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       g.diseases[dn] = (g.diseases[dn] || 0) + 1;
     });
 
-    console.table(groups);
     setBarangayData(Object.values(groups));
 
     // Purok-level grouping — used when scoped to a single barangay

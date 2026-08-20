@@ -5,30 +5,23 @@ import BackButton from './BackButton';
 
 export default function RecoverAccount() {
   const navigate = useNavigate();
-  const [step, setStep] = useState('request'); // 'request', 'otp_verify', 'new_password'
-  const [method, setMethod] = useState('email'); // 'email' or 'mobile'
   const [identity, setIdentity] = useState('');
-  const [otpCode, setOtpCode] = useState('');
-  const [newPassword, setNewPassword] = useState('');
   const [status, setStatus] = useState({ type: '', msg: '' });
 
-  // Handle the initial request (Requesting the link or the OTP)
   const handleRequest = async (e) => {
     e.preventDefault();
+    setStatus({ type: '', msg: '' });
     try {
       const response = await fetch(API_URL + '/api/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identity, method }),
+        body: JSON.stringify({ identity }),
       });
-      
-      if (!response.ok) throw new Error('Failed to send request.');
 
-      if (method === 'email') {
-        setStatus({ type: 'success', msg: 'Recovery link sent to your email address.' });
-      } else {
-        setStep('otp_verify'); // Move to OTP entry if mobile
-      }
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to send request.');
+
+      setStatus({ type: 'success', msg: data.message || 'Recovery link sent to your registered email address.' });
     } catch (err) {
       setStatus({ type: 'error', msg: err.message });
     }
@@ -40,38 +33,32 @@ export default function RecoverAccount() {
         <div style={cardWrapperStyle}>
           <h2 style={{ color: 'white', marginBottom: '8px' }}>Recover Account</h2>
           <p style={{ color: '#9ca3af', marginBottom: '20px', fontSize: '15px' }}>
-            {method === 'email' 
-              ? "Enter your registered email to receive recovery instructions." 
-              : "Enter your mobile number to receive an OTP code."}
+            Enter your registered email or username to receive a password reset link.
           </p>
 
-          {/* METHOD TOGGLE */}
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-            <button onClick={() => setMethod('email')} style={method === 'email' ? activeBtn : inactiveBtn}>Email</button>
-            <button onClick={() => setMethod('mobile')} style={method === 'mobile' ? activeBtn : inactiveBtn}>Mobile</button>
-          </div>
-
-          {status.msg && <div style={{ color: status.type === 'error' ? '#ef4444' : '#129968', marginBottom: '15px', fontSize: '15px' }}>{status.msg}</div>}
-
-          {/* STEP 1: REQUEST */}
-          {step === 'request' && (
-            <form onSubmit={handleRequest}>
-              <input 
-                type="text" 
-                placeholder={method === 'email' ? "name@cabuyaohealth.gov.ph" : "09123456789"} 
-                value={identity} 
-                onChange={(e) => setIdentity(e.target.value)} 
-                style={inputStyle} 
-                required 
-              />
-              <button type="submit" style={actionBtn}>
-                {method === 'email' ? 'Send Recovery Link' : 'Send OTP'}
-              </button>
-            </form>
+          {status.msg && (
+            <div style={{
+              color: status.type === 'error' ? '#ef4444' : '#129968',
+              background: status.type === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(18,153,104,0.1)',
+              padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '15px',
+              border: `1px solid ${status.type === 'error' ? '#ef4444' : '#129968'}`
+            }}>
+              {status.type === 'success' ? '✓ ' : '✗ '}{status.msg}
+            </div>
           )}
 
-          {/* ADD YOUR OTP_VERIFY AND NEW_PASSWORD STEPS HERE SIMILAR TO YOUR PREVIOUS CODE */}
-          
+          <form onSubmit={handleRequest}>
+            <input
+              type="text"
+              placeholder="Username or email address"
+              value={identity}
+              onChange={(e) => setIdentity(e.target.value)}
+              style={inputStyle}
+              required
+            />
+            <button type="submit" style={actionBtn}>Send Reset Link</button>
+          </form>
+
           <div style={{ textAlign: 'center', marginTop: '20px' }}>
             <BackButton onClick={() => navigate('/login')} color="#129968">Back to Login</BackButton>
           </div>
@@ -81,11 +68,8 @@ export default function RecoverAccount() {
   );
 }
 
-// Minimal Styles (matching your existing dark theme)
 const containerStyle = { display: 'flex', height: '100vh', background: '#0B111E', justifyContent: 'center' };
 const rightPaneStyle = { width: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#111827' };
 const cardWrapperStyle = { width: '85%' };
-const inputStyle = { width: '100%', padding: '12px', marginBottom: '15px', borderRadius: '6px', background: '#1f2937', color: 'white', border: '1px solid #374151', boxSizing: 'border-box' };
+const inputStyle = { width: '100%', padding: '12px', marginBottom: '15px', borderRadius: '6px', background: '#1f2937', color: 'white', border: '1px solid #374151', boxSizing: 'border-box', fontSize: '15px' };
 const actionBtn = { width: '100%', padding: '12px', background: '#129968', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' };
-const activeBtn = { flex: 1, padding: '10px', background: '#129968', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' };
-const inactiveBtn = { flex: 1, padding: '10px', background: '#1f2937', color: '#9ca3af', border: 'none', borderRadius: '6px', cursor: 'pointer' };

@@ -37,6 +37,8 @@
   color: var(--text-main);
   font-size: 15px;
 }
+
+.generate-report-btn {
   background-color: #129968;
   color: #fff;
   font-weight: 600;

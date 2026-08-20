@@ -9,6 +9,7 @@ const cors = require('cors');
 const crypto = require('crypto');
 const axios = require('axios');
 const cron = require('node-cron');
+const bcrypt = require('bcryptjs');
 
 async function sendBrevoEmail(to, subject, htmlContent) {
   try {
@@ -537,14 +538,6 @@ app.get('/api/users', (req, res) => {
     db.query(query, (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(results);
-    });
-});
-
-// ROUTE: Get barangay summary reports
-app.get('/api/reports', (req, res) => {
-    db.query("SELECT * FROM barangay_reports", (err, results) => {
-        if (err) res.status(500).send(err);
-        else res.json(results);
     });
 });
 
@@ -1403,7 +1396,8 @@ app.put('/api/users/:id/set-password', (req, res) => {
     return res.status(400).json({ error: 'New password must be at least 6 characters.' });
   }
 
-  db.query('UPDATE users SET password = ? WHERE user_id = ?', [newPassword, id], (err, result) => {
+  const hashed = bcrypt.hashSync(newPassword, 10);
+  db.query('UPDATE users SET password = ? WHERE user_id = ?', [hashed, id], (err, result) => {
     if (err) return res.status(500).json({ error: err.message });
     if (result.affectedRows === 0) return res.status(404).json({ error: 'User not found.' });
 
@@ -1630,7 +1624,8 @@ app.put('/api/users/:id', async (req, res) => {
         // If newPassword provided (CHO changing BHW password), update it and email the user
         const afterUpdate = () => {
           if (newPassword && newPassword.trim()) {
-            db.query('UPDATE users SET password = ? WHERE user_id = ?', [newPassword.trim(), id], (pwErr) => {
+            const hashedPw = bcrypt.hashSync(newPassword.trim(), 10);
+            db.query('UPDATE users SET password = ? WHERE user_id = ?', [hashedPw, id], (pwErr) => {
               if (pwErr) {
                 console.error('Error updating password:', pwErr.message);
                 return res.status(500).json({ error: 'User updated but password change failed.' });
@@ -1697,11 +1692,13 @@ app.put('/api/users/:id/change-password', (req, res) => {
         if (err) return res.status(500).json({ error: err.message });
         if (results.length === 0) return res.status(404).json({ error: 'User not found.' });
 
-        if (results[0].password !== currentPassword) {
+        const pwValid = bcrypt.compareSync(currentPassword, results[0].password) || results[0].password === currentPassword;
+        if (!pwValid) {
             return res.status(401).json({ error: 'Current password is incorrect.' });
         }
 
-        db.query('UPDATE users SET password = ? WHERE user_id = ?', [newPassword, id], (updateErr) => {
+        const hashedNew = bcrypt.hashSync(newPassword, 10);
+        db.query('UPDATE users SET password = ? WHERE user_id = ?', [hashedNew, id], (updateErr) => {
             if (updateErr) return res.status(500).json({ error: updateErr.message });
             return res.status(200).json({ message: 'Password updated successfully.' });
         });
@@ -1903,19 +1900,16 @@ app.delete('/api/generated-reports/:id', (req, res) => {
 app.post('/api/login', (req, res) => {
     const { email, password, role, context, device, location } = req.body;
 
-    console.log("--- Login Attempt ---", { email, role, context });
-
     const query = `
         SELECT u.*, b.name AS assigned_barangay_name
         FROM users u
         LEFT JOIN barangays b ON u.assigned_barangay_id = b.id
         WHERE (u.username = ? OR u.email = ?)
-        AND u.password = ?
         AND u.role = ?
         AND u.is_active = 1
     `;
 
-    db.query(query, [email, email, password, role], (err, results) => {
+    db.query(query, [email, email, role], (err, results) => {
         if (err) {
             console.error("Database error:", err);
             return res.status(500).json({ error: 'Internal server error' });
@@ -1926,6 +1920,20 @@ app.post('/api/login', (req, res) => {
         }
 
         const user = results[0];
+
+        // Verify password: try bcrypt first, fallback to plaintext for legacy accounts
+        const passwordMatch = bcrypt.compareSync(password, user.password);
+        const plaintextMatch = !passwordMatch && user.password === password;
+
+        if (!passwordMatch && !plaintextMatch) {
+            return res.status(401).json({ error: 'Invalid credentials or account not found.' });
+        }
+
+        // Auto-upgrade plaintext password to bcrypt on first login after hashing was added
+        if (plaintextMatch) {
+            const hashed = bcrypt.hashSync(password, 10);
+            db.query('UPDATE users SET password = ? WHERE user_id = ?', [hashed, user.user_id]);
+        }
 
         // Block login for pending or rejected registrations
         if (user.status === 'pending') {
@@ -2052,7 +2060,8 @@ app.post('/api/register', (req, res) => {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'pending')
     `;
 
-    db.query(insertQuery, [username, name, email, mobile || null, password, password, enforcedRole, assignedBarangayId], (err, result) => {
+    const hashedPw = bcrypt.hashSync(password, 10);
+    db.query(insertQuery, [username, name, email, mobile || null, hashedPw, hashedPw, enforcedRole, assignedBarangayId], (err, result) => {
         if (err) {
             console.error("MySQL Registration Error:", err.message);
             if (err.code === 'ER_DUP_ENTRY') {
@@ -2365,8 +2374,6 @@ app.post('/api/forgot-password', (req, res) => {
         return res.status(400).json({ error: 'Identity is required.' });
     }
 
-    console.log(`--- Password recovery for: ${identity} ---`);
-
     const findUserQuery = 'SELECT * FROM users WHERE email = ? OR mobile_number = ? OR username = ?';
     
     db.query(findUserQuery, [identity, identity, identity], (err, results) => {
@@ -2380,7 +2387,6 @@ app.post('/api/forgot-password', (req, res) => {
         }
 
         const userFound = results[0];
-        console.log(`Found user: ${userFound.username} | Email: ${userFound.email}`);
 
         if (!userFound.email) {
             return res.status(400).json({ error: 'This account has no email address on file.' });
@@ -2456,7 +2462,8 @@ app.post('/api/reset-password', (req, res) => {
             SET password = ?, reset_token = NULL, token_expiry = NULL 
             WHERE email = ?
         `;
-        db.query(clearAndSave, [newPassword, email], (updateErr) => {
+        const hashedReset = bcrypt.hashSync(newPassword, 10);
+        db.query(clearAndSave, [hashedReset, email], (updateErr) => {
             if (updateErr) return res.status(500).json({ error: 'Failed to save new password.' });
             return res.status(200).json({ message: 'Password updated successfully!' });
         });
@@ -2515,7 +2522,8 @@ app.post('/api/users', async (req, res) => {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
-    db.query(insertQuery, [username, fullName, email, mobile || null, finalPassword, finalPassword, role || 'BHW', barangayId, isActive ? 1 : 0], (err, result) => {
+    const hashedFinal = bcrypt.hashSync(finalPassword, 10);
+    db.query(insertQuery, [username, fullName, email, mobile || null, hashedFinal, finalPassword, role || 'BHW', barangayId, isActive ? 1 : 0], (err, result) => {
         if (err) {
             console.error("Add user error:", err.message);
             if (err.code === 'ER_DUP_ENTRY') {
@@ -3147,7 +3155,8 @@ app.delete('/api/users/:id/my-data', (req, res) => {
         completed++;
         if (completed === queries.length) {
           // 3. Reset password to initial_password
-          db.query('UPDATE users SET password = ? WHERE user_id = ?', [resetPassword, id], (updateErr) => {
+          const hashedReset = bcrypt.hashSync(resetPassword, 10);
+          db.query('UPDATE users SET password = ? WHERE user_id = ?', [hashedReset, id], (updateErr) => {
             if (updateErr) {
               console.error('Password reset error:', updateErr.message);
               return res.status(500).json({ error: 'Failed to reset password.' });
