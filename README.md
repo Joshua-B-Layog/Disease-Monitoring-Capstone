@@ -5,24 +5,24 @@ A web-based disease surveillance and mapping system built for the **City Health 
 ## Features
 
 ### CHO (City Health Officer)
-- **Dashboard** — Real-time stats with trend comparisons, interactive bar charts, and export options (Word, Excel, CSV, PDF, PowerPoint)
-- **Manage Cases** — Full CRUD for disease cases with auto-geocoding, patient auto-fill, and status tracking
-- **Map View** — Interactive Leaflet map with barangay boundaries, satellite/standard tiles, pin markers, and case clustering
-- **Audit Reports** — System-generated logs with Excel/PDF export and filtered search
-- **User Accounts** — Manage BHW accounts, approve/reject registrations
-- **Inbox** — Notifications, referrals, edit requests, and registration approvals
-- **Settings** — Profile, password, 2FA, notifications, appearance, language, timezone, data management
+- **Dashboard** - Real-time stats with trend comparisons, interactive bar charts, and export options (Word, Excel, CSV, PDF, PowerPoint)
+- **Manage Cases** - Full CRUD for disease cases with auto-geocoding, patient auto-fill, and status tracking
+- **Map View** - Interactive Leaflet map with barangay boundaries, satellite/standard tiles, pin markers, and case clustering
+- **Audit Reports** - System-generated logs with Excel/PDF export and filtered search
+- **User Accounts** - Manage BHW accounts, approve/reject registrations
+- **Inbox** - Notifications, referrals, edit requests, and registration approvals
+- **Settings** - Profile, password, 2FA, notifications, appearance, language, timezone, data management
 
 ### BHW (Barangay Health Worker)
-- **Dashboard** — Scoped to assigned barangay with "Top Disease" view
-- **Manage Cases** — Add new cases, request edits via CHO
-- **Map View** — View-only map of assigned barangay
-- **Settings** — Profile and password management
+- **Dashboard** - Scoped to assigned barangay with "Top Disease" view
+- **Manage Cases** - Add new cases, request edits via CHO
+- **Map View** - View-only map of assigned barangay
+- **Settings** - Profile and password management
 
 ### Resident Portal
-- **Prevention Tips** — 28 disease cards with prevention tips, YouTube videos, and symptom checker quiz
-- **Interactive Map** — Public disease map with barangay risk classification and health overview
-- **Contact Us** — Submit health concerns to BHW inbox
+- **Prevention Tips** - 28 disease cards with prevention tips, YouTube videos, and symptom checker quiz
+- **Interactive Map** - Public disease map with barangay risk classification and health overview
+- **Contact Us** - Submit health concerns to BHW inbox
 
 ## Tech Stack
 
