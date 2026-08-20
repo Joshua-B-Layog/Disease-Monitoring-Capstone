@@ -1218,7 +1218,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         if (form) form.requestSubmit();
       }
 
-      if (view === 'list' && (e.key === 'n' || e.key === 'N') && !e.ctrlKey && !e.metaKey) {
+      if ((view === 'list' || view === 'categories') && (e.key === 'n' || e.key === 'N') && !e.ctrlKey && !e.metaKey) {
         setView('add');
       }
     };
@@ -2812,10 +2812,10 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <div>
             <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '4px' }}>
-              Dashboard / Manage Cases / {selectedDisease?.name}
+              Dashboard / Manage Cases / {selectedDisease?.name || 'All Cases'}
             </div>
             <h2 style={{ margin: 0, fontSize: '22px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span>{selectedDisease?.icon}</span> {selectedDisease?.name} Cases
+              {selectedDisease ? <span>{selectedDisease.icon}</span> : <span>📋</span>} {selectedDisease?.name || 'All Cases'}
             </h2>
           </div>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>

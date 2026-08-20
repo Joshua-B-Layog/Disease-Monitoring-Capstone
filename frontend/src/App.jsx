@@ -91,7 +91,11 @@ function App() {
     };
   };
 
-  const [activeTab, setActiveTab]         = useState('Dashboard');  
+  const [activeTab, setActiveTab]         = useState(() => {
+    const valid = ['Dashboard','Manage Cases','Map View','User Accounts','Audit Reports','Settings','Weekly Summary'];
+    const stored = loadStored('cdms_active_tab', 'Dashboard');
+    return valid.includes(stored) ? stored : 'Dashboard';
+  });
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedDisease, setSelectedDisease] = useState(() => loadStored('cdms_dash_disease', 'Dengue'));
   const [dateRange, setDateRange]         = useState(() => loadStored('cdms_dash_dates', getWorkWeek()));
@@ -119,6 +123,7 @@ function App() {
   useEffect(() => { localStorage.setItem('cdms_dash_period', JSON.stringify(dashPeriod)); }, [dashPeriod]);
   useEffect(() => { localStorage.setItem('cdms_dash_quarter', JSON.stringify(dashQuarter)); }, [dashQuarter]);
   useEffect(() => { localStorage.setItem('cdms_dash_year', JSON.stringify(dashYear)); }, [dashYear]);
+  useEffect(() => { localStorage.setItem('cdms_active_tab', JSON.stringify(activeTab)); }, [activeTab]);
 
   const [authView, setAuthView]           = useState('login'); 
 
