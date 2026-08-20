@@ -55,6 +55,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterBarangay, setFilterBarangay] = useState('All Barangays');
   const [filterStatus, setFilterStatus] = useState('All Status');
+  const [filterRole, setFilterRole] = useState('All Roles');
   const [currentPage, setCurrentPage] = useState(1);
   const [ellipsisOpen, setEllipsisOpen] = useState(false);
   const [ellipsisPageInput, setEllipsisPageInput] = useState('');
@@ -80,6 +81,8 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
 
   const [statusOpen, setStatusOpen] = useState(false);
   const statusRef = useRef(null);
+  const [filterRoleOpen, setFilterRoleOpen] = useState(false);
+  const filterRoleRef = useRef(null);
   const [roleOpen, setRoleOpen] = useState(false);
   const roleRef = useRef(null);
 
@@ -134,6 +137,9 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
       if (statusRef.current && !statusRef.current.contains(e.target)) {
         setStatusOpen(false);
       }
+      if (filterRoleRef.current && !filterRoleRef.current.contains(e.target)) {
+        setFilterRoleOpen(false);
+      }
       if (roleRef.current && !roleRef.current.contains(e.target)) {
         setRoleOpen(false);
       }
@@ -163,7 +169,8 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
     const matchesStatus = filterStatus === 'All Status' ||
       (filterStatus === 'Active' && u.is_active === 1) ||
       (filterStatus === 'Inactive' && u.is_active === 0);
-    return matchesSearch && matchesBarangay && matchesStatus;
+    const matchesRole = filterRole === 'All Roles' || u.role === filterRole;
+    return matchesSearch && matchesBarangay && matchesStatus && matchesRole;
   });
 
   const totalPages = Math.max(1, Math.ceil(filteredUsers.length / USERS_PER_PAGE));
@@ -287,7 +294,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
     if (!editingUser) {
       payload.password = formData.password;
       payload.generateTempPassword = formData.generateTempPassword;
-    } else if (editingUser.role === 'BHW' && formData.password.trim()) {
+    } else if (editingUser && formData.password.trim()) {
       payload.newPassword = formData.password.trim();
     }
 
@@ -448,8 +455,29 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
               </div>
             )}
           </div>
+          <div style={{ position: 'relative' }} ref={filterRoleRef}>
+            <button type="button" onClick={() => setFilterRoleOpen(!filterRoleOpen)}
+              style={{ ...inputStyle, width: '140px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}>
+              <span>{filterRole === 'CHO' ? 'CHO' : filterRole === 'BHW' ? 'BHW' : filterRole}</span>
+              <span style={{ fontSize: '13px', opacity: 0.6, transition: 'transform 0.2s', transform: filterRoleOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+            </button>
+            {filterRoleOpen && (
+              <div style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 100, overflow: 'hidden' }}>
+                {[{ value: 'All Roles', label: 'All Roles' }, { value: 'CHO', label: 'CHO' }, { value: 'BHW', label: 'BHW' }].map(r => (
+                  <button key={r.value} type="button"
+                    onClick={() => { setFilterRole(r.value); setFilterRoleOpen(false); setCurrentPage(1); }}
+                    style={{ display: 'block', width: '100%', padding: '10px 14px', background: filterRole === r.value ? 'var(--input-bg)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: filterRole === r.value ? '#3B82F6' : 'var(--text-main)', cursor: 'pointer', fontWeight: filterRole === r.value ? '600' : '400' }}
+                    onMouseEnter={e => { if (filterRole !== r.value) e.target.style.background = 'var(--input-bg)'; }}
+                    onMouseLeave={e => { if (filterRole !== r.value) e.target.style.background = 'transparent'; }}>
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           {selectedIds.length > 0 && (
             <>
+              {selectedIds.length < paginatedUsers.length && (
               <button onClick={() => {
                 setEditQueueIndex(0);
                 openEdit(users.find(u => u.user_id === selectedIds[0]));
@@ -460,6 +488,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                 style={{ padding: '8px 16px', background: 'transparent', border: '1px solid #3b82f6', color: '#3b82f6', borderRadius: '6px', cursor: offlineMode ? 'not-allowed' : 'pointer', fontWeight: '500', fontSize: '15px', opacity: offlineMode ? 0.4 : 1 }}>
                 Edit Selected ({selectedIds.length})
               </button>
+              )}
               <button onClick={() => {
                 setBulkDeleteMode(true);
                 setDeleteTarget({ user_id: null, full_name: `${selectedIds.length} accounts`, barangay_name: '' });
@@ -708,6 +737,14 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                       )}
                     </div>
                 </div>
+                {editingUser && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Password</label>
+                  <input type="password" placeholder="Leave blank to keep current password" style={inputStyle}
+                    value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} />
+                  <p style={{ margin: '6px 0 0', fontSize: '15px', color: 'var(--text-muted)' }}>If set, the user will receive an email notification with their new password.</p>
+                </div>
+                )}
               </div>
 
               <p style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '20px 0 12px 0' }}>Account Settings</p>
@@ -741,15 +778,6 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                     </div>
                   </div>
                 </>
-              )}
-
-              {editingUser && editingUser.role === 'BHW' && (
-                <div style={{ marginBottom: '16px' }}>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-muted)', marginBottom: '8px', fontWeight: '500' }}>New Password (optional)</label>
-                  <input type="password" placeholder="Leave blank to keep current password" style={inputStyle}
-                    value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} />
-                  <p style={{ margin: '6px 0 0', fontSize: '15px', color: 'var(--text-muted)' }}>If set, the BHW will receive an email notification with their new password.</p>
-                </div>
               )}
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>

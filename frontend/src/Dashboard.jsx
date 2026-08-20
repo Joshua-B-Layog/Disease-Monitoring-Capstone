@@ -309,12 +309,13 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     .map(([label, count]) => ({ label, count }))
     .sort((a, b) => b.count - a.count);
 
-  // --- PERIOD CHART MODE: quarterly & yearly show month-column chart ---
-  const periodChart = dashPeriod === 'quarterly' || dashPeriod === 'yearly';
+  // --- PERIOD CHART MODE: shows column chart for all period types ---
+  const periodChart = dashPeriod === 'quarterly' || dashPeriod === 'yearly' || dashPeriod === 'weekly' || dashPeriod === 'monthly';
 
   const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const MONTH_FULL  = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  const COLUMN_COLORS = ['#DC2626', '#D97706', '#129968', '#3b82f6', '#7c3aed', '#db2777', '#0ea5e9', '#84cc16', '#f59e0b', '#14b8a6', '#ef4444', '#6366f1'];
+  const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const COLUMN_COLORS = ['#DC2626', '#D97706', '#129968', '#3b82f6', '#7c3aed', '#db2777', '#0ea5e9', '#84cc16', '#f59e0b', '#14b8a6', '#ef4444', '#6366f1', '#059669', '#d946ef', '#0891b2'];
 
   const buildMonthBars = (months) => months.map(m => {
     const key = String(dashYear).padStart(4, '0') + '-' + String(m + 1).padStart(2, '0');
@@ -322,11 +323,61 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     return { label: MONTH_SHORT[m], full: MONTH_FULL[m], count };
   });
 
+  // Weekly: 5 bars (Mon–Fri) within the date range
+  const buildWeekBars = () => {
+    const bars = [];
+    const start = new Date(dateRange.start);
+    for (let i = 0; i < 5; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      const key = d.toISOString().slice(0, 10);
+      const dayLabel = DAY_SHORT[d.getDay()];
+      const dateLabel = `${d.getDate()}/${d.getMonth() + 1}`;
+      const count = displayCases.filter(c => c.date_reported && c.date_reported.slice(0, 10) === key).length;
+      bars.push({ label: `${dayLabel} ${dateLabel}`, full: `${dayLabel}, ${MONTH_FULL[d.getMonth()]} ${d.getDate()}`, count });
+    }
+    return bars;
+  };
+
+  // Monthly: ~4-5 bars (Week 1, Week 2, ...) splitting the calendar month
+  const buildMonthlyWeekBars = () => {
+    const bars = [];
+    const [startStr, endStr] = [dateRange.start, dateRange.end];
+    if (!startStr || !endStr) return bars;
+    const sDate = new Date(startStr);
+    const eDate = new Date(endStr);
+    let weekNum = 1;
+    let cursor = new Date(sDate);
+    while (cursor <= eDate) {
+      const weekEnd = new Date(cursor);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      const effectiveEnd = weekEnd > eDate ? eDate : weekEnd;
+      const sKey = cursor.toISOString().slice(0, 10);
+      const eKey = effectiveEnd.toISOString().slice(0, 10);
+      const count = displayCases.filter(c => {
+        if (!c.date_reported) return false;
+        const d = c.date_reported.slice(0, 10);
+        return d >= sKey && d <= eKey;
+      }).length;
+      const label = `Wk ${weekNum}`;
+      const full = `Week ${weekNum} (${cursor.getDate()} ${MONTH_SHORT[cursor.getMonth()]} – ${effectiveEnd.getDate()} ${MONTH_SHORT[effectiveEnd.getMonth()]})`;
+      bars.push({ label, full, count });
+      cursor = new Date(effectiveEnd);
+      cursor.setDate(cursor.getDate() + 1);
+      weekNum++;
+    }
+    return bars;
+  };
+
   const qStartMonth = (dashQuarter - 1) * 3;
   const monthBars = periodChart
-    ? (dashPeriod === 'quarterly'
-        ? buildMonthBars([qStartMonth, qStartMonth + 1, qStartMonth + 2])
-        : buildMonthBars([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]))
+    ? (dashPeriod === 'weekly'
+        ? buildWeekBars()
+        : dashPeriod === 'monthly'
+          ? buildMonthlyWeekBars()
+          : dashPeriod === 'quarterly'
+            ? buildMonthBars([qStartMonth, qStartMonth + 1, qStartMonth + 2])
+            : buildMonthBars([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]))
     : [];
   const monthMax = monthBars.length > 0 ? Math.max(...monthBars.map(b => b.count)) : 1;
 
@@ -356,7 +407,13 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
   const exportBars = periodChart ? monthBars : (isBhw ? diseaseBars : sortedBars);
   const exportTitle = periodChart
-    ? `Monthly Cases (${dashPeriod === 'quarterly' ? `Q${dashQuarter} ` : ''}${dashYear})`
+    ? (dashPeriod === 'weekly'
+        ? `Weekly Cases (${dateRange.start || ''} to ${dateRange.end || ''})`
+        : dashPeriod === 'monthly'
+          ? `Monthly Cases (${MONTH_FULL[new Date(dateRange.start || Date.now()).getMonth()]} ${dashYear})`
+          : dashPeriod === 'quarterly'
+            ? `Quarterly Cases (Q${dashQuarter} ${dashYear})`
+            : `Yearly Cases (${dashYear})`)
     : (isBhw ? 'All Diseases - Case Counts' : `${selectedDisease} Cases by Barangay`);
   const exportHighest = periodChart ? monthMax : (isBhw ? (diseaseBars.length > 0 ? diseaseBars[0].count : 1) : highestCount);
 

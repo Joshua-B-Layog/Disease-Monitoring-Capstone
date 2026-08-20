@@ -354,7 +354,7 @@ db.query(`CREATE TABLE IF NOT EXISTS password_change_requests (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,
   user_name VARCHAR(255),
-  status ENUM('pending','accepted','rejected') DEFAULT 'pending',
+  status ENUM('pending','accepted','rejected','resolved') DEFAULT 'pending',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   resolved_at TIMESTAMP NULL,
   is_read TINYINT(1) DEFAULT 0,
@@ -362,6 +362,37 @@ db.query(`CREATE TABLE IF NOT EXISTS password_change_requests (
 )`, (err) => {
   if (err) console.error('Error creating password_change_requests table:', err.message);
   else console.log('Password change requests table created/verified');
+  // Migration: add user_name column if missing
+  db.query("SHOW COLUMNS FROM password_change_requests LIKE 'user_name'", (une, unr) => {
+    if (!une && (!unr || unr.length === 0)) {
+      db.query("ALTER TABLE password_change_requests ADD COLUMN user_name VARCHAR(255)", (ae) => {
+        if (ae) console.error('Error adding user_name to password_change_requests:', ae.message);
+        else console.log('Added user_name column to password_change_requests');
+      });
+    }
+  });
+  // Migration: add is_read column if missing
+  db.query("SHOW COLUMNS FROM password_change_requests LIKE 'is_read'", (ire, irr) => {
+    if (!ire && (!irr || irr.length === 0)) {
+      db.query("ALTER TABLE password_change_requests ADD COLUMN is_read TINYINT(1) DEFAULT 0", (ae) => {
+        if (ae) console.error('Error adding is_read to password_change_requests:', ae.message);
+        else console.log('Added is_read column to password_change_requests');
+      });
+    }
+  });
+  // Migration: add 'resolved' to status ENUM if missing
+  db.query("SHOW COLUMNS FROM password_change_requests LIKE 'status'", (me, mr) => {
+    if (!me && mr && mr.length > 0) {
+      db.query("SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'password_change_requests' AND COLUMN_NAME = 'status'", [process.env.DB_NAME], (ie, ir) => {
+        if (!ie && ir && ir.length > 0 && !ir[0].COLUMN_TYPE.includes('resolved')) {
+          db.query("ALTER TABLE password_change_requests MODIFY COLUMN status ENUM('pending','accepted','rejected','resolved') DEFAULT 'pending'", (ae) => {
+            if (ae) console.error('Error adding resolved to password_change_requests status:', ae.message);
+            else console.log('Added resolved to password_change_requests status ENUM');
+          });
+        }
+      });
+    }
+  });
 });
 
 // Migration: add status column to users table for BHW registration approval
@@ -1396,15 +1427,23 @@ app.put('/api/users/:id/set-password', (req, res) => {
     return res.status(400).json({ error: 'New password must be at least 6 characters.' });
   }
 
-  const hashed = bcrypt.hashSync(newPassword, 10);
-  db.query('UPDATE users SET password = ? WHERE user_id = ?', [hashed, id], (err, result) => {
+  // Gate: verify an accepted request exists before allowing password change
+  db.query('SELECT id FROM password_change_requests WHERE user_id = ? AND status = \'accepted\' LIMIT 1', [id], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
-    if (result.affectedRows === 0) return res.status(404).json({ error: 'User not found.' });
+    if (!rows || rows.length === 0) {
+      return res.status(403).json({ error: 'No approved password change request found. Please wait for CHO approval.' });
+    }
 
-    // Mark any accepted request as fully resolved
-    db.query("UPDATE password_change_requests SET status = 'accepted' WHERE user_id = ? AND status = 'accepted'", [id]);
+    const hashed = bcrypt.hashSync(newPassword, 10);
+    db.query('UPDATE users SET password = ? WHERE user_id = ?', [hashed, id], (err2, result) => {
+      if (err2) return res.status(500).json({ error: err2.message });
+      if (result.affectedRows === 0) return res.status(404).json({ error: 'User not found.' });
 
-    res.json({ message: 'Password updated successfully.' });
+      // Mark the accepted request as fully resolved
+      db.query("UPDATE password_change_requests SET status = 'resolved', resolved_at = NOW() WHERE user_id = ? AND status = 'accepted'", [id]);
+
+      res.json({ message: 'Password updated successfully.' });
+    });
   });
 });
 
@@ -1621,7 +1660,7 @@ app.put('/api/users/:id', async (req, res) => {
             return res.status(404).json({ error: 'User not found.' });
         }
         console.log("User updated:", id);
-        // If newPassword provided (CHO changing BHW password), update it and email the user
+        // If newPassword provided, update it, email the user, and send in-app notification
         const afterUpdate = () => {
           if (newPassword && newPassword.trim()) {
             const hashedPw = bcrypt.hashSync(newPassword.trim(), 10);
@@ -1630,7 +1669,7 @@ app.put('/api/users/:id', async (req, res) => {
                 console.error('Error updating password:', pwErr.message);
                 return res.status(500).json({ error: 'User updated but password change failed.' });
               }
-              // Send email notification to the BHW
+              // Send email notification
               db.query('SELECT email, full_name FROM users WHERE user_id = ?', [id], (eErr, eRows) => {
                 if (!eErr && eRows && eRows.length > 0 && eRows[0].email) {
                   const userEmail = eRows[0].email;
@@ -1651,7 +1690,13 @@ app.put('/api/users/:id', async (req, res) => {
                   ).catch(e => console.error('Email notification failed:', e.message));
                 }
               });
-              res.status(200).json({ message: 'User updated and password changed. BHW has been notified via email.' });
+              // Send in-app notification to the target user
+              const pwNotifMsg = 'Your password has been updated by the City Health Office. Please log in with your new password.';
+              db.query(
+                'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
+                [id, 'Password Updated', pwNotifMsg, 'info', 'Settings']
+              );
+              res.status(200).json({ message: 'User updated and password changed. User has been notified via email.' });
             });
           } else {
             res.status(200).json({ message: 'User updated successfully.' });
