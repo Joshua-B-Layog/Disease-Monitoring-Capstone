@@ -111,6 +111,12 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   const exportRef = useRef(null);
   const [chartMounted, setChartMounted] = useState(false);
   const [hoveredBar, setHoveredBar] = useState(null);
+  const [showAllDiseases, setShowAllDiseases] = useState(false);
+  const [allPeriod, setAllPeriod] = useState('monthly');
+  const [allDateRange, setAllDateRange] = useState({ start: dateRange.start, end: dateRange.end });
+  const [allQuarter, setAllQuarter] = useState(1);
+  const [allYear, setAllYear] = useState(new Date().getFullYear());
+  const [allYearOpen, setAllYearOpen] = useState(false);
   const [yearOpen, setYearOpen] = useState(false);
   const yearRef = useRef(null);
 
@@ -202,6 +208,17 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     return filtered;
   })();
 
+  const allDiseaseDisplayCases = (() => {
+    let filtered = scopedCases;
+    if (allDateRange.start) {
+      filtered = filtered.filter(c => c.date_reported && c.date_reported.slice(0, 10) >= allDateRange.start);
+    }
+    if (allDateRange.end) {
+      filtered = filtered.filter(c => c.date_reported && c.date_reported.slice(0, 10) <= allDateRange.end);
+    }
+    return filtered;
+  })();
+
   if (loading) {
     return (
       <div style={{ color: 'var(--text-main)', padding: '28px' }}>
@@ -214,6 +231,273 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           ))}
         </div>
         <div className="cdms-skeleton" style={{ width: '100%', height: '260px', borderRadius: '10px' }} />
+      </div>
+    );
+  }
+
+  // Count-based color: Red = highest, Yellow = 2nd highest (all ties), Blue = rest
+  const getCountColor = (count, bars) => {
+    if (!bars || bars.length === 0) return '#3b82f6';
+    const uniqueCounts = [...new Set(bars.map(b => b.count))].filter(c => c > 0).sort((a, b) => b - a);
+    if (uniqueCounts.length === 0) return '#3b82f6';
+    if (count === uniqueCounts[0]) return '#DC2626';
+    if (uniqueCounts.length > 1 && count === uniqueCounts[1]) return '#D97706';
+    return '#3b82f6';
+  };
+
+  // ── FULL-PAGE: All Disease Count ──
+  if (showAllDiseases) {
+    const allDiseaseCounts = {};
+    ALL_DISEASES.forEach(d => { allDiseaseCounts[d] = 0; });
+    allDiseaseDisplayCases.forEach(c => {
+      if (c.disease_name) {
+        const matched = findBestDisease(c.disease_name);
+        if (matched) allDiseaseCounts[matched]++;
+      }
+    });
+    const allDiseaseList = Object.entries(allDiseaseCounts)
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count);
+    const allDiseaseMax = allDiseaseList.length > 0 ? allDiseaseList[0].count : 1;
+    const hasCases = allDiseaseList.some(d => d.count > 0);
+    const allTotalCases = allDiseaseDisplayCases.length;
+    const allYearList = (() => {
+      const yrs = new Set();
+      scopedCases.forEach(c => {
+        if (c.date_reported) {
+          const y = c.date_reported.slice(0, 4);
+          if (/^\d{4}$/.test(y)) yrs.add(Number(y));
+        }
+      });
+      return [...yrs].sort((a, b) => b - a);
+    })();
+
+    const allGridLines = (() => {
+      const step = Math.max(1, Math.ceil(allDiseaseMax / 4));
+      const top = step * 4;
+      const lines = [];
+      for (let k = 0; k <= 4; k++) lines.push({ value: k * step, frac: k / 4 });
+      return { lines, top };
+    })();
+
+    return (
+      <div className="cdms-view-in" style={{ padding: compactMode ? '12px' : '4px 28px 28px 28px' }}>
+        <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '4px' }}>
+          <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--accent, #60a5fa)' }} onClick={() => setShowAllDiseases(false)}>Dashboard</span>
+          {' / All Disease Count'}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h2 style={{ margin: 0, fontSize: '22px', color: 'var(--text-main)' }}>All Disease Count</h2>
+          <button
+            onClick={() => setShowAllDiseases(false)}
+            style={{ padding: '8px 18px', background: '#121358', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: '600' }}
+            onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+            onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+          >
+            ← Back to Dashboard
+          </button>
+        </div>
+
+        {/* Period selector bar — local state only */}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', gap: '4px' }}>
+            {['weekly', 'monthly', 'quarterly', 'yearly'].map(p => (
+              <button
+                key={p}
+                onClick={() => { setAllPeriod(p); setAllDateRange(getPeriodRange(p, allQuarter, allYear)); }}
+                style={{
+                  padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '15px', fontWeight: '500', textTransform: 'capitalize',
+                  background: allPeriod === p ? '#121358' : 'var(--input-bg)',
+                  color: allPeriod === p ? 'white' : 'var(--text-muted)',
+                  border: '1px solid var(--border-color)',
+                }}
+                onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+                onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+
+          {allPeriod === 'quarterly' && (
+            <div style={{ display: 'flex', gap: '4px' }}>
+              {[1, 2, 3, 4].map(q => (
+                <button
+                  key={q}
+                  onClick={() => { setAllQuarter(q); setAllDateRange(getPeriodRange('quarterly', q, allYear)); }}
+                  style={{
+                    padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '15px', fontWeight: '600',
+                    background: allQuarter === q ? '#129968' : 'var(--input-bg)',
+                    color: allQuarter === q ? 'white' : 'var(--text-muted)',
+                    border: '1px solid var(--border-color)',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+                  onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                >
+                  Q{q}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {(allPeriod === 'quarterly' || allPeriod === 'yearly') && (
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setAllYearOpen(!allYearOpen)}
+                style={{
+                  padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '15px', fontWeight: '500',
+                  background: 'var(--input-bg)', color: 'var(--text-main)',
+                  border: '1px solid var(--border-color)',
+                }}
+                onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+                onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+              >
+                {allYear} ▾
+              </button>
+              {allYearOpen && (
+                <div style={{ position: 'absolute', top: '110%', left: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '4px', zIndex: 100, maxHeight: '200px', overflowY: 'auto', minWidth: '80px' }}>
+                  {allYearList.map(y => (
+                    <div
+                      key={y}
+                      onClick={() => {
+                        setAllYear(y);
+                        setAllDateRange(allPeriod === 'yearly' ? getPeriodRange('yearly', 0, y) : getPeriodRange('quarterly', allQuarter, y));
+                        setAllYearOpen(false);
+                      }}
+                      style={{
+                        padding: '6px 10px', cursor: 'pointer', fontSize: '15px', borderRadius: '4px',
+                        background: allYear === y ? 'rgba(96,165,250,0.25)' : 'transparent',
+                        color: 'var(--text-main)',
+                      }}
+                      onMouseEnter={e => { if (allYear !== y) { e.currentTarget.style.background = 'rgba(96,165,250,0.25)'; e.currentTarget.style.color = 'var(--text-main)'; } }}
+                      onMouseLeave={e => { if (allYear !== y) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-main)'; } }}
+                    >
+                      {y}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {(allPeriod === 'weekly' || allPeriod === 'monthly' || allPeriod === 'custom') && (
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <input
+                type="date"
+                key={`all-start-${allDateRange.start}`}
+                defaultValue={allDateRange.start}
+                onBlur={(e) => { const v = e.target.value; if (/^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(new Date(v))) { setAllDateRange({ ...allDateRange, start: v }); setAllPeriod('custom'); } }}
+                onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
+                style={{ padding: '6px 8px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '15px' }}
+              />
+              <span style={{ color: 'var(--text-muted)', fontSize: '15px' }}>to</span>
+              <input
+                type="date"
+                key={`all-end-${allDateRange.end}`}
+                defaultValue={allDateRange.end}
+                onBlur={(e) => { const v = e.target.value; if (/^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(new Date(v))) { setAllDateRange({ ...allDateRange, end: v }); setAllPeriod('custom'); } }}
+                onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
+                style={{ padding: '6px 8px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '15px' }}
+              />
+            </div>
+          )}
+
+          <span style={{ marginLeft: 'auto', fontSize: '15px', color: 'var(--text-muted)' }}>
+            {allDateRange.start} to {allDateRange.end}
+          </span>
+        </div>
+
+        {/* ── Vertical Disease Bar Chart (28 diseases) ── */}
+        <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' }}>
+          <h4 style={{ color: 'var(--text-main)', margin: '0 0 16px 0', fontSize: '15px', fontWeight: '600' }}>
+            Disease Cases by Count
+            <span style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: '400', marginLeft: '8px' }}>({allTotalCases} total cases · {allDateRange.start} to {allDateRange.end})</span>
+          </h4>
+          {!hasCases ? (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: '15px' }}>
+              No cases found for this date range.
+            </div>
+          ) : (
+            <div style={{ position: 'relative' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-end', height: '280px', position: 'relative' }}>
+                {/* Y-axis labels + grid */}
+                <div style={{ width: '30px', height: '280px', position: 'relative', flexShrink: 0 }}>
+                  {allGridLines.lines.map(l => {
+                    const bottomPx = l.frac * 270;
+                    return (
+                      <span key={l.value} style={{ position: 'absolute', right: 4, bottom: `${bottomPx}px`, transform: 'translateY(50%)', fontSize: '11px', color: 'var(--text-muted)' }}>
+                        {l.value}
+                      </span>
+                    );
+                  })}
+                </div>
+                {/* Bars area */}
+                <div style={{ flex: 1, height: '280px', position: 'relative', display: 'flex', alignItems: 'flex-end', gap: '3px' }}>
+                  {/* Grid lines */}
+                  {allGridLines.lines.map(l => {
+                    const bottomPx = l.frac * 270;
+                    return <div key={l.value} style={{ position: 'absolute', left: 0, right: 0, bottom: `${bottomPx}px`, borderTop: '1px dashed var(--border-color)', pointerEvents: 'none' }} />;
+                  })}
+                  {/* Bars */}
+                  {allDiseaseList.map((bar, i) => {
+                    const h = chartMounted ? Math.max((bar.count / allGridLines.top) * 270, bar.count > 0 ? 4 : 2) : 0;
+                    const color = getCountColor(bar.count, allDiseaseList);
+                    const isHovered = hoveredBar && hoveredBar.idx === i;
+                    return (
+                      <div key={bar.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%', position: 'relative' }}>
+                        {/* Tooltip — only on hovered bar */}
+                        {isHovered && (
+                          <div style={{
+                            position: 'absolute', bottom: `${h + 32}px`, left: '50%', transform: 'translateX(-50%)',
+                            background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
+                            borderRadius: '8px', padding: '8px 14px', boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+                            fontSize: '13px', color: 'var(--text-main)', whiteSpace: 'nowrap', textAlign: 'center', zIndex: 10, pointerEvents: 'none',
+                          }}>
+                            <div style={{ fontWeight: '700', marginBottom: '2px' }}>{bar.label}</div>
+                            <div>{bar.count} cases ({hoveredBar.pct}%)</div>
+                          </div>
+                        )}
+                        <div style={{
+                          fontSize: '11px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '2px',
+                          opacity: chartMounted ? 1 : 0, transition: 'opacity 0.5s ease 0.2s',
+                          position: 'absolute', bottom: `${Math.max(h + 4, 6)}px`
+                        }}>
+                          {bar.count > 0 ? bar.count : ''}
+                        </div>
+                        <div
+                          onMouseEnter={() => setHoveredBar({ label: bar.label, count: bar.count, pct: allTotalCases > 0 ? Math.round((bar.count / allTotalCases) * 100) : 0, idx: i })}
+                          onMouseLeave={() => setHoveredBar(null)}
+                          style={{
+                            width: '100%', maxWidth: '32px', cursor: 'default',
+                            background: color,
+                            filter: isHovered ? 'brightness(1.15)' : 'none',
+                            height: `${h}px`, borderRadius: '4px 4px 0 0',
+                            transition: 'height 0.7s cubic-bezier(0.22, 1, 0.36, 1), filter 0.15s ease',
+                            boxShadow: isHovered ? `0 4px 12px ${color}66` : '0 2px 4px rgba(0,0,0,0.1)',
+                          }} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              {/* X-axis labels — abbreviated, full name on hover */}
+              <div style={{ display: 'flex', gap: '3px', marginTop: '4px', paddingLeft: '30px' }}>
+                {allDiseaseList.map((bar) => {
+                  const short = bar.label.length > 8 ? bar.label.slice(0, 7) + '.' : bar.label;
+                  return (
+                    <div key={bar.label} title={bar.label} style={{
+                      flex: 1, textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)',
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                      cursor: 'default',
+                    }}>
+                      {short}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -310,7 +594,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     .sort((a, b) => b.count - a.count);
 
   // --- PERIOD CHART MODE: shows column chart for all period types ---
-  const periodChart = dashPeriod === 'quarterly' || dashPeriod === 'yearly' || dashPeriod === 'weekly' || dashPeriod === 'monthly';
+  const periodChart = dashPeriod === 'quarterly' || dashPeriod === 'yearly' || dashPeriod === 'weekly' || dashPeriod === 'monthly' || dashPeriod === 'custom';
 
   const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const MONTH_FULL  = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -369,6 +653,54 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     return bars;
   };
 
+  // Custom range: daily bars if ≤14 days, weekly bars if >14 days
+  const buildCustomBars = () => {
+    const bars = [];
+    if (!dateRange.start || !dateRange.end) return bars;
+    const sDate = new Date(dateRange.start);
+    const eDate = new Date(dateRange.end);
+    if (isNaN(sDate) || isNaN(eDate)) return bars;
+    if (sDate > eDate) return bars;
+    const dayDiff = Math.round((eDate - sDate) / 86400000) + 1;
+    if (dayDiff <= 14) {
+      let cursor = new Date(sDate);
+      let safety = 0;
+      while (cursor <= eDate && safety < 366) {
+        const key = cursor.toISOString().slice(0, 10);
+        const dayLabel = DAY_SHORT[cursor.getDay()];
+        const dateLabel = `${cursor.getDate()}/${cursor.getMonth() + 1}`;
+        const count = displayCases.filter(c => c.date_reported && c.date_reported.slice(0, 10) === key).length;
+        bars.push({ label: `${dayLabel} ${dateLabel}`, full: `${dayLabel}, ${MONTH_FULL[cursor.getMonth()]} ${cursor.getDate()}`, count });
+        cursor.setDate(cursor.getDate() + 1);
+        safety++;
+      }
+    } else {
+      let cursor = new Date(sDate);
+      let weekNum = 1;
+      let safety = 0;
+      while (cursor <= eDate && safety < 53) {
+        const weekEnd = new Date(cursor);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        const effectiveEnd = weekEnd > eDate ? eDate : weekEnd;
+        const sKey = cursor.toISOString().slice(0, 10);
+        const eKey = effectiveEnd.toISOString().slice(0, 10);
+        const count = displayCases.filter(c => {
+          if (!c.date_reported) return false;
+          const d = c.date_reported.slice(0, 10);
+          return d >= sKey && d <= eKey;
+        }).length;
+        const label = `Wk ${weekNum}`;
+        const full = `Week ${weekNum} (${cursor.getDate()} ${MONTH_SHORT[cursor.getMonth()]} – ${effectiveEnd.getDate()} ${MONTH_SHORT[effectiveEnd.getMonth()]})`;
+        bars.push({ label, full, count });
+        cursor = new Date(effectiveEnd);
+        cursor.setDate(cursor.getDate() + 1);
+        weekNum++;
+        safety++;
+      }
+    }
+    return bars;
+  };
+
   const qStartMonth = (dashQuarter - 1) * 3;
   const monthBars = periodChart
     ? (dashPeriod === 'weekly'
@@ -377,7 +709,9 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           ? buildMonthlyWeekBars()
           : dashPeriod === 'quarterly'
             ? buildMonthBars([qStartMonth, qStartMonth + 1, qStartMonth + 2])
-            : buildMonthBars([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]))
+            : dashPeriod === 'custom'
+              ? buildCustomBars()
+              : buildMonthBars([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]))
     : [];
   const monthMax = monthBars.length > 0 ? Math.max(...monthBars.map(b => b.count)) : 1;
 
@@ -413,7 +747,9 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           ? `Monthly Cases (${MONTH_FULL[new Date(dateRange.start || Date.now()).getMonth()]} ${dashYear})`
           : dashPeriod === 'quarterly'
             ? `Quarterly Cases (Q${dashQuarter} ${dashYear})`
-            : `Yearly Cases (${dashYear})`)
+            : dashPeriod === 'custom'
+              ? `Custom Range (${dateRange.start || ''} to ${dateRange.end || ''})`
+              : `Yearly Cases (${dashYear})`)
     : (isBhw ? 'All Diseases - Case Counts' : `${selectedDisease} Cases by Barangay`);
   const exportHighest = periodChart ? monthMax : (isBhw ? (diseaseBars.length > 0 ? diseaseBars[0].count : 1) : highestCount);
 
@@ -771,7 +1107,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                   ))}
                 </div>
                 {hoveredBar && (
-                  <div style={{ position: 'absolute', bottom: '44px', left: '50%', transform: 'translateX(-50%)', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px 14px', boxShadow: '0 4px 16px rgba(0,0,0,0.2)', fontSize: '13px', color: 'var(--text-main)', pointerEvents: 'none', whiteSpace: 'nowrap', zIndex: 10 }}>
+                  <div style={{ position: 'absolute', bottom: '44px', left: `calc(26px + ${(hoveredBar.idx + 0.5) * (100 / monthBars.length)}% - 24px)`, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px 14px', boxShadow: '0 4px 16px rgba(0,0,0,0.2)', fontSize: '13px', color: 'var(--text-main)', pointerEvents: 'none', whiteSpace: 'nowrap', zIndex: 10 }}>
                     <div style={{ fontWeight: '700', marginBottom: '2px' }}>{hoveredBar.label}</div>
                     <div>{hoveredBar.count} cases ({hoveredBar.pct}%)</div>
                   </div>
@@ -798,7 +1134,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                     <div style={{ flex: 1, background: 'var(--input-bg)', height: '24px', borderRadius: '6px', overflow: 'hidden', position: 'relative' }}>
                       <div style={{
                         width: dHighest > 0 ? `${(bar.count / dHighest) * 100}%` : '0%',
-                        background: i === 0 ? '#DC2626' : bar.count >= 10 ? '#D97706' : bar.count > 0 ? '#129968' : '#3b82f6',
+                        background: getCountColor(bar.count, diseaseBars),
                         height: '100%', borderRadius: '6px', transition: 'width 0.4s ease',
                         display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
                         paddingRight: '8px', color: '#fff', fontWeight: '700', fontSize: '15px',
@@ -825,7 +1161,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                   <div style={{ flex: 1, background: 'var(--input-bg)', height: '24px', borderRadius: '6px', overflow: 'hidden', position: 'relative' }}>
                     <div style={{
                       width: `${(bar.count / highestCount) * 100}%`,
-                      background: i === 0 ? '#DC2626' : bar.count >= 10 ? '#D97706' : bar.count > 0 ? '#129968' : '#3b82f6',
+                      background: getCountColor(bar.count, sortedBars),
                       height: '100%', borderRadius: '6px', transition: 'width 0.4s ease',
                       display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
                       paddingRight: '8px', color: '#fff', fontWeight: '700', fontSize: '15px',
@@ -892,6 +1228,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                   onClick={() => {
                     setDashPeriod(p);
                     setDateRange(getPeriodRange(p, dashQuarter, dashYear));
+                    setShowAllDiseases(false);
                   }}
                   style={{
                     flex: 1, padding: '6px 4px', borderRadius: '6px', cursor: 'pointer',
@@ -1018,14 +1355,18 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '8px' }}>
                 <input
                   type="date"
-                  value={dateRange.start}
-                  onChange={(e) => { setDateRange({ ...dateRange, start: e.target.value }); setDashPeriod('custom'); }}
+                  key={`start-${dateRange.start}`}
+                  defaultValue={dateRange.start}
+                  onBlur={(e) => { const v = e.target.value; if (/^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(new Date(v))) { setDateRange({ ...dateRange, start: v }); setDashPeriod('custom'); } }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.target.blur(); } }}
                   style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '15px', boxSizing: 'border-box' }}
                 />
                 <input
                   type="date"
-                  value={dateRange.end}
-                  onChange={(e) => { setDateRange({ ...dateRange, end: e.target.value }); setDashPeriod('custom'); }}
+                  key={`end-${dateRange.end}`}
+                  defaultValue={dateRange.end}
+                  onBlur={(e) => { const v = e.target.value; if (/^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(new Date(v))) { setDateRange({ ...dateRange, end: v }); setDashPeriod('custom'); } }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.target.blur(); } }}
                   style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '15px', boxSizing: 'border-box' }}
                 />
               </div>
@@ -1079,6 +1420,103 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           </div>
         </div>
       </div>
+
+      {/* ── TOP CASES ── */}
+      {(() => {
+        const topBarangayList = (() => {
+          const counts = {};
+          displayCases.forEach(c => { if (c.barangay_name) counts[c.barangay_name] = (counts[c.barangay_name] || 0) + 1; });
+          return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => ({ name, count }));
+        })();
+        const topDiseaseList = (() => {
+          const counts = {};
+          displayCases.forEach(c => {
+            if (c.disease_name) {
+              const matched = findBestDisease(c.disease_name);
+              if (matched) counts[matched] = (counts[matched] || 0) + 1;
+            }
+          });
+          return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => ({ name, count }));
+        })();
+        const topBrgyMax = topBarangayList.length > 0 ? topBarangayList[0].count : 1;
+        const topDisMax = topDiseaseList.length > 0 ? topDiseaseList[0].count : 1;
+        const getRankColor = (count, list) => {
+          if (!list || list.length === 0) return 'var(--input-bg)';
+          const uniqueCounts = [...new Set(list.map(b => b.count))].filter(c => c > 0).sort((a, b) => b - a);
+          if (count === uniqueCounts[0]) return '#DC2626';
+          if (uniqueCounts.length > 1 && count === uniqueCounts[1]) return '#D97706';
+          return '#3b82f6';
+        };
+        const rankBadge = (count, list) => {
+          const bg = getRankColor(count, list);
+          return <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '22px', height: '22px', borderRadius: '50%', background: bg, color: '#fff', fontSize: '13px', fontWeight: '700', flexShrink: 0 }}>{list.indexOf(list.find(b => b.count === count)) + 1}</span>;
+        };
+        return (
+          <div style={{ display: 'grid', gridTemplateColumns: isBhw ? '1fr' : '1fr 1fr', gap: '16px' }}>
+            {/* Top Barangays — CHO only */}
+            {!isBhw && (
+              <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' }}>
+                <h4 style={{ color: 'var(--text-main)', margin: '0 0 16px 0', fontSize: '15px', fontWeight: '600' }}>
+                  Top Barangays
+                  <span style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: '400', marginLeft: '8px' }}>({dateRange.start} to {dateRange.end})</span>
+                </h4>
+                {topBarangayList.length === 0 ? (
+                  <div style={{ color: 'var(--text-muted)', fontSize: '15px', padding: '20px 0', textAlign: 'center' }}>No cases in this period</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {topBarangayList.map((item, i) => (
+                      <div key={item.name} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        {rankBadge(item.count, topBarangayList)}
+                        <span style={{ minWidth: '130px', fontSize: '15px', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={item.name}>{item.name}</span>
+                        <div style={{ flex: 1, background: 'var(--input-bg)', height: '20px', borderRadius: '6px', overflow: 'hidden' }}>
+                          <div style={{ width: `${topBrgyMax > 0 ? (item.count / topBrgyMax) * 100 : 0}%`, background: getCountColor(item.count, topBarangayList), height: '100%', borderRadius: '6px', transition: 'width 0.4s ease', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '6px', color: '#fff', fontSize: '13px', fontWeight: '700', boxSizing: 'border-box' }}>
+                            {item.count > 0 ? item.count : ''}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Top Diseases — all roles */}
+            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h4 style={{ color: 'var(--text-main)', margin: 0, fontSize: '15px', fontWeight: '600' }}>
+                  Top Diseases
+                  <span style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: '400', marginLeft: '8px' }}>({dateRange.start} to {dateRange.end})</span>
+                </h4>
+                <button
+                  onClick={() => setShowAllDiseases(true)}
+                  style={{ padding: '4px 12px', background: '#121358', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '500', whiteSpace: 'nowrap' }}
+                  onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+                  onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                >
+                  View All Diseases →
+                </button>
+              </div>
+              {topDiseaseList.length === 0 ? (
+                <div style={{ color: 'var(--text-muted)', fontSize: '15px', padding: '20px 0', textAlign: 'center' }}>No cases in this period</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {topDiseaseList.map((item, i) => (
+                    <div key={item.name} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      {rankBadge(item.count, topDiseaseList)}
+                      <span style={{ minWidth: '130px', fontSize: '15px', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</span>
+                      <div style={{ flex: 1, background: 'var(--input-bg)', height: '20px', borderRadius: '6px', overflow: 'hidden' }}>
+                        <div style={{ width: `${topDisMax > 0 ? (item.count / topDisMax) * 100 : 0}%`, background: getCountColor(item.count, topDiseaseList), height: '100%', borderRadius: '6px', transition: 'width 0.4s ease', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '6px', color: '#fff', fontSize: '13px', fontWeight: '700', boxSizing: 'border-box' }}>
+                          {item.count > 0 ? item.count : ''}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── RECENT CASE REPORTS ── */}
           <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' }}>
