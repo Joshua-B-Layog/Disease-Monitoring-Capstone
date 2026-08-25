@@ -1115,7 +1115,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 14px', marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}>
                 {monthBars.map((b, i) => (
-                  <span key={b.label} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                  <span key={b.label} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '15px', color: 'var(--text-muted)' }}>
                     <span style={{ width: '11px', height: '11px', borderRadius: '3px', background: COLUMN_COLORS[i % COLUMN_COLORS.length] }} />
                     {b.full}
                   </span>

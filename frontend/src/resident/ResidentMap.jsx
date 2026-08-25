@@ -10,8 +10,8 @@ import { getPointInBarangay, pointInFeature } from '../data/coordinates';
 
 const CABUYAO_CENTER = [14.2253, 121.1254];
 const CABUYAO_BOUNDS = [
-  [14.16, 120.98],
-  [14.29, 121.18],
+  [14.15, 121.00],
+  [14.30, 121.19],
 ];
 
 const ALL_BARANGAYS = [
@@ -567,7 +567,7 @@ export default function ResidentMap() {
   const [allCases, setAllCases]         = useState([]);
   const [barangayData, setBarangayData] = useState([]);
   const [purokData, setPurokData]       = useState([]);
-  const [mapZoom, setMapZoom]           = useState(14);
+  const [mapZoom, setMapZoom]           = useState(13);
   const [autoDetectedBrgy, setAutoDetectedBrgy] = useState(null);
   const [tooltip, setTooltip] = useState(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
@@ -581,6 +581,20 @@ export default function ResidentMap() {
   const [mapLayer, setMapLayer] = useState('HD'); // 'SD' = street map (Carto), 'HD' = satellite (Esri)
   const [showOverview, setShowOverview] = useState(true);
   const geoJsonLayerRef = useRef(null);
+  const overviewContentRef = useRef(null);
+  const [overviewHeight, setOverviewHeight] = useState(0);
+
+  useEffect(() => {
+    if (overviewContentRef.current) {
+      setOverviewHeight(overviewContentRef.current.scrollHeight);
+    }
+  }, [barangayData, allCases]);
+
+  useEffect(() => {
+    if (showOverview && overviewContentRef.current) {
+      setOverviewHeight(overviewContentRef.current.scrollHeight);
+    }
+  }, [showOverview]);
   const barangayDataRef = useRef(barangayData);
   useEffect(() => { barangayDataRef.current = barangayData; }, [barangayData]);
 
@@ -752,14 +766,28 @@ export default function ResidentMap() {
       <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '12px', marginBottom: '20px', overflow: 'hidden' }}>
         <button onClick={() => setShowOverview(!showOverview)}
           style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-main)' }}>
-          <span style={{ fontWeight: '700', fontSize: '18px' }}>🏥 City Health Overview</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: '700', fontSize: '18px' }}>
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="var(--text-main)" style={{ flexShrink: 0 }}>
+              <path d="m23.58 8.536-3.362-5.4-4.945 3.08v-6.216h-6.546v6.216l-4.945-3.08-3.362 5.4 5.563 3.464-5.563 3.464 3.362 5.4 4.945-3.08v6.216h6.546v-6.216l4.945 3.08 3.362-5.4-5.563-3.464z"/>
+            </svg>
+            City Health Overview
+          </span>
           <span style={{ fontSize: '18px', color: 'var(--text-muted)' }}>{showOverview ? '▲' : '▼'}</span>
         </button>
 
-        {showOverview && (
-          <div style={{ padding: '0 20px 20px' }}>
+        <div
+          ref={overviewContentRef}
+          style={{
+            maxHeight: showOverview ? overviewHeight + 'px' : '0px',
+            opacity: showOverview ? 1 : 0,
+            overflow: 'hidden',
+            transition: 'max-height 0.35s ease, opacity 0.25s ease',
+            padding: showOverview ? '16px 20px 20px' : '0 20px',
+            borderTop: showOverview ? '1px solid var(--border-color)' : 'none',
+          }}
+        >
             {/* Stat cards */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
+            <div className="resident-stat-cards" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '20px' }}>
               {[
                 { label: 'Total Cases', value: totalCases, color: '#1e3a8a', bg: '#eff6ff' },
                 { label: 'Most Affected', value: mostAffected ? mostAffected.barangayName : '—', sub: mostAffected ? `${mostAffected.totalCases} cases` : '', color: '#dc2626', bg: '#fef2f2' },
@@ -767,10 +795,10 @@ export default function ResidentMap() {
                 { label: 'Active Cases', value: activeCases, color: '#f59e0b', bg: '#fffbeb' },
                 { label: 'Affected Barangays', value: `${affectedBrgyCount} / ${ALL_BARANGAYS.length}`, color: '#10b981', bg: '#ecfdf5' },
               ].map(card => (
-                <div key={card.label} style={{ flex: '1 1 160px', background: card.bg, borderRadius: '10px', padding: '16px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '26px', fontWeight: '800', color: card.color, lineHeight: '1.2' }}>{card.value}</div>
-                  {card.sub && <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px' }}>{card.sub}</div>}
-                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#475569', marginTop: '4px' }}>{card.label}</div>
+                <div key={card.label} style={{ flex: '1 1 140px', background: card.bg, borderRadius: '10px', padding: '14px 12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '28px', fontWeight: '800', color: card.color, lineHeight: '1.2' }}>{card.value}</div>
+                  {card.sub && <div style={{ fontSize: '14px', fontWeight: '600', color: '#475569', marginTop: '4px' }}>{card.sub}</div>}
+                  <div style={{ fontSize: '16px', fontWeight: '600', color: '#475569', marginTop: '6px' }}>{card.label}</div>
                 </div>
               ))}
             </div>
@@ -779,15 +807,15 @@ export default function ResidentMap() {
             {sortedBarangays.length > 0 && (
               <div style={{ marginBottom: '20px' }}>
                 <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Barangay Risk Classification</div>
-                <div style={{ maxHeight: '300px', overflowY: 'auto', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <div className="resident-table-wrap" style={{ maxHeight: '300px', overflowY: 'auto', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '15px' }}>
                     <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
                       <tr style={{ background: 'var(--input-bg)' }}>
-                        <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: '600', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>#</th>
-                        <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: '600', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>Barangay</th>
+                        <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: '600', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>No.</th>
+                        <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: '600', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>Barangay</th>
                         <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: '600', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>Cases</th>
                         <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: '600', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>Risk Level</th>
-                        <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: '600', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>Top Disease</th>
+                        <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: '600', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>Top Disease</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -797,7 +825,7 @@ export default function ResidentMap() {
                         return (
                           <tr key={b.barangayName} style={{ background: i % 2 === 0 ? 'transparent' : 'var(--input-bg)' }}>
                             <td style={{ padding: '7px 10px', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>{i + 1}</td>
-                            <td style={{ padding: '7px 10px', borderBottom: '1px solid var(--border-color)', fontWeight: '600', color: 'var(--text-main)' }}>{b.barangayName}</td>
+                            <td style={{ padding: '7px 10px', borderBottom: '1px solid var(--border-color)', fontWeight: '600', color: 'var(--text-main)', textAlign: 'center' }}>{b.barangayName}</td>
                             <td style={{ padding: '7px 10px', borderBottom: '1px solid var(--border-color)', textAlign: 'center', fontWeight: '700', color: 'var(--text-main)' }}>{b.totalCases}</td>
                             <td style={{ padding: '7px 10px', borderBottom: '1px solid var(--border-color)', textAlign: 'center' }}>
                               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '2px 10px', borderRadius: '12px', fontSize: '13px', fontWeight: '600', color: risk.color, background: risk.ring }}>
@@ -805,7 +833,7 @@ export default function ResidentMap() {
                                 {risk.label.replace(' Risk', '')}
                               </span>
                             </td>
-                            <td style={{ padding: '7px 10px', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '14px' }}>
+                            <td style={{ padding: '7px 10px', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '14px', textAlign: 'center' }}>
                               {topD ? `${topD[0]} (${topD[1]})` : '—'}
                             </td>
                           </tr>
@@ -824,7 +852,7 @@ export default function ResidentMap() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {top8Diseases.map(([disease, count]) => (
                     <div key={disease} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ width: '180px', fontSize: '14px', color: 'var(--text-main)', fontWeight: '500', textAlign: 'right', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{disease}</span>
+                      <span className="resident-disease-label" style={{ fontSize: '14px', color: 'var(--text-main)', fontWeight: '500' }}>{disease}</span>
                       <div style={{ flex: 1, height: '18px', background: 'var(--input-bg)', borderRadius: '4px', overflow: 'hidden' }}>
                         <div style={{ width: `${(count / maxDiseaseCount) * 100}%`, height: '100%', background: getDiseaseColor(disease), borderRadius: '4px', minWidth: '2px' }} />
                       </div>
@@ -835,8 +863,7 @@ export default function ResidentMap() {
               </div>
             )}
           </div>
-        )}
-      </div>
+        </div>
       {offlineMode && (
         <div style={{ padding: '8px 14px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '15px', color: '#F59E0B' }}>
           Offline - showing cached data. Will refresh when reconnected.
@@ -893,8 +920,8 @@ export default function ResidentMap() {
       )}
 
       {/* Map area */}
-      <div style={{
-        height: '550px', borderRadius: '12px', overflow: 'hidden',
+      <div className="resident-map-area" style={{
+        borderRadius: '12px', overflow: 'hidden',
         border: '1px solid var(--border-color)', position: 'relative',
       }}
         onMouseMove={(e) => {
@@ -903,7 +930,8 @@ export default function ResidentMap() {
         }}
       >
         <MapContainer
-          center={CABUYAO_CENTER} zoom={14} minZoom={12} maxZoom={19} scrollWheelZoom={true}
+          center={CABUYAO_CENTER} zoom={14} minZoom={12.5} maxZoom={19} scrollWheelZoom={true}
+          zoomSnap={0} zoomDelta={0.5}
           maxBounds={CABUYAO_BOUNDS}
           maxBoundsViscosity={0.6}
           style={{ width: '100%', height: '100%' }}>
@@ -1135,7 +1163,7 @@ export default function ResidentMap() {
       </div>
 
       {/* Legend */}
-      <div style={{ marginTop: '16px', display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'flex-start' }}>
+      <div style={{ marginTop: '16px', display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '24px', padding: '0 16px', alignItems: 'start' }}>
         <div>
           <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Risk Levels</div>
           <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>

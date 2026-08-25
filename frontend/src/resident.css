@@ -1,5 +1,5 @@
 /* =========================================================
-   RESIDENT PORTAL — Typography rules
+   RESIDENT PORTAL — Typography + Animations + Responsive
    Bahnschrift SemiBold Condensed for headings/buttons/labels
    Tw Cen MT Condensed for body (inherited from global reset)
    ========================================================= */
@@ -51,4 +51,147 @@
 .resident-page select {
   font-family: var(--sans);
   font-size: 15px;
+}
+
+/* =========================================================
+   ANIMATIONS
+   ========================================================= */
+
+@keyframes overviewExpand {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* =========================================================
+   RESPONSIVE — ResidentApp header + hero + sections
+   ========================================================= */
+
+/* Desktop nav: show by default, hide on mobile */
+.resident-nav-desktop { display: flex !important; }
+.resident-hamburger   { display: none !important; }
+
+/* Section containers: full-width + visual boundary + gaps */
+.resident-section {
+  max-width: 1200px;
+  margin: 24px auto;
+  padding: 28px 24px;
+  background: var(--bg-surface);
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
+}
+
+/* Hero heading */
+.resident-hero-title {
+  font-size: 36px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.resident-hero-sub {
+  font-size: 16px;
+  max-width: 600px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+/* =========================================================
+   RESPONSIVE — ResidentMap elements
+   ========================================================= */
+
+/* Map container */
+.resident-map-area {
+  height: 450px;
+}
+
+/* Stat cards grid */
+.resident-stat-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+/* Disease bar rows */
+.resident-disease-label {
+  width: 180px;
+  flex-shrink: 0;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* =========================================================
+   BREAKPOINT: 1024px  (tablet / small laptop / MacBook)
+   ========================================================= */
+@media (max-width: 1024px) {
+  .resident-page h2 { font-size: 24px; }
+
+  .resident-header { padding: 0 24px !important; }
+
+  .resident-hero-title { font-size: 28px; }
+
+  .resident-section { padding: 24px 20px; }
+
+  .resident-map-area { height: 340px; }
+
+  .resident-stat-cards > div { flex: 1 1 140px; }
+
+  .resident-disease-label { width: 140px; font-size: 14px; }
+}
+
+/* =========================================================
+   BREAKPOINT: 768px  (tablet portrait / small laptop)
+   ========================================================= */
+@media (max-width: 768px) {
+  .resident-nav-desktop { display: none !important; }
+  .resident-hamburger   { display: flex !important; }
+
+  .resident-header { padding: 0 16px !important; }
+
+  .resident-hero-title { font-size: 24px; }
+  .resident-hero-sub  { font-size: 14px; }
+
+  .resident-page h2 { font-size: 22px; }
+
+  .resident-section { padding: 20px 16px; }
+
+  .resident-map-area { height: 400px; }
+
+  .resident-stat-cards > div { flex: 1 1 120px; }
+
+  .resident-disease-label { width: 110px; font-size: 13px; }
+
+  /* Tables: allow horizontal scroll */
+  .resident-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
+
+/* =========================================================
+   BREAKPOINT: 480px  (phone)
+   ========================================================= */
+@media (max-width: 480px) {
+  .resident-header { padding: 0 12px !important; }
+
+  .resident-hero-title { font-size: 20px; }
+  .resident-hero-sub  { font-size: 13px; }
+
+  .resident-page h2 { font-size: 20px; }
+  .resident-page h3 { font-size: 16px; }
+
+  .resident-section { padding: 16px 12px; border-radius: 8px; }
+
+  .resident-map-area { height: 320px; }
+
+  .resident-stat-cards {
+    flex-direction: column;
+  }
+  .resident-stat-cards > div { flex: 1 1 100%; }
+
+  .resident-disease-label { width: 90px; font-size: 12px; }
+
+  /* Full-width buttons and inputs on phone */
+  .resident-page button { width: auto; }
+  .resident-page input,
+  .resident-page textarea,
+  .resident-page select { width: 100%; box-sizing: border-box; }
 }

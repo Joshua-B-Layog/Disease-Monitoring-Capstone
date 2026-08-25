@@ -22,6 +22,7 @@ export default function ResidentApp() {
   const [activeSection, setActiveSection] = useState('map');
 
   const scrollRef = useRef(null);
+  const isScrollingRef = useRef(false);
   const saved = localStorage.getItem('cdms_theme');
   const [theme, setTheme] = useState(saved || 'light');
 
@@ -50,11 +51,18 @@ export default function ResidentApp() {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
           entry.target.classList.add('visible');
-          const key = entry.target.id.replace('section-', '');
-          setActiveSection(key);
         }
       });
-    }, { threshold: 0.2, rootMargin: '-64px 0px 0px 0px' });
+      if (isScrollingRef.current) return;
+      const visibleEntries = entries.filter(e => e.isIntersecting);
+      if (visibleEntries.length > 0) {
+        const best = visibleEntries.reduce((a, b) =>
+          a.intersectionRatio > b.intersectionRatio ? a : b
+        );
+        const key = best.target.id.replace('section-', '');
+        setActiveSection(key);
+      }
+    }, { threshold: [0.2, 0.4, 0.6, 0.8], rootMargin: '-64px 0px -10% 0px' });
 
     els.forEach(el => observer.observe(el));
     return () => observer.disconnect();
@@ -63,9 +71,11 @@ export default function ResidentApp() {
   const scrollToSection = (key) => {
     const el = document.getElementById(`section-${key}`);
     if (el && scrollRef.current) {
+      isScrollingRef.current = true;
+      setActiveSection(key);
       const top = el.getBoundingClientRect().top + scrollRef.current.scrollTop - 80;
       scrollRef.current.scrollTo({ top, behavior: 'smooth' });
-      setActiveSection(key);
+      setTimeout(() => { isScrollingRef.current = false; }, 800);
     }
     setMenuOpen(false);
   };
@@ -82,7 +92,7 @@ export default function ResidentApp() {
       transition: 'background 0.3s, color 0.3s',
     }}>
       {/* ── STICKY HEADER ── */}
-      <header style={{
+      <header className="resident-header" style={{
         background: 'linear-gradient(90deg, #121358 100%)',
         padding: '0 64px',
         position: 'sticky',
@@ -112,7 +122,7 @@ export default function ResidentApp() {
           </div>
 
           {/* Desktop nav */}
-          <nav style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+          <nav className="resident-nav-desktop" style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
             {SECTIONS.map(s => (
               <button key={s.key} onClick={() => scrollToSection(s.key)}
                 style={{
@@ -148,9 +158,8 @@ export default function ResidentApp() {
           </nav>
 
           {/* Mobile hamburger */}
-          <button onClick={() => setMenuOpen(!menuOpen)}
+          <button className="resident-hamburger" onClick={() => setMenuOpen(!menuOpen)}
             style={{
-              display: 'none',
               background: 'none', border: 'none', color: '#fff', fontSize: '26px', cursor: 'pointer',
             }}>
             {menuOpen ? '✕' : '☰'}
@@ -197,13 +206,13 @@ export default function ResidentApp() {
         padding: '28px 24px 32px',
         textAlign: 'center',
       }}>
-        <h1 style={{
+        <h1 className="resident-hero-title" style={{
           margin: '0 0 8px', color: '#fff', fontSize: '36px', fontWeight: '800',
           letterSpacing: '-0.02em',
         }}>
           Cabuyao Disease Monitoring System
         </h1>
-        <p style={{
+        <p className="resident-hero-sub" style={{
           margin: '0', color: 'rgba(255,255,255,0.8)',
           fontSize: '16px', maxWidth: '600px', margin: '0 auto',
           lineHeight: '1.6',
@@ -214,19 +223,19 @@ export default function ResidentApp() {
       </div>
 
       {/* ── SECTIONS ── */}
-      <section id="section-map" className="section-fade-in" style={{ maxWidth: '1200px', margin: '0 auto', padding: '28px 24px' }}>
+      <section id="section-map" className="section-fade-in resident-section">
         <ResidentMap />
       </section>
-      <section id="section-about" className="section-fade-in" style={{ maxWidth: '1200px', margin: '0 auto', padding: '28px 24px' }}>
+      <section id="section-about" className="section-fade-in resident-section">
         <AboutCho />
       </section>
-      <section id="section-contact" className="section-fade-in" style={{ maxWidth: '1200px', margin: '0 auto', padding: '28px 24px' }}>
+      <section id="section-contact" className="section-fade-in resident-section">
         <ContactUs />
       </section>
-      <section id="section-help" className="section-fade-in" style={{ maxWidth: '1200px', margin: '0 auto', padding: '28px 24px' }}>
+      <section id="section-help" className="section-fade-in resident-section">
         <Help />
       </section>
-      <section id="section-tips" className="section-fade-in" style={{ maxWidth: '1200px', margin: '0 auto', padding: '28px 24px' }}>
+      <section id="section-tips" className="section-fade-in resident-section">
         <PreventionTips />
       </section>
 
