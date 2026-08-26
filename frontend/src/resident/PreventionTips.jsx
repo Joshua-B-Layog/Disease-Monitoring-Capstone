@@ -558,11 +558,14 @@ const DISEASE_CATEGORY = {
 };
 
 const CATEGORIES = ['All', 'Vector-borne', 'Waterborne', 'Airborne', 'Blood-borne', 'Contact'];
+const ALL_BARANGAYS = ['All Barangays','Baclaran','Banay-Banay','Banlic','Barangay Dos (Poblacion)','Barangay Tres (Poblacion)','Barangay Uno (Poblacion)','Bigaa','Butong','Casile','Diezmo','Gulod','Mamatid','Marinig','Niugan','Pittland','Pulo','Sala','San Isidro'];
 
 export default function PreventionTips() {
   const [expanded, setExpanded] = useState(null);
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('All');
+  const [selectedBarangay, setSelectedBarangay] = useState('All Barangays');
+  const [diseaseCounts, setDiseaseCounts] = useState({});
 
   useEffect(() => { setExpanded(null); }, [search, catFilter]);
 
@@ -571,6 +574,20 @@ export default function PreventionTips() {
   const [scAnswers, setScAnswers] = useState({});
   const [scResult, setScResult] = useState(null);
   const quizRef = useRef(null);
+
+  useEffect(() => {
+    const params = selectedBarangay !== 'All Barangays' ? `?barangay=${encodeURIComponent(selectedBarangay)}` : '';
+    fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/disease_cases/public-disease-counts${params}`)
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          const map = {};
+          data.forEach(d => { map[d.disease_name] = d.case_count; });
+          setDiseaseCounts(map);
+        }
+      })
+      .catch(() => {});
+  }, [selectedBarangay]);
 
   const filtered = DISEASES.filter(d =>
     d.name.toLowerCase().includes(search.toLowerCase()) &&
@@ -631,6 +648,88 @@ export default function PreventionTips() {
         }}
       />
 
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
+        <label style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Barangay:</label>
+        <select
+          value={selectedBarangay}
+          onChange={e => setSelectedBarangay(e.target.value)}
+          style={{
+            padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: '8px',
+            fontSize: '15px', background: 'var(--bg-surface)', color: 'var(--text-main)',
+            cursor: 'pointer', outline: 'none',
+          }}
+        >
+          {ALL_BARANGAYS.map(b => <option key={b} value={b}>{b}</option>)}
+        </select>
+        {selectedBarangay !== 'All Barangays' && (
+          <span style={{ fontSize: '15px', color: '#3B82F6', fontWeight: '500' }}>
+            Showing cases in {selectedBarangay}
+          </span>
+        )}
+      </div>
+
+      {/* ── ACTIVE HEALTH ALERT BANNER (aggregate, privacy-safe) ── */}
+      {(() => {
+        const scopeLabel = selectedBarangay === 'All Barangays' ? 'Cabuyao City' : `Barangay ${selectedBarangay}`;
+        const activeDiseases = Object.entries(diseaseCounts)
+          .filter(([, count]) => count > 0)
+          .sort((a, b) => b[1] - a[1]);
+        const totalActive = activeDiseases.reduce((sum, [, c]) => sum + c, 0);
+        const top3 = activeDiseases.slice(0, 3);
+
+        let tier;
+        if (totalActive >= 20) {
+          tier = {
+            label: 'High Case Activity', icon: '⚠', color: '#DC2626',
+            bg: 'rgba(220,38,38,0.12)', border: 'rgba(220,38,38,0.35)',
+            msg: 'Practice extra caution and follow the prevention tips below closely.',
+          };
+        } else if (totalActive >= 10) {
+          tier = {
+            label: 'Moderate Case Activity', icon: 'ℹ', color: '#D97706',
+            bg: 'rgba(217,119,6,0.12)', border: 'rgba(217,119,6,0.35)',
+            msg: 'Stay alert and review the prevention tips for the most common diseases.',
+          };
+        } else if (totalActive > 0) {
+          tier = {
+            label: 'Current Case Activity', icon: '✓', color: '#2563eb',
+            bg: 'rgba(37,99,235,0.12)', border: 'rgba(37,99,235,0.3)',
+            msg: 'A small number of cases have been reported. Basic precautions are advised.',
+          };
+        } else {
+          tier = {
+            label: 'No Cases Reported', icon: '✓', color: '#129968',
+            bg: 'rgba(18,153,104,0.12)', border: 'rgba(18,153,104,0.3)',
+            msg: 'No cases recorded for this area. Keep up the good prevention habits!',
+          };
+        }
+
+        return (
+          <div style={{
+            display: 'flex', alignItems: 'flex-start', gap: '12px',
+            padding: '14px 18px', borderRadius: '10px', marginBottom: '20px',
+            background: tier.bg, border: `1px solid ${tier.border}`,
+          }}>
+            <span style={{ fontSize: '20px', lineHeight: 1.2, flexShrink: 0 }}>{tier.icon}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '15px', fontWeight: '700', color: tier.color }}>{tier.label}</span>
+                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>- {scopeLabel}</span>
+              </div>
+              {totalActive > 0 && (
+                <div style={{ fontSize: '14px', color: 'var(--text-main)', marginTop: '4px' }}>
+                  <strong>{totalActive}</strong> case{totalActive !== 1 ? 's' : ''} on record
+                  {top3.length > 0 && (
+                    <> · Most common: {top3.map(([name, count]) => `${name} (${count})`).join(', ')}{activeDiseases.length > 3 ? `, +${activeDiseases.length - 3} more` : ''}</>
+                  )}
+                </div>
+              )}
+              <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>{tier.msg}</div>
+            </div>
+          </div>
+        );
+      })()}
+
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '20px' }}>
         {CATEGORIES.map(cat => (
           <button
@@ -676,6 +775,11 @@ export default function PreventionTips() {
                 <div style={{ fontSize: '15px', color: 'var(--text-main)' }}>
                   {disease.tips.length} prevention tips
                 </div>
+                {selectedBarangay !== 'All Barangays' && (
+                  <div style={{ fontSize: '13px', color: diseaseCounts[disease.name] > 0 ? '#ef4444' : '#10b981', fontWeight: '500', marginTop: '2px' }}>
+                    {diseaseCounts[disease.name] || 0} case{(diseaseCounts[disease.name] || 0) !== 1 ? 's' : ''} in {selectedBarangay}
+                  </div>
+                )}
               </div>
               <span style={{ color: '#64748b', fontSize: '16px' }}>
                 {expanded === idx ? '▲' : '▼'}

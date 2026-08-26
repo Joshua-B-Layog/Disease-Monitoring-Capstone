@@ -35,6 +35,7 @@ export default function ContactUs() {
   const [sent, setSent] = useState(false);
   const [offlineQueued, setOfflineQueued] = useState(false);
   const [error, setError] = useState('');
+  const [formErrors, setFormErrors] = useState({});
   const [locationView, setLocationView] = useState('cho1');
   const [diseaseOpen, setDiseaseOpen] = useState(false);
   const [targetBarangayOpen, setTargetBarangayOpen] = useState(false);
@@ -52,10 +53,25 @@ export default function ContactUs() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name || !form.age || !form.gender || !form.contact || !form.address || !form.disease || !form.message) {
-      setError('Please fill in all required fields.');
+    const errors = {};
+    if (!form.name.trim()) errors.name = true;
+    if (!form.age) errors.age = true;
+    else { const ageNum = Number(form.age); if (isNaN(ageNum) || ageNum < 0 || ageNum > 150) errors.age = true; }
+    if (!form.gender) errors.gender = true;
+    if (!form.contact.trim()) errors.contact = true;
+    else { const phoneClean = form.contact.replace(/[\s\-()]/g, ''); if (!/^09\d{9}$/.test(phoneClean)) errors.contact = true; }
+    if (!form.address.trim()) errors.address = true;
+    if (!form.disease) errors.disease = true;
+    if (!form.message.trim()) errors.message = true;
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      const msgs = [];
+      if (errors.age) msgs.push('Age must be 0–150');
+      if (errors.contact) msgs.push('Use valid PH phone (e.g., 09123456789)');
+      setError(msgs.length > 0 ? msgs.join('. ') + '.' : 'Please fill in all required fields highlighted in red.');
       return;
     }
+    setFormErrors({});
     setSending(true);
     setError('');
     try {
@@ -69,12 +85,14 @@ export default function ContactUs() {
         setSent(true);
         setOfflineQueued(true);
         setForm({ name: '', age: '', gender: '', contact: '', address: '', targetCho: 'BHW', targetBarangay: '', disease: '', message: '' });
+        setFormErrors({});
         setSending(false);
         return;
       }
       await axios.post(`${API_URL}/api/contact-messages`, form);
       setSent(true);
       setForm({ name: '', age: '', gender: '', contact: '', address: '', targetCho: 'BHW', targetBarangay: '', disease: '', message: '' });
+      setFormErrors({});
     } catch (err) {
       setError('Failed to send message. Please try again later.');
     }
@@ -140,33 +158,35 @@ export default function ContactUs() {
             </div>
           ) : (
             <form onSubmit={handleSubmit}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <input required placeholder="Your Name"
-                  value={form.name} onChange={e => setForm({...form, name: e.target.value})}
-                  style={inputStyle} />
-                <input required type="number" placeholder="Age"
-                  value={form.age} onChange={e => setForm({...form, age: e.target.value})}
-                  style={inputStyle} min="0" max="150" />
-                <select required value={form.gender} onChange={e => setForm({...form, gender: e.target.value})}
-                  style={{ ...inputStyle, cursor: 'pointer' }}>
-                  <option value="" disabled>- Select Gender -</option>
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Other">Other</option>
-                </select>
-                <input required type="tel" placeholder="Contact Number"
-                  value={form.contact} onChange={e => setForm({...form, contact: e.target.value})}
-                  style={inputStyle} />
-                <input required placeholder="Your Address"
-                  value={form.address} onChange={e => setForm({...form, address: e.target.value})}
-                  style={inputStyle} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <input required placeholder="Your Name"
+                    value={form.name} onChange={e => { setForm({...form, name: e.target.value}); setFormErrors(prev => ({...prev, name: false})); }}
+                    style={{ ...inputStyle, border: formErrors.name ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.name ? 'rgba(239,68,68,0.1)' : 'var(--bg-surface)' }} />
+                  <input required type="number" placeholder="Age"
+                    value={form.age} onChange={e => { setForm({...form, age: e.target.value}); setFormErrors(prev => ({...prev, age: false})); }}
+                    style={{ ...inputStyle, border: formErrors.age ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.age ? 'rgba(239,68,68,0.1)' : 'var(--bg-surface)' }} min="0" max="150" />
+                  {formErrors.age && <span style={{ fontSize: '13px', color: '#ef4444' }}>Age must be between 0 and 150</span>}
+                  <select required value={form.gender} onChange={e => { setForm({...form, gender: e.target.value}); setFormErrors(prev => ({...prev, gender: false})); }}
+                    style={{ ...inputStyle, cursor: 'pointer', border: formErrors.gender ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.gender ? 'rgba(239,68,68,0.1)' : 'var(--bg-surface)' }}>
+                    <option value="" disabled>- Select Gender -</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                  <input required type="tel" placeholder="Contact Number"
+                    value={form.contact} onChange={e => { setForm({...form, contact: e.target.value}); setFormErrors(prev => ({...prev, contact: false})); }}
+                    style={{ ...inputStyle, border: formErrors.contact ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.contact ? 'rgba(239,68,68,0.1)' : 'var(--bg-surface)' }} />
+                  {formErrors.contact && <span style={{ fontSize: '13px', color: '#ef4444' }}>Enter a valid PH number (e.g., 09123456789)</span>}
+                  <input required placeholder="Your Address"
+                    value={form.address} onChange={e => { setForm({...form, address: e.target.value}); setFormErrors(prev => ({...prev, address: false})); }}
+                    style={{ ...inputStyle, border: formErrors.address ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.address ? 'rgba(239,68,68,0.1)' : 'var(--bg-surface)' }} />
                 <div ref={targetBarangayRef} style={{ position: 'relative' }}>
                     <button type="button" onClick={() => setTargetBarangayOpen(!targetBarangayOpen)}
                       style={{ ...inputStyle, cursor: 'pointer', textAlign: 'left', display: 'flex', gap: '8px', alignItems: 'center', width: '100%' }}>
                       <span style={{ color: form.targetBarangay ? 'var(--text-main)' : 'var(--text-muted)', flex: 1 }}>
                         {form.targetBarangay || '- Select Barangay -'}
                       </span>
-                      <span style={{ fontSize: '15px', flexShrink: 0, transition: 'transform 0.2s', transform: targetBarangayOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                      <span style={{ fontSize: '10px', flexShrink: 0, transition: 'transform 0.2s', transform: targetBarangayOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                     </button>
                     {targetBarangayOpen && (
                       <div style={{
@@ -190,11 +210,11 @@ export default function ContactUs() {
                   </div>
                 <div ref={diseaseRef} style={{ position: 'relative' }}>
                   <button type="button" onClick={() => setDiseaseOpen(!diseaseOpen)}
-                    style={{ ...inputStyle, cursor: 'pointer', textAlign: 'left', display: 'flex', gap: '8px', alignItems: 'center', width: '100%' }}>
+                    style={{ ...inputStyle, cursor: 'pointer', textAlign: 'left', display: 'flex', gap: '8px', alignItems: 'center', width: '100%', border: formErrors.disease ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.disease ? 'rgba(239,68,68,0.1)' : 'var(--bg-surface)' }}>
                     <span style={{ color: form.disease ? 'var(--text-main)' : 'var(--text-muted)', flex: 1 }}>
                       {form.disease || '- Select Disease -'}
                     </span>
-                    <span style={{ fontSize: '15px', flexShrink: 0, transition: 'transform 0.2s', transform: diseaseOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                    <span style={{ fontSize: '10px', flexShrink: 0, transition: 'transform 0.2s', transform: diseaseOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                   </button>
                   {diseaseOpen && (
                     <div style={{
@@ -204,7 +224,7 @@ export default function ContactUs() {
                       borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
                     }}>
                       {DISEASE_OPTIONS.map(d => (
-                        <div key={d} onClick={() => { setForm({...form, disease: d}); setDiseaseOpen(false); }}
+                        <div key={d} onClick={() => { setForm({...form, disease: d}); setDiseaseOpen(false); setFormErrors(prev => ({...prev, disease: false})); }}
                           style={{
                             padding: '10px 12px', cursor: 'pointer', fontSize: '15px',
                             color: 'var(--text-main)',
@@ -216,10 +236,10 @@ export default function ContactUs() {
                     </div>
                   )}
                 </div>
-                <textarea required placeholder="Your Message"
-                  value={form.message} onChange={e => setForm({...form, message: e.target.value})}
-                  rows={4} style={{...inputStyle, resize: 'vertical'}} />
-                {error && <div style={{ color: '#ef4444', fontSize: '15px' }}>{error}</div>}
+                  <textarea required placeholder="Your Message"
+                    value={form.message} onChange={e => { setForm({...form, message: e.target.value}); setFormErrors(prev => ({...prev, message: false})); }}
+                    rows={4} style={{...inputStyle, resize: 'vertical', border: formErrors.message ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.message ? 'rgba(239,68,68,0.1)' : 'var(--bg-surface)'}} />
+                  {error && <div style={{ color: '#ef4444', fontSize: '15px' }}>{error}</div>}
                 <button type="submit" disabled={sending}
                   style={{
                     padding: '12px', background: '#129968', color: '#fff',

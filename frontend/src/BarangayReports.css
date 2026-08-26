@@ -252,3 +252,63 @@
 .badge-created { background-color: #dcf7eb; color: #129968 !important; }
 .badge-updated { background-color: #dbeafe; color: #2563eb !important; }
 .badge-deleted { background-color: #fee2e2; color: #dc2626 !important; }
+
+/* =========================================================
+   FORCE DARK MODE CONTRAST OVERRIDES FOR SYSTEM LOGS
+   ========================================================= */
+
+/* Fix 1: Filter Dropdowns (Updated, Covid-19, CHO Users, etc.) */
+.dark select,
+.dark-mode select,
+body.dark select,
+body.dark-mode select,
+.dark select option,
+.dark-mode select option {
+  background-color: #1e293b !important;
+  color: #ffffff !important;
+  border-color: #475569 !important;
+}
+
+/* Override dark background when option/filter is active */
+.dark select:focus,
+.dark-mode select:focus,
+.dark select:active,
+.dark-mode select:active {
+  background-color: #0f172a !important;
+  color: #38bdf8 !important;
+}
+
+/* Fix 2: Search Input Text & Placeholder in Dark Mode */
+.dark input[type="text"],
+.dark-mode input[type="text"] {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+.dark input[type="text"]::placeholder,
+.dark-mode input[type="text"]::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Fix 3: Table Text, Role Badges, and BHW/CHO Sub-pills */
+.dark table span,
+.dark-mode table span,
+.dark .badge,
+.dark-mode .badge {
+  color: #ffffff !important;
+}
+
+/* Specific fix for green BHW text on dark background */
+.dark table .text-emerald-500,
+.dark table .text-green-500,
+.dark-mode table .text-emerald-500,
+.dark-mode table .text-green-500 {
+  color: #34d399 !important; /* High-contrast bright mint */
+}
+
+/* Specific fix for blue CHO text on dark background */
+.dark table .text-blue-500,
+.dark-mode table .text-blue-500 {
+  color: #60a5fa !important; /* High-contrast bright blue */
+}

@@ -3,19 +3,22 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API_URL } from './config';
 import BackButton from './components/BackButton';
-import { getAllQueueItems, clearCompleted } from './syncEngine';
+import { getAllQueueItems, clearCompleted, getSyncHistory, clearSyncHistory } from './syncEngine';
 import { cacheUserProfile, getCachedUserProfile, getCachedBarangays, isOnline } from './offlineSync';
 import './ChoSettings.css';
 
 function OfflineSyncPanel() {
   const [items, setItems] = useState([]);
+  const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState('queue');
 
   const refresh = async () => {
     setLoading(true);
     try {
-      const all = await getAllQueueItems();
+      const [all, hist] = await Promise.all([getAllQueueItems(), getSyncHistory()]);
       setItems(all.reverse());
+      setHistory(hist);
     } catch {}
     setLoading(false);
   };
@@ -38,32 +41,67 @@ function OfflineSyncPanel() {
   };
 
   if (loading) return <div style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '15px' }}>Loading sync queue...</div>;
-  if (items.length === 0) return <div style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '15px' }}>No offline operations recorded.</div>;
+
+  const renderRow = (item, idx) => (
+    <div key={item.id || idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderBottom: '1px solid var(--border-color)', fontSize: '15px' }}>
+      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: statusColor(item.status), flexShrink: 0 }}></span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ fontWeight: '600', color: 'var(--text-main)' }}>{typeLabel(item.type)}</span>
+        <span style={{ color: 'var(--text-muted)', marginLeft: '8px' }}>
+          {new Date(item.timestamp).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+        </span>
+      </div>
+      <span style={{ fontSize: '15px', padding: '2px 8px', borderRadius: '10px', background: statusColor(item.status) + '22', color: statusColor(item.status), fontWeight: '600', textTransform: 'capitalize' }}>
+        {item.status}
+      </span>
+      {item.error && <span style={{ fontSize: '15px', color: '#EF4444', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.error}>{item.error}</span>}
+    </div>
+  );
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
-        <button onClick={async () => { await clearCompleted(); refresh(); }} style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '15px', fontWeight: '500' }}>
-          Clear Completed
+      <div style={{ display: 'flex', gap: '4px', marginBottom: '12px', background: 'var(--input-bg)', borderRadius: '8px', padding: '3px' }}>
+        <button onClick={() => setTab('queue')} style={{ flex: 1, padding: '6px 12px', borderRadius: '6px', border: 'none', fontSize: '15px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s', background: tab === 'queue' ? 'var(--bg-surface)' : 'transparent', color: tab === 'queue' ? 'var(--text-main)' : 'var(--text-muted)', boxShadow: tab === 'queue' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
+          Queue ({items.filter(i => i.status === 'pending').length})
+        </button>
+        <button onClick={() => setTab('history')} style={{ flex: 1, padding: '6px 12px', borderRadius: '6px', border: 'none', fontSize: '15px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s', background: tab === 'history' ? 'var(--bg-surface)' : 'transparent', color: tab === 'history' ? 'var(--text-main)' : 'var(--text-muted)', boxShadow: tab === 'history' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
+          History ({history.length})
         </button>
       </div>
-      <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
-        {items.slice(0, 20).map((item) => (
-          <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderBottom: '1px solid var(--border-color)', fontSize: '15px' }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: statusColor(item.status), flexShrink: 0 }}></span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ fontWeight: '600', color: 'var(--text-main)' }}>{typeLabel(item.type)}</span>
-              <span style={{ color: 'var(--text-muted)', marginLeft: '8px' }}>
-                {new Date(item.timestamp).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-              </span>
-            </div>
-            <span style={{ fontSize: '15px', padding: '2px 8px', borderRadius: '10px', background: statusColor(item.status) + '22', color: statusColor(item.status), fontWeight: '600', textTransform: 'capitalize' }}>
-              {item.status}
-            </span>
-            {item.error && <span style={{ fontSize: '15px', color: '#EF4444', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.error}>{item.error}</span>}
+
+      {tab === 'queue' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+            <button onClick={async () => { await clearCompleted(); refresh(); }} style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '15px', fontWeight: '500' }}>
+              Archive & Clear Completed
+            </button>
           </div>
-        ))}
-      </div>
+          {items.length === 0 ? (
+            <div style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '15px' }}>No offline operations in queue.</div>
+          ) : (
+            <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
+              {items.slice(0, 20).map((item, idx) => renderRow(item, idx))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'history' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+            <button onClick={async () => { await clearSyncHistory(); refresh(); }} style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '15px', fontWeight: '500' }}>
+              Clear History
+            </button>
+          </div>
+          {history.length === 0 ? (
+            <div style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '15px' }}>No sync history yet. Completed syncs will appear here.</div>
+          ) : (
+            <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
+              {history.slice(0, 50).map((item, idx) => renderRow(item, idx))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

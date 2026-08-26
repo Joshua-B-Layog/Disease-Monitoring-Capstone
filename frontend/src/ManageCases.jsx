@@ -472,6 +472,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const [diseasePage, setDiseasePage] = useState(0);
   const [selectedDisease, setSelectedDisease] = useState(null);
   const [editingCase, setEditingCase] = useState(null);
+  const [statusHistory, setStatusHistory] = useState([]);
   const [routingStep, setRoutingStep] = useState(null);
   const [routingData, setRoutingData] = useState(null);
   const [routingDescription, setRoutingDescription] = useState('');
@@ -919,7 +920,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   };
 
   const handleApproveRegistration = (reg) => {
-    axios.put(`${API_URL}/api/pending-registrations/${reg.user_id}/approve`)
+    axios.put(`${API_URL}/api/pending-registrations/${reg.user_id}/approve`, { actor_id: loggedUserId })
       .then(() => { fetchPendingRegistrations(); })
       .catch(err => alert('Approve failed: ' + (err.response?.data?.error || err.message)));
   };
@@ -927,7 +928,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const handleRejectRegistration = (reg) => {
     const reason = window.prompt(`Reject registration for ${reg.full_name}? Enter optional reason (or leave blank):`);
     if (reason === null) return; // user cancelled
-    axios.put(`${API_URL}/api/pending-registrations/${reg.user_id}/reject`, { reason })
+    axios.put(`${API_URL}/api/pending-registrations/${reg.user_id}/reject`, { reason, actor_id: loggedUserId })
       .then(() => { fetchPendingRegistrations(); })
       .catch(err => alert('Reject failed: ' + (err.response?.data?.error || err.message)));
   };
@@ -1534,6 +1535,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     if (!filledForm.symptoms.trim()) errors.symptoms = true;
     if (!filledForm.lat || !filledForm.lng) errors.location = true;
     setFormErrors(errors);
+
+    // Fetch status history for this case
+    setStatusHistory([]);
+    axios.get(`${API_URL}/api/cases/${caseItem.case_id}/status-history`)
+      .then(res => { if (Array.isArray(res.data)) setStatusHistory(res.data); })
+      .catch(() => {});
 
     setView('edit');
   };
@@ -3144,7 +3151,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
         <div style={{ background: 'var(--bg-surface)', borderRadius: '12px', padding: '40px', color: 'var(--text-main)', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', maxWidth: '900px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-            <h2 style={{ margin: '0 0 6px 0', fontSize: '26px', color: 'var(--text-main)' }}>
+            <h2 style={{ margin: '0 0 6px 0', fontSize: '24px', color: 'var(--text-main)' }}>
               {isEdit ? 'Edit Case Report' : 'New Case Report'}
             </h2>
             <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '15px' }}>
@@ -3177,7 +3184,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
               {/* LEFT: Patient Info */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <h4 style={{ margin: 0, color: 'var(--text-main)', fontSize: '15px', fontWeight: '700', paddingBottom: '8px', borderBottom: '1px solid var(--border-color)' }}>
+                <h4 style={{ margin: 0, color: 'var(--text-main)', fontSize: '15px', fontWeight: '700', paddingBottom: '8px' }}>
                   Patient Information
                 </h4>
                 <div style={{ position: 'relative' }}>
@@ -3227,6 +3234,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     </div>
                   )}
                 </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Age <span style={{ color: '#ef4444' }}>*</span></label>
@@ -3621,7 +3629,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
               {/* RIGHT: Clinical Info */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <h4 style={{ margin: 0, color: 'var(--text-main)', fontSize: '15px', fontWeight: '700', paddingBottom: '8px', borderBottom: '1px solid var(--border-color)' }}>
+                <h4 style={{ margin: 0, color: 'var(--text-main)', fontSize: '15px', fontWeight: '700', paddingBottom: '8px' }}>
                   Clinical Information
                 </h4>
                 <div>
@@ -3744,6 +3752,31 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   </div>
                   )}
                 </div>
+
+                {/* Status Transition Log */}
+                {editingCase && statusHistory.length > 0 && (
+                  <div style={{ gridColumn: '1 / -1', marginTop: '4px', marginBottom: '4px' }}>
+                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: '600' }}>Status History</label>
+                    <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
+                      {statusHistory.map((entry, idx) => (
+                        <div key={entry.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', borderBottom: idx < statusHistory.length - 1 ? '1px solid var(--border-color)' : 'none', fontSize: '13px' }}>
+                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: idx === statusHistory.length - 1 ? '#129968' : '#94a3b8', flexShrink: 0 }}></div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <span style={{ color: 'var(--text-muted)' }}>{entry.old_status || 'Initial'} → </span>
+                            <span style={{ fontWeight: '600', color: 'var(--text-main)' }}>{entry.new_status}</span>
+                            {entry.changed_by_name && (
+                              <span style={{ color: 'var(--text-muted)', marginLeft: '6px' }}>by {entry.changed_by_name}</span>
+                            )}
+                          </div>
+                          <span style={{ fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                            {new Date(entry.changed_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Date of Onset <span style={{ color: '#ef4444' }}>*</span></label>
                   <div style={{ position: 'relative', cursor: 'pointer' }}
@@ -3796,7 +3829,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 Location & Coordinates
               </label>
 
-              <div style={{ display: 'grid', gridTemplateColumns: hasCoords ? '1fr 1fr' : '1fr', gap: '20px', alignItems: 'start' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', alignItems: 'start' }}>
                 <div>
                   {hasCoords && (
                     <div style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px 14px', marginBottom: '12px', fontSize: '15px', color: 'var(--text-main)', fontWeight: '500' }}>
@@ -3805,31 +3838,24 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   )}
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <div style={{ flex: 1 }}>
-                      <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '4px' }}>Latitude (N)</label>
+                      <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px' }}>Latitude (N)</label>
                       <input type="text" placeholder="e.g. 14.2253" style={{ ...inputStyle, border: formErrors.location ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.location ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                         value={formData.lat} onChange={e => setFormData({ ...formData, lat: e.target.value })}
                         readOnly={isBhwReadOnly} />
                     </div>
                     <div style={{ flex: 1 }}>
-                      <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '4px' }}>Longitude (E)</label>
+                      <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px' }}>Longitude (E)</label>
                       <input type="text" placeholder="e.g. 121.3025" style={{ ...inputStyle, border: formErrors.location ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.location ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                         value={formData.lng} onChange={e => setFormData({ ...formData, lng: e.target.value })}
                         readOnly={isBhwReadOnly} />
                     </div>
                   </div>
-                  {!hasCoords && (
-                    <p style={{ margin: '8px 0 0 0', fontSize: '15px', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                      Enter coordinates above to see a map preview.
-                    </p>
-                  )}
                 </div>
 
-                {hasCoords && (
-                    <div style={{ height: '140px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-color)', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-                    <iframe title="location-preview" src={mapSrc} width="100%" height="100%"
-                      style={{ border: 'none', display: 'block' }} loading="lazy" />
-                  </div>
-                )}
+                <div style={{ height: '140px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-color)', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                  <iframe title="location-preview" src={mapSrc} width="100%" height="100%"
+                    style={{ border: 'none', display: 'block' }} loading="lazy" />
+                </div>
               </div>
             </div>
 

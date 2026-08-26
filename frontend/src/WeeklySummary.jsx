@@ -257,7 +257,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
 
   if (!data) return null;
 
-  const { summary, byBarangay, byDisease, bySeverity, newCases, auditLogs, scopeLabel, dateRange } = data;
+  const { summary, byBarangay, byDisease, bySeverity, newCases, auditLogs, scopeLabel, dateRange, comparison, rates } = data;
   const maxBarangayCount = Math.max(...byBarangay.map(b => b.count), 1);
   const maxDiseaseCount = Math.max(...byDisease.map(d => d.count), 1);
   const highRiskCount = byBarangay.filter(b => b.count >= 20).length;
@@ -309,7 +309,18 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
           <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '2px' }}>Total Cases</div>
         </div>
         <div style={{ ...cardStyle, borderLeft: '3px solid #DC2626' }}>
-          <div style={{ fontSize: '28px', fontWeight: '700', color: '#DC2626' }}>{summary.new_this_week}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ fontSize: '28px', fontWeight: '700', color: '#DC2626' }}>{summary.new_this_week}</div>
+            {comparison && (
+              <span title={`Previous period (${data.previousPeriod?.start} to ${data.previousPeriod?.end}): ${comparison.newCases.previous}`} style={{
+                fontSize: '13px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px',
+                background: comparison.newCases.up ? 'rgba(220,38,38,0.15)' : 'rgba(18,153,104,0.15)',
+                color: comparison.newCases.up ? '#ef4444' : '#16b877',
+              }}>
+                {comparison.newCases.up ? '▲' : '▼'} {Math.abs(comparison.newCases.pct)}%
+              </span>
+            )}
+          </div>
           <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '2px' }}>New This Period</div>
         </div>
         <div style={{ ...cardStyle, borderLeft: '3px solid #D97706' }}>
@@ -328,6 +339,18 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
           <div style={{ fontSize: '28px', fontWeight: '700', color: highRiskCount > 0 ? '#DC2626' : '#129968' }}>{highRiskCount}</div>
           <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '2px' }}>High-Risk Areas</div>
         </div>
+        {rates && (
+          <>
+            <div style={{ ...cardStyle, borderLeft: '3px solid #16b877' }}>
+              <div style={{ fontSize: '28px', fontWeight: '700', color: '#16b877' }}>{rates.recoveryRate}%</div>
+              <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '2px' }}>Recovery Rate</div>
+            </div>
+            <div style={{ ...cardStyle, borderLeft: '3px solid #991b1b' }}>
+              <div style={{ fontSize: '28px', fontWeight: '700', color: rates.mortalityRate > 5 ? '#DC2626' : '#991b1b' }}>{rates.mortalityRate}%</div>
+              <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '2px' }}>Mortality Rate</div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* ── Cases by Barangay ── */}

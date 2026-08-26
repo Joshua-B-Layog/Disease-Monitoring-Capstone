@@ -715,6 +715,46 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     : [];
   const monthMax = monthBars.length > 0 ? Math.max(...monthBars.map(b => b.count)) : 1;
 
+  // ── 7-DAY MOVING AVERAGE TREND LINE DATA ──
+  // Only shown on daily-granularity charts (Weekly view, Custom ranges ≤14 days).
+  // A moving average is meaningless over weekly/monthly/quarterly buckets.
+  const isDailyChart = (() => {
+    if (dashPeriod === 'weekly') return true;
+    if (dashPeriod === 'custom' && dateRange.start && dateRange.end) {
+      const sd = new Date(dateRange.start);
+      const ed = new Date(dateRange.end);
+      if (!isNaN(sd) && !isNaN(ed) && sd <= ed) return Math.round((ed - sd) / 86400000) + 1 <= 14;
+    }
+    return false;
+  })();
+  const movingAvgData = (() => {
+    if (!periodChart || !isDailyChart || monthBars.length < 2) return null;
+    const counts = monthBars.map(b => b.count);
+    const windowSize = Math.min(7, counts.length);
+    const points = [];
+    for (let i = 0; i < counts.length; i++) {
+      const start = Math.max(0, i - windowSize + 1);
+      const slice = counts.slice(start, i + 1);
+      const avg = slice.reduce((a, b) => a + b, 0) / slice.length;
+      points.push({ idx: i, avg });
+    }
+    return points;
+  })();
+
+  // ── THRESHOLD ALERT BADGES ──
+  const thresholdAlerts = (() => {
+    const alerts = [];
+    if (deathCases > 0) alerts.push({ label: 'Mortality Alert', detail: `${deathCases} death(s) recorded`, color: '#DC2626', bg: 'rgba(220,38,38,0.1)', border: 'rgba(220,38,38,0.3)' });
+    if (activeCases > 5) alerts.push({ label: 'High Active Cases', detail: `${activeCases} cases under monitoring`, color: '#D97706', bg: 'rgba(217,119,6,0.1)', border: 'rgba(217,119,6,0.3)' });
+    const totalPrev = prevTotal;
+    if (totalCases > 0 && totalPrev > 0) {
+      const growth = ((totalCases - totalPrev) / totalPrev) * 100;
+      if (growth >= 50) alerts.push({ label: 'Rapid Surge', detail: `+${Math.round(growth)}% vs previous period`, color: '#DC2626', bg: 'rgba(220,38,38,0.1)', border: 'rgba(220,38,38,0.3)' });
+      else if (growth >= 20) alerts.push({ label: 'Rising Trend', detail: `+${Math.round(growth)}% vs previous period`, color: '#D97706', bg: 'rgba(217,119,6,0.1)', border: 'rgba(217,119,6,0.3)' });
+    }
+    return alerts;
+  })();
+
   const gridLines = (() => {
     const step = Math.max(1, Math.ceil(monthMax / 4));
     const top = step * 4;
@@ -1053,6 +1093,24 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         ))}
       </div>
 
+      {/* ── THRESHOLD ALERT BADGES ── */}
+      {thresholdAlerts.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+          {thresholdAlerts.map((alert, i) => (
+            <div key={i} style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '8px 14px', borderRadius: '8px',
+              background: alert.bg, border: `1px solid ${alert.border}`,
+              fontSize: '13px', fontWeight: '600',
+            }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: alert.color, flexShrink: 0 }} />
+              <span style={{ color: alert.color }}>{alert.label}</span>
+              <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>{alert.detail}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* ── CHART + FILTER ROW ── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '16px' }}>
 
@@ -1097,6 +1155,33 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                           </div>
                         );
                       })}
+                      {/* ── 7-Day Moving Average Trend Line (SVG overlay) ── */}
+                      {movingAvgData && (
+                        <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 5 }}>
+                          {movingAvgData.map((pt, i) => {
+                            if (i === 0) return null;
+                            const xPct1 = ((movingAvgData[i - 1].idx + 0.5) / monthBars.length) * 100;
+                            const xPct2 = ((pt.idx + 0.5) / monthBars.length) * 100;
+                            const y1 = 184 - (movingAvgData[i - 1].avg / gridLines.top) * 184;
+                            const y2 = 184 - (pt.avg / gridLines.top) * 184;
+                            return (
+                              <line key={i} x1={`${xPct1}%`} y1={y1} x2={`${xPct2}%`} y2={y2}
+                                stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="6,3"
+                                style={{ opacity: chartMounted ? 0.85 : 0, transition: 'opacity 0.8s ease 0.5s' }} />
+                            );
+                          })}
+                          {/* Trend line dots */}
+                          {movingAvgData.map((pt, i) => {
+                            const xPct = ((pt.idx + 0.5) / monthBars.length) * 100;
+                            const y = 184 - (pt.avg / gridLines.top) * 184;
+                            return (
+                              <circle key={`dot-${i}`} cx={`${xPct}%`} cy={y} r="3.5"
+                                fill="#f59e0b" stroke="var(--bg-surface)" strokeWidth="1.5"
+                                style={{ opacity: chartMounted ? 1 : 0, transition: 'opacity 0.8s ease 0.5s' }} />
+                            );
+                          })}
+                        </svg>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1120,6 +1205,12 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                     {b.full}
                   </span>
                 ))}
+                {movingAvgData && (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px', color: '#f59e0b', fontWeight: '600', marginLeft: '8px' }}>
+                    <span style={{ width: '18px', height: '3px', background: '#f59e0b', borderRadius: '2px' }} />
+                    7-Day Avg
+                  </span>
+                )}
               </div>
             </div>
           ) : periodChart || isBhw ? (

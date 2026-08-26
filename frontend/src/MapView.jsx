@@ -486,6 +486,72 @@ if (!document.getElementById('cdms-barangay-labels')) {
   document.head.appendChild(ls);
 }
 
+function CreateTopPane() {
+  const map = useMap();
+  useEffect(() => {
+    const pane = map.createPane('topPane');
+    pane.style.zIndex = 800;
+  }, [map]);
+  return null;
+}
+
+function CaseDotMarkers({ cases, zoom }) {
+  const map = useMap();
+  const markersRef = useRef([]);
+
+  useEffect(() => {
+    markersRef.current.forEach(m => m.remove());
+    markersRef.current = [];
+
+    if (zoom < 16) return;
+
+    const isFullView = zoom === 19;
+    const casesWithCoords = cases.filter(c => c.latitude && c.longitude && !isNaN(parseFloat(c.latitude)) && !isNaN(parseFloat(c.longitude)));
+
+    casesWithCoords.forEach(c => {
+      const lat = parseFloat(c.latitude);
+      const lng = parseFloat(c.longitude);
+      const color = getDiseaseColor(c.disease_name);
+      const severityColor = c.severity === 'Severe' ? '#DC2626' : c.severity === 'Moderate' ? '#D97706' : '#3b82f6';
+
+      const marker = L.circleMarker([lat, lng], {
+        radius: isFullView ? 7 : 4,
+        fillColor: color,
+        color: isFullView ? '#fff' : 'rgba(255,255,255,0.6)',
+        weight: isFullView ? 2 : 1.5,
+        opacity: isFullView ? 1 : 0.7,
+        fillOpacity: isFullView ? 0.85 : 0.45,
+        interactive: isFullView,
+        pane: 'topPane',
+      }).addTo(map);
+
+      if (isFullView) {
+        marker.bindTooltip(`
+          <div style="font-size:12px;line-height:1.4;min-width:140px;">
+            <div style="font-weight:700;margin-bottom:2px;">${c.patient_name || 'Unknown'}</div>
+            <div style="color:#666;">${c.disease_name || 'Unknown Disease'}</div>
+            <div style="color:#666;">Age: ${c.age || '--'} · ${c.gender || ''}</div>
+            <div style="display:flex;align-items:center;gap:4px;margin-top:2px;">
+              <span style="width:7px;height:7px;border-radius:50%;background:${severityColor};display:inline-block;"></span>
+              ${c.severity || 'N/A'} · ${c.status || ''}
+            </div>
+          </div>
+        `, { direction: 'top', offset: [0, -8] });
+
+        marker.on('click', () => {
+          marker.openTooltip();
+        });
+      }
+
+      markersRef.current.push(marker);
+    });
+
+    return () => { markersRef.current.forEach(m => m.remove()); };
+  }, [cases, zoom, map]);
+
+  return null;
+}
+
 function PulseMarkers({ barangayData, onHover, onLeave, onClick }) {
   const map = useMap();
   const markersRef = useRef([]);
@@ -1205,8 +1271,10 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               maxZoom={19}
             />
           )}
+          <CreateTopPane />
           <ZoomToBarangay barangay={filterBarangay} loginRole={loginRole} loginBarangay={loginBarangay} sessionContext={sessionContext} cases={allCases} />
           <ZoomListener onZoom={setMapZoom} filterBarangay={filterBarangay} autoDetectedBrgy={autoDetectedBrgy} setAutoDetectedBrgy={setAutoDetectedBrgy} loginRole={loginRole} />
+          <CaseDotMarkers cases={allCases} zoom={mapZoom} />
           {loginRole !== 'BHW' && (filterBarangay === 'All Barangays' && !showAutoPurok) ? (
             <GeoJSON
               ref={geoJsonLayerRef}
@@ -1250,14 +1318,14 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                 });
               }}
             />
-          ) : (
+          ) : mapZoom < 19 ? (
             <PulseMarkers
               barangayData={purokData.length > 0 ? purokData : barangayData}
               onHover={setTooltip}
               onLeave={() => setTooltip(null)}
               onClick={setPopup}
             />
-          )}
+          ) : null}
         </MapContainer>
 
         {/* SD / HD BASE LAYER TOGGLE */}
@@ -1286,6 +1354,60 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
             HD Map
           </button>
         </div>
+
+        {/* EXPORT MAP AS IMAGE */}
+        <div style={{
+          position: 'absolute', bottom: '16px', right: '16px', zIndex: 1000,
+        }}>
+          <button
+            onClick={() => {
+              const mapContainer = document.querySelector('.leaflet-container');
+              if (!mapContainer) return;
+              import('html2canvas').then(({ default: html2canvas }) => {
+                html2canvas(mapContainer, { useCORS: true, allowTaint: true, scale: 2 }).then(canvas => {
+                  const link = document.createElement('a');
+                  link.download = 'CDMS_Map_Export.png';
+                  link.href = canvas.toDataURL('image/png');
+                  link.click();
+                });
+              }).catch(() => {
+                alert('Export requires html2canvas. Please use the Print option instead.');
+              });
+            }}
+            style={{
+              padding: '8px 14px', borderRadius: '8px', cursor: 'pointer',
+              background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
+              boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
+              fontSize: '13px', fontWeight: '700', color: 'var(--text-main)',
+              display: 'flex', alignItems: 'center', gap: '6px',
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export Image
+          </button>
+        </div>
+
+        {/* ZOOM LEVEL INDICATOR */}
+        {mapZoom >= 16 && mapZoom < 19 && (
+          <div style={{
+            position: 'absolute', bottom: '16px', left: '50%', transform: 'translateX(-50%)',
+            zIndex: 1000, padding: '6px 12px', borderRadius: '8px',
+            background: 'rgba(18,153,104,0.15)', border: '1px solid rgba(18,153,104,0.3)',
+            fontSize: '12px', fontWeight: '600', color: '#129968',
+          }}>
+            ● Dots showing case placements — zoom to max for full details
+          </div>
+        )}
+        {mapZoom === 19 && (
+          <div style={{
+            position: 'absolute', bottom: '16px', left: '50%', transform: 'translateX(-50%)',
+            zIndex: 1000, padding: '6px 12px', borderRadius: '8px',
+            background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)',
+            fontSize: '12px', fontWeight: '600', color: '#3b82f6',
+          }}>
+            ● Click dots for individual case details
+          </div>
+        )}
 
         {/* HOVER TOOLTIP */}
         {tooltip && (

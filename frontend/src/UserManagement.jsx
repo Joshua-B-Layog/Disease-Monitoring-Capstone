@@ -46,7 +46,7 @@ const EMPTY_FORM = {
   role: 'BHW',
 };
 
-export default function UserManagement({ confirmDelete, fontScale, compactMode, dateFormat, loggedUserId }) {
+export default function UserManagement({ confirmDelete, fontScale, compactMode, dateFormat, loggedUserId, loginRole }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [barangayList, setBarangayList] = useState([]);
@@ -69,6 +69,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
   const [formData, setFormData] = useState({ ...EMPTY_FORM });
   const [submitMsg, setSubmitMsg] = useState('');
   const [submitLoading, setSubmitLoading] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -219,6 +220,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
     setFormData({ ...EMPTY_FORM });
     setEditingUser(null);
     setSubmitMsg('');
+    setFormErrors({});
     setShowModal(true);
   };
 
@@ -238,6 +240,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
     });
     setEditingUser(user);
     setSubmitMsg('');
+    setFormErrors({});
     setShowModal(true);
   };
 
@@ -280,6 +283,27 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
         return;
     }
 
+    const errors = {};
+    if (!formData.firstName.trim()) errors.firstName = true;
+    if (!formData.lastName.trim()) errors.lastName = true;
+    if (!formData.username.trim()) errors.username = true;
+    if (!formData.email.trim()) errors.email = true;
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) errors.email = true;
+    if (!formData.mobile.trim()) errors.mobile = true;
+    else if (!/^09\d{9}$/.test(formData.mobile.trim())) errors.mobile = true;
+    if (!formData.barangayId) errors.barangayId = true;
+    if (!editingUser && !formData.generateTempPassword && !formData.password.trim()) errors.password = true;
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      const msgs = [];
+      if (errors.email) msgs.push('Enter a valid email address');
+      if (errors.mobile) msgs.push('Use valid PH phone (e.g., 09123456789)');
+      setSubmitMsg(msgs.length > 0 ? `Error: ${msgs.join('. ')}.` : 'Error: Please fill in all required fields highlighted in red.');
+      setSubmitLoading(false);
+      return;
+    }
+    setFormErrors({});
+
     const payload = {
       firstName: formData.firstName,
       lastName: formData.lastName,
@@ -298,12 +322,13 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
       payload.newPassword = formData.password.trim();
     }
 
+    const roleHeaders = { headers: { 'x-user-role': loginRole || 'CHO' } };
     try {
       if (editingUser) {
-        await axios.put(`${API_URL}/api/users/${editingUser.user_id}`, payload);
+        await axios.put(`${API_URL}/api/users/${editingUser.user_id}`, payload, roleHeaders);
         setSubmitMsg('User updated successfully!');
       } else {
-        await axios.post(API_URL + '/api/users', payload);
+        await axios.post(API_URL + '/api/users', payload, roleHeaders);
         setSubmitMsg('User account created successfully!');
       }
       fetchUsers();
@@ -329,17 +354,18 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
   const executeDelete = async () => {
     if (!deleteTarget) return;
     setDeleteLoading(true);
+    const roleHeaders = { headers: { 'x-user-role': loginRole || 'CHO' } };
     try {
       if (bulkDeleteMode) {
         for (const id of selectedIds) {
-          await axios.delete(`${API_URL}/api/users/${id}`);
+          await axios.delete(`${API_URL}/api/users/${id}`, roleHeaders);
         }
         fetchUsers();
         setBulkDeleteMode(false);
         setSelectedIds([]);
         setDeleteTarget(null);
       } else {
-        await axios.delete(`${API_URL}/api/users/${deleteTarget.user_id}`);
+        await axios.delete(`${API_URL}/api/users/${deleteTarget.user_id}`, roleHeaders);
         fetchUsers();
         setDeleteTarget(null);
       }
@@ -647,23 +673,28 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>First Name *</label>
-                  <input type="text" required placeholder="Enter First Name" style={inputStyle}
-                    value={formData.firstName} onChange={e => setFormData({ ...formData, firstName: e.target.value })} />
+                  <input type="text" required placeholder="Enter First Name"
+                    style={{ ...inputStyle, border: formErrors.firstName ? '2px solid #ef4444' : '1px solid var(--input-border)', background: formErrors.firstName ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
+                    value={formData.firstName} onChange={e => { setFormData({ ...formData, firstName: e.target.value }); setFormErrors(prev => ({ ...prev, firstName: false })); }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Last Name *</label>
-                  <input type="text" required placeholder="Enter Last Name" style={inputStyle}
-                    value={formData.lastName} onChange={e => setFormData({ ...formData, lastName: e.target.value })} />
+                  <input type="text" required placeholder="Enter Last Name"
+                    style={{ ...inputStyle, border: formErrors.lastName ? '2px solid #ef4444' : '1px solid var(--input-border)', background: formErrors.lastName ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
+                    value={formData.lastName} onChange={e => { setFormData({ ...formData, lastName: e.target.value }); setFormErrors(prev => ({ ...prev, lastName: false })); }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Username *</label>
-                  <input type="text" required placeholder="Username" style={inputStyle} readOnly={!!editingUser}
-                    value={formData.username} onChange={e => setFormData({ ...formData, username: e.target.value })} />
+                  <input type="text" required placeholder="Username" readOnly={!!editingUser}
+                    style={{ ...inputStyle, border: formErrors.username ? '2px solid #ef4444' : '1px solid var(--input-border)', background: formErrors.username ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
+                    value={formData.username} onChange={e => { setFormData({ ...formData, username: e.target.value }); setFormErrors(prev => ({ ...prev, username: false })); }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Email *</label>
-                  <input type="email" required placeholder="Email" style={inputStyle}
-                    value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
+                  <input type="email" required placeholder="Email"
+                    style={{ ...inputStyle, border: formErrors.email ? '2px solid #ef4444' : '1px solid var(--input-border)', background: formErrors.email ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
+                    value={formData.email} onChange={e => { setFormData({ ...formData, email: e.target.value }); setFormErrors(prev => ({ ...prev, email: false })); }} />
+                  {formErrors.email && <span style={{ fontSize: '13px', color: '#ef4444', marginTop: '3px', display: 'block' }}>Enter a valid email address</span>}
                 </div>
                 <div>
                 <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Role *</label>
@@ -690,15 +721,17 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
               </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Contact Number *</label>
-                  <input type="text" required placeholder="Contact Number" style={inputStyle}
-                    value={formData.mobile} onChange={e => setFormData({ ...formData, mobile: e.target.value.replace(/\D/g, '').slice(0, 11) })} />
+                  <input type="text" required placeholder="Contact Number"
+                    style={{ ...inputStyle, border: formErrors.mobile ? '2px solid #ef4444' : '1px solid var(--input-border)', background: formErrors.mobile ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
+                    value={formData.mobile} onChange={e => { setFormData({ ...formData, mobile: e.target.value.replace(/\D/g, '').slice(0, 11) }); setFormErrors(prev => ({ ...prev, mobile: false })); }} />
+                  {formErrors.mobile && <span style={{ fontSize: '13px', color: '#ef4444', marginTop: '3px', display: 'block' }}>Use valid PH phone (e.g., 09123456789)</span>}
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Barangay Assignment *</label>
                     <div style={{ position: 'relative' }} ref={barangayAssignRef}>
                       <button type="button"
                         onClick={() => { setBarangayAssignOpen(!barangayAssignOpen); setShowAllBarangayAssign(false); }}
-                        style={{ ...inputStyle, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}>
+                        style={{ ...inputStyle, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left', border: formErrors.barangayId ? '2px solid #ef4444' : '1px solid var(--input-border)', background: formErrors.barangayId ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}>
                         <span>{barangayList.find(b => b.id === formData.barangayId)?.name || '— Select Barangay —'}</span>
                         <span style={{ fontSize: '13px', opacity: 0.6, transition: 'transform 0.2s', transform: barangayAssignOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                       </button>
@@ -758,8 +791,9 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                   </label>
                   <p style={{ margin: '0 0 10px 0', fontSize: '15px', color: 'var(--text-muted)' }}>Password will be emailed to user</p>
                   {!formData.generateTempPassword && (
-                    <input type="password" placeholder="Set a password" style={inputStyle}
-                      value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} />
+                    <input type="password" placeholder="Set a password"
+                      style={{ ...inputStyle, border: formErrors.password ? '2px solid #ef4444' : '1px solid var(--input-border)', background: formErrors.password ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
+                      value={formData.password} onChange={e => { setFormData({ ...formData, password: e.target.value }); setFormErrors(prev => ({ ...prev, password: false })); }} />
                   )}
                 </div>
               )}

@@ -405,12 +405,48 @@ db.query("SHOW COLUMNS FROM users LIKE 'status'", (e, r) => {
   }
 });
 
+// Case status history table
+db.query(`CREATE TABLE IF NOT EXISTS case_status_history (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  case_id INT NOT NULL,
+  old_status VARCHAR(30),
+  new_status VARCHAR(30) NOT NULL,
+  changed_by INT,
+  changed_by_name VARCHAR(255),
+  changed_by_role VARCHAR(20),
+  changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  notes TEXT,
+  FOREIGN KEY (case_id) REFERENCES disease_cases(case_id) ON DELETE CASCADE
+)`, (err) => {
+  if (err) console.error('Error creating case_status_history table:', err.message);
+  else console.log('Case status history table created/verified');
+});
+
 function createAuditLog(userId, userName, userRole, choUnit, barangay, action, entity, details) {
   db.query(
     'INSERT INTO audit_logs (user_id, user_name, user_role, cho_unit, barangay, action, entity, details) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     [userId || null, userName || 'System', userRole || 'System', choUnit || null, barangay || null, action, entity, details],
     (err) => { if (err) console.error('Audit log insert error:', err.message); }
   );
+}
+
+function requireRole(...roles) {
+  return (req, res, next) => {
+    const userRole = req.headers['x-user-role'];
+    if (!userRole || !roles.includes(userRole)) {
+      createAuditLog(
+        req.headers['x-user-id'] || null,
+        req.headers['x-user-name'] || 'Unknown',
+        userRole || 'Unknown',
+        null, null,
+        'Access Denied',
+        req.originalUrl,
+        `Attempted to access ${req.method} ${req.originalUrl} with role "${userRole || 'none'}"`
+      );
+      return res.status(403).json({ error: 'Access denied. Insufficient permissions.' });
+    }
+    next();
+  };
 }
 
 // ==========================================
@@ -775,12 +811,9 @@ app.post('/api/cases', (req, res) => {
                       const u = uRes[0];
                       db.query('SELECT name FROM barangays WHERE id = ?', [u.assigned_barangay_id], (bErr, bRes) => {
                         const brgy = (!bErr && bRes.length > 0) ? bRes[0].name : null;
-                        db.query(
-                          'INSERT INTO audit_logs (user_id, user_name, user_role, barangay, action, entity, details) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                          [auditUserId, u.full_name, u.role, brgy, auditAction, 'Case Record',
-                           `Added new ${auditDisease} case for ${auditPatient} (Case ID: ${result.insertId})`],
-                          (aErr) => { if (aErr) console.error('Audit log error:', aErr.message); }
-                        );
+                        const choUnit = u.role === 'CHO' ? getChoUnitForBarangay(brgy) : null;
+                        createAuditLog(auditUserId, u.full_name, u.role, choUnit, brgy, auditAction, 'Case Record',
+                         `Added new ${auditDisease} case for ${auditPatient} (Case ID: ${result.insertId})`);
                       });
                     }
                   });
@@ -1185,6 +1218,17 @@ app.post('/api/cases/:id/request-edit', (req, res) => {
     [caseId, requested_by, requested_by_name || 'Unknown', from_barangay_name || null, target_cho_unit || null, note],
     (err, result) => {
       if (err) return res.status(500).json({ error: err.message });
+
+      // Audit log: BHW submitted an edit request
+      db.query('SELECT full_name, role, assigned_barangay_id FROM users WHERE user_id = ?', [requested_by], (aErr, aRes) => {
+        if (!aErr && aRes.length > 0) {
+          const actor = aRes[0];
+          createAuditLog(requested_by, actor.full_name, actor.role, null, from_barangay_name || null,
+            'Requested Edit', 'Case Record',
+            `Submitted edit request for Case ID ${caseId} — Note: "${note.length > 60 ? note.slice(0, 57) + '...' : note}"`);
+        }
+      });
+
       // Notify CHOs in the target unit (direct BHW→CHO request, bypasses user preferences)
       if (target_cho_unit) {
         const unitBarangays = CHO_UNIT_BARANGAYS[target_cho_unit] || [];
@@ -1465,6 +1509,54 @@ app.put('/api/cases/:id', (req, res) => {
 
         const doUpdate = (dId) => {
             const offlineTs = (req.body && req.body._offlineTimestamp) ? new Date(req.body._offlineTimestamp).getTime() : 0;
+
+            // Fetch full existing record before updating (for status transition + field-level audit logging)
+            db.query('SELECT dc.*, d.name AS _oldDiseaseName FROM disease_cases dc LEFT JOIN diseases d ON dc.disease_id = d.id WHERE dc.case_id = ?', [id], (oldErr, oldRows) => {
+              const oldRow = (!oldErr && oldRows && oldRows.length > 0) ? oldRows[0] : null;
+              const oldStatus = oldRow ? oldRow.status : null;
+
+              // ── Field-level change tracking: build "field: old → new" diff list ──
+              const FIELD_LABELS = {
+                patient_name: 'Patient Name', age: 'Age', severity: 'Severity', gender: 'Gender',
+                status: 'Status', contact: 'Contact', onset_date: 'Date of Onset', address: 'Address',
+                symptoms: 'Symptoms', physician: 'Physician', latitude: 'Latitude', longitude: 'Longitude',
+              };
+              const normalize = (v) => (v === null || v === undefined || v === '') ? '' : String(v);
+              const buildChangeSummary = () => {
+                if (!oldRow) return '';
+                const FIELD_MAP = { patient_name: 'patient_name', age: 'age', severity: 'severity', gender: 'gender', status: 'status', contact: 'contact', onset_date: 'onset_date', address: 'address', symptoms: 'symptoms', physician: 'physician', latitude: 'latitude', longitude: 'longitude' };
+                const changes = [];
+                for (const [payloadKey, label] of Object.entries(FIELD_LABELS)) {
+                  let newVal;
+                  if (payloadKey === 'age') newVal = age || 0;
+                  else if (payloadKey === 'gender') newVal = gender || 'Male';
+                  else if (payloadKey === 'contact') newVal = contact || null;
+                  else if (payloadKey === 'onset_date') newVal = onset_date || null;
+                  else if (payloadKey === 'address') newVal = address || null;
+                  else if (payloadKey === 'symptoms') newVal = symptoms || null;
+                  else if (payloadKey === 'physician') newVal = physician || null;
+                  else if (payloadKey === 'latitude') newVal = latitude || null;
+                  else if (payloadKey === 'longitude') newVal = longitude || null;
+                  else newVal = req.body[payloadKey];
+                  const oldVal = oldRow[payloadKey];
+                  // Compare normalized values; skip empty→empty
+                  if (normalize(oldVal) !== normalize(newVal)) {
+                    const ov = normalize(oldVal) || '(empty)';
+                    const nv = normalize(newVal) || '(empty)';
+                    // Truncate long values (symptoms/address)
+                    const fmtOv = ov.length > 40 ? ov.slice(0, 37) + '...' : ov;
+                    const fmtNv = nv.length > 40 ? nv.slice(0, 37) + '...' : nv;
+                    changes.push(`${label}: ${fmtOv} → ${fmtNv}`);
+                  }
+                }
+                // Disease name change (disease_id compared via dId)
+                if (oldRow.disease_id !== undefined && Number(oldRow.disease_id) !== Number(dId)) {
+                  const oldDiseaseName = req.body._oldDiseaseName || 'Previous Disease';
+                  changes.push(`Disease Type: ${oldDiseaseName} → ${disease_name || '(empty)'}`);
+                }
+                return changes.join(', ');
+              };
+
             const applyUpdate = () => {
             const updateQuery = `
                 UPDATE disease_cases SET
@@ -1491,27 +1583,36 @@ app.put('/api/cases/:id', (req, res) => {
                 }
                 console.log("Case updated:", id);
 
-                // Write audit log entry
+                // Write audit log entry (with field-level change tracking)
                 const isOfflineEdit = !!(req.body && req.body._offlineTimestamp);
                 const auditUserId = (req.body && (req.body.user_id || req.body._offlineUserId)) || null;
                 const auditAction = isOfflineEdit ? 'Synced Edit (Offline)' : 'Updated';
                 const auditDisease = disease_name || 'Unknown Disease';
                 const auditPatient = patient_name || 'Unknown Patient';
+                const changeSummary = buildChangeSummary();
+                const auditDetails = `Updated ${auditDisease} case for ${auditPatient}${changeSummary ? ` [Changed: ${changeSummary}]` : ' (no field changes)'} (Case ID: ${id})`;
                 if (auditUserId) {
                   db.query('SELECT full_name, role, assigned_barangay_id FROM users WHERE user_id = ?', [auditUserId], (uErr, uRes) => {
                     if (!uErr && uRes.length > 0) {
                       const u = uRes[0];
                       db.query('SELECT name FROM barangays WHERE id = ?', [u.assigned_barangay_id], (bErr, bRes) => {
                         const brgy = (!bErr && bRes.length > 0) ? bRes[0].name : null;
-                        db.query(
-                          'INSERT INTO audit_logs (user_id, user_name, user_role, barangay, action, entity, details) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                          [auditUserId, u.full_name, u.role, brgy, auditAction, 'Case Record',
-                           `Updated ${auditDisease} case for ${auditPatient} (Case ID: ${id})`],
-                          (aErr) => { if (aErr) console.error('Audit log error:', aErr.message); }
-                        );
+                        const choUnit = u.role === 'CHO' ? getChoUnitForBarangay(brgy) : null;
+                        createAuditLog(auditUserId, u.full_name, u.role, choUnit, brgy, auditAction, 'Case Record', auditDetails);
                       });
                     }
                   });
+                }
+
+                // Record status transition if status changed
+                if (oldStatus && oldStatus !== status) {
+                  const historyUserId = (req.body && (req.body.user_id || req.body._offlineUserId)) || null;
+                  const historyUserName = (req.body && (req.body.user_name || req.body._offlineUserName)) || null;
+                  db.query(
+                    'INSERT INTO case_status_history (case_id, old_status, new_status, changed_by, changed_by_name, changed_by_role) VALUES (?, ?, ?, ?, ?, ?)',
+                    [id, oldStatus, status, historyUserId, historyUserName, req.body?.user_role || null],
+                    (hErr) => { if (hErr) console.error('Status history error:', hErr.message); }
+                  );
                 }
 
                 // Trigger status updated notification
@@ -1578,6 +1679,7 @@ app.put('/api/cases/:id', (req, res) => {
             } else {
                 applyUpdate();
             }
+            }); // end fetch old status
         };
 
         if (contact && contact.trim()) {
@@ -1605,8 +1707,22 @@ app.put('/api/cases/:id', (req, res) => {
     });
 });
 
+// ROUTE: Get status history for a case
+app.get('/api/cases/:id/status-history', (req, res) => {
+  const { id } = req.params;
+  db.query(
+    `SELECT id, case_id, old_status, new_status, changed_by, changed_by_name, changed_by_role, changed_at, notes
+     FROM case_status_history WHERE case_id = ? ORDER BY changed_at ASC`,
+    [id],
+    (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json(rows);
+    }
+  );
+});
+
 // ROUTE: Admin-edit a user account
-app.put('/api/users/:id', async (req, res) => {
+app.put('/api/users/:id', requireRole('CHO'), async (req, res) => {
     const { id } = req.params;
     const { firstName, lastName, username, email, mobile, barangayId, isActive, role, loggedUserId, newPassword } = req.body;
     const fullName = `${firstName.trim()} ${lastName.trim()}`;
@@ -1799,12 +1915,9 @@ app.delete('/api/cases/:id', (req, res) => {
                   const u = uRes[0];
                   db.query('SELECT name FROM barangays WHERE id = ?', [u.assigned_barangay_id], (bErr, bRes) => {
                     const brgy = (!bErr && bRes.length > 0) ? bRes[0].name : null;
-                    db.query(
-                      'INSERT INTO audit_logs (user_id, user_name, user_role, barangay, action, entity, details) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                      [auditUserId, u.full_name, u.role, brgy, auditAction, 'Case Record',
-                       `Deleted case for ${auditPatient} (${auditDisease}) in Barangay ${barangay_name || 'N/A'} (Case ID: ${id})`],
-                      (aErr) => { if (aErr) console.error('Audit log error:', aErr.message); }
-                    );
+                    const choUnit = u.role === 'CHO' ? getChoUnitForBarangay(brgy) : null;
+                    createAuditLog(auditUserId, u.full_name, u.role, choUnit, brgy, auditAction, 'Case Record',
+                     `Deleted case for ${auditPatient} (${auditDisease}) in Barangay ${barangay_name || 'N/A'} (Case ID: ${id})`);
                   });
                 }
               });
@@ -1821,7 +1934,7 @@ app.delete('/api/cases/:id', (req, res) => {
 });
 
 // ROUTE: Delete a user account
-app.delete('/api/users/:id', (req, res) => {
+app.delete('/api/users/:id', requireRole('CHO'), (req, res) => {
     const { id } = req.params;
     db.query('DELETE FROM users WHERE user_id = ?', [id], (err, result) => {
         if (err) {
@@ -2058,6 +2171,13 @@ app.post('/api/login', (req, res) => {
             }
         });
     });
+});
+
+// ROUTE: Log out (audit trail)
+app.post('/api/logout', (req, res) => {
+    const { userId, userName, userRole, barangay } = req.body;
+    createAuditLog(userId || null, userName || 'Unknown', userRole || 'System', null, barangay || null, 'Logged Out', 'System', `Logout at ${new Date().toISOString()}`);
+    res.json({ ok: true });
 });
 
 // ROUTE: Register new user
@@ -2359,6 +2479,22 @@ app.put('/api/pending-registrations/:id/approve', (req, res) => {
                             .catch(err => console.error(`Approval email failed for user ${id}:`, err.message));
                     }
 
+                    // Audit log: registration approved
+                    const actorId = (req.body && req.body.actor_id) || null;
+                    if (actorId) {
+                      db.query('SELECT full_name, role, assigned_barangay_id FROM users WHERE user_id = ?', [actorId], (aErr, aRes) => {
+                        if (!aErr && aRes.length > 0) {
+                          const actor = aRes[0];
+                          db.query('SELECT name FROM barangays WHERE id = ?', [actor.assigned_barangay_id], (bErr2, bRes2) => {
+                            const actorBrgy = (!bErr2 && bRes2.length > 0) ? bRes2[0].name : null;
+                            createAuditLog(actorId, actor.full_name, actor.role, getChoUnitForBarangay(actorBrgy), actorBrgy,
+                              'Approved', 'User Registration',
+                              `Approved BHW registration for ${user.full_name} (User ID: ${user.user_id})`);
+                          });
+                        }
+                      });
+                    }
+
                     res.json({ message: `Registration for ${user.full_name} approved.` });
                 }
             );
@@ -2399,6 +2535,22 @@ app.put('/api/pending-registrations/:id/reject', (req, res) => {
                             </div>`;
                         sendBrevoEmail(user.email, 'BHW Registration Not Approved - Cabuyao CDMS', html)
                             .catch(err => console.error(`Rejection email failed for user ${id}:`, err.message));
+                    }
+
+                    // Audit log: registration rejected
+                    const actorId = (req.body && req.body.actor_id) || null;
+                    if (actorId) {
+                      db.query('SELECT full_name, role, assigned_barangay_id FROM users WHERE user_id = ?', [actorId], (aErr, aRes) => {
+                        if (!aErr && aRes.length > 0) {
+                          const actor = aRes[0];
+                          db.query('SELECT name FROM barangays WHERE id = ?', [actor.assigned_barangay_id], (bErr2, bRes2) => {
+                            const actorBrgy = (!bErr2 && bRes2.length > 0) ? bRes2[0].name : null;
+                            createAuditLog(actorId, actor.full_name, actor.role, getChoUnitForBarangay(actorBrgy), actorBrgy,
+                              'Rejected', 'User Registration',
+                              `Rejected BHW registration for ${user.full_name}${reason ? ` — Reason: ${reason}` : ''} (User ID: ${user.user_id})`);
+                          });
+                        }
+                      });
                     }
 
                     res.json({ message: `Registration for ${user.full_name} rejected.` });
@@ -2520,7 +2672,7 @@ app.post('/api/reset-password', (req, res) => {
 // ==========================================
 
 // ROUTE: Admin-create a user account
-app.post('/api/users', async (req, res) => {
+app.post('/api/users', requireRole('CHO'), async (req, res) => {
     const { firstName, lastName, username, email, mobile, barangayId, isActive, password, generateTempPassword, role } = req.body;
 
     if (!firstName || !lastName || !username || !email || !barangayId) {
@@ -3420,6 +3572,31 @@ app.get('/api/disease_cases/public-summary', (req, res) => {
   });
 });
 
+// GET /api/disease_cases/public-disease-counts — Per-disease case counts for a barangay
+app.get('/api/disease_cases/public-disease-counts', (req, res) => {
+  const { barangay } = req.query;
+  let sql, params;
+  if (barangay) {
+    sql = `SELECT d.name AS disease_name, COUNT(dc.case_id) AS case_count
+           FROM diseases d
+           LEFT JOIN disease_cases dc ON dc.disease_id = d.id
+           LEFT JOIN barangays b ON dc.barangay_id = b.id
+           WHERE b.name = ?
+           GROUP BY d.id, d.name ORDER BY case_count DESC`;
+    params = [barangay];
+  } else {
+    sql = `SELECT d.name AS disease_name, COUNT(dc.case_id) AS case_count
+           FROM diseases d
+           LEFT JOIN disease_cases dc ON dc.disease_id = d.id
+           GROUP BY d.id, d.name ORDER BY case_count DESC`;
+    params = [];
+  }
+  db.query(sql, params, (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(results);
+  });
+});
+
 // ==========================================
 // 7. SCHEDULED JOBS
 // ==========================================
@@ -3520,6 +3697,21 @@ app.get('/api/weekly-summary', (req, res) => {
                 ORDER BY al.created_at DESC
                 LIMIT 50`;
 
+            // ── Week-over-week comparison: same-length window immediately before ──
+            const sdDate = new Date(sd + 'T00:00:00Z');
+            const edDate = new Date(ed + 'T00:00:00Z');
+            const durationDays = Math.max(1, Math.round((edDate - sdDate) / 86400000) + 1);
+            const prevEndDate = new Date(sdDate.getTime() - 86400000);
+            const prevStartDate = new Date(prevEndDate.getTime() - (durationDays - 1) * 86400000);
+            const prevStartStr = prevStartDate.toISOString().slice(0, 10);
+            const prevEndStr = prevEndDate.toISOString().slice(0, 10);
+
+            const periodSQL = `
+                SELECT COUNT(*) AS new_in_period
+                FROM disease_cases dc
+                JOIN barangays b ON dc.barangay_id = b.id
+                WHERE b.name IN (${ph}) AND dc.date_reported >= ? AND dc.date_reported < DATE_ADD(?, INTERVAL 1 DAY)`;
+
             const params = [...barangayNames];
 
             Promise.all([
@@ -3529,16 +3721,37 @@ app.get('/api/weekly-summary', (req, res) => {
                 doQuery(severitySQL, params),
                 doQuery(newCasesSQL, [...params, sd]),
                 doQuery(auditSQL, [...params, scopeLabel, sd, ed]),
-            ]).then(([summary, barangays, diseases, severities, newCases, auditLogs]) => {
+                doQuery(periodSQL, [...params, sd, ed]).then(r => r[0]),
+                doQuery(periodSQL, [...params, prevStartStr, prevEndStr]).then(r => r[0]),
+            ]).then(([summary, barangays, diseases, severities, newCases, auditLogs, currPeriod, prevPeriod]) => {
+                // ── Comparison + rate computations ──
+                const currNew = currPeriod.new_in_period || 0;
+                const prevNew = prevPeriod.new_in_period || 0;
+                const pctChange = (curr, prev) => {
+                    if (prev === 0) return curr > 0 ? 100 : 0;
+                    return Math.round(((curr - prev) / prev) * 100);
+                };
+                const totalAll = summary.total_cases || 0;
+                const recoveryRate = totalAll > 0 ? Math.round(((summary.recovered || 0) / totalAll) * 1000) / 10 : 0;
+                const mortalityRate = totalAll > 0 ? Math.round(((summary.deceased || 0) / totalAll) * 1000) / 10 : 0;
+
                 res.json({
                     scopeLabel,
                     dateRange: { start: sd, end: ed },
+                    previousPeriod: { start: prevStartStr, end: prevEndStr },
                     summary: {
-                        total_cases: summary.total_cases || 0,
+                        total_cases: totalAll,
                         new_this_week: summary.new_this_week || 0,
                         active_cases: summary.active_cases || 0,
                         recovered: summary.recovered || 0,
                         deceased: summary.deceased || 0,
+                    },
+                    comparison: {
+                        newCases: { current: currNew, previous: prevNew, pct: pctChange(currNew, prevNew), up: currNew > prevNew },
+                    },
+                    rates: {
+                        recoveryRate,
+                        mortalityRate,
                     },
                     byBarangay: barangays,
                     byDisease: diseases,
@@ -3574,12 +3787,15 @@ function buildWeeklyHtmlAndPlain(summary, barangays, diseases, severities, scope
     ).join('') : '<tr><td colspan="2">No data</td></tr>';
 
     const scopeTitle = scopeLabel ? ` — ${scopeLabel}` : '';
+    const totalAll = total || 0;
+    const recoveryRate = totalAll > 0 ? Math.round((recovered / totalAll) * 1000) / 10 : 0;
+    const mortalityRate = totalAll > 0 ? Math.round((deceased / totalAll) * 1000) / 10 : 0;
 
     const html = `
         <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:12px">
             <h1 style="color:#1e3a8a;font-size:22px;margin:0 0 4px 0">Weekly Summary${scopeTitle}</h1>
             <p style="color:#64748b;font-size:13px;margin:0 0 20px 0">${new Date().toLocaleDateString('en-PH', { month:'long', day:'numeric', year:'numeric' })}</p>
-            <table style="width:100%;border-collapse:collapse;margin-bottom:20px">
+            <table style="width:100%;border-collapse:collapse;margin-bottom:8px">
                 <tr>
                     <td style="background:#eff6ff;padding:12px;border-radius:8px 0 0 8px;text-align:center">
                         <div style="font-size:24px;font-weight:700;color:#1e3a8a">${total}</div>
@@ -3589,12 +3805,26 @@ function buildWeeklyHtmlAndPlain(summary, barangays, diseases, severities, scope
                         <div style="font-size:24px;font-weight:700;color:#dc2626">${newWeek}</div>
                         <div style="font-size:11px;color:#64748b">New This Week</div>
                     </td>
-                    <td style="background:#f0fdf4;padding:12px;border-radius:0 8px 8px 0;text-align:center">
+                    <td style="background:#fffbeb;padding:12px;text-align:center">
+                        <div style="font-size:24px;font-weight:700;color:#d97706">${active}</div>
+                        <div style="font-size:11px;color:#64748b">Active</div>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="3" style="height:6px"></td>
+                </tr>
+                <tr>
+                    <td style="background:#f0fdf4;padding:12px;border-radius:8px 0 0 8px;text-align:center">
                         <div style="font-size:24px;font-weight:700;color:#16a34a">${recovered}</div>
                         <div style="font-size:11px;color:#64748b">Recovered</div>
                     </td>
+                    <td colspan="2" style="background:#fef2f2;padding:12px;border-radius:0 8px 8px 0;text-align:center">
+                        <div style="font-size:24px;font-weight:700;color:#991b1b">${deceased}</div>
+                        <div style="font-size:11px;color:#64748b">Deceased</div>
+                    </td>
                 </tr>
             </table>
+            <p style="color:#475569;font-size:13px;margin:0 0 20px 0;text-align:center">Recovery Rate: <strong style="color:#16a34a">${recoveryRate}%</strong> &nbsp;·&nbsp; Mortality Rate: <strong style="color:#dc2626">${mortalityRate}%</strong></p>
             <h3 style="color:#1e293b;font-size:15px;margin:0 0 8px 0">Top Barangays</h3>
             <ul style="margin:0 0 20px 0;padding-left:20px;font-size:14px;color:#334155">${topBarangay}</ul>
             <h3 style="color:#1e293b;font-size:15px;margin:0 0 8px 0">Top Diseases</h3>
@@ -3680,12 +3910,19 @@ cron.schedule('0 17 * * 5', () => {
                 sendBrevoEmail(user.email, '📊 Weekly Summary - Cabuyao CDMS', html)
                     .catch(err => console.error(`Weekly summary email failed for ${user.user_id}:`, err.message));
             }
+            // SMS delivery for users with sms_notifications enabled + mobile number on file
+            if (user.sms_notifications === 1 && user.mobile_number) {
+                const smsBody = plain.length > 400 ? plain.slice(0, 397) + '...' : plain;
+                sendSMS(formatPhone(user.mobile_number), smsBody)
+                    .catch(err => console.error(`Weekly summary SMS failed for ${user.user_id}:`, err.message));
+            }
         });
     }
 
     // 1. Fetch all eligible users with scope info
     db.query(
-        `SELECT u.user_id, u.role, u.assigned_barangay_id, b.name AS barangay_name, u.email, u.full_name, u.mobile_number
+        `SELECT u.user_id, u.role, u.assigned_barangay_id, b.name AS barangay_name, u.email, u.full_name, u.mobile_number,
+                np.sms_notifications
          FROM users u
          LEFT JOIN barangays b ON u.assigned_barangay_id = b.id
          INNER JOIN notification_preferences np ON u.user_id = np.user_id

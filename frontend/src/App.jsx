@@ -317,6 +317,26 @@ useEffect(() => {
     return () => clearInterval(interval);
   }, []);
 
+  // ── 30-minute session timeout ──
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    let timeout;
+    const resetTimer = () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        window.alert('Your session has expired due to inactivity. Please log in again.');
+        handleLogout();
+      }, 30 * 60 * 1000);
+    };
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+    events.forEach(e => document.addEventListener(e, resetTimer));
+    resetTimer();
+    return () => {
+      clearTimeout(timeout);
+      events.forEach(e => document.removeEventListener(e, resetTimer));
+    };
+  }, [isLoggedIn]);
+
   // ── Session idle timeout (30 min) ──
   const [idleWarning, setIdleWarning] = useState(false);
   const idleTimerRef = useRef(null);
@@ -443,7 +463,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             </div>
           );
         }
-        return <UserManagement dateFormat={dateFormat} confirmDelete={confirmDelete} fontScale={fontScale} compactMode={compactMode} loggedUserId={loggedUserId} />;
+        return <UserManagement dateFormat={dateFormat} confirmDelete={confirmDelete} fontScale={fontScale} compactMode={compactMode} loggedUserId={loggedUserId} loginRole={loginRole} />;
       case 'Audit Reports':
         return <BarangayReports dateFormat={dateFormat} activeUser={{ role: loginRole, context: sessionContext }} fontScale={fontScale} compactMode={compactMode} loggedUserId={loggedUserId} />;
       case 'Settings':
@@ -510,12 +530,17 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
     if (!navigator.onLine) {
       if (!window.confirm('You are currently offline. Logging out will prevent you from logging back in until reconnected. Continue?')) return;
     }
+    fetch(`${API_URL}/api/logout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: loggedUserId, userName: loggedUser, userRole: loginRole, barangay: null }),
+    }).catch(() => {});
+    localStorage.removeItem('cdms_session');
+    localStorage.removeItem('cdms_active_tab');
     setIsLoggedIn(false); 
     setSessionContext('');
     setLoggedUser('');
     setLoggedUserId(null);
-    localStorage.removeItem('cdms_session');
-    localStorage.removeItem('cdms_active_tab');
     window.location.reload();
   };
 

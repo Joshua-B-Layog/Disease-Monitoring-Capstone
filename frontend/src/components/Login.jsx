@@ -598,12 +598,15 @@ const handleLoginOtpSubmit = async (e) => {
       
       if (step === 'signup_role') {
         setStep('role');
-      } else if (step === 'signup' || step === 'cho_contact') {
+      } else if (step === 'signup') {
         if (selectedContext) {
           setStep('auth');
         } else {
-          setStep('role');
+          setStep('signup_role');
         }
+        setSignupContext('');
+      } else if (step === 'cho_contact') {
+        setStep('role');
         setSignupContext('');
       } else if (step === 'cho_select' || step === 'bhw_select') {
         setStep('role');
@@ -904,7 +907,6 @@ const handleLoginOtpSubmit = async (e) => {
             {step === 'cho_contact' && (
               <>
                 <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
-                  <BackButton onClick={handleBackNavigation} color="#129968" style={{ marginBottom: '10px' }}>Back</BackButton>
                   <h2 style={{ fontSize: '26px', color: 'var(--text-main)', marginBottom: '8px' }}>CHO Account Access</h2>
                   <p style={{ color: 'var(--text-muted)', lineHeight: '1.6' }}>
                     For security purposes, City Health Office accounts cannot be created through self-registration. Please contact your CHO unit directly to request an account.

@@ -579,7 +579,7 @@ export default function ResidentMap() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchMatches, setSearchMatches] = useState([]);
   const [mapLayer, setMapLayer] = useState('HD'); // 'SD' = street map (Carto), 'HD' = satellite (Esri)
-  const [showOverview, setShowOverview] = useState(true);
+  const [showOverview, setShowOverview] = useState(false);
   const geoJsonLayerRef = useRef(null);
   const overviewContentRef = useRef(null);
   const [overviewHeight, setOverviewHeight] = useState(0);
@@ -753,6 +753,31 @@ export default function ResidentMap() {
   const top8Diseases = topDiseasesSorted.slice(0, 8);
   const maxDiseaseCount = top8Diseases.length ? top8Diseases[0][1] : 1;
 
+  // ── Age distribution (grouped into brackets) ──
+  const ageGroups = { '0-5': 0, '6-17': 0, '18-35': 0, '36-55': 0, '56-75': 0, '76+': 0 };
+  allCases.forEach(c => {
+    const a = parseInt(c.age) || 0;
+    if (a <= 5) ageGroups['0-5']++;
+    else if (a <= 17) ageGroups['6-17']++;
+    else if (a <= 35) ageGroups['18-35']++;
+    else if (a <= 55) ageGroups['36-55']++;
+    else if (a <= 75) ageGroups['56-75']++;
+    else ageGroups['76+']++;
+  });
+  const maxAgeCount = Math.max(...Object.values(ageGroups), 1);
+
+  // ── Gender distribution ──
+  const genderCounts = {};
+  allCases.forEach(c => { const g = (c.gender || 'Unknown').trim(); genderCounts[g] = (genderCounts[g] || 0) + 1; });
+  const genderEntries = Object.entries(genderCounts).sort((a, b) => b[1] - a[1]);
+  const totalCasesCount = allCases.length;
+
+  // ── Barangay health advisories (top 3 affected barangays) ──
+  const brgyAdvisories = barangayData.filter(b => b.totalCases > 0).slice(0, 3).map(b => {
+    const topDisease = Object.entries(b.diseases).sort((a, b) => b[1] - a[1])[0];
+    return { name: b.name, count: b.totalCases, topDisease: topDisease ? topDisease[0] : 'N/A', topCount: topDisease ? topDisease[1] : 0 };
+  });
+
   return (
     <div className="resident-page">
       <h2 style={{ margin: '0 0 16px', fontSize: '26px', fontWeight: '700' }}>
@@ -857,6 +882,58 @@ export default function ResidentMap() {
                         <div style={{ width: `${(count / maxDiseaseCount) * 100}%`, height: '100%', background: getDiseaseColor(disease), borderRadius: '4px', minWidth: '2px' }} />
                       </div>
                       <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)', width: '30px', textAlign: 'right' }}>{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Age Distribution */}
+            {allCases.length > 0 && (
+              <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '8px' }}>Age Distribution</div>
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '100px' }}>
+                  {Object.entries(ageGroups).map(([label, count]) => (
+                    <div key={label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
+                      <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '2px' }}>{count}</span>
+                      <div style={{ width: '100%', height: `${(count / maxAgeCount) * 100}%`, background: '#3b82f6', borderRadius: '3px 3px 0 0', minHeight: count > 0 ? '4px' : '0' }} />
+                      <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px', textAlign: 'center' }}>{label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Gender Distribution */}
+            {genderEntries.length > 0 && (
+              <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '8px' }}>Gender Distribution</div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {genderEntries.map(([gender, count]) => {
+                    const pct = totalCasesCount > 0 ? Math.round((count / totalCasesCount) * 100) : 0;
+                    const color = gender === 'Male' ? '#3b82f6' : gender === 'Female' ? '#ec4899' : '#94a3b8';
+                    return (
+                      <div key={gender} style={{ flex: 1, background: 'var(--input-bg)', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '22px', fontWeight: '800', color }}>{count}</div>
+                        <div style={{ fontSize: '14px', color: 'var(--text-muted)', fontWeight: '600' }}>{gender} ({pct}%)</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Barangay Health Advisories */}
+            {brgyAdvisories.length > 0 && (
+              <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '8px' }}>Barangay Health Advisories</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {brgyAdvisories.map(b => (
+                    <div key={b.name} style={{ padding: '10px 14px', background: 'var(--input-bg)', borderRadius: '8px', borderLeft: `3px solid ${b.count > 10 ? '#dc2626' : b.count > 5 ? '#d97706' : '#129968'}` }}>
+                      <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)' }}>{b.name}</div>
+                      <div style={{ fontSize: '14px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        {b.count} case{b.count !== 1 ? 's' : ''}, Top: {b.topDisease} ({b.topCount})
+                      </div>
                     </div>
                   ))}
                 </div>

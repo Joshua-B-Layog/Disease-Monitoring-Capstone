@@ -149,6 +149,31 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
   const casesDeleted    = auditLogs.filter(l => l.action === 'Deleted' && l.entity === 'Case Record').length;
   const accountsCreated = auditLogs.filter(l => l.action === 'Created' && l.entity === 'User Account').length;
 
+  // ── Period-over-period comparison (last 7 days vs previous 7 days) ──
+  const nowMs = Date.now();
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const thisWeekCases = myCases.filter(c => {
+    const d = new Date(c.date_reported);
+    return d.getTime() >= nowMs - 7 * DAY_MS;
+  }).length;
+  const prevWeekCases = myCases.filter(c => {
+    const d = new Date(c.date_reported);
+    return d.getTime() >= nowMs - 14 * DAY_MS && d.getTime() < nowMs - 7 * DAY_MS;
+  }).length;
+  const weekDiff = thisWeekCases - prevWeekCases;
+  const weekPct = prevWeekCases > 0 ? Math.round((weekDiff / prevWeekCases) * 100) : (thisWeekCases > 0 ? 100 : 0);
+
+  const thisMonthCases = myCases.filter(c => {
+    const d = new Date(c.date_reported);
+    return d.getTime() >= nowMs - 30 * DAY_MS;
+  }).length;
+  const prevMonthCases = myCases.filter(c => {
+    const d = new Date(c.date_reported);
+    return d.getTime() >= nowMs - 60 * DAY_MS && d.getTime() < nowMs - 30 * DAY_MS;
+  }).length;
+  const monthDiff = thisMonthCases - prevMonthCases;
+  const monthPct = prevMonthCases > 0 ? Math.round((monthDiff / prevMonthCases) * 100) : (thisMonthCases > 0 ? 100 : 0);
+
   // ── Generated Report Logs ──
   const [reportLogs, setReportLogs] = useState([]);
   const [reportsLoading, setReportsLoading] = useState(true);
@@ -343,6 +368,9 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
   // ── NEW two-level user filter ──
   const [filterUserRole, setFilterUserRole] = useState('All Users');   // 'All Users' | 'CHO Users' | 'BHW Users'
   const [filterUserSub,  setFilterUserSub]  = useState('All');          // 'All' | 'CHO Unit I' | 'CHO Unit II' | <barangay>
+  const [filterDisease,  setFilterDisease]  = useState('All Diseases');
+  const [showDiseaseDrop, setShowDiseaseDrop] = useState(false);
+  const diseaseDropRef   = useRef(null);
 
   const [showActionDrop,  setShowActionDrop]  = useState(false);
   const [showUserDrop,    setShowUserDrop]    = useState(false);
@@ -378,6 +406,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
       if (reportSortRef.current  && !reportSortRef.current.contains(e.target))  setShowReportSortDrop(false);
       if (periodRef.current      && !periodRef.current.contains(e.target))      setPeriodOpen(false);
       if (typeRef.current        && !typeRef.current.contains(e.target))        setTypeOpen(false);
+      if (diseaseDropRef.current && !diseaseDropRef.current.contains(e.target)) setShowDiseaseDrop(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -398,6 +427,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
   const handleRoleSelect = (role) => {
     setFilterUserRole(role);
     setFilterUserSub('All');
+    setFilterDisease('All Diseases');
     setShowUserDrop(false);
     setLogPage(1);
   };
@@ -409,6 +439,20 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
       ? ['All', ...COVERED_BARANGAYS_UNIT_I]
       : [];
 
+  // Extract unique disease names from case audit logs for the disease filter
+  const diseaseList = [...new Set(
+    allCases.map(c => c.disease_name).filter(Boolean)
+  )].sort();
+
+  // Helper: extract disease name from an audit log's details field
+  const extractDiseaseFromLog = (log) => {
+    const details = (log.details || '').toLowerCase();
+    for (const d of diseaseList) {
+      if (details.includes(d.toLowerCase())) return d;
+    }
+    return null;
+  };
+
   const filteredAuditLogs = auditLogs.filter(log => {
     const q = searchLog.toLowerCase();
     const matchSearch = !q ||
@@ -417,6 +461,9 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
       (log.entity || '').toLowerCase().includes(q);
 
     const matchAction = filterAction === 'All Actions' || log.action === filterAction;
+
+    const matchDisease = filterDisease === 'All Diseases' ||
+      extractDiseaseFromLog(log) === filterDisease;
 
     // ── restrict to this user's scope ──
     let matchScope = true;
@@ -446,7 +493,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
       matchDate = logDate >= new Date(dateRange.start) && logDate <= new Date(dateRange.end);
     }
 
-    return matchSearch && matchAction && matchScope && matchUser && matchDate;
+    return matchSearch && matchAction && matchDisease && matchScope && matchUser && matchDate;
   });
 
   const totalLogPages  = Math.max(1, Math.ceil(filteredAuditLogs.length / ITEMS_PER_PAGE));
@@ -515,10 +562,13 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
   const renderCalendar = () => { const days = getDaysInMonth(calYear, calMonth); const first = getFirstDay(calYear, calMonth); const cells = []; for (let i = 0; i < first; i++) cells.push(null); for (let d = 1; d <= days; d++) cells.push(d); return cells; };
 
   const actionBadgeStyle = (action) => {
-    if (action === 'Created')   return { background: '#dcf7eb', color: '#129968' };
-    if (action === 'Updated')   return { background: '#dbeafe', color: '#2563eb' };
-    if (action === 'Deleted')   return { background: '#fee2e2', color: '#dc2626' };
-    if (action === 'Logged In') return { background: '#f3e8ff', color: '#7c3aed' };
+    if (action === 'Created')   return { background: 'rgba(18,153,104,0.15)', color: '#16b877' };
+    if (action === 'Updated')   return { background: 'rgba(37,99,235,0.15)', color: '#5b8def' };
+    if (action === 'Deleted')   return { background: 'rgba(220,38,38,0.15)', color: '#ef4444' };
+    if (action === 'Logged In') return { background: 'rgba(124,58,237,0.15)', color: '#a78bfa' };
+    if (action === 'Requested Edit') return { background: 'rgba(217,119,6,0.15)', color: '#fbbf24' };
+    if (action === 'Approved')  return { background: 'rgba(20,184,166,0.15)', color: '#2dd4bf' };
+    if (action === 'Rejected')  return { background: 'rgba(220,38,38,0.15)', color: '#f87171' };
     return { background: 'var(--input-bg)', color: 'var(--text-muted)' };
   };
 
@@ -544,9 +594,9 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
     card:    { background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' },
     label:   { fontSize: '15px', fontWeight: '600', color: 'var(--text-muted)', letterSpacing: '0.04em', textTransform: 'uppercase' },
     input:   { padding: '9px 14px', border: '1px solid var(--input-border)', borderRadius: '7px', fontSize: '15px', color: 'var(--text-main)', background: 'var(--input-bg)', outline: 'none', width: '100%', boxSizing: 'border-box' },
-    dropBtn: (active) => ({ padding: '9px 14px', border: `1px solid ${active ? '#121358' : 'var(--input-border)'}`, borderRadius: '7px', fontSize: '15px', color: active ? '#121358' : 'var(--text-muted)', background: 'var(--input-bg)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap', fontWeight: active ? '600' : '400' }),
+    dropBtn: (active) => ({ padding: '9px 14px', border: `1px solid ${active ? '#3b82f6' : 'var(--text-muted)'}`, borderRadius: '7px', fontSize: '15px', color: active ? '#93c5fd' : 'var(--text-main)', background: active ? 'rgba(59,130,246,0.15)' : 'var(--input-bg)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap', fontWeight: active ? '600' : '400' }),
     dropMenu: { position: 'absolute', top: '110%', left: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 200, minWidth: '200px', overflow: 'hidden' },
-    dropItem: (active) => ({ padding: '10px 16px', fontSize: '15px', cursor: 'pointer', color: active ? '#121358' : 'var(--text-main)', background: active ? 'var(--input-bg)' : 'transparent', display: 'block', width: '100%', border: 'none', textAlign: 'left', fontWeight: active ? '600' : '400' }),
+    dropItem: (active) => ({ padding: '10px 16px', fontSize: '15px', cursor: 'pointer', color: active ? '#93c5fd' : 'var(--text-main)', background: active ? 'rgba(59,130,246,0.15)' : 'transparent', display: 'block', width: '100%', border: 'none', textAlign: 'left', fontWeight: active ? '600' : '400' }),
   };
 
   return (
@@ -640,14 +690,14 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                                 onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(modalEllipsisInput); if (v >= 1 && v <= modalTotalPages) { setModalPage(v); setModalEllipsisOpen(false); setModalEllipsisInput(''); } } }}
                                 style={{ flex: 1, padding: '5px 6px', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px', outline: 'none', width: '100%' }} />
                               <button onClick={() => { const v = parseInt(modalEllipsisInput); if (v >= 1 && v <= modalTotalPages) { setModalPage(v); setModalEllipsisOpen(false); setModalEllipsisInput(''); } }}
-                                style={{ padding: '5px 8px', border: '1px solid #1e3a8a', borderRadius: '4px', background: '#1e3a8a', color: 'white', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>Go</button>
+                                style={{ padding: '5px 8px', border: '1px solid #2563eb', borderRadius: '4px', background: '#2563eb', color: 'white', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>Go</button>
                             </div>
                           </div>
                         )}
                       </div>
                     ) : (
                       <button key={p} onClick={() => setModalPage(p)}
-                        style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: p === modalPage ? '#1e3a8a' : 'var(--bg-surface)', color: p === modalPage ? '#fff' : 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '15px', fontWeight: p === modalPage ? '600' : '400' }}>
+                        style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: p === modalPage ? '#2563eb' : 'var(--bg-surface)', color: p === modalPage ? '#fff' : 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '15px', fontWeight: p === modalPage ? '600' : '400' }}>
                         {p}
                       </button>
                     )
@@ -667,7 +717,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
               <button onClick={() => handleDeleteReport(viewReport.id)}
                 disabled={offlineMode}
-                style={{ padding: '10px 20px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', fontSize: '15px', fontWeight: '600', color: '#dc2626', cursor: offlineMode ? 'not-allowed' : 'pointer', opacity: offlineMode ? 0.4 : 1 }}
+                style={{ padding: '10px 20px', background: 'rgba(220,38,38,0.15)', border: '1px solid rgba(220,38,38,0.35)', borderRadius: '8px', fontSize: '15px', fontWeight: '600', color: '#ef4444', cursor: offlineMode ? 'not-allowed' : 'pointer', opacity: offlineMode ? 0.4 : 1 }}
                 onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                 onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
                 🗑️ Delete Report
@@ -677,7 +727,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                 {modalShowAll ? 'Show Less' : 'Show All'}
               </button>
               <button onClick={() => { setViewReport(null); setModalShowAll(false); setModalPage(1); }}
-                style={{ padding: '10px 28px', background: '#1e3a8a', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: '600', color: '#fff', cursor: 'pointer' }}
+                style={{ padding: '10px 28px', background: '#2563eb', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: '600', color: '#fff', cursor: 'pointer' }}
                 onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                 onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
                 OK
@@ -725,7 +775,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                 {ENTITY_OPTIONS.map(e => (
                   <button key={e} type="button" onClick={() => setGenForm({ ...genForm, entity: e })}
                     style={{ padding: '7px 14px', borderRadius: '20px', border: '1px solid', fontSize: '15px', fontWeight: '500', cursor: 'pointer',
-                      background: genForm.entity === e ? '#1e3a8a' : 'var(--input-bg)', color: genForm.entity === e ? '#fff' : 'var(--text-muted)', borderColor: genForm.entity === e ? '#1e3a8a' : 'var(--border-color)' }}>
+                      background: genForm.entity === e ? '#2563eb' : 'var(--input-bg)', color: genForm.entity === e ? '#fff' : 'var(--text-muted)', borderColor: genForm.entity === e ? '#2563eb' : 'var(--border-color)' }}>
                     {e}
                   </button>
                 ))}
@@ -878,7 +928,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
             <div key={file.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', marginBottom: '10px', position: 'relative' }}>
               <div style={{ flex: 1, minWidth: 0, marginRight: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
-                  <span style={{ fontSize: '15px', fontWeight: '600', padding: '2px 8px', borderRadius: '10px', background: '#e0f2fe', color: '#0369a1', flexShrink: 0 }}>
+                  <span style={{ fontSize: '15px', fontWeight: '600', padding: '2px 8px', borderRadius: '10px', background: 'rgba(14,165,233,0.15)', color: '#38bdf8', flexShrink: 0 }}>
                     {file.period || 'Manual'}
                   </span>
                   <p style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>
@@ -928,7 +978,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                   )}
                 </div>
                 <button onClick={() => { setViewReport(file); setShowDownloadMenu(null); }}
-                  style={{ padding: '6px 14px', background: '#e6f8f0', border: '1px solid #baf0d7', borderRadius: '6px', fontSize: '15px', cursor: 'pointer', color: '#129968', fontWeight: '500' }}
+                  style={{ padding: '6px 14px', background: 'rgba(18,153,104,0.15)', border: '1px solid rgba(18,153,104,0.35)', borderRadius: '6px', fontSize: '15px', cursor: 'pointer', color: '#16b877', fontWeight: '500' }}
                   onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                   onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
                   View
@@ -948,10 +998,10 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               {[
-                { label: 'Cases Added',      value: casesAdded,      color: '#1e3a8a', bg: '#eff6ff' },
-                { label: 'Cases Updated',    value: casesUpdated,    color: '#0369a1', bg: '#e0f2fe' },
-                { label: 'Cases Deleted',    value: casesDeleted,    color: '#dc2626', bg: '#fee2e2' },
-                { label: 'Accounts Created', value: accountsCreated, color: '#0e7d56', bg: '#d1f5e9' },
+                { label: 'Cases Added',      value: casesAdded,      color: '#5b8def', bg: 'rgba(37,99,235,0.15)' },
+                { label: 'Cases Updated',    value: casesUpdated,    color: '#38bdf8', bg: 'rgba(14,165,233,0.15)' },
+                { label: 'Cases Deleted',    value: casesDeleted,    color: '#ef4444', bg: 'rgba(220,38,38,0.15)' },
+                { label: 'Accounts Created', value: accountsCreated, color: '#16b877', bg: 'rgba(18,153,104,0.15)' },
               ].map(stat => (
                 <div key={stat.label} style={{ background: stat.bg, borderRadius: '8px', padding: '14px', textAlign: 'center' }}>
                   <div style={{ fontSize: '26px', fontWeight: '800', color: stat.color }}>{stat.value}</div>
@@ -960,6 +1010,26 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
               ))}
             </div>
           )}
+
+          <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
+            <p style={{ ...s.label, display: 'block', marginBottom: '8px' }}>Period Comparison</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div style={{ background: 'var(--input-bg)', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '15px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '4px' }}>This Week</div>
+                <div style={{ fontSize: '22px', fontWeight: '800', color: '#5b8def' }}>{thisWeekCases}</div>
+                <div style={{ fontSize: '13px', fontWeight: '600', color: weekDiff > 0 ? '#dc2626' : weekDiff < 0 ? '#16a34a' : '#475569', marginTop: '2px' }}>
+                  {weekDiff === 0 ? 'No change' : `${weekDiff > 0 ? '+' : ''}${weekDiff} (${weekPct > 0 ? '+' : ''}${weekPct}%) vs prev`}
+                </div>
+              </div>
+              <div style={{ background: 'var(--input-bg)', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '15px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '4px' }}>This Month</div>
+                <div style={{ fontSize: '22px', fontWeight: '800', color: '#38bdf8' }}>{thisMonthCases}</div>
+                <div style={{ fontSize: '13px', fontWeight: '600', color: monthDiff > 0 ? '#dc2626' : monthDiff < 0 ? '#16a34a' : '#475569', marginTop: '2px' }}>
+                  {monthDiff === 0 ? 'No change' : `${monthDiff > 0 ? '+' : ''}${monthDiff} (${monthPct > 0 ? '+' : ''}${monthPct}%) vs prev`}
+                </div>
+              </div>
+            </div>
+          </div>
 
           <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
             <p style={{ ...s.label, display: 'block', marginBottom: '8px' }}>
@@ -983,11 +1053,13 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
         {/* ── AUDIT SUMMARY CHIPS ── */}
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '16px' }}>
           {[
-            { label: 'Total', count: filteredAuditLogs.length, color: '#1e3a8a', bg: '#eff6ff' },
-            { label: 'Created', count: filteredAuditLogs.filter(l => l.action === 'Created').length, color: '#129968', bg: '#dcf7eb' },
-            { label: 'Updated', count: filteredAuditLogs.filter(l => l.action === 'Updated').length, color: '#2563eb', bg: '#dbeafe' },
-            { label: 'Deleted', count: filteredAuditLogs.filter(l => l.action === 'Deleted').length, color: '#dc2626', bg: '#fee2e2' },
-            { label: 'Logged In', count: filteredAuditLogs.filter(l => l.action === 'Logged In').length, color: '#7c3aed', bg: '#f3e8ff' },
+            { label: 'Total', count: filteredAuditLogs.length, color: '#5b8def', bg: 'rgba(37,99,235,0.15)' },
+            { label: 'Created', count: filteredAuditLogs.filter(l => l.action === 'Created').length, color: '#16b877', bg: 'rgba(18,153,104,0.15)' },
+            { label: 'Updated', count: filteredAuditLogs.filter(l => l.action === 'Updated').length, color: '#5b8def', bg: 'rgba(37,99,235,0.15)' },
+            { label: 'Deleted', count: filteredAuditLogs.filter(l => l.action === 'Deleted').length, color: '#ef4444', bg: 'rgba(220,38,38,0.15)' },
+            { label: 'Logged In', count: filteredAuditLogs.filter(l => l.action === 'Logged In').length, color: '#a78bfa', bg: 'rgba(124,58,237,0.15)' },
+            { label: 'Edit Requests', count: filteredAuditLogs.filter(l => l.action === 'Requested Edit').length, color: '#fbbf24', bg: 'rgba(217,119,6,0.15)' },
+            { label: 'Registrations', count: filteredAuditLogs.filter(l => l.action === 'Approved' || l.action === 'Rejected').length, color: '#2dd4bf', bg: 'rgba(20,184,166,0.15)' },
           ].map(chip => (
             <span key={chip.label} style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 12px', borderRadius: '16px', fontSize: '13px', fontWeight: '600', color: chip.color, background: chip.bg }}>
               {chip.label}: {chip.count}
@@ -1008,21 +1080,21 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
 
           {/* Action filter */}
           <div style={{ position: 'relative' }} ref={actionDropRef}>
-            <button onClick={() => { setShowActionDrop(!showActionDrop); setShowUserDrop(false); setShowSubDrop(false); setShowDatePicker(false); }}
+            <button onClick={() => { setShowActionDrop(!showActionDrop); setShowUserDrop(false); setShowSubDrop(false); setShowDatePicker(false); setShowDiseaseDrop(false); }}
               style={s.dropBtn(filterAction !== 'All Actions')}>
               {filterAction}
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
             {showActionDrop && (
               <div style={s.dropMenu}>
-                {['All Actions', 'Created', 'Updated', 'Deleted', 'Logged In'].map(a => (
+                {['All Actions', 'Created', 'Updated', 'Deleted', 'Logged In', 'Requested Edit', 'Approved', 'Rejected'].map(a => (
                   <button key={a} style={s.dropItem(filterAction === a)}
                     onClick={() => { setFilterAction(a); setShowActionDrop(false); setLogPage(1); }}
                     onMouseEnter={e => { if (filterAction !== a) e.target.style.background = 'var(--input-bg)'; }}
                     onMouseLeave={e => { if (filterAction !== a) e.target.style.background = 'transparent'; }}>
                     {a !== 'All Actions' && (
                       <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', marginRight: '8px',
-                        background: a === 'Created' ? '#129968' : a === 'Updated' ? '#2563eb' : a === 'Deleted' ? '#dc2626' : '#7c3aed' }} />
+                        background: a === 'Created' ? '#129968' : a === 'Updated' ? '#2563eb' : a === 'Deleted' ? '#dc2626' : a === 'Requested Edit' ? '#fbbf24' : a === 'Approved' ? '#2dd4bf' : a === 'Rejected' ? '#ef4444' : '#7c3aed' }} />
                     )}
                     {a}
                   </button>
@@ -1030,6 +1102,35 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
               </div>
             )}
           </div>
+
+          {/* Disease filter */}
+          {diseaseList.length > 0 && (
+            <div style={{ position: 'relative' }} ref={diseaseDropRef}>
+              <button onClick={() => { setShowDiseaseDrop(!showDiseaseDrop); setShowActionDrop(false); setShowUserDrop(false); setShowSubDrop(false); setShowDatePicker(false); }}
+                style={s.dropBtn(filterDisease !== 'All Diseases')}>
+                {filterDisease === 'All Diseases' ? 'All Diseases' : filterDisease}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              {showDiseaseDrop && (
+                <div style={{ ...s.dropMenu, maxHeight: '260px', overflowY: 'auto' }}>
+                  <button style={s.dropItem(filterDisease === 'All Diseases')}
+                    onClick={() => { setFilterDisease('All Diseases'); setShowDiseaseDrop(false); setLogPage(1); }}
+                    onMouseEnter={e => { if (filterDisease !== 'All Diseases') e.target.style.background = 'var(--input-bg)'; }}
+                    onMouseLeave={e => { if (filterDisease !== 'All Diseases') e.target.style.background = 'transparent'; }}>
+                    All Diseases
+                  </button>
+                  {diseaseList.map(d => (
+                    <button key={d} style={s.dropItem(filterDisease === d)}
+                      onClick={() => { setFilterDisease(d); setShowDiseaseDrop(false); setLogPage(1); }}
+                      onMouseEnter={e => { if (filterDisease !== d) e.target.style.background = 'var(--input-bg)'; }}
+                      onMouseLeave={e => { if (filterDisease !== d) e.target.style.background = 'transparent'; }}>
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ── LEVEL 1: Role filter (CHO Users / BHW Users) ── */}
           <div style={{ position: 'relative' }} ref={userDropRef}>
@@ -1139,7 +1240,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                 </div>
                 {(dateRange.start || dateRange.end) && (
                   <button onClick={() => { setDateRange({ start: '', end: '' }); setSelectingStart(true); setLogPage(1); }}
-                    style={{ marginTop: '10px', width: '100%', padding: '7px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '15px', color: '#dc2626', cursor: 'pointer', fontWeight: '500' }}>
+                    style={{ marginTop: '10px', width: '100%', padding: '7px', background: 'rgba(220,38,38,0.15)', border: '1px solid rgba(220,38,38,0.3)', borderRadius: '6px', fontSize: '15px', color: '#ef4444', cursor: 'pointer', fontWeight: '500' }}>
                     Clear Date Range
                   </button>
                 )}
@@ -1248,14 +1349,14 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                           onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(logEllipsisInput); if (v >= 1 && v <= totalLogPages) { setLogPage(v); setLogEllipsisOpen(false); setLogEllipsisInput(''); } } }}
                           style={{ flex: 1, padding: '5px 6px', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px', outline: 'none', width: '100%' }} />
                         <button onClick={() => { const v = parseInt(logEllipsisInput); if (v >= 1 && v <= totalLogPages) { setLogPage(v); setLogEllipsisOpen(false); setLogEllipsisInput(''); } }}
-                          style={{ padding: '5px 8px', border: '1px solid #1e3a8a', borderRadius: '4px', background: '#1e3a8a', color: 'white', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>Go</button>
+                          style={{ padding: '5px 8px', border: '1px solid #2563eb', borderRadius: '4px', background: '#2563eb', color: 'white', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>Go</button>
                       </div>
                     </div>
                   )}
                 </div>
               ) : (
                 <button key={p} onClick={() => setLogPage(p)}
-                  style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: p === logPage ? '#1e3a8a' : 'var(--bg-surface)', color: p === logPage ? '#fff' : 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '15px', fontWeight: p === logPage ? '600' : '400' }}>
+                  style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: p === logPage ? '#2563eb' : 'var(--bg-surface)', color: p === logPage ? '#fff' : 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '15px', fontWeight: p === logPage ? '600' : '400' }}>
                   {p}
                 </button>
               )

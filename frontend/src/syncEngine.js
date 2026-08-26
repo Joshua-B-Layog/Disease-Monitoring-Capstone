@@ -36,8 +36,32 @@ export async function removePendingCreatesByCaseId(caseId) {
 }
 
 export async function clearCompleted() {
+  const done = await db.syncQueue.where('status').equals('done').toArray();
+  const errors = await db.syncQueue.where('status').equals('error').toArray();
+  const toArchive = [...done, ...errors];
+  if (toArchive.length > 0) {
+    await db.syncHistory.bulkAdd(toArchive.map(item => ({
+      type: item.type,
+      endpoint: item.endpoint,
+      method: item.method,
+      timestamp: item.timestamp,
+      syncedAt: Date.now(),
+      status: item.status,
+      error: item.error || null,
+      userId: item.userId,
+      userName: item.userName,
+    })));
+  }
   await db.syncQueue.where('status').equals('done').delete();
   await db.syncQueue.where('status').equals('error').delete();
+}
+
+export async function getSyncHistory() {
+  return await db.syncHistory.orderBy('id').reverse().toArray();
+}
+
+export async function clearSyncHistory() {
+  await db.syncHistory.clear();
 }
 
 export async function processSyncQueue(onProgress, onConflict) {
