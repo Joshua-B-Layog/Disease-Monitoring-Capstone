@@ -1,7 +1,7 @@
-  import React, { useState, useEffect, useRef } from 'react';
-  import { API_URL } from '../config';
-  import ChoLogoIcon from '../assets/ChoLogo';
-  import { getCachedUsers, upsertCachedUser } from '../offlineSync';
+import React, { useState, useEffect, useRef } from 'react';
+import { API_URL } from '../config';
+import ChoLogoIcon from '../assets/ChoLogo';
+import { getCachedUsers, upsertCachedUser } from '../offlineSync';
 import BackButton from './BackButton';
 import L from 'leaflet';
 import { MapContainer, TileLayer, useMap, GeoJSON } from 'react-leaflet';
@@ -39,6 +39,25 @@ const OVERALL_BOUNDS = (() => {
   return [[minLat, minLng], [maxLat, maxLng]];
 })();
 
+// Build SVG path data for the faint Cabuyao map outline behind the auth card
+const SVG_W = 800;
+const SVG_H = 520;
+const MAP_PADDING = 30;
+const mapScale = Math.min(
+  (SVG_W - MAP_PADDING * 2) / (OVERALL_BOUNDS[1][1] - OVERALL_BOUNDS[0][1]),
+  (SVG_H - MAP_PADDING * 2) / (OVERALL_BOUNDS[1][0] - OVERALL_BOUNDS[0][0])
+);
+const toSvgX = (lng) => (lng - OVERALL_BOUNDS[0][1]) * mapScale + (SVG_W - (OVERALL_BOUNDS[1][1] - OVERALL_BOUNDS[0][1]) * mapScale) / 2;
+const toSvgY = (lat) => (OVERALL_BOUNDS[1][0] - lat) * mapScale + (SVG_H - (OVERALL_BOUNDS[1][0] - OVERALL_BOUNDS[0][0]) * mapScale) / 2;
+const CABUYAO_MAP_PATHS = cabuyaoBoundaries.features.map((f) => {
+  const rings = f.geometry.type === 'MultiPolygon'
+    ? f.geometry.coordinates.map((p) => p[0])
+    : [f.geometry.coordinates[0]];
+  return rings.map((ring) =>
+    'M ' + ring.map(([lng, lat]) => `${toSvgX(lng).toFixed(1)},${toSvgY(lat).toFixed(1)}`).join(' L ') + ' Z'
+  ).join(' ');
+}).join(' ');
+
 const CABUYAO_CENTER = [
   (OVERALL_BOUNDS[0][0] + OVERALL_BOUNDS[1][0]) / 2,
   (OVERALL_BOUNDS[0][1] + OVERALL_BOUNDS[1][1]) / 2,
@@ -56,10 +75,10 @@ const ANIM_SCENES = [
 ];
 
 const BRANDING_FEATURES = [
-  { text: 'Continuous communicable disease surveillance', color: '#3b82f6' },
-  { text: 'Barangay-level case mapping across 18 barangays', color: '#dc2626' },
-  { text: 'Automated alerts, referrals & weekly summaries', color: '#3b82f6' },
-  { text: 'Offline-ready field data collection', color: '#dc2626' },
+  { icon: '🛰️', title: 'Continuous Surveillance', subtitle: 'Real-time monitoring & early detection', color: '#3b82f6' },
+  { icon: '🗺️', title: 'Barangay & Purok Mapping', subtitle: 'Localized clusters across 18 barangays', color: '#dc2626' },
+  { icon: '🔔', title: 'Automated Alerts', subtitle: 'Timely updates and outbreak warnings', color: '#3b82f6' },
+  { icon: '📊', title: 'Decision Support', subtitle: 'Accurate reports for CHO health response', color: '#dc2626' },
 ];
 
 function CityHealthBranding() {
@@ -76,18 +95,21 @@ function CityHealthBranding() {
           <span>CITY HEALTH OFFICE</span>
         </div>
 
-        <h1 className="login-branding-title">City Health Office</h1>
-        <p className="login-branding-subtitle">Cabuyao City, Laguna, Philippines</p>
+        <h1 className="login-branding-title">Building a Healthier Cabuyao, Together.</h1>
+        <p className="login-branding-subtitle">City of Cabuyao · City Health Office - Laguna</p>
         <p className="login-branding-desc">
-          The City Health Office of Cabuyao monitors communicable diseases in real time, mapping every case
-          down to barangay and purok level to guide prompt community health response across the city.
+          Real-time communicable disease surveillance across all 18 barangays, mapping every case down to
+          barangay and purok level to guide prompt community health response across the city.
         </p>
 
         <div className="login-branding-features">
           {BRANDING_FEATURES.map((f, i) => (
             <div key={i} className="login-branding-feature">
-              <span className="login-branding-feature-dot" style={{ background: f.color }} />
-              <span>{f.text}</span>
+              <span className="login-branding-feature-icon" style={{ borderColor: f.color }}>{f.icon}</span>
+              <span className="login-branding-feature-text">
+                <span className="login-branding-feature-title">{f.title}</span>
+                <span className="login-branding-feature-sub">{f.subtitle}</span>
+              </span>
             </div>
           ))}
         </div>
@@ -643,7 +665,8 @@ const handleLoginOtpSubmit = async (e) => {
                 style={{ width: '100%', height: '100%', background: 'transparent' }}
               >
                 <TileLayer
-                  url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
                 <AnimatedMapView setFade={setMapFade} active={leftPanel === 1} onSequenceComplete={() => setLeftPanel(0)} />
               </MapContainer>
@@ -652,6 +675,59 @@ const handleLoginOtpSubmit = async (e) => {
         </div>
 
         <div className="login-right">
+          <div className="auth-bg-decorations" aria-hidden="true">
+            <svg
+              className="auth-bg-map"
+              viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path d={CABUYAO_MAP_PATHS} stroke="currentColor" strokeWidth="1.5" fill="currentColor" fillOpacity="0.12" />
+            </svg>
+
+            <svg className="auth-bg-nodes" viewBox={`0 0 ${SVG_W} ${SVG_H}`} fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M120 90 L210 150 L330 110 L470 200 M210 150 L270 320 L470 200 M470 200 L600 260 L690 170 L600 120 M600 260 L520 400" stroke="#38BDF8" strokeOpacity="0.3" strokeWidth="1" strokeDasharray="2 4" />
+              <path d="M330 110 L420 90 M120 90 L60 180 L120 90" stroke="#34D399" strokeOpacity="0.3" strokeWidth="1" strokeDasharray="2 4" />
+              <circle cx="120" cy="90"  r="3" fill="#38BDF8" fillOpacity="0.4" />
+              <circle cx="210" cy="150" r="3" fill="#34D399" fillOpacity="0.4" />
+              <circle cx="330" cy="110" r="2.5" fill="#38BDF8" fillOpacity="0.3" />
+              <circle cx="470" cy="200" r="3" fill="#34D399" fillOpacity="0.4" />
+              <circle cx="600" cy="260" r="3" fill="#38BDF8" fillOpacity="0.4" />
+              <circle cx="690" cy="170" r="2.5" fill="#34D399" fillOpacity="0.3" />
+              <circle cx="600" cy="120" r="2.5" fill="#38BDF8" fillOpacity="0.3" />
+              <circle cx="270" cy="320" r="3" fill="#34D399" fillOpacity="0.4" />
+              <circle cx="520" cy="400" r="2.5" fill="#38BDF8" fillOpacity="0.3" />
+              <circle cx="420" cy="90"  r="2.5" fill="#34D399" fillOpacity="0.3" />
+              <circle cx="60"  cy="180" r="2.5" fill="#38BDF8" fillOpacity="0.3" />
+            </svg>
+
+            <svg className="auth-bg-icon users-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="9" cy="8" r="3.2" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M3.5 20c0-3 2.5-5 5.5-5s5.5 2 5.5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <circle cx="17" cy="9" r="2.4" stroke="currentColor" strokeWidth="1.4" />
+              <path d="M16.5 15.5c2.6.3 4.2 2 4.2 4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            </svg>
+
+            <svg className="auth-bg-icon pin-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="12" cy="12" r="9" fill="#10B981" fillOpacity="0.2" />
+              <path d="M20 10c0 4.4-6 10-8 10s-8-5.6-8-10a8 8 0 0 1 16 0z" stroke="currentColor" strokeWidth="1.5" />
+              <circle cx="12" cy="10" r="3" fill="currentColor" />
+            </svg>
+
+            <svg className="auth-bg-icon chart-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="4" y="12" width="4" height="8" stroke="currentColor" strokeWidth="1.7" />
+              <rect x="10" y="7" width="4" height="13" stroke="currentColor" strokeWidth="1.7" />
+              <rect x="16" y="3" width="4" height="17" stroke="currentColor" strokeWidth="1.7" />
+            </svg>
+
+            <svg className="auth-bg-icon cross-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M11 4 H13 V11 H20 V13 H13 V20 H11 V13 H4 V11 H11 Z" stroke="currentColor" strokeWidth="1.4" fill="currentColor" fillOpacity="0.25" />
+            </svg>
+            <svg className="auth-bg-icon cross-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M11 4 H13 V11 H20 V13 H13 V20 H11 V13 H4 V11 H11 Z" stroke="currentColor" strokeWidth="1.4" fill="currentColor" fillOpacity="0.25" />
+            </svg>
+          </div>
+          <div className="login-column">
           <div key={step} className={step === 'role' ? 'login-form-container' : 'login-form-container cdms-login-step'}>
             
             <div className="brand-logo" style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '30px' }}>
@@ -664,24 +740,27 @@ const handleLoginOtpSubmit = async (e) => {
             {/* STEP 1: PORTAL ROUTING */}
             {step === 'role' && (
               <>
-                <div className="login-header" style={{ marginBottom: '30px', textAlign: 'left' }}>
-                  <h2 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '8px' }}>Welcome back</h2>
+                <div className="login-header" style={{ marginBottom: '28px', textAlign: 'left' }}>
+                  <h2 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '8px' }}>Welcome back!</h2>
                   <p style={{ color: 'var(--text-muted)' }}>Select your system surveillance portal access group.</p>
+                  <div className="accent-bar" />
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <button type="button" onClick={() => handleRoleSelection('CHO')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px', background: 'rgba(18, 19, 88, 0.15)', border: '1px solid #121358', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
-                    <div>
-                      <div style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '16px' }}>City Health Office (CHO)</div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '15px', marginTop: '2px' }}>Central Systems & Analytics</div>
+                  <button type="button" className="portal-card portal-card-cho" onClick={() => handleRoleSelection('CHO')} aria-label="Select City Health Office portal">
+                    <div className="portal-card-body">
+                      <span className="portal-card-title" style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '16px' }}>City Health Office (CHO)</span>
+                      <span className="portal-card-sub" style={{ color: 'var(--text-muted)', fontSize: '15px', marginTop: '2px' }}>Central Systems &amp; Analytics</span>
                     </div>
+                    <span className="portal-card-arrow">→</span>
                   </button>
 
-                  <button type="button" onClick={() => handleRoleSelection('BHW')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px', background: 'rgba(18, 153, 104, 0.08)', border: '1px solid #129968', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
-                    <div>
-                      <div style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '16px' }}>Barangay Health Worker</div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '15px', marginTop: '2px' }}>Community Surveillance Data Entry</div>
+                  <button type="button" className="portal-card portal-card-bhw" onClick={() => handleRoleSelection('BHW')} aria-label="Select Barangay Health Worker portal">
+                    <div className="portal-card-body">
+                      <span className="portal-card-title" style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '16px' }}>Barangay Health Worker</span>
+                      <span className="portal-card-sub" style={{ color: 'var(--text-muted)', fontSize: '15px', marginTop: '2px' }}>Community Surveillance Data Entry</span>
                     </div>
+                    <span className="portal-card-arrow">→</span>
                   </button>
                 </div>
               </>
@@ -694,27 +773,24 @@ const handleLoginOtpSubmit = async (e) => {
                   <BackButton onClick={handleBackNavigation} color="#129968" style={{ marginBottom: '10px' }}>Back</BackButton>
                   <h2 style={{ fontSize: '26px', color: 'var(--text-main)', marginBottom: '6px' }}>Select Health Unit</h2>
                   <p style={{ color: 'var(--text-muted)' }}>Identify your current administrative station hub.</p>
+                  <div className="accent-bar" />
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  <button type="button" onClick={() => handleChoSelection('CHO Unit I (Sala)')} style={{ padding: '16px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-main)', fontWeight: '600', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '16px' }}>CHO Unit I (Main)</span>
-                      <span style={{ fontSize: '15px', background: '#1e3a8a', color: '#93c5fd', padding: '2px 6px', borderRadius: '4px' }}>CHO 1 Hub</span>
+                  <button type="button" className="portal-card portal-card-cho" onClick={() => handleChoSelection('CHO Unit I (Sala)')} aria-label="Select CHO Unit I">
+                    <div className="portal-card-body">
+                      <span className="portal-card-title" style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '16px' }}>CHO Unit I (Main)</span>
+                      <span className="portal-card-sub" style={{ color: 'var(--text-muted)', fontSize: '15px', marginTop: '2px' }}>City Hall Complex, Brgy. Sala Cabuyao, Laguna</span>
                     </div>
-                    <span style={{ fontSize: '15px', color: 'var(--text-muted)', fontWeight: '400', display: 'block', marginTop: '6px' }}>
-                      City Hall Complex, F.B. Bailon St., Brgy. Sala
-                    </span>
+                    <span className="portal-card-arrow">→</span>
                   </button>
-                  
-                  <button type="button" onClick={() => handleChoSelection('CHO Unit II (Pulo)')} style={{ padding: '16px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-main)', fontWeight: '600', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '16px' }}>CHO Unit II (Extension)</span>
-                      <span style={{ fontSize: '15px', background: '#1e3a8a', color: '#93c5fd', padding: '2px 6px', borderRadius: '4px' }}>CHO 2 Hub</span>
+
+                  <button type="button" className="portal-card portal-card-cho" onClick={() => handleChoSelection('CHO Unit II (Pulo)')} aria-label="Select CHO Unit II">
+                    <div className="portal-card-body">
+                      <span className="portal-card-title" style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '16px' }}>CHO Unit II (Extension)</span>
+                      <span className="portal-card-sub" style={{ color: 'var(--text-muted)', fontSize: '15px', marginTop: '2px' }}>Pulo Health Center, Brgy. Pulo Cabuyao, Laguna</span>
                     </div>
-                    <span style={{ fontSize: '15px', color: 'var(--text-muted)', fontWeight: '400', display: 'block', marginTop: '6px' }}>
-                      National Highway, Brgy. Pulo (Beside Centro Mall)
-                    </span>
+                    <span className="portal-card-arrow">→</span>
                   </button>
                 </div>
               </>
@@ -735,14 +811,11 @@ const handleLoginOtpSubmit = async (e) => {
                   </div>
                 )}
 
-                <div style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', maxHeight: '220px', overflowY: 'auto', marginBottom: '24px', padding: '4px', textAlign: 'left' }}>
+                <div style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', maxHeight: '220px', overflowY: 'auto', marginBottom: '24px', textAlign: 'left' }}>
                   {cabuyaoBarangays.map((b) => (
-                    <div key={b.name} onClick={() => { setSelectedContext(`Brgy. ${b.name}`); setLoginError(''); }} style={{
-                      padding: '12px', cursor: 'pointer', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '2px 0',
-                      background: selectedContext === `Brgy. ${b.name}` ? '#129968' : 'transparent', color: selectedContext === `Brgy. ${b.name}` ? '#ffffff' : 'var(--text-main)'
-                    }}>
-                      <span style={{ fontWeight: selectedContext === `Brgy. ${b.name}` ? '600' : '400' }}>Brgy. {b.name}</span>
-                      <span style={{ fontSize: '15px', padding: '2px 6px', borderRadius: '4px', background: 'rgba(0,0,0,0.2)', color: selectedContext === `Brgy. ${b.name}` ? '#fff' : 'var(--text-muted)' }}>{b.district}</span>
+                    <div key={b.name} onClick={() => { setSelectedContext(`Brgy. ${b.name}`); setLoginError(''); }} className={`brgy-option-card ${selectedContext === `Brgy. ${b.name}` ? 'brgy-option-active' : ''}`}>
+                      <span className="brgy-option-name">Brgy. {b.name}</span>
+                      <span className="brgy-option-badge">{b.district}</span>
                     </div>
                   ))}
                 </div>
@@ -939,7 +1012,7 @@ const handleLoginOtpSubmit = async (e) => {
                   </div>
                 </div>
 
-                <BackButton onClick={() => setStep('role')} style={{ marginTop: '24px', width: '100%', justifyContent: 'center' }}>Back to Portal</BackButton>
+                <BackButton onClick={() => setStep('role')} className="back-btn-boxed" style={{ marginTop: '24px', width: '100%', justifyContent: 'center' }}>Back to Portal</BackButton>
               </>
             )}
 
@@ -949,25 +1022,25 @@ const handleLoginOtpSubmit = async (e) => {
               <>
                 <div className="login-header" style={{ marginBottom: '30px', textAlign: 'left' }}>
                   <BackButton onClick={handleBackNavigation} color="#129968" style={{ marginBottom: '10px' }}>Back</BackButton>
-                  <h2 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '8px' }}>Create Account</h2>
-                  <p style={{ color: 'var(--text-muted)' }}>Select your registration type to proceed.</p>
+                  <h2 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '8px' }}>Create Surveillance Account</h2>
+                  <p style={{ color: 'var(--text-muted)' }}>Register as an authorized health encoder or BHW for Cabuyao City.</p>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <button type="button" onClick={() => { setSignupRole('BHW'); setStep('signup'); }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px', background: 'rgba(18, 153, 104, 0.08)', border: '1px solid #129968', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
-                    <div>
-                      <div style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '16px' }}>Barangay Health Worker</div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '15px', marginTop: '2px' }}>Community Surveillance Data Entry</div>
+                  <button type="button" className="portal-card" onClick={() => { setSignupRole('BHW'); setStep('signup'); }}>
+                    <div className="portal-card-body">
+                      <span className="portal-card-title" style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '16px' }}>Barangay Health Worker</span>
+                      <span className="portal-card-sub" style={{ color: 'var(--text-muted)', fontSize: '15px', marginTop: '2px' }}>Community Surveillance Data Entry</span>
                     </div>
-                    <span style={{ fontSize: '22px' }}>📍</span>
+                    <span className="portal-card-arrow"></span>
                   </button>
 
-                  <button type="button" onClick={() => setStep('cho_contact')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px', background: 'rgba(18, 19, 88, 0.15)', border: '1px solid #121358', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
-                    <div>
-                      <div style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '16px' }}>City Health Office (CHO)</div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '15px', marginTop: '2px' }}>Central Systems & Analytics</div>
+                  <button type="button" className="portal-card" onClick={() => setStep('cho_contact')}>
+                    <div className="portal-card-body">
+                      <span className="portal-card-title" style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '16px' }}>City Health Office (CHO)</span>
+                      <span className="portal-card-sub" style={{ color: 'var(--text-muted)', fontSize: '15px', marginTop: '2px' }}>Central Systems &amp; Analytics</span>
                     </div>
-                    <span style={{ fontSize: '22px' }}>🏢</span>
+                    <span className="portal-card-arrow"></span>
                   </button>
                 </div>
               </>
@@ -979,8 +1052,8 @@ const handleLoginOtpSubmit = async (e) => {
               <>
                 <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
                   <BackButton onClick={handleBackNavigation} color="#129968" style={{ marginBottom: '10px' }}>Back to Login</BackButton>
-                  <h2 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '8px' }}>Recover Account</h2>
-                  <p style={{ color: 'var(--text-muted)' }}>Enter your email or username to receive a password reset link.</p>
+                  <h2 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '8px' }}>Account Recovery</h2>
+                  <p style={{ color: 'var(--text-muted)' }}>Enter your registered email address to receive password reset instructions.</p>
                 </div>
 
                 <form onSubmit={handleRecoverySubmit}>
@@ -997,7 +1070,7 @@ const handleLoginOtpSubmit = async (e) => {
 
                   <div className="form-group" style={{ textAlign: 'left' }}>
                     <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>
-                      Username or registered email address
+                      Registered Email Address
                     </label>
                     <input 
                       type="text"
@@ -1019,10 +1092,15 @@ const handleLoginOtpSubmit = async (e) => {
             {/* SIGN UP SECTION */}
             {step === 'signup' && (
                 <>
-                    <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
-                        <BackButton onClick={handleBackNavigation} color="#129968" style={{ marginBottom: '10px' }}>Back</BackButton>
-                        <h2 style={{ fontSize: '26px', color: 'var(--text-main)', marginBottom: '6px' }}>Create Account</h2>
-                        <p style={{ color: 'var(--text-muted)' }}>Register a new account for surveillance database entry.</p>
+                    <div className="login-header" style={{ marginBottom: '14px', textAlign: 'left' }}>
+                        <BackButton onClick={handleBackNavigation} color="#129968" style={{ marginBottom: '10px' }}>Back to Sign In</BackButton>
+                        <h2 style={{ fontSize: '26px', color: 'var(--text-main)', marginBottom: '6px', fontWeight: 'bold' }}>Create an Account</h2>
+                        <p style={{ color: 'var(--text-muted)' }}>Request authorization to access the Cabuyao surveillance portal.</p>
+                    </div>
+
+                    <div className="cdms-auth-notice cdms-auth-notice-signup">
+                        <span className="cdms-auth-notice-icon">ℹ</span>
+                        <span>Registrations require approval from the City Health Office administrator before account activation.</span>
                     </div>
 
                     <form onSubmit={handleSignupSubmit}>
@@ -1042,7 +1120,7 @@ const handleLoginOtpSubmit = async (e) => {
                             <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Full Name</label>
                             <input
                                 type="text"
-                                className="form-input"
+                                className="form-input cdms-field-icon cdms-field-user"
                                 placeholder="Juan Dela Cruz"
                                 value={signupName}
                                 onChange={(e) => setSignupName(e.target.value)}
@@ -1068,7 +1146,7 @@ const handleLoginOtpSubmit = async (e) => {
                             <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Email Address</label>
                             <input
                                 type="email"
-                                className="form-input"
+                                className="form-input cdms-field-icon cdms-field-mail"
                                 placeholder="juan@example.com"
                                 value={signupEmail}
                                 onChange={(e) => setSignupEmail(e.target.value)}
@@ -1081,7 +1159,7 @@ const handleLoginOtpSubmit = async (e) => {
                             <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Mobile Number</label>
                             <input
                                 type="text"
-                                className="form-input"
+                                className="form-input cdms-field-icon cdms-field-phone"
                                 placeholder="09123456789"
                                 value={signupMobile}
                                 onChange={(e) => setSignupMobile(e.target.value.replace(/\D/g, '').slice(0, 11))}
@@ -1223,7 +1301,7 @@ const handleLoginOtpSubmit = async (e) => {
                         </div>
 
                         <button type="submit" className="submit-btn" style={{ backgroundColor: '#129968', color: '#FFFFFF', marginTop: '20px', width: '100%' }}>
-                            Register Account
+                            Submit Account Registration
                         </button>
                     </form>
                 </>
@@ -1249,16 +1327,33 @@ const handleLoginOtpSubmit = async (e) => {
                     }
                   }
                   setStep('signup');
-                }} style={{ color: '#129968', cursor: 'pointer', fontWeight: '500' }}>Sign up</span>
+                }} style={{ color: '#129968', cursor: 'pointer', fontWeight: '500' }}>Sign Up</span>
               </div>
             ) : (
               step !== 'role' && step !== 'cho_contact' && (
                 <div style={{ marginTop: '30px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '15px' }}>
-                  Already registered? <span onClick={() => setStep('role')} style={{ color: '#129968', cursor: 'pointer', fontWeight: '500' }}>Sign In here</span>
+                  Already have an account? <span onClick={() => setStep('role')} style={{ color: '#129968', cursor: 'pointer', fontWeight: '500' }}>Sign In</span>
                 </div>
               )
             )}  
 
+          </div>
+
+          <div className="cdms-auth-footer">
+            <span>© 2026 City Health Office of Cabuyao. All rights reserved.</span>
+            <span className="cdms-auth-footer-sep">·</span>
+            <span>Contact: (049) 502-1234 | chounit1@cabuyao.gov.ph</span>
+            <span className="cdms-auth-footer-sep">·</span>
+            <span>Location: Sala Health Center, Brgy. Sala, Cabuyao, Laguna</span>
+            <span className="cdms-auth-footer-sep">·</span>
+            <span className="cdms-auth-footer-links">
+              <a href="#" onClick={(e) => e.preventDefault()}>Privacy Policy</a>
+              <span className="cdms-auth-footer-sep">|</span>
+              <a href="#" onClick={(e) => e.preventDefault()}>Terms of Use</a>
+              <span className="cdms-auth-footer-sep">|</span>
+              <a href="#" onClick={(e) => e.preventDefault()}>Data Disclaimer</a>
+            </span>
+          </div>
           </div>
         </div>
       </div>

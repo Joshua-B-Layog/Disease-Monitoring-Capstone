@@ -775,7 +775,7 @@ export default function ResidentMap() {
   // ── Barangay health advisories (top 3 affected barangays) ──
   const brgyAdvisories = barangayData.filter(b => b.totalCases > 0).slice(0, 3).map(b => {
     const topDisease = Object.entries(b.diseases).sort((a, b) => b[1] - a[1])[0];
-    return { name: b.name, count: b.totalCases, topDisease: topDisease ? topDisease[0] : 'N/A', topCount: topDisease ? topDisease[1] : 0 };
+    return { name: b.barangayName, count: b.totalCases, topDisease: topDisease ? topDisease[0] : 'N/A', topCount: topDisease ? topDisease[1] : 0 };
   });
 
   return (
@@ -1007,28 +1007,32 @@ export default function ResidentMap() {
         }}
       >
         <MapContainer
-          center={CABUYAO_CENTER} zoom={14} minZoom={12.5} maxZoom={19} scrollWheelZoom={true}
+          center={CABUYAO_CENTER} zoom={14} minZoom={12.3} maxZoom={19} scrollWheelZoom={true}
           zoomSnap={0} zoomDelta={0.5}
           maxBounds={CABUYAO_BOUNDS}
           maxBoundsViscosity={0.6}
           style={{ width: '100%', height: '100%' }}>
           {mapLayer === 'SD' ? (
             <TileLayer
+              key="tile-sd"
               attribution='&copy; OpenStreetMap contributors &copy; CARTO'
               url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
             />
           ) : (
             <TileLayer
-              attribution='Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
-              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              key="tile-hd"
+              attribution='&copy; Google'
+              url="https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
+              subdomains={['mt0', 'mt1', 'mt2', 'mt3']}
               maxZoom={19}
             />
           )}
-          <BoundsSetter />
-          <ZoomToBarangay barangay={selectedBrgy} cases={allCases} />
-          <ZoomListener onZoom={setMapZoom} autoDetectedBrgy={autoDetectedBrgy} setAutoDetectedBrgy={setAutoDetectedBrgy} />
+          <BoundsSetter key="bounds-setter" />
+          <ZoomToBarangay key="zoom-barangay" barangay={selectedBrgy} cases={allCases} />
+          <ZoomListener key="zoom-listener" onZoom={setMapZoom} autoDetectedBrgy={autoDetectedBrgy} setAutoDetectedBrgy={setAutoDetectedBrgy} />
           {!showAutoPurok ? (
             <GeoJSON
+              key="brgy-geojson"
               ref={geoJsonLayerRef}
               data={cabuyaoBoundaries}
               style={(feature) => getGeoJsonStyle(feature, barangayData)}
@@ -1077,6 +1081,7 @@ export default function ResidentMap() {
             />
           ) : (
             <PulseMarkers
+              key="pulse-markers"
               barangayData={purokData.length > 0 ? purokData : barangayData}
               onHover={setTooltip}
               onLeave={() => setTooltip(null)}

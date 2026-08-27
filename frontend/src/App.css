@@ -63,34 +63,111 @@ html, body, #root {
   width: 100vw; 
   height: 100vh; 
   background-color: var(--bg-main); 
+  max-width: 100vw; 
+  margin: 0 auto; 
 }
 
 .login-left { 
-  flex: 1.2; 
+  flex: 50 1 0; 
   position: relative; 
   overflow: hidden; 
   background: linear-gradient(135deg, #121358 0%, var(--bg-main) 100%); 
 }
 
 .login-right { 
-  flex: 1; 
+  flex: 50 1 0; 
+  position: relative;
   display: flex; 
   align-items: center; 
   justify-content: center; 
-  padding: 40px; 
+  padding: 2.5rem 3.5rem;
   background-color: var(--bg-main); 
   overflow-y: auto;
 }
 
+.login-right > .login-column { position: relative; z-index: 10; }
+
+/* Faint Cabuyao map outline + PH gov health-data motif behind the auth card */
+.auth-bg-decorations {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+  color: rgba(56, 189, 248, 0.15);
+}
+
+.auth-bg-map {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 85%;
+  max-width: 640px;
+  opacity: 1;
+  stroke: currentColor;
+  fill: rgba(30, 58, 138, 0.1);
+}
+
+.auth-bg-nodes {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 1;
+}
+
+.auth-bg-icon {
+  position: absolute;
+  opacity: 1;
+  filter: drop-shadow(0 0 6px rgba(16, 185, 129, 0.3));
+}
+.auth-bg-icon.pin-1   { top: 44%; left: 6%;  width: 34px; color: #10B981; animation: authFloat 6s ease-in-out infinite; }
+.auth-bg-icon.chart-1 { top: 30%; right: 8%; width: 34px; color: #3B82F6; animation: authFloat 6s ease-in-out infinite 0.7s; }
+.auth-bg-icon.users-1 { top: 8%;  left: 10%; width: 34px; color: #0D9488; animation: authFloat 6s ease-in-out infinite 1.5s; }
+.auth-bg-icon.cross-1 { bottom: 18%; left: 7%;  width: 30px; color: #06B6D4; }
+.auth-bg-icon.cross-2 { top: 52%;  right: 6%; width: 28px; color: #0D9488; animation: authFloat 6s ease-in-out infinite 1s; }
+
+[data-theme='light'] .auth-bg-decorations { color: rgba(37, 99, 235, 0.12); }
+[data-theme='light'] .auth-bg-map { fill: rgba(30, 58, 138, 0.08); }
+
+@keyframes authFloat {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-3px); }
+}
+
 .login-form-container {
   width: 100%;
-  max-width: 500px; 
+  max-width: 100%; 
+  min-width: 0;
   padding: 40px;
   background-color: var(--bg-surface);
-  border-radius: 12px;
+  border-radius: 16px;
   border: 1px solid var(--border-color);
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  margin: 0;
+}
+
+.login-column {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  max-width: 500px;
+  min-width: 0;
   margin: auto;
+}
+
+.accent-bar {
+  width: 40px;
+  height: 3px;
+  background-color: #10B981;
+  margin: 10px 0 0 0;
+  border-radius: 2px;
 }
 
 /* Login card + step transitions */
@@ -100,6 +177,168 @@ html, body, #root {
 }
 .login-form-container { animation: cdmsLoginIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
 .login-form-container.cdms-login-step { animation: cdmsLoginIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* --- Portal selection cards --- */
+.portal-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: all 0.2s ease-in-out;
+}
+.portal-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+  border-color: #2563EB;
+}
+.portal-card:focus-visible {
+  outline: 2px solid #2563EB;
+  outline-offset: 2px;
+}
+.portal-card-body {
+  display: flex;
+  flex-direction: column;
+}
+.portal-card-arrow {
+  font-size: 20px;
+  color: var(--text-muted);
+  transition: transform 0.2s ease-in-out;
+}
+.portal-card:hover .portal-card-arrow { transform: translateX(4px); color: #2563EB; }
+
+.portal-card-cho { background: rgba(37, 99, 235, 0.10); border-color: rgba(37, 99, 235, 0.25); }
+.portal-card-cho:hover { border-color: #2563EB; }
+.portal-card-bhw { background: rgba(16, 185, 129, 0.10); border-color: rgba(16, 185, 129, 0.25); }
+.portal-card-bhw:hover { border-color: #10B981; }
+
+/* --- BHW Assigned Locality barangay option rows (flat with separator lines) --- */
+.brgy-option-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 11px 12px;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-main);
+  text-align: left;
+  transition: background-color 0.15s ease-in-out;
+  box-sizing: border-box;
+}
+.brgy-option-card:last-child {
+  border-bottom: none;
+}
+.brgy-option-card:hover {
+  background: rgba(18, 153, 104, 0.08);
+}
+.brgy-option-card.brgy-option-active {
+  background: #129968;
+  color: #ffffff;
+}
+.brgy-option-card .brgy-option-name {
+  font-weight: 500;
+}
+.brgy-option-card.brgy-option-active .brgy-option-name {
+  font-weight: 600;
+}
+.brgy-option-card .brgy-option-badge {
+  font-size: 15px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--input-bg);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.brgy-option-card.brgy-option-active .brgy-option-badge {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: transparent;
+  color: #ffffff;
+}
+
+
+
+/* --- Sign-up approval notice --- */
+.cdms-auth-notice {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #f59e0b;
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-bottom: 18px;
+  font-size: 14px;
+  line-height: 1.5;
+  text-align: left;
+}
+
+/* Sign-up callout banner (soft blue/yellow note) */
+.cdms-auth-notice-signup {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(59, 130, 246, 0.10);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  border-left: 4px solid #f59e0b;
+  color: var(--text-main);
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.cdms-auth-notice-icon {
+  flex-shrink: 0;
+  color: #f59e0b;
+  font-size: 15px;
+  line-height: 1.55;
+}
+.cdms-auth-notice-signup span:last-child { color: var(--text-main); }
+
+/* Small inline back link ("← Back to Sign In") */
+.cdms-back-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0 0 12px 0;
+  color: #129968;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+.cdms-back-link:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+/* --- Government footer --- */
+.cdms-auth-footer {
+  width: 100%;
+  margin-top: 20px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.cdms-auth-footer-sep { opacity: 0.6; margin: 0 3px; }
+.cdms-auth-footer-links { display: inline-flex; gap: 2px; }
+.cdms-auth-footer-links a {
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.cdms-auth-footer-links a:hover { color: #2563EB; }
 
 /* Error / warning box shake */
 @keyframes cdmsShake {
@@ -173,16 +412,27 @@ html, body, #root {
 
 .form-input::placeholder { color: var(--text-muted); }
 
-/* ── Reusable Back Button ── */
+/* Input field left icons */
+.cdms-field-icon {
+  padding-left: 42px;
+  background-repeat: no-repeat;
+  background-position: 14px center;
+  background-size: 18px 18px;
+  background-color: var(--input-bg);
+}
+.cdms-field-user   { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.8'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='12' cy='7' r='4'/%3E%3C/svg%3E"); }
+.cdms-field-mail   { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.8'%3E%3Crect x='3' y='5' width='18' height='14' rx='2'/%3E%3Cpath d='m3 7 9 6 9-6'/%3E%3C/svg%3E"); }
+.cdms-field-phone  { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.8'%3E%3Cpath d='M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z'/%3E%3C/svg%3E"); }
+
+/* ── Reusable Back Button (open, boxless) ── */
 .back-btn {
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
   gap: 8px;
-  padding: 6px 14px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
+  padding: 6px 0;
+  background: transparent;
+  border: none;
   color: var(--text-muted);
   cursor: pointer;
   font-size: 15px;
@@ -197,6 +447,12 @@ html, body, #root {
   outline: 2px solid #3B82F6;
   outline-offset: 2px;
   border-radius: 4px;
+}
+.back-btn.back-btn-boxed {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 6px 14px;
 }
 
 /* Figma Green Submit Button */
@@ -675,6 +931,11 @@ button:active { transform: scale(0.97); }
   position: relative;
   z-index: 1;
   max-width: 460px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
   animation: cdmsBrandingIn 0.7s ease both;
 }
 @keyframes cdmsBrandingIn {
@@ -690,7 +951,7 @@ button:active { transform: scale(0.97); }
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 999px;
   font-family: 'Franklin Gothic Demi Cond', 'Arial Narrow', system-ui, sans-serif;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.10em;
   color: #93c5fd;
@@ -708,25 +969,25 @@ button:active { transform: scale(0.97); }
 }
 .login-branding-title {
   font-family: 'Franklin Gothic Demi Cond', 'Arial Narrow', system-ui, sans-serif;
-  font-size: 40px;
+  font-size: 44px;
   font-weight: normal;
   line-height: 1.08;
   letter-spacing: -0.01em;
   color: #fff;
-  margin: 0 0 8px 0;
+  margin: 0 0 10px 0;
 }
 .login-branding-subtitle {
   font-family: 'Franklin Gothic Demi Cond', 'Arial Narrow', system-ui, sans-serif;
-  font-size: 17px;
+  font-size: 19px;
   font-weight: 600;
   color: #93c5fd;
-  margin: 0 0 24px 0;
+  margin: 0 0 26px 0;
   padding-left: 12px;
   border-left: 3px solid #dc2626;
 }
 .login-branding-desc {
   font-family: 'Franklin Gothic Demi Cond', 'Arial Narrow', system-ui, sans-serif;
-  font-size: 16px;
+  font-size: 18px;
   line-height: 1.7;
   color: rgba(255, 255, 255, 0.75);
   margin: 0 0 32px 0;
@@ -734,28 +995,45 @@ button:active { transform: scale(0.97); }
 .login-branding-features {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+  width: 100%;
 }
 .login-branding-feature {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   padding: 12px 16px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 10px;
-  font-family: 'Franklin Gothic Demi Cond', 'Arial Narrow', system-ui, sans-serif;
-  font-size: 15px;
-  color: rgba(255, 255, 255, 0.92);
+  text-align: left;
 }
-.login-branding-feature span {
-  font-family: inherit;
-}
-.login-branding-feature-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
+.login-branding-feature-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid;
+  font-size: 19px;
   flex-shrink: 0;
+}
+.login-branding-feature-text {
+  display: flex;
+  flex-direction: column;
+  font-family: 'Franklin Gothic Demi Cond', 'Arial Narrow', system-ui, sans-serif;
+}
+.login-branding-feature-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+}
+.login-branding-feature-sub {
+  font-size: 15px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.62);
 }
 .login-branding-bottom {
   position: absolute;

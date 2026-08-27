@@ -1261,22 +1261,26 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           style={{ width: '100%', height: '100%' }}>
           {mapLayer === 'SD' ? (
             <TileLayer
+              key="tile-sd"
               attribution='&copy; OpenStreetMap contributors &copy; CARTO'
               url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
             />
           ) : (
             <TileLayer
-              attribution='Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
-              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              key="tile-hd"
+              attribution='&copy; Google'
+              url="https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
+              subdomains={['mt0', 'mt1', 'mt2', 'mt3']}
               maxZoom={19}
             />
           )}
-          <CreateTopPane />
-          <ZoomToBarangay barangay={filterBarangay} loginRole={loginRole} loginBarangay={loginBarangay} sessionContext={sessionContext} cases={allCases} />
-          <ZoomListener onZoom={setMapZoom} filterBarangay={filterBarangay} autoDetectedBrgy={autoDetectedBrgy} setAutoDetectedBrgy={setAutoDetectedBrgy} loginRole={loginRole} />
-          <CaseDotMarkers cases={allCases} zoom={mapZoom} />
+          <CreateTopPane key="create-top-pane" />
+          <ZoomToBarangay key="zoom-barangay" barangay={filterBarangay} loginRole={loginRole} loginBarangay={loginBarangay} sessionContext={sessionContext} cases={allCases} />
+          <ZoomListener key="zoom-listener" onZoom={setMapZoom} filterBarangay={filterBarangay} autoDetectedBrgy={autoDetectedBrgy} setAutoDetectedBrgy={setAutoDetectedBrgy} loginRole={loginRole} />
+          <CaseDotMarkers key="case-dot-markers" cases={allCases} zoom={mapZoom} />
           {loginRole !== 'BHW' && (filterBarangay === 'All Barangays' && !showAutoPurok) ? (
             <GeoJSON
+              key="brgy-geojson"
               ref={geoJsonLayerRef}
               data={scopedGeoJson}
               style={(feature) => getGeoJsonStyle(feature, barangayData)}
