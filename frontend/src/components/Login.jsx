@@ -81,6 +81,46 @@ const BRANDING_FEATURES = [
   { icon: '📊', title: 'Decision Support', subtitle: 'Accurate reports for CHO health response', color: '#dc2626' },
 ];
 
+// Footer contact / legal content (SVG icons matching the app's stroke style)
+const POLICY_TITLES = {
+  privacy: 'Privacy Policy',
+  terms: 'Terms of Use',
+  disclaimer: 'Data Disclaimer',
+};
+const POLICY_SECTIONS = {
+  privacy: [
+    'The City Health Office of Cabuyao is committed to protecting the personal data of residents, health workers, and system users in line with the Data Privacy Act of 2012 (RA 10173).',
+    'Disease surveillance records, contact details, and account information are collected solely for public health monitoring, response, and reporting purposes under the authority of the City Health Office.',
+    'Access to case and personal data is restricted to authorized health personnel. Data is only shared with entities or agencies as required or permitted by law.',
+    'You may request access, correction, or deletion of your personal data by contacting the City Health Office through the channels provided on this portal.',
+  ],
+  terms: [
+    'By accessing and using the Cabuyao Disease Monitoring and Mapping System (CDMS), you agree to use the system only for legitimate public health and administrative purposes.',
+    'User accounts are issued to accredited City Health Office staff and Barangay Health Workers. Account credentials are confidential and must not be shared.',
+    'You are responsible for the accuracy of data you enter. Deliberate falsification or misuse of case records may result in account suspension or revocation.',
+    'The system may be updated or taken offline for maintenance from time to time. Continued use of the system constitutes acceptance of these terms.',
+  ],
+  disclaimer: [
+    'The information presented on this portal is for official City Health Office surveillance use and general public health awareness only.',
+    'While every effort is made to keep data accurate and up to date, the City Health Office makes no guarantees regarding the completeness, accuracy, or timeliness of the information.',
+    'This system does not provide medical advice. For personal medical concerns, please consult a licensed healthcare professional or visit your nearest health center.',
+    'Reference to specific barangay, purok, or case data does not constitute medical, legal, or professional advice.',
+  ],
+};
+
+const FooterIcon = ({ type }) => {
+  const paths = {
+    phone: <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />,
+    mail: <><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><path d="m22 6-10 7L2 6" /></>,
+    pin: <><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z" /><circle cx="12" cy="10" r="3" /></>,
+  };
+  return (
+    <svg className="cdms-global-footer-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {paths[type]}
+    </svg>
+  );
+};
+
 function CityHealthBranding() {
   return (
     <div className="login-branding">
@@ -105,7 +145,7 @@ function CityHealthBranding() {
         <div className="login-branding-features">
           {BRANDING_FEATURES.map((f, i) => (
             <div key={i} className="login-branding-feature">
-              <span className="login-branding-feature-icon" style={{ borderColor: f.color }}>{f.icon}</span>
+              <span className="login-branding-feature-tile" style={{ borderColor: f.color, backgroundColor: f.color }}>{f.icon}</span>
               <span className="login-branding-feature-text">
                 <span className="login-branding-feature-title">{f.title}</span>
                 <span className="login-branding-feature-sub">{f.subtitle}</span>
@@ -113,11 +153,6 @@ function CityHealthBranding() {
             </div>
           ))}
         </div>
-      </div>
-
-      <div className="login-branding-bottom">
-        <span>City of Cabuyao · City Health Office</span>
-        <div className="login-branding-bottom-bar" />
       </div>
     </div>
   );
@@ -230,6 +265,7 @@ function AnimatedMapView({ setFade, active, onSequenceComplete }) {
     const [selectedContext, setSelectedContext] = useState(''); 
     const [mapFade, setMapFade] = useState(1);
     const [leftPanel, setLeftPanel] = useState(0); // 0 = City Health branding, 1 = animated map
+    const [policyModal, setPolicyModal] = useState(null); // null | 'privacy' | 'terms' | 'disclaimer'
     
     // Login Form States
     const [email, setEmail] = useState('');
@@ -1337,25 +1373,49 @@ const handleLoginOtpSubmit = async (e) => {
               )
             )}  
 
-          </div>
-
-          <div className="cdms-auth-footer">
-            <span>© 2026 City Health Office of Cabuyao. All rights reserved.</span>
-            <span className="cdms-auth-footer-sep">·</span>
-            <span>Contact: (049) 502-1234 | chounit1@cabuyao.gov.ph</span>
-            <span className="cdms-auth-footer-sep">·</span>
-            <span>Location: Sala Health Center, Brgy. Sala, Cabuyao, Laguna</span>
-            <span className="cdms-auth-footer-sep">·</span>
-            <span className="cdms-auth-footer-links">
-              <a href="#" onClick={(e) => e.preventDefault()}>Privacy Policy</a>
-              <span className="cdms-auth-footer-sep">|</span>
-              <a href="#" onClick={(e) => e.preventDefault()}>Terms of Use</a>
-              <span className="cdms-auth-footer-sep">|</span>
-              <a href="#" onClick={(e) => e.preventDefault()}>Data Disclaimer</a>
-            </span>
-          </div>
+            </div>
           </div>
         </div>
+
+        <div className="cdms-global-footer">
+          <div className="cdms-global-footer-left">
+            <span className="cdms-global-footer-badge"><ChoLogoIcon size={16} /></span>
+            <span>© 2026 City Health Office of Cabuyao. All rights reserved.</span>
+          </div>
+          <div className="cdms-global-footer-center">
+            <span className="cdms-global-footer-contact"><FooterIcon type="phone" />(049) 502-1234</span>
+            <span className="cdms-global-footer-sep">|</span>
+            <span className="cdms-global-footer-contact"><FooterIcon type="mail" />chounit1@cabuyao.gov.ph</span>
+            <span className="cdms-global-footer-sep">|</span>
+            <span className="cdms-global-footer-contact"><FooterIcon type="pin" />Sala Health Center, Brgy. Sala, Cabuyao, Laguna</span>
+          </div>
+          <div className="cdms-global-footer-right">
+            <a href="#" onClick={(e) => { e.preventDefault(); setPolicyModal('privacy'); }}>Privacy Policy</a>
+            <span className="cdms-global-footer-sep">|</span>
+            <a href="#" onClick={(e) => { e.preventDefault(); setPolicyModal('terms'); }}>Terms of Use</a>
+            <span className="cdms-global-footer-sep">|</span>
+            <a href="#" onClick={(e) => { e.preventDefault(); setPolicyModal('disclaimer'); }}>Data Disclaimer</a>
+          </div>
+        </div>
+
+        {policyModal && (
+          <div className="cdms-modal-backdrop" onClick={() => setPolicyModal(null)}>
+            <div className="cdms-modal-card cdms-policy-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="cdms-policy-header">
+                <h3 className="cdms-policy-title">{POLICY_TITLES[policyModal]}</h3>
+                <button type="button" className="cdms-policy-close" onClick={() => setPolicyModal(null)} aria-label="Close">✕</button>
+              </div>
+              <div className="cdms-policy-body">
+                {POLICY_SECTIONS[policyModal].map((p, idx) => (
+                  <p key={idx} className="cdms-policy-text">{p}</p>
+                ))}
+              </div>
+              <div className="cdms-policy-footer">
+                <button type="button" className="cdms-policy-agree" onClick={() => setPolicyModal(null)}>Agree</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
