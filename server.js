@@ -145,6 +145,16 @@ db.query("SHOW COLUMNS FROM diseases LIKE 'icon'", (err, rows) => {
     }
 });
 
+// Migration: prevention/symptom/video columns for the Prevention Tips feature
+db.query("SHOW COLUMNS FROM diseases LIKE 'prevention_tips'", (err, rows) => {
+    if (!err && rows.length === 0) {
+        db.query("ALTER TABLE diseases ADD COLUMN prevention_tips TEXT NULL, ADD COLUMN symptoms TEXT NULL, ADD COLUMN video_url VARCHAR(255) NULL", (alterErr) => {
+            if (alterErr) console.error('Migration error adding prevention columns:', alterErr.message);
+            else console.log('Migration: added prevention_tips/symptoms/video_url columns to diseases table');
+        });
+    }
+});
+
 // Custom disease categories (persisted user-created categories for the disease carousel)
 db.query(`CREATE TABLE IF NOT EXISTS disease_categories (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -537,12 +547,39 @@ app.post('/api/diseases', (req, res) => {
     const icon = (req.body && req.body.icon ? String(req.body.icon).slice(0, 100) : null);
     const color = (req.body && req.body.color ? String(req.body.color).slice(0, 20) : null);
     const description = (req.body && req.body.description ? String(req.body.description).slice(0, 255) : null);
+    const preventionTips = (req.body && req.body.preventionTips != null && String(req.body.preventionTips).trim() !== '' ? String(req.body.preventionTips) : null);
+    const symptoms = (req.body && req.body.symptoms != null && String(req.body.symptoms).trim() !== '' ? String(req.body.symptoms) : null);
+    const videoUrl = (req.body && req.body.videoUrl ? String(req.body.videoUrl).slice(0, 255) : null);
     if (!name) return res.status(400).json({ error: 'Disease name is required.' });
-    db.query('INSERT IGNORE INTO diseases (name, icon, color, description) VALUES (?, ?, ?, ?)', [name, icon, color, description], (err, result) => {
+    db.query('INSERT IGNORE INTO diseases (name, icon, color, description, prevention_tips, symptoms, video_url) VALUES (?, ?, ?, ?, ?, ?, ?)', [name, icon, color, description, preventionTips, symptoms, videoUrl], (err, result) => {
         if (err) return res.status(500).json({ error: err.message });
         if (result.affectedRows === 0) return res.status(409).json({ error: 'Disease already exists.' });
         res.status(201).json({ message: 'Disease added successfully.', id: result.insertId });
     });
+});
+
+// ROUTE: Update a disease (prevention tips / symptoms / video) — CHO only
+app.put('/api/diseases/:id', requireRole('CHO'), (req, res) => {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Invalid disease id.' });
+    const description = (req.body != null && req.body.description != null && String(req.body.description).trim() !== '' ? String(req.body.description).slice(0, 255) : null);
+    const preventionTips = (req.body != null && req.body.preventionTips != null && String(req.body.preventionTips).trim() !== '' ? String(req.body.preventionTips) : null);
+    const symptoms = (req.body != null && req.body.symptoms != null && String(req.body.symptoms).trim() !== '' ? String(req.body.symptoms) : null);
+    const videoUrl = (req.body != null && req.body.videoUrl ? String(req.body.videoUrl).slice(0, 255) : null);
+    db.query(
+        'UPDATE diseases SET description = ?, prevention_tips = ?, symptoms = ?, video_url = ? WHERE id = ?',
+        [description, preventionTips, symptoms, videoUrl, id],
+        (err, result) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (result.affectedRows === 0) return res.status(404).json({ error: 'Disease not found.' });
+            createAuditLog(
+                req.headers['x-user-id'] || null, req.headers['x-user-name'] || 'Unknown', 'CHO', null, null,
+                'Updated Prevention Tips', `Disease #${id}`,
+                'Updated prevention tips / symptoms / video'
+            );
+            res.json({ message: 'Disease updated successfully.' });
+        }
+    );
 });
 
 // ROUTE: Get all custom disease categories (with their linked disease ids)

@@ -23,6 +23,7 @@
   --success-text: #34D399;
   --success-border: #34D399;
   color-scheme: dark;
+  --scale: 1;
 }
 
 [data-theme='light'] {
@@ -42,6 +43,7 @@
   --success-text: #129968;
   --success-border: #129968;
   color-scheme: light;
+  --scale: 1;
 }
 
 html, body, #root {
@@ -722,6 +724,33 @@ html, body, #root {
 }
 
 /* =========================================================
+   LARGE SCREEN SCALING (big monitors / TV)
+   ========================================================= */
+@media (min-width: 1600px) {
+  :root, [data-theme='light'] { --scale: 1.1; }
+}
+@media (min-width: 2200px) {
+  :root, [data-theme='light'] { --scale: 1.25; }
+}
+
+/* Content area is capped so dashboards don't stretch awkwardly edge-to-edge */
+/* (applied within large-screen media query below to avoid breaking flex layout) */
+
+/* Widen sidebar & scale chrome on large screens */
+@media (min-width: 1600px) {
+  .dashboard-layout { max-width: 2400px; margin: 0 auto; }
+  .sidebar { width: calc(260px * var(--scale)); }
+  .sidebar-logo { padding: calc(30px * var(--scale)) calc(20px * var(--scale)); }
+  .sidebar-logo h3 { font-size: calc(16px * var(--scale)); letter-spacing: 1px; }
+  .menu-item { padding: calc(14px * var(--scale)) calc(20px * var(--scale)); font-size: calc(18px * var(--scale)); gap: calc(15px * var(--scale)); }
+  .top-nav { height: calc(70px * var(--scale)); padding: 0 calc(30px * var(--scale)); }
+  .nav-title h2 { font-size: calc(22px * var(--scale)); }
+  .dashboard-grid { gap: calc(20px * var(--scale)); padding: calc(30px * var(--scale)); }
+  .stat-card, .chart-main, .chart-side, .recent-records { padding: calc(20px * var(--scale)); }
+  .chart-main { height: calc(350px * var(--scale)); }
+}
+
+/* =========================================================
    4. DASHBOARD COMPONENTS (Cards, Charts, Tables)
    ========================================================= */
 .dashboard-grid {
@@ -953,7 +982,7 @@ html, body, #root {
    GLOBAL MOTION / MICRO-INTERACTIONS
    ========================================================= */
 
-/* Page transition — opacity only (safe for Leaflet) */
+/* Page transition - opacity only (safe for Leaflet) */
 @keyframes cdmsPageFade {
   from { opacity: 0; }
   to   { opacity: 1; }
@@ -1007,7 +1036,7 @@ button:active { transform: scale(0.97); }
   from { opacity: 0; transform: translateY(-10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.cdms-msg-in { animation: cdmsMsgIn 0.3s ease both; }
+.cdms-msg-in { animation: cdmsMsgIn 0.18s ease both; }
 
 /* Skeleton loading shimmer */
 @keyframes cdmsShimmer {

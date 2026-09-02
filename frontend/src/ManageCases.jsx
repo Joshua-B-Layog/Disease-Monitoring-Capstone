@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import axios from 'axios';
 import { API_URL } from './config';
 import BackButton from './components/BackButton';
@@ -7,6 +8,8 @@ import cabuyaoBoundaries from './data/cabuyao_barangays.geojson.json';
 import { cacheCases, getCachedCases, cacheBarangays, cacheDiseases, getCachedBarangays, getCachedDiseases, isOnline, cacheInboxItems, getCachedInboxItems, cacheContactMessages, getCachedContactMessages, cacheEditRequests, getCachedEditRequests, cacheOutboxItems, getCachedOutboxItems, cachePendingRegistrations, getCachedPendingRegistrations, upsertCachedCase, removeCachedCase } from './offlineSync';
 import { enqueueOperation, removePendingCreatesByCaseId } from './syncEngine';
 import { getPointInBarangay } from './data/coordinates';
+import { notify } from './components/Toast';
+import { DISEASES as DEFAULT_DISEASES } from './resident/PreventionTips';
 const FeverIcon = ({ color = '#ef4444', size = 28 }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
     <path d="M23.909,10.583c-.104,.345-.297,.668-.587,.924l-.512,.451-1.277-1.451-1.5,1.322,1.277,1.45-1.646,1.45-1.263-1.434-1.5,1.322,1.262,1.433-1.793,1.718-.025-.036-.013,.014c-.02-.018-2.005-1.748-4.336-1.748s-4.316,1.73-4.336,1.748l-1.33-1.493c.103-.092,2.559-2.254,5.666-2.254,.741,0,1.44,.128,2.084,.316l6.598-5.81c.83-.73,2.093-.65,2.823,.179,.015,.017,.024,.036,.038,.054C22.117,3.698,17.495,0,12,0,5.373,0,0,5.373,0,12s5.373,12,12,12,12-5.373,12-12c0-.48-.036-.951-.091-1.417Zm-8.413-2.583c.828,0,1.5,.672,1.5,1.5s-.672,1.5-1.5,1.5-1.5-.672-1.5-1.5,.672-1.5,1.5-1.5Zm-7,0c.828,0,1.5,.672,1.5,1.5s-.672,1.5-1.5,1.5-1.5-.672-1.5-1.5,.672-1.5,1.5-1.5Z"/>
@@ -486,6 +489,82 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const [newDiseaseCategory, setNewDiseaseCategory] = useState('all');
   const [newCategoryName, setNewCategoryName] = useState('');
   const [addDiseaseMsg, setAddDiseaseMsg] = useState('');
+
+  const [tipsList, setTipsList] = useState([]);
+  const [tipsEditor, setTipsEditor] = useState(null);
+  const [tipsSaving, setTipsSaving] = useState(false);
+  const [tipsMsg, setTipsMsg] = useState('');
+  const [tipsOpen, setTipsOpen] = useState(false);
+  const [tipsBackdrop, setTipsBackdrop] = useState(null);
+
+  const measureTipsBackdrop = () => {
+    const el = document.querySelector('.content-scroller');
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setTipsBackdrop({
+      position: 'fixed', left: r.left, top: r.top,
+      width: r.width, height: r.height,
+      background: 'rgba(0,0,0,0.5)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 9999,
+    });
+  };
+
+  useEffect(() => {
+    if (!tipsOpen) return;
+    measureTipsBackdrop();
+    const onResize = () => measureTipsBackdrop();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tipsOpen]);
+
+  const closeTipsManager = () => {
+    setTipsOpen(false);
+    setTipsEditor(null);
+    setTipsMsg('');
+    setTipsList([]);
+  };
+
+  const openTipsManager = () => {
+    setTipsEditor(null);
+    setTipsMsg('');
+    setTipsList([]);
+    setTipsOpen(true);
+    axios.get(`${API_URL}/api/diseases`)
+      .then(res => { setTipsList(Array.isArray(res.data) ? res.data : []); })
+      .catch(err => setTipsMsg('Error: ' + (err.response?.data?.error || err.message)));
+  };
+
+  const openTipsEditor = (d) => {
+    const hard = DEFAULT_DISEASES.find(h => h.name === d.name);
+    setTipsEditor({
+      id: d.id, name: d.name, icon: d.icon || '🦠', color: d.color || '#64748b',
+      preventionTips: d.prevention_tips || (hard && Array.isArray(hard.tips) ? hard.tips.join('\n') : ''),
+      symptoms: d.symptoms || (hard && Array.isArray(hard.symptoms) ? hard.symptoms.join('\n') : ''),
+      videoUrl: d.video_url || (hard && hard.videoUrl ? hard.videoUrl : ''),
+    });
+    setTipsMsg('');
+  };
+
+  const saveTips = async () => {
+    if (!tipsEditor) return;
+    setTipsSaving(true);
+    try {
+      await axios.put(`${API_URL}/api/diseases/${tipsEditor.id}`, {
+        preventionTips: tipsEditor.preventionTips,
+        symptoms: tipsEditor.symptoms,
+        videoUrl: tipsEditor.videoUrl,
+      }, { headers: { 'x-user-role': 'CHO', 'x-user-id': loggedUserId || '', 'x-user-name': loggedUser || '' } });
+      notify('Prevention tips updated successfully!', 'success');
+      setTipsEditor(null);
+      openTipsManager();
+    } catch (err) {
+      setTipsMsg('Error: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setTipsSaving(false);
+    }
+  };
 
   const [allCases, setAllCases] = useState([]);
   const [loadingCases, setLoadingCases] = useState(false);
@@ -1121,7 +1200,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         try {
           const cres = await axios.get(API_URL + '/api/disease_categories');
           mergeCustomCategories(cres.data);
-        } catch (e) { /* categories unavailable offline — skip */ }
+        } catch (e) { /* categories unavailable offline - skip */ }
       })
       .catch(async () => {
         const cached = await getCachedDiseases();
@@ -1132,7 +1211,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         try {
           const cres = await axios.get(API_URL + '/api/disease_categories');
           mergeCustomCategories(cres.data);
-        } catch (e) { /* categories unavailable offline — skip */ }
+        } catch (e) { /* categories unavailable offline - skip */ }
       });
   }, []);
 
@@ -1310,7 +1389,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const getCaseCount = (cardOrCategory) => {
     if (!cardOrCategory) return 0;
     if (cardOrCategory.diseases) {
-      // It's a category — sum counts across diseases
+      // It's a category - sum counts across diseases
       return cardOrCategory.diseases.reduce((sum, d) => {
         return sum + baseCases.filter(c => matchesCard(c, d)).length;
       }, 0);
@@ -1483,8 +1562,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       await axios.delete(`${API_URL}/api/cases/${deleteTarget.case_id}`);
       fetchCases();
       setDeleteTarget(null);
+      notify('Case deleted successfully!', 'success');
     } catch (err) {
-      alert('Delete failed: ' + (err.response?.data?.error || err.message));
+      notify('Delete failed: ' + (err.response?.data?.error || err.message), 'error');
     } finally {
       setDeleteLoading(false);
     }
@@ -1790,7 +1870,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           };
           await enqueueOperation(op);
           await applyLocalOfflineCase(op, editingCase);
-          setSubmitMsg('Case saved offline — will sync when reconnected.');
+          setSubmitMsg('Case saved offline - will sync when reconnected.');
+          notify('Case saved offline - will sync when reconnected.', 'info');
         } else {
           const op = {
             type: 'create',
@@ -1802,7 +1883,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           };
           await enqueueOperation(op);
           await applyLocalOfflineCase(op);
-          setSubmitMsg(isDraft ? 'Draft saved offline — will sync when reconnected.' : 'Case saved offline — will sync when reconnected.');
+          setSubmitMsg(isDraft ? 'Draft saved offline - will sync when reconnected.' : 'Case saved offline - will sync when reconnected.');
+          notify(isDraft ? 'Draft saved offline - will sync when reconnected.' : 'Case saved offline - will sync when reconnected.', 'info');
         }
         setOfflineMode(true);
         setTimeout(() => { setView('list'); setSubmitMsg(''); setSubmitLoading(false); }, 1800);
@@ -1812,6 +1894,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       if (editingCase) {
         await axios.put(`${API_URL}/api/cases/${editingCase.case_id}`, payload);
         setSubmitMsg('Case updated successfully!');
+        notify('Case updated successfully!', 'success');
       } else {
         const newCaseRes = await axios.post(API_URL + '/api/cases', {
           ...payload,
@@ -1826,13 +1909,14 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           fetchOutbox();
         }
         setSubmitMsg(isDraft ? 'Case saved as draft!' : 'Case added successfully!');
+        notify(isDraft ? 'Case saved as draft!' : 'Case added successfully!', 'success');
       }
       await fetchCases();
       const diseaseEntry = findDiseaseEntry(formData.diseaseType);
       if (diseaseEntry) { setSelectedDisease(diseaseEntry); setSelectedCategory(null); setCategoryPage(0); }
       setTimeout(() => { setView('list'); setSubmitMsg(''); setSubmitLoading(false); }, 1200);
     } catch (err) {
-      // Network error (no response) — queue offline instead of showing error
+      // Network error (no response) - queue offline instead of showing error
       if (!err.response) {
         const tempId = 'temp-' + Date.now();
         try {
@@ -1859,11 +1943,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             await enqueueOperation(op);
             await applyLocalOfflineCase(op);
           }
-          setSubmitMsg('Case saved offline — will sync when reconnected.');
+          setSubmitMsg('Case saved offline - will sync when reconnected.');
           setOfflineMode(true);
           setTimeout(() => { setView('list'); setSubmitMsg(''); setSubmitLoading(false); }, 1800);
         } catch (queueErr) {
           setSubmitMsg('Error saving offline: ' + queueErr.message);
+          notify('Error saving offline: ' + queueErr.message, 'error');
           setSubmitLoading(false);
         }
         return;
@@ -1881,16 +1966,19 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               target_barangay_name: detectedBarangay,
             });
             setSubmitMsg('Case sent to ' + detectedBarangay + ' BHW inbox successfully!');
+          notify('Case sent to ' + detectedBarangay + ' BHW inbox successfully!', 'success');
             await fetchCases();
             const diseaseEntry = findDiseaseEntry(formData.diseaseType);
             if (diseaseEntry) { setSelectedDisease(diseaseEntry); setSelectedCategory(null); setCategoryPage(0); }
             setTimeout(() => { setView('list'); setSubmitMsg(''); setSubmitLoading(false); }, 1200);
           } catch (routeErr) {
             setSubmitMsg('Error: ' + (routeErr.response?.data?.error || routeErr.message));
+            notify('Error: ' + (routeErr.response?.data?.error || routeErr.message), 'error');
             setSubmitLoading(false);
           }
         } else {
           setSubmitMsg('Please select the correct assigned barangay.');
+          notify('Please select the correct assigned barangay.', 'error');
           setSubmitLoading(false);
         }
         return;
@@ -1903,6 +1991,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         return;
       }
       setSubmitMsg('Error: ' + (err.response?.data?.error || err.message));
+      notify('Error: ' + (err.response?.data?.error || err.message), 'error');
       setSubmitLoading(false);
     }
   };
@@ -2244,6 +2333,14 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               })()}
               {carouselIndex === 2 && (
                 <div style={{ maxWidth: '720px', margin: '0 auto', textAlign: 'left' }}>
+                  {loginRole === 'CHO' && (
+                    <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+                      <button onClick={openTipsManager}
+                        style={{ padding: '10px 20px', background: 'var(--success-bg)', color: 'var(--success-text)', border: '1px solid var(--success-border)', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
+                        ✏️ Manage Prevention Tips
+                      </button>
+                    </div>
+                  )}
                   <h3 style={{ margin: '0 0 12px 0', fontSize: '17px', color: 'var(--text-main)', textAlign: 'center' }}>➕ Add New Disease</h3>
                   {addDiseaseMsg && (
                     <div style={{ padding: '8px 12px', marginBottom: '10px', borderRadius: '6px', fontSize: '15px', background: addDiseaseMsg.startsWith('Error') ? '#fee2e2' : '#d1f5e9', color: addDiseaseMsg.startsWith('Error') ? '#991b1b' : '#0a5e42' }}>
@@ -2377,6 +2474,96 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             {currentDiseases.map(entry => renderDiseaseCard(entry, !gridMode))}
           </div>
         )}
+
+        {tipsOpen && (() => {
+          if (tipsEditor) {
+            return createPortal(
+              <div className="cdms-modal-backdrop" onClick={closeTipsManager} style={tipsBackdrop}>
+                <div className="cdms-modal-card" onClick={e => e.stopPropagation()} style={{ background: 'var(--bg-surface)', borderRadius: '16px', padding: '28px 28px', width: '560px', maxHeight: '82vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                    <span style={{ fontSize: '26px' }}>{tipsEditor.icon}</span>
+                    <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: 'var(--text-main)' }}>Edit Prevention - {tipsEditor.name}</h3>
+                  </div>
+                  {tipsMsg && (
+                    <div style={{ padding: '10px 12px', marginBottom: '14px', borderRadius: '6px', fontSize: '15px', background: tipsMsg.startsWith('Error') ? 'var(--error-bg, #fee2e2)' : '#d1f5e9', color: tipsMsg.startsWith('Error') ? '#991b1b' : '#0a5e42' }}>{tipsMsg}</div>
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div>
+                      <label style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '6px' }}>Prevention Tips <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>(one per line)</span></label>
+                      <textarea
+                        value={tipsEditor.preventionTips}
+                        onChange={e => setTipsEditor({ ...tipsEditor, preventionTips: e.target.value })}
+                        rows={6}
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontFamily: 'var(--sans)', fontSize: '15px', boxSizing: 'border-box', resize: 'vertical' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '6px' }}>Symptom Checker Questions <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>(one per line)</span></label>
+                      <textarea
+                        value={tipsEditor.symptoms}
+                        onChange={e => setTipsEditor({ ...tipsEditor, symptoms: e.target.value })}
+                        rows={4}
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontFamily: 'var(--sans)', fontSize: '15px', boxSizing: 'border-box', resize: 'vertical' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '6px' }}>External Video URL <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>(optional)</span></label>
+                      <input
+                        type="url"
+                        value={tipsEditor.videoUrl}
+                        onChange={e => setTipsEditor({ ...tipsEditor, videoUrl: e.target.value })}
+                        placeholder="https://..."
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px', boxSizing: 'border-box', outline: 'none' }}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', borderTop: '1px solid var(--border-color)', paddingTop: '16px', marginTop: '20px', gap: '0' }}>
+                    <button onClick={() => { setTipsEditor(null); setTipsMsg(''); }}
+                      style={{ flex: 1, padding: '13px', background: 'var(--input-bg)', border: 'none', borderRight: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '16px', fontWeight: '500', color: 'var(--text-main)', borderRadius: '6px 0 0 6px' }}>
+                      Back to list
+                    </button>
+                    <button onClick={saveTips} disabled={tipsSaving}
+                      style={{ flex: 2, padding: '13px', background: '#129968', border: 'none', cursor: tipsSaving ? 'not-allowed' : 'pointer', fontSize: '16px', fontWeight: '600', color: '#fff', borderRadius: '0 6px 6px 0' }}>
+                      {tipsSaving ? 'Saving...' : 'Save Prevention Tips'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            , document.body);
+          }
+          return createPortal(
+            <div className="cdms-modal-backdrop" onClick={closeTipsManager} style={tipsBackdrop}>
+              <div className="cdms-modal-card" onClick={e => e.stopPropagation()} style={{ background: 'var(--bg-surface)', borderRadius: '16px', padding: '24px 24px', width: '620px', maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: 'var(--text-main)' }}>✏️ Manage Prevention Tips</h3>
+                  <button onClick={closeTipsManager} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '22px', lineHeight: 1 }}>✕</button>
+                </div>
+                <p style={{ margin: '0 0 6px 0', color: 'var(--text-muted)', fontSize: '14px' }}>Select a disease to edit its prevention tips, symptom-checker questions, and video.</p>
+                {tipsMsg && (
+                  <div style={{ padding: '10px 12px', marginBottom: '10px', borderRadius: '6px', fontSize: '15px', background: '#fee2e2', color: '#991b1b' }}>{tipsMsg}</div>
+                )}
+                <div style={{ overflowY: 'auto', flex: 1, marginTop: '8px' }}>
+                  {tipsList.length === 0 && <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '30px 0', fontSize: '15px' }}>Loading diseases…</div>}
+                  {tipsList.map(d => (
+                    <div key={d.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderBottom: '1px solid var(--border-color)', gap: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                        <span style={{ fontSize: '22px' }}>{d.icon || '🦠'}</span>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.name}</div>
+                          <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{(() => { const hard = DEFAULT_DISEASES.find(h => h.name === d.name); if (d.prevention_tips) return `${d.prevention_tips.split('\n').filter(Boolean).length} tips`; return hard ? `Default tips (${(hard.tips || []).length}) - will save to DB on Edit` : 'No tips set'; })()}</div>
+                        </div>
+                      </div>
+                      <button onClick={() => openTipsEditor(d)}
+                        style={{ padding: '7px 14px', background: '#121358', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '14px', flexShrink: 0 }}>
+                        Edit
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          , document.body);
+        })()}
       </div>
     );
   }
@@ -2565,7 +2752,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         <div style={{ flex: 1, minWidth: 0 }}>
                           {req._type === 'password-change' ? (
                             <div style={{ fontSize: '15px', color: 'var(--text-main)' }}>
-                              {req.user_name || 'Unknown BHW'} — requesting password change
+                              {req.user_name || 'Unknown BHW'} - requesting password change
                             </div>
                           ) : (
                             <>
@@ -2753,14 +2940,14 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '10px' }}>
                     {item.item_type === 'referral' ? (
                       <>
-                        {item.direction === 'sent' ? 'Sent to' : 'Received from'} {item.direction === 'sent' ? (item.to_cho_unit || item.to_barangay_name || '—') : (item.from_barangay_name ? `BHW (${item.from_barangay_name})` : item.from_cho_unit || '—')}
+                        {item.direction === 'sent' ? 'Sent to' : 'Received from'} {item.direction === 'sent' ? (item.to_cho_unit || item.to_barangay_name || '-') : (item.from_barangay_name ? `BHW (${item.from_barangay_name})` : item.from_cho_unit || '-')}
                       </>
                     ) : item.item_type === 'resident' ? (
-                      <>Resident message from {item.barangay_name || '—'} · {item.to_cho_unit || '—'}</>
+                      <>Resident message from {item.barangay_name || '-'} · {item.to_cho_unit || '-'}</>
                     ) : item.item_type === 'edit_request' ? (
-                      <>Edit request from BHW ({item.from_barangay_name || '—'})</>
+                      <>Edit request from BHW ({item.from_barangay_name || '-'})</>
                     ) : (
-                      <>{item.direction === 'sent' ? 'Sent to' : 'Received from'} {item.direction === 'sent' ? (item.to_cho_unit || item.to_barangay_name || '—') : (item.from_barangay_name ? `BHW (${item.from_barangay_name})` : item.from_cho_unit || '—')}</>
+                      <>{item.direction === 'sent' ? 'Sent to' : 'Received from'} {item.direction === 'sent' ? (item.to_cho_unit || item.to_barangay_name || '-') : (item.from_barangay_name ? `BHW (${item.from_barangay_name})` : item.from_cho_unit || '-')}</>
                     )}
                     <span> · Status: <span style={{ textTransform: 'capitalize', fontWeight: '600', color: item.status === 'accepted' ? '#129968' : item.status === 'rejected' ? '#ef4444' : '#D97706' }}>{item.status}</span></span>
                     {item.barangay_name && <span> · {item.item_type === 'edit_request' ? 'Barangay' : 'Assigned to'} {item.barangay_name}</span>}
@@ -3022,7 +3209,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       <td style={{ padding: compactMode ? '7px 8px' : '12px', fontSize: '15px', color: 'var(--text-muted)', textAlign: 'center' }}>
                         #{String(c.case_id).padStart(3, '0')}
                         {c._pendingSync && (
-                          <span title="Pending sync — will upload when reconnected" style={{ marginLeft: '6px', fontSize: '15px', fontWeight: '600', color: '#D97706' }}>⏳</span>
+                          <span title="Pending sync - will upload when reconnected" style={{ marginLeft: '6px', fontSize: '15px', fontWeight: '600', color: '#D97706' }}>⏳</span>
                         )}
                       </td>
                       <td style={{ padding: compactMode ? '7px 8px' : '12px', fontSize: '15px', fontWeight: '500', color: 'var(--text-main)', textAlign: 'center' }}>
@@ -3189,7 +3376,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 </h4>
                 <div style={{ position: 'relative' }}>
                   <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>
-                    Patient Full Name <span style={{ color: '#ef4444' }}>*</span>
+                    Patient Full Name
                       <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '15px', marginLeft: '6px' }}>
                       (Type surname to auto-fill past records)
                     </span>
@@ -3237,7 +3424,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Age <span style={{ color: '#ef4444' }}>*</span></label>
+                    <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Age </label>
                     <input type="number" min="0" max="120" placeholder="25" style={{ ...inputStyle, border: formErrors.age ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.age ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                       value={formData.age} onChange={e => setFormData({ ...formData, age: e.target.value })}
                       readOnly={isBhwReadOnly} />
@@ -3274,14 +3461,14 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   </div>
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Contact No. <span style={{ color: '#ef4444' }}>*</span></label>
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Contact No.</label>
                   <input type="text" placeholder="0918-234-2331" style={{ ...inputStyle, border: formErrors.contact ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.contact ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                     value={formData.contact} onChange={e => setFormData({ ...formData, contact: e.target.value })}
                     readOnly={isBhwReadOnly} />
                   {formErrors.contact && <span style={{ fontSize: '13px', color: '#ef4444', marginTop: '3px', display: 'block' }}>Enter a valid PH number (e.g., 09123456789)</span>}
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Address <span style={{ color: '#ef4444' }}>*</span></label>
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Address </label>
                   <input type="text" placeholder="123 Rizal St, San Isidro Cabuyao" style={inputStyle}
                     value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })}
                     readOnly={isBhwReadOnly}
@@ -3503,7 +3690,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           border: `1px solid ${purokOpen ? '#3B82F6' : 'var(--border-color)'}`,
                         }}
                       >
-                          <span>{formData.purok || '— Select Location —'}</span>
+                          <span>{formData.purok || '- Select Location -'}</span>
                         <span style={{
                           fontSize: '15px', opacity: 0.6, marginLeft: '8px',
                           transition: 'transform 0.2s', display: 'inline-block',
@@ -3528,7 +3715,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                             onMouseEnter={e => e.currentTarget.style.background = 'var(--input-bg)'}
                             onMouseLeave={e => { e.currentTarget.style.background = !formData.purok ? 'rgba(37,99,235,0.12)' : 'transparent'; }}
                           >
-                            — Select Location —
+                            -  Select Location -
                           </div>
                           {dynamicPurokOptions.map(p => (
                             <div
@@ -3572,7 +3759,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           background: formErrors.barangayId ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)',
                         }}
                       >
-                        <span>{scopedBarangayList.find(b => String(b.id) === String(formData.barangayId))?.name || '— Select Barangay —'}</span>
+                        <span>{scopedBarangayList.find(b => String(b.id) === String(formData.barangayId))?.name || '- Select Barangay -'}</span>
                         <span style={{
                           fontSize: '15px', opacity: 0.6, marginLeft: '8px',
                           transition: 'transform 0.2s', display: 'inline-block',
@@ -3593,7 +3780,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                             onMouseEnter={e => e.currentTarget.style.background = 'var(--input-bg)'}
                             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                           >
-                            — Select Barangay —
+                            - Select Barangay -
                           </div>
                           {scopedBarangayList.map(b => (
                             <div
@@ -3633,7 +3820,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   Clinical Information
                 </h4>
                 <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Disease Type <span style={{ color: '#ef4444' }}>*</span></label>
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Disease Type</label>
                   {isBhwReadOnly ? (
                     <div style={{ padding: '8px 12px', background: 'var(--input-bg, #f1f5f9)', borderRadius: '6px', fontSize: '15px', color: 'var(--text-main)' }}>
                       {formData.diseaseType || 'Not set'}
@@ -3650,7 +3837,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           border: `1px solid ${diseaseOpen ? '#3B82F6' : 'var(--border-color)'}`,
                       }}
                     >
-                      <span>{formData.diseaseType || '— Select Disease —'}</span>
+                      <span>{formData.diseaseType || '- Select Disease -'}</span>
                       <span style={{
                         fontSize: '15px', opacity: 0.6, marginLeft: '8px',
                         transition: 'transform 0.2s', display: 'inline-block',
@@ -3671,7 +3858,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           onMouseEnter={e => e.currentTarget.style.background = 'var(--input-bg)'}
                           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                         >
-                          — Select Disease —
+                          - Select Disease -
                         </div>
                         {ALL_DISEASE_OPTIONS.map(d => (
                           <div
@@ -3778,7 +3965,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 )}
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Date of Onset <span style={{ color: '#ef4444' }}>*</span></label>
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Date of Onset</label>
                   <div style={{ position: 'relative', cursor: 'pointer' }}
                     onClick={() => {
                       const el = document.getElementById('onset-date-input');
@@ -3806,7 +3993,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   </div>
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Attending Physician <span style={{ color: '#ef4444' }}>*</span></label>
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Attending Physician</label>
                   <input type="text" placeholder="Dr. Jose Reyes, MD" style={{ ...inputStyle, border: formErrors.physician ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.physician ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                     value={formData.physician} onChange={e => setFormData({ ...formData, physician: e.target.value })}
                     readOnly={isBhwReadOnly} />
@@ -3816,7 +4003,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
             {/* Symptoms full width */}
             <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Symptoms & Observations <span style={{ color: '#ef4444' }}>*</span></label>
+              <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Symptoms & Observations</label>
               <textarea placeholder="e.g. Fever (39.5°C), Severe Headache, Muscle and Joint Pain..." rows="3"
                 style={{ ...inputStyle, resize: 'vertical', border: formErrors.symptoms ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.symptoms ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                 value={formData.symptoms} onChange={e => setFormData({ ...formData, symptoms: e.target.value })}

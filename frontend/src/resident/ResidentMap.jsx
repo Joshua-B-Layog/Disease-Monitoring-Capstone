@@ -433,10 +433,7 @@ function PulseMarkers({ barangayData, onHover, onLeave, onClick }) {
     const { color, ring } = getRisk(b.totalCases);
     const w = size;
     const h = Math.round(size * 44 / 34);
-    const labelRaw = b.purok && b.purok !== 'Unspecified' ? b.purok : (b.barangayName || b.barangay || '');
-    const label = labelRaw.length > 22 ? labelRaw.slice(0, 21) + '…' : labelRaw;
-    const labelH = 20;
-    const totalH = h + labelH;
+    const totalH = h;
 
     return L.divIcon({
       className: '',
@@ -448,7 +445,6 @@ function PulseMarkers({ barangayData, onHover, onLeave, onClick }) {
             <circle cx="17" cy="17" r="11" fill="#ffffff"/>
             <text x="17" y="21" text-anchor="middle" font-size="12" font-weight="800" fill="${color}" font-family="Tw Cen MT Condensed,system-ui,sans-serif">${b.totalCases}</text>
           </svg>
-          <div style="position:absolute;left:50%;top:${h + 1}px;transform:translateX(-50%);background:rgba(15,23,42,0.85);border:1px solid rgba(255,255,255,0.18);color:#fff;font-size:9.5px;font-weight:600;padding:2px 7px;border-radius:8px;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis;line-height:1.2;text-shadow:0 1px 2px rgba(0,0,0,0.3);">${label}</div>
         </div>`,
       iconSize: [w, totalH],
       iconAnchor: [w / 2, h],
@@ -495,41 +491,13 @@ function ZoomListener({ onZoom, autoDetectedBrgy, setAutoDetectedBrgy }) {
   return null;
 }
 
-function ZoomToBarangay({ barangay, cases }) {
+function ZoomToBarangay({ barangay }) {
   const map = useMap();
   const prevRef = useRef(null);
-  const casesRef = useRef([]);
-  casesRef.current = cases;
   useEffect(() => {
     const target = barangay;
     if (!target || target === prevRef.current) return;
     prevRef.current = target;
-
-    const targetCases = (casesRef.current || []).filter(
-      c => c.barangay_name === target && c.latitude && c.longitude
-    );
-    if (targetCases.length > 0) {
-      let minLat = Infinity, maxLat = -Infinity;
-      let minLng = Infinity, maxLng = -Infinity;
-      targetCases.forEach(c => {
-        const lat = parseFloat(c.latitude);
-        const lng = parseFloat(c.longitude);
-        if (lat < minLat) minLat = lat;
-        if (lat > maxLat) maxLat = lat;
-        if (lng < minLng) minLng = lng;
-        if (lng > maxLng) maxLng = lng;
-      });
-      if (minLat !== Infinity) {
-        const latSpan = maxLat - minLat;
-        const lngSpan = maxLng - minLng;
-        if (latSpan < 0.005 && lngSpan < 0.005) {
-          map.setView([(minLat + maxLat) / 2, (minLng + maxLng) / 2], 14, { animate: true, duration: 0.8 });
-        } else {
-          map.fitBounds([[minLat, minLng], [maxLat, maxLng]], { padding: [50, 50], animate: true, duration: 0.8 });
-        }
-        return;
-      }
-    }
 
     const bounds = getBarangayBounds(target);
     if (bounds) {
@@ -641,7 +609,7 @@ export default function ResidentMap() {
     setBarangayData(Object.values(groups));
   }, [allCases]);
 
-  // Purok grouping — only when scoped to a detected barangay
+  // Purok grouping - only when scoped to a detected barangay
   useEffect(() => {
     if (autoDetectedBrgy) {
       const canon = findCanonicalName(autoDetectedBrgy);
@@ -807,7 +775,7 @@ export default function ResidentMap() {
             opacity: showOverview ? 1 : 0,
             overflow: 'hidden',
             transition: 'max-height 0.35s ease, opacity 0.25s ease',
-            padding: showOverview ? '16px 20px 20px' : '0 20px',
+            padding: showOverview ? '10px 16px 14px' : '0 16px',
             borderTop: showOverview ? '1px solid var(--border-color)' : 'none',
           }}
         >
@@ -815,15 +783,15 @@ export default function ResidentMap() {
             <div className="resident-stat-cards" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '20px' }}>
               {[
                 { label: 'Total Cases', value: totalCases, color: '#1e3a8a', bg: '#eff6ff' },
-                { label: 'Most Affected', value: mostAffected ? mostAffected.barangayName : '—', sub: mostAffected ? `${mostAffected.totalCases} cases` : '', color: '#dc2626', bg: '#fef2f2' },
-                { label: 'Top Disease', value: topDiseaseCitywide ? topDiseaseCitywide[0] : '—', sub: topDiseaseCitywide ? `${topDiseaseCitywide[1]} cases` : '', color: '#7c3aed', bg: '#f5f3ff' },
+                { label: 'Most Affected', value: mostAffected ? mostAffected.barangayName : '-', sub: mostAffected ? `${mostAffected.totalCases} cases` : '', color: '#dc2626', bg: '#fef2f2' },
+                { label: 'Top Disease', value: topDiseaseCitywide ? topDiseaseCitywide[0] : '-', sub: topDiseaseCitywide ? `${topDiseaseCitywide[1]} cases` : '', color: '#7c3aed', bg: '#f5f3ff' },
                 { label: 'Active Cases', value: activeCases, color: '#f59e0b', bg: '#fffbeb' },
                 { label: 'Affected Barangays', value: `${affectedBrgyCount} / ${ALL_BARANGAYS.length}`, color: '#10b981', bg: '#ecfdf5' },
               ].map(card => (
-                <div key={card.label} style={{ flex: '1 1 140px', background: card.bg, borderRadius: '10px', padding: '14px 12px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '28px', fontWeight: '800', color: card.color, lineHeight: '1.2' }}>{card.value}</div>
-                  {card.sub && <div style={{ fontSize: '14px', fontWeight: '600', color: '#475569', marginTop: '4px' }}>{card.sub}</div>}
-                  <div style={{ fontSize: '16px', fontWeight: '600', color: '#475569', marginTop: '6px' }}>{card.label}</div>
+                <div key={card.label} style={{ flex: '1 1 120px', background: card.bg, borderRadius: '10px', padding: '10px 10px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '24px', fontWeight: '800', color: card.color, lineHeight: '1.2' }}>{card.value}</div>
+                  {card.sub && <div style={{ fontSize: '13px', fontWeight: '600', color: '#475569', marginTop: '3px' }}>{card.sub}</div>}
+                  <div style={{ fontSize: '14px', fontWeight: '600', color: '#475569', marginTop: '4px' }}>{card.label}</div>
                 </div>
               ))}
             </div>
@@ -832,7 +800,7 @@ export default function ResidentMap() {
             {sortedBarangays.length > 0 && (
               <div style={{ marginBottom: '20px' }}>
                 <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Barangay Risk Classification</div>
-                <div className="resident-table-wrap" style={{ maxHeight: '300px', overflowY: 'auto', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <div className="resident-table-wrap" style={{ maxHeight: '200px', overflowY: 'auto', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '15px' }}>
                     <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
                       <tr style={{ background: 'var(--input-bg)' }}>
@@ -859,7 +827,7 @@ export default function ResidentMap() {
                               </span>
                             </td>
                             <td style={{ padding: '7px 10px', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '14px', textAlign: 'center' }}>
-                              {topD ? `${topD[0]} (${topD[1]})` : '—'}
+                              {topD ? `${topD[0]} (${topD[1]})` : '-'}
                             </td>
                           </tr>
                         );

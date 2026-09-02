@@ -1,7 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import BackButton from '../components/BackButton';
 
-const DISEASES = [
+const parseLines = (str) => (str ? String(str).split('\n').map(s => s.trim()).filter(Boolean) : []);
+
+export const DISEASES = [
   {
     name: 'Dengue', icon: '🦟', color: '#ef4444', videoId: 'AxjL9T57svI',
     tips: [
@@ -565,9 +567,23 @@ export default function PreventionTips() {
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('All');
   const [selectedBarangay, setSelectedBarangay] = useState('All Barangays');
+  const [barangayOpen, setBarangayOpen] = useState(false);
+  const barangayRef = useRef(null);
   const [diseaseCounts, setDiseaseCounts] = useState({});
+  const [dbDiseases, setDbDiseases] = useState([]);
 
   useEffect(() => { setExpanded(null); }, [search, catFilter]);
+
+  useEffect(() => {
+    if (!barangayOpen) return;
+    const onDocClick = (e) => {
+      if (barangayRef.current && !barangayRef.current.contains(e.target)) {
+        setBarangayOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [barangayOpen]);
 
   const [scStep, setScStep] = useState('pick'); // pick | quiz | result
   const [scDisease, setScDisease] = useState(null);
@@ -589,7 +605,41 @@ export default function PreventionTips() {
       .catch(() => {});
   }, [selectedBarangay]);
 
-  const filtered = DISEASES.filter(d =>
+  useEffect(() => {
+    fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/diseases`)
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data)) setDbDiseases(data);
+      })
+      .catch(() => {});
+  }, []);
+
+  const mergedDiseases = useMemo(() => {
+    const dbByName = {};
+    (dbDiseases || []).forEach(r => { dbByName[r.name] = r; });
+    const out = DISEASES.map(d => {
+      const db = dbByName[d.name];
+      if (!db) return d;
+      const tips = db.prevention_tips ? parseLines(db.prevention_tips) : d.tips;
+      const symptoms = db.symptoms ? parseLines(db.symptoms) : d.symptoms;
+      const videoUrl = db.video_url;
+      return { ...d, tips, symptoms, ...(videoUrl ? { videoId: '', videoUrl, color: d.color } : {}) };
+    });
+    const known = new Set(DISEASES.map(d => d.name));
+    Object.keys(dbByName).forEach(name => {
+      if (!known.has(name)) {
+        const r = dbByName[name];
+        out.push({
+          name, icon: r.icon || '🦠', color: r.color || '#64748b',
+          videoId: '', videoUrl: r.video_url || '',
+          tips: parseLines(r.prevention_tips), symptoms: parseLines(r.symptoms),
+        });
+      }
+    });
+    return out;
+  }, [dbDiseases]);
+
+  const filtered = mergedDiseases.filter(d =>
     d.name.toLowerCase().includes(search.toLowerCase()) &&
     (catFilter === 'All' || DISEASE_CATEGORY[d.name] === catFilter)
   );
@@ -608,7 +658,7 @@ export default function PreventionTips() {
   };
 
   const calculateResult = () => {
-    const disease = DISEASES.find(d => d.name === scDisease);
+    const disease = mergedDiseases.find(d => d.name === scDisease);
     if (!disease) return;
     const total = disease.symptoms.length;
     const yesCount = Object.values(scAnswers).filter(a => a === true).length;
@@ -650,17 +700,25 @@ export default function PreventionTips() {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
         <label style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Barangay:</label>
-        <select
-          value={selectedBarangay}
-          onChange={e => setSelectedBarangay(e.target.value)}
-          style={{
-            padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: '8px',
-            fontSize: '15px', background: 'var(--bg-surface)', color: 'var(--text-main)',
-            cursor: 'pointer', outline: 'none',
-          }}
-        >
-          {ALL_BARANGAYS.map(b => <option key={b} value={b}>{b}</option>)}
-        </select>
+        <div style={{ position: 'relative' }} ref={barangayRef}>
+          <button className="mc-custom-dropdown-btn" onClick={() => setBarangayOpen(!barangayOpen)}>
+            <span>{selectedBarangay}</span>
+            <span style={{ marginLeft: '6px', opacity: 0.6, transition: 'transform 0.2s', display: 'inline-block', transform: barangayOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+          </button>
+          {barangayOpen && (
+            <div className="mc-custom-dropdown-panel">
+              {ALL_BARANGAYS.map(b => (
+                <div
+                  key={b}
+                  className={`mc-custom-dropdown-item ${selectedBarangay === b ? 'mc-custom-dropdown-item--active' : ''}`}
+                  onClick={() => { setSelectedBarangay(b); setBarangayOpen(false); }}
+                >
+                  {b}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
         {selectedBarangay !== 'All Barangays' && (
           <span style={{ fontSize: '15px', color: '#3B82F6', fontWeight: '500' }}>
             Showing cases in {selectedBarangay}
@@ -867,7 +925,7 @@ export default function PreventionTips() {
                 Choose a disease to check your symptoms against:
               </p>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px' }}>
-                {DISEASES.map(d => (
+                {mergedDiseases.map(d => (
                   <button key={d.name} onClick={() => startQuiz(d.name)}
                     style={{
                       padding: '10px 14px', background: 'var(--bg-main)', border: '1px solid var(--border-color)',

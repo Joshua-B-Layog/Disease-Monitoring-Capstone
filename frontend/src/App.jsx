@@ -9,6 +9,7 @@ import Login from './components/Login';
 import RecoverAccount from './components/RecoverAccount';
 import MapView from './MapView';
 import WeeklySummary from './WeeklySummary';
+import { ToastHost } from './components/Toast';
 
 import { API_URL } from './config';
 import { getPendingCount, processSyncQueue } from './syncEngine';
@@ -577,7 +578,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
   const ProfileRow = ({ label, value }) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '16px' }}>
       <span style={{ fontSize: '15px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
-      <span style={{ fontSize: '15px', color: '#0f172a', fontWeight: '500' }}>{value || '—'}</span>
+      <span style={{ fontSize: '15px', color: '#0f172a', fontWeight: '500' }}>{value || '-'}</span>
     </div>
   );
 
@@ -1010,6 +1011,8 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
           </div>
         </div>
       )}
+
+      <ToastHost />
     </div>
   );
 }

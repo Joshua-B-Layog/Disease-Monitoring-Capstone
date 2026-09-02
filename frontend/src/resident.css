@@ -1,5 +1,5 @@
 /* =========================================================
-   RESIDENT PORTAL — Typography + Animations + Responsive
+   RESIDENT PORTAL - Typography + Animations + Responsive
    Bahnschrift SemiBold Condensed for headings/buttons/labels
    Tw Cen MT Condensed for body (inherited from global reset)
    ========================================================= */
@@ -63,7 +63,7 @@
 }
 
 /* =========================================================
-   RESPONSIVE — ResidentApp header + hero + sections
+   RESPONSIVE - ResidentApp header + hero + sections
    ========================================================= */
 
 /* Desktop nav: show by default, hide on mobile */
@@ -95,12 +95,12 @@
 }
 
 /* =========================================================
-   RESPONSIVE — ResidentMap elements
+   RESPONSIVE - ResidentMap elements
    ========================================================= */
 
 /* Map container */
 .resident-map-area {
-  height: 450px;
+  height: min(60vh, 520px);
 }
 
 /* Stat cards grid */
@@ -194,4 +194,44 @@
   .resident-page input,
   .resident-page textarea,
   .resident-page select { width: 100%; box-sizing: border-box; }
+}
+
+/* =========================================================
+   LARGE SCREEN SCALING (big monitors / TV) - resident portal
+   ========================================================= */
+@media (min-width: 1600px) {
+  .resident-section { max-width: 1500px; padding: 32px 28px; }
+  .resident-hero-title { font-size: 42px; }
+  .resident-hero-sub { font-size: 18px; max-width: 700px; }
+  .resident-page h2 { font-size: 32px; }
+  .resident-page h3 { font-size: 20px; }
+  .resident-page p { font-size: 16px; }
+  .resident-page button { font-size: 16px; }
+}
+
+/* =========================================================
+   CUSTOM DROPDOWN (matches the system-wide component bar)
+   ========================================================= */
+.mc-custom-dropdown-btn {
+  padding: 8px 12px; background: var(--input-bg);
+  border: 1px solid var(--border-color); border-radius: 6px;
+  color: var(--text-main); font-size: 15px; cursor: pointer;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 6px; white-space: nowrap; box-sizing: border-box;
+}
+.mc-custom-dropdown-btn:hover { border-color: var(--text-muted); }
+.mc-custom-dropdown-panel {
+  position: absolute; top: 100%; left: 0; z-index: 100;
+  max-height: 250px; overflow-y: auto; margin-top: 4px; min-width: 100%;
+  background: var(--bg-surface); border: 1px solid var(--border-color);
+  border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  animation: cdmsPopIn 0.15s ease;
+}
+.mc-custom-dropdown-item {
+  padding: 8px 12px; cursor: pointer; font-size: 15px;
+  color: var(--text-main);
+}
+.mc-custom-dropdown-item:hover { background: var(--input-bg); }
+.mc-custom-dropdown-item--active {
+  background: rgba(59,130,246,0.12); color: #60a5fa; font-weight: 600;
 }

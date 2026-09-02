@@ -67,7 +67,10 @@ CREATE TABLE `diseases` (
   `name` varchar(100) NOT NULL,
   `icon` varchar(100) DEFAULT NULL,
   `color` varchar(20) DEFAULT NULL,
-  `description` varchar(255) DEFAULT NULL
+  `description` varchar(255) DEFAULT NULL,
+  `prevention_tips` text DEFAULT NULL,
+  `symptoms` text DEFAULT NULL,
+  `video_url` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
