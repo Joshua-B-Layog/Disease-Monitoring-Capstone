@@ -155,6 +155,16 @@ db.query("SHOW COLUMNS FROM diseases LIKE 'prevention_tips'", (err, rows) => {
     }
 });
 
+// Migration: 'active' flag on diseases (soft hide from Resident portal only)
+db.query("SHOW COLUMNS FROM diseases LIKE 'active'", (err, rows) => {
+    if (!err && rows.length === 0) {
+        db.query("ALTER TABLE diseases ADD COLUMN active TINYINT(1) NOT NULL DEFAULT 1", (alterErr) => {
+            if (alterErr) console.error('Migration error adding active column:', alterErr.message);
+            else console.log('Migration: added active column to diseases table');
+        });
+    }
+});
+
 // Custom disease categories (persisted user-created categories for the disease carousel)
 db.query(`CREATE TABLE IF NOT EXISTS disease_categories (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -580,6 +590,24 @@ app.put('/api/diseases/:id', requireRole('CHO'), (req, res) => {
             res.json({ message: 'Disease updated successfully.' });
         }
     );
+});
+
+// ROUTE: Hide/unhide a disease (soft delete) — CHO only. Affects Resident portal only.
+app.patch('/api/diseases/:id/visibility', requireRole('CHO'), (req, res) => {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Invalid disease id.' });
+    const active = req.body && req.body.active !== undefined ? (req.body.active ? 1 : 0) : null;
+    if (active === null) return res.status(400).json({ error: 'Missing active flag.' });
+    db.query('UPDATE diseases SET active = ? WHERE id = ?', [active, id], (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'Disease not found.' });
+        createAuditLog(
+            req.headers['x-user-id'] || null, req.headers['x-user-name'] || 'Unknown', 'CHO', null, null,
+            active ? 'Unhidden Disease' : 'Hidden Disease', `Disease #${id}`,
+            active ? 'Disease made visible to Resident portal' : 'Disease hidden from Resident portal'
+        );
+        res.json({ message: active ? 'Disease is now visible to residents.' : 'Disease hidden from residents.' });
+    });
 });
 
 // ROUTE: Get all custom disease categories (with their linked disease ids)

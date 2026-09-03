@@ -616,15 +616,20 @@ export default function PreventionTips() {
 
   const mergedDiseases = useMemo(() => {
     const dbByName = {};
-    (dbDiseases || []).forEach(r => { dbByName[r.name] = r; });
+    const hiddenNames = {};
+    (dbDiseases || []).forEach(r => {
+      if (r.active === 0) { hiddenNames[r.name] = true; }
+      else dbByName[r.name] = r;
+    });
     const out = DISEASES.map(d => {
+      if (hiddenNames[d.name]) return null;
       const db = dbByName[d.name];
       if (!db) return d;
       const tips = db.prevention_tips ? parseLines(db.prevention_tips) : d.tips;
       const symptoms = db.symptoms ? parseLines(db.symptoms) : d.symptoms;
       const videoUrl = db.video_url;
       return { ...d, tips, symptoms, ...(videoUrl ? { videoId: '', videoUrl, color: d.color } : {}) };
-    });
+    }).filter(Boolean);
     const known = new Set(DISEASES.map(d => d.name));
     Object.keys(dbByName).forEach(name => {
       if (!known.has(name)) {

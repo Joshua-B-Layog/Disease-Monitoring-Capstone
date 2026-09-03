@@ -497,6 +497,16 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const [tipsOpen, setTipsOpen] = useState(false);
   const [tipsBackdrop, setTipsBackdrop] = useState(null);
 
+  const [box2DiseaseId, setBox2DiseaseId] = useState('');
+  const [box2Tips, setBox2Tips] = useState('');
+  const [box2Symptoms, setBox2Symptoms] = useState('');
+  const [box2Video, setBox2Video] = useState('');
+  const [box2Saving, setBox2Saving] = useState(false);
+  const [box2Msg, setBox2Msg] = useState('');
+  const [addTipsPrompt, setAddTipsPrompt] = useState(null);
+  const [box2DiseaseOpen, setBox2DiseaseOpen] = useState(false);
+  const box2DiseaseRef = useRef(null);
+
   const measureTipsBackdrop = () => {
     const el = document.querySelector('.content-scroller');
     if (!el) return;
@@ -563,6 +573,55 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       setTipsMsg('Error: ' + (err.response?.data?.error || err.message));
     } finally {
       setTipsSaving(false);
+    }
+  };
+
+  // ── BOX 2: Inline Add/Edit Prevention Tips ──
+  const loadBox2 = (diseaseId) => {
+    const d = allDiseases.find(x => String(x.id) === String(diseaseId));
+    if (!d) { setBox2DiseaseId(''); setBox2Tips(''); setBox2Symptoms(''); setBox2Video(''); return; }
+    const hard = DEFAULT_DISEASES.find(h => h.name === d.name);
+    setBox2DiseaseId(String(d.id));
+    setBox2Tips(d.prevention_tips || (hard && Array.isArray(hard.tips) ? hard.tips.join('\n') : ''));
+    setBox2Symptoms(d.symptoms || (hard && Array.isArray(hard.symptoms) ? hard.symptoms.join('\n') : ''));
+    setBox2Video(d.video_url || (hard && hard.videoUrl ? hard.videoUrl : ''));
+    setBox2Msg('');
+  };
+
+  const saveBox2Tips = async () => {
+    if (!box2DiseaseId) { setBox2Msg('Error: Select a disease first.'); return; }
+    setBox2Saving(true);
+    try {
+      await axios.put(`${API_URL}/api/diseases/${box2DiseaseId}`, {
+        preventionTips: box2Tips,
+        symptoms: box2Symptoms,
+        videoUrl: box2Video,
+      }, { headers: { 'x-user-role': 'CHO', 'x-user-id': loggedUserId || '', 'x-user-name': loggedUser || '' } });
+      notify('Prevention tips saved!', 'success');
+      setBox2Msg('');
+      const dres = await axios.get(API_URL + '/api/diseases');
+      setAllDiseases(dres.data);
+      setTipsList(dres.data);
+      const updated = (dres.data || []).find(x => String(x.id) === String(box2DiseaseId));
+      if (updated) { setBox2Tips(updated.prevention_tips || ''); setBox2Symptoms(updated.symptoms || ''); setBox2Video(updated.video_url || ''); }
+    } catch (err) {
+      setBox2Msg('Error: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setBox2Saving(false);
+    }
+  };
+
+  const toggleDiseaseActive = async (d) => {
+    const next = d.active ? 0 : 1;
+    try {
+      await axios.patch(`${API_URL}/api/diseases/${d.id}/visibility`, { active: next },
+        { headers: { 'x-user-role': 'CHO', 'x-user-id': loggedUserId || '', 'x-user-name': loggedUser || '' } });
+      notify(next ? `"${d.name}" is now visible to residents.` : `"${d.name}" hidden from residents.`, 'info');
+      const dres = await axios.get(API_URL + '/api/diseases');
+      setTipsList(dres.data);
+      setAllDiseases(dres.data);
+    } catch (err) {
+      notify('Error: ' + (err.response?.data?.error || err.message), 'error');
     }
   };
 
@@ -1249,6 +1308,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       if (lookupDropdownRef.current && !lookupDropdownRef.current.contains(e.target)) {
         setShowLookupDropdown(false);
       }
+      if (box2DiseaseRef.current && !box2DiseaseRef.current.contains(e.target)) {
+        setBox2DiseaseOpen(false);
+      }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -1714,7 +1776,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       }
       ALL_DISEASE_OPTIONS.length = 0;
       ALL_DISEASE_OPTIONS.push(...ALL_DISEASE_ENTRIES.map(d => d.name).sort());
-      setAddDiseaseMsg('Disease added successfully!');
+      setAddDiseaseMsg('✅ Disease added successfully!');
+      const addedName = newDiseaseName.trim();
       setNewDiseaseName('');
       setNewDiseaseDesc('');
       setNewDiseaseIcon('🦠');
@@ -1723,8 +1786,13 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       setNewCategoryName('');
       const dres = await axios.get(API_URL + '/api/diseases');
       setAllDiseases(dres.data);
+      setTipsList(dres.data);
       cacheDiseases(dres.data).catch(() => {});
-      setTimeout(() => { setAddDiseaseMsg(''); setCarouselIndex(0); }, 1200);
+      notify('Disease added!', 'success');
+      const added = (dres.data || []).find(d => d.name === addedName);
+      setAddTipsPrompt(added ? { id: added.id, name: added.name } : { id: null, name: addedName });
+      setCarouselIndex(2);
+      setAddDiseaseMsg('');
     } catch (err) {
       setAddDiseaseMsg('Error: ' + (err.response?.data?.error || err.message));
     }
@@ -2332,15 +2400,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 );
               })()}
               {carouselIndex === 2 && (
-                <div style={{ maxWidth: '720px', margin: '0 auto', textAlign: 'left' }}>
-                  {loginRole === 'CHO' && (
-                    <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-                      <button onClick={openTipsManager}
-                        style={{ padding: '10px 20px', background: 'var(--success-bg)', color: 'var(--success-text)', border: '1px solid var(--success-border)', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
-                        ✏️ Manage Prevention Tips
-                      </button>
-                    </div>
-                  )}
+                <div style={{ maxWidth: '760px', margin: '0 auto', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '22px 24px', boxShadow: '0 2px 10px rgba(0,0,0,0.04)' }}>
                   <h3 style={{ margin: '0 0 12px 0', fontSize: '17px', color: 'var(--text-main)', textAlign: 'center' }}>➕ Add New Disease</h3>
                   {addDiseaseMsg && (
                     <div style={{ padding: '8px 12px', marginBottom: '10px', borderRadius: '6px', fontSize: '15px', background: addDiseaseMsg.startsWith('Error') ? '#fee2e2' : '#d1f5e9', color: addDiseaseMsg.startsWith('Error') ? '#991b1b' : '#0a5e42' }}>
@@ -2433,6 +2494,103 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       Save Disease
                     </button>
                   </div>
+                  </div>
+
+                  <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '22px 24px', boxShadow: '0 2px 10px rgba(0,0,0,0.04)' }}>
+                    <h3 style={{ margin: '0 0 6px 0', fontSize: '17px', color: 'var(--text-main)', textAlign: 'center' }}>➕ Add / Edit Prevention Tips</h3>
+                    <p style={{ margin: '0 0 14px 0', color: 'var(--text-muted)', fontSize: '14px', textAlign: 'center' }}>Select a disease, then add or edit its prevention tips, symptom-checker questions, and video.</p>
+                    {box2Msg && (
+                      <div style={{ padding: '8px 12px', marginBottom: '10px', borderRadius: '6px', fontSize: '15px', background: box2Msg.startsWith('Error') ? '#fee2e2' : '#d1f5e9', color: box2Msg.startsWith('Error') ? '#991b1b' : '#0a5e42' }}>
+                        {box2Msg}
+                      </div>
+                    )}
+                    <div style={{ marginBottom: '12px' }}>
+                      <label style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '6px' }}>Disease</label>
+                      <div style={{ position: 'relative' }} ref={box2DiseaseRef}>
+                        <button className="mc-custom-dropdown-btn" style={{ width: '100%' }} onClick={() => setBox2DiseaseOpen(!box2DiseaseOpen)}>
+                          <span>
+                            {box2DiseaseId
+                              ? (allDiseases.find(d => String(d.id) === String(box2DiseaseId))?.name || 'Select a disease...')
+                              : 'Select a disease...'}
+                          </span>
+                          <span style={{ marginLeft: '6px', opacity: 0.6, transition: 'transform 0.2s', display: 'inline-block', transform: box2DiseaseOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                        </button>
+                        {box2DiseaseOpen && (
+                          <div className="mc-custom-dropdown-panel" style={{ maxHeight: '260px', overflowY: 'auto' }}>
+                            {allDiseases.length === 0 && (
+                              <div className="mc-custom-dropdown-item mc-custom-dropdown-item--active">No diseases</div>
+                            )}
+                            {allDiseases.map(d => (
+                              <div
+                                key={d.id}
+                                className={`mc-custom-dropdown-item ${String(d.id) === String(box2DiseaseId) ? 'mc-custom-dropdown-item--active' : ''}`}
+                                onClick={() => { loadBox2(d.id); setBox2DiseaseOpen(false); }}
+                              >
+                                {d.name}{d.active ? '' : ' (hidden)'}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div>
+                        <label style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '6px' }}>Prevention Tips <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>(one per line)</span></label>
+                        <textarea value={box2Tips} onChange={e => setBox2Tips(e.target.value)} rows={5}
+                          placeholder="Type prevention tips here, one per line..."
+                          style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontFamily: 'var(--sans)', fontSize: '15px', resize: 'vertical' }} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '6px' }}>Symptom Checker Questions <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>(one per line)</span></label>
+                        <textarea value={box2Symptoms} onChange={e => setBox2Symptoms(e.target.value)} rows={3}
+                          placeholder="Type symptom-checker questions here, one per line..."
+                          style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontFamily: 'var(--sans)', fontSize: '15px', resize: 'vertical' }} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '6px' }}>External Video URL <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>(optional)</span></label>
+                        <input type="url" value={box2Video} onChange={e => setBox2Video(e.target.value)}
+                          placeholder="https://..."
+                          style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px', outline: 'none' }} />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0', marginTop: '16px' }}>
+                      <button onClick={saveBox2Tips} disabled={box2Saving}
+                        style={{ flex: 1, padding: '12px', background: '#129968', border: 'none', borderRight: '1px solid var(--bg-main)', cursor: box2Saving ? 'not-allowed' : 'pointer', fontSize: '15px', fontWeight: '600', color: '#fff', borderRadius: '8px 0 0 8px' }}>
+                        {box2Saving ? 'Saving...' : '💾 Save Prevention Tips'}
+                      </button>
+                      <button onClick={openTipsManager}
+                        style={{ flex: 1, padding: '12px', background: 'var(--success-bg)', color: 'var(--success-text)', border: '1px solid var(--success-border)', borderLeft: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: '600', borderRadius: '0 8px 8px 0' }}>
+                        ✏️ Manage Prevention Tips
+                      </button>
+                    </div>
+                  </div>
+
+                  {addTipsPrompt && createPortal(
+                    (() => {
+                      const el = document.querySelector('.content-scroller');
+                      const r = el ? el.getBoundingClientRect() : null;
+                      return (
+                        <div style={{ position: 'fixed', left: r ? r.left : 0, top: r ? r.top : 0, width: r ? r.width : '100%', height: r ? r.height : '100%', background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10050 }}>
+                          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '26px 28px', maxWidth: '440px', width: '92%', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', textAlign: 'center' }}>
+                            <div style={{ fontSize: '34px', marginBottom: '10px' }}>🦠</div>
+                            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '700', color: 'var(--text-main)' }}>Add prevention tips for &quot;{addTipsPrompt.name}&quot;?</h3>
+                            <p style={{ margin: '0 0 18px 0', color: 'var(--text-muted)', fontSize: '15px' }}>You can add prevention tips now, or later from the &quot;Add / Edit Prevention Tips&quot; box below.</p>
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                              <button onClick={() => { if (addTipsPrompt.id) { setBox2DiseaseId(String(addTipsPrompt.id)); loadBox2(addTipsPrompt.id); } setAddTipsPrompt(null); }}
+                                style={{ flex: 1, padding: '12px', background: '#129968', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
+                                Yes, add tips
+                              </button>
+                              <button onClick={() => setAddTipsPrompt(null)}
+                                style={{ flex: 1, padding: '12px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
+                                Not now
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })(),
+                    document.body
+                  )}
                 </div>
               )}
             </div>
@@ -2549,14 +2707,20 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
                         <span style={{ fontSize: '22px' }}>{d.icon || '🦠'}</span>
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.name}</div>
+                          <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.name}{d.active === 0 ? ' (hidden)' : ''}</div>
                           <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{(() => { const hard = DEFAULT_DISEASES.find(h => h.name === d.name); if (d.prevention_tips) return `${d.prevention_tips.split('\n').filter(Boolean).length} tips`; return hard ? `Default tips (${(hard.tips || []).length}) - will save to DB on Edit` : 'No tips set'; })()}</div>
                         </div>
                       </div>
-                      <button onClick={() => openTipsEditor(d)}
-                        style={{ padding: '7px 14px', background: '#121358', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '14px', flexShrink: 0 }}>
-                        Edit
-                      </button>
+                      <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                        <button onClick={() => { if (window.confirm(d.active === 0 ? `Un-hide "${d.name}" so it shows again on the Resident portal?` : `Hide "${d.name}" from the Resident portal? Its prevention tips and data will be kept and can be restored anytime.`)) toggleDiseaseActive(d); }}
+                          style={{ padding: '7px 12px', background: d.active === 0 ? 'var(--success-bg)' : 'transparent', color: d.active === 0 ? 'var(--success-text)' : '#D97706', border: '1px solid ' + (d.active === 0 ? 'var(--success-border)' : '#D97706'), borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
+                          {d.active === 0 ? 'Un-hide' : 'Hide'}
+                        </button>
+                        <button onClick={() => openTipsEditor(d)}
+                          style={{ padding: '7px 14px', background: '#121358', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}>
+                          Edit
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
