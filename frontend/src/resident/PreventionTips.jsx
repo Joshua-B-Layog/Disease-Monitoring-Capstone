@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import BackButton from '../components/BackButton';
+import { onDiseasesChanged } from '../diseaseSignal';
 
 const parseLines = (str) => (str ? String(str).split('\n').map(s => s.trim()).filter(Boolean) : []);
 
@@ -606,12 +607,26 @@ export default function PreventionTips() {
   }, [selectedBarangay]);
 
   useEffect(() => {
-    fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/diseases`)
-      .then(r => r.json())
-      .then(data => {
-        if (Array.isArray(data)) setDbDiseases(data);
-      })
-      .catch(() => {});
+    const load = () => {
+      fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/diseases?_=${Date.now()}`, { cache: 'no-store' })
+        .then(r => r.json())
+        .then(data => {
+          if (Array.isArray(data)) setDbDiseases(data);
+        })
+        .catch(() => {});
+    };
+    load();
+    const onVis = () => { if (document.visibilityState === 'visible') load(); };
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('focus', load);
+    const offSignal = onDiseasesChanged(load);
+    const interval = setInterval(() => { if (navigator.onLine) load(); }, 30000);
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('focus', load);
+      offSignal();
+      clearInterval(interval);
+    };
   }, []);
 
   const mergedDiseases = useMemo(() => {

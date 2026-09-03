@@ -199,7 +199,7 @@
 /* =========================================================
    LARGE SCREEN SCALING (big monitors / TV) - resident portal
    ========================================================= */
-@media (min-width: 1600px) {
+@media (min-width: 2560px) {
   .resident-section { max-width: 1500px; padding: 32px 28px; }
   .resident-hero-title { font-size: 42px; }
   .resident-hero-sub { font-size: 18px; max-width: 700px; }

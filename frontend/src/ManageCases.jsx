@@ -10,6 +10,7 @@ import { enqueueOperation, removePendingCreatesByCaseId } from './syncEngine';
 import { getPointInBarangay } from './data/coordinates';
 import { notify } from './components/Toast';
 import { DISEASES as DEFAULT_DISEASES } from './resident/PreventionTips';
+import { emitDiseasesChanged } from './diseaseSignal';
 const FeverIcon = ({ color = '#ef4444', size = 28 }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
     <path d="M23.909,10.583c-.104,.345-.297,.668-.587,.924l-.512,.451-1.277-1.451-1.5,1.322,1.277,1.45-1.646,1.45-1.263-1.434-1.5,1.322,1.262,1.433-1.793,1.718-.025-.036-.013,.014c-.02-.018-2.005-1.748-4.336-1.748s-4.316,1.73-4.336,1.748l-1.33-1.493c.103-.092,2.559-2.254,5.666-2.254,.741,0,1.44,.128,2.084,.316l6.598-5.81c.83-.73,2.093-.65,2.823,.179,.015,.017,.024,.036,.038,.054C22.117,3.698,17.495,0,12,0,5.373,0,0,5.373,0,12s5.373,12,12,12,12-5.373,12-12c0-.48-.036-.951-.091-1.417Zm-8.413-2.583c.828,0,1.5,.672,1.5,1.5s-.672,1.5-1.5,1.5-1.5-.672-1.5-1.5,.672-1.5,1.5-1.5Zm-7,0c.828,0,1.5,.672,1.5,1.5s-.672,1.5-1.5,1.5-1.5-.672-1.5-1.5,.672-1.5,1.5-1.5Z"/>
@@ -567,6 +568,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         videoUrl: tipsEditor.videoUrl,
       }, { headers: { 'x-user-role': 'CHO', 'x-user-id': loggedUserId || '', 'x-user-name': loggedUser || '' } });
       notify('Prevention tips updated successfully!', 'success');
+      emitDiseasesChanged();
       setTipsEditor(null);
       openTipsManager();
     } catch (err) {
@@ -598,6 +600,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         videoUrl: box2Video,
       }, { headers: { 'x-user-role': 'CHO', 'x-user-id': loggedUserId || '', 'x-user-name': loggedUser || '' } });
       notify('Prevention tips saved!', 'success');
+      emitDiseasesChanged();
       setBox2Msg('');
       const dres = await axios.get(API_URL + '/api/diseases');
       setAllDiseases(dres.data);
@@ -617,6 +620,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       await axios.patch(`${API_URL}/api/diseases/${d.id}/visibility`, { active: next },
         { headers: { 'x-user-role': 'CHO', 'x-user-id': loggedUserId || '', 'x-user-name': loggedUser || '' } });
       notify(next ? `"${d.name}" is now visible to residents.` : `"${d.name}" hidden from residents.`, 'info');
+      emitDiseasesChanged();
       const dres = await axios.get(API_URL + '/api/diseases');
       setTipsList(dres.data);
       setAllDiseases(dres.data);
@@ -1789,6 +1793,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       setTipsList(dres.data);
       cacheDiseases(dres.data).catch(() => {});
       notify('Disease added!', 'success');
+      emitDiseasesChanged();
       const added = (dres.data || []).find(d => d.name === addedName);
       setAddTipsPrompt(added ? { id: added.id, name: added.name } : { id: null, name: addedName });
       setCarouselIndex(2);

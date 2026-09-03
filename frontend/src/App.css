@@ -726,18 +726,18 @@ html, body, #root {
 /* =========================================================
    LARGE SCREEN SCALING (big monitors / TV)
    ========================================================= */
-@media (min-width: 1600px) {
-  :root, [data-theme='light'] { --scale: 1.1; }
+@media (min-width: 2560px) {
+  :root, [data-theme='light'] { --scale: 1.15; }
 }
-@media (min-width: 2200px) {
-  :root, [data-theme='light'] { --scale: 1.25; }
+@media (min-width: 3840px) {
+  :root, [data-theme='light'] { --scale: 1.3; }
 }
 
 /* Content area is capped so dashboards don't stretch awkwardly edge-to-edge */
 /* (applied within large-screen media query below to avoid breaking flex layout) */
 
 /* Widen sidebar & scale chrome on large screens */
-@media (min-width: 1600px) {
+@media (min-width: 2560px) {
   .dashboard-layout { max-width: 2400px; margin: 0 auto; }
   .sidebar { width: calc(260px * var(--scale)); }
   .sidebar-logo { padding: calc(30px * var(--scale)) calc(20px * var(--scale)); }

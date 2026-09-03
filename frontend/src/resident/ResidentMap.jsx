@@ -7,6 +7,7 @@ import { API_URL } from '../config';
 import { cacheCases, getCachedCases } from '../offlineSync';
 import cabuyaoBoundaries from '../data/cabuyao_barangays.geojson.json';
 import { getPointInBarangay, pointInFeature } from '../data/coordinates';
+import { onDiseasesChanged } from '../diseaseSignal';
 
 const CABUYAO_CENTER = [14.2253, 121.1254];
 const CABUYAO_BOUNDS = [
@@ -581,6 +582,11 @@ export default function ResidentMap() {
       if (navigator.onLine) fetchMapData();
     }, 30000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const offSignal = onDiseasesChanged(() => { if (navigator.onLine) fetchMapData(); });
+    return offSignal;
   }, []);
 
   useEffect(() => {
