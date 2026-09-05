@@ -689,6 +689,27 @@ function ZoomToBarangay({ barangay, loginRole, loginBarangay, sessionContext, ca
   return null;
 }
 
+// Lock the view to the logged-in user's area of responsibility (CHO unit / BHW barangay)
+function ScopeEnforcer({ bounds }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!bounds) return;
+    map.setMaxBounds(bounds);
+    const applyMinZoom = () => {
+      if (!bounds) return;
+      const fitZoom = map.getBoundsZoom(bounds, false, [40, 40]);
+      if (!Number.isFinite(fitZoom)) return;
+      map.setMinZoom(Math.max(12, Math.min(map.getMaxZoom(), Math.round(fitZoom))));
+    };
+    applyMinZoom();
+    map.on('resize', applyMinZoom);
+    return () => {
+      map.off('resize', applyMinZoom);
+    };
+  }, [map, bounds]);
+  return null;
+}
+
 function ChoroplethLayer({ barangayData, onHover, onLeave, onClick }) {
   const findMatch = (feature) => {
     const rawName = feature?.properties?.name ?? feature?.properties?.NAME ?? '';
@@ -770,10 +791,27 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const statusRef = useRef(null);
   const [severityOpen, setSeverityOpen] = useState(false);
   const severityRef = useRef(null);
-  const [mapLayer, setMapLayer] = useState('HD'); // 'SD' = street map (Carto), 'HD' = satellite (Esri)
+  const [mapLayer, setMapLayer] = useState('HD'); // 'SD' = street map (OSM), 'HD' = satellite (Esri)
   const geoJsonLayerRef = useRef(null);
   const barangayDataRef = useRef(barangayData);
   useEffect(() => { barangayDataRef.current = barangayData; }, [barangayData]);
+
+  // Area of responsibility for the logged-in user — drives maxBounds + minZoom
+  const roleBounds = useMemo(() => {
+    if (loginRole === 'CHO' && sessionContext && CHO_UNIT_BARANGAYS[sessionContext]) {
+      return getCombinedBounds(CHO_UNIT_BARANGAYS[sessionContext]) || CABUYAO_BOUNDS;
+    }
+    if (loginRole === 'BHW' && loginBarangay) {
+      const b = getBarangayBounds(loginBarangay);
+      if (b) {
+        const pad = 0.004;
+        return [[b[0][0] - pad, b[0][1] - pad], [b[1][0] + pad, b[1][1] + pad]];
+      }
+      const c = findCoords(loginBarangay);
+      if (c) return [[c[0] - 0.015, c[1] - 0.015], [c[0] + 0.015, c[1] + 0.015]];
+    }
+    return CABUYAO_BOUNDS;
+  }, [loginRole, sessionContext, loginBarangay]);
 
 
   const scopedGeoJson = useMemo(() => {
@@ -1256,21 +1294,21 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           center={(loginRole === 'BHW' && loginBarangay && findCoords(loginBarangay)) 
             ? findCoords(loginBarangay) 
             : CABUYAO_CENTER} zoom={14} minZoom={12} maxZoom={19} scrollWheelZoom={true}
-          maxBounds={CABUYAO_BOUNDS}
-          maxBoundsViscosity={0.6}
+          maxBounds={roleBounds}
+          maxBoundsViscosity={1.0}
           style={{ width: '100%', height: '100%' }}>
+          <ScopeEnforcer key="scope-enforcer" bounds={roleBounds} />
           {mapLayer === 'SD' ? (
             <TileLayer
               key="tile-sd"
-              attribution='&copy; OpenStreetMap contributors &copy; CARTO'
-              url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
           ) : (
             <TileLayer
               key="tile-hd"
-              attribution='&copy; Google'
-              url="https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
-              subdomains={['mt0', 'mt1', 'mt2', 'mt3']}
+              attribution='Tiles &copy; Esri - Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
               maxZoom={19}
             />
           )}
@@ -1399,7 +1437,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
             background: 'rgba(18,153,104,0.15)', border: '1px solid rgba(18,153,104,0.3)',
             fontSize: '12px', fontWeight: '600', color: '#129968',
           }}>
-            ● Dots showing case placements — zoom to max for full details
+            ● Dots showing case placements - zoom to max for full details
           </div>
         )}
         {mapZoom === 19 && (

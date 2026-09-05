@@ -224,14 +224,41 @@ function App() {
   const [showNotifications, setShowNotifications] = useState(false);
   const notifRef = useRef(null);
 
-  // ── THEME ──
-  const [theme, setTheme] = useState(() => localStorage.getItem('cdms_theme') || 'dark');
+  // ── THEME (separate scopes: per-user app theme for CHO/BHW, plus the login screen theme) ──
+  const [appTheme, setAppTheme] = useState(() => {
+    if (savedSession?.id) {
+      return localStorage.getItem(`cdms_theme_${savedSession.id}`) || localStorage.getItem('cdms_theme') || 'dark';
+    }
+    return 'dark';
+  });
+  const [loginTheme, setLoginTheme] = useState(() => {
+    const lastId = localStorage.getItem('cdms_last_user');
+    if (lastId) {
+      return localStorage.getItem(`cdms_theme_${lastId}`) || localStorage.getItem('cdms_theme') || 'dark';
+    }
+    return localStorage.getItem('cdms_theme') || 'dark';
+  });
+
+  const activeTheme = isLoggedIn ? appTheme : loginTheme;
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('cdms_theme', theme);
-  }, [theme]);
-  const toggleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark');
+    document.documentElement.setAttribute('data-theme', activeTheme);
+  }, [activeTheme]);
+
+  // Persist only the logged-in user's own preference
+  useEffect(() => {
+    if (isLoggedIn && loggedUserId) {
+      localStorage.setItem(`cdms_theme_${loggedUserId}`, appTheme);
+    }
+  }, [appTheme, isLoggedIn, loggedUserId]);
+
+  const toggleTheme = () => setAppTheme(appTheme === 'dark' ? 'light' : 'dark');
+  const toggleLoginTheme = () => setLoginTheme(prev => {
+    const next = prev === 'dark' ? 'light' : 'dark';
+    const lastId = localStorage.getItem('cdms_last_user');
+    if (lastId && !isLoggedIn) localStorage.setItem(`cdms_theme_${lastId}`, next);
+    return next;
+  });
   // ── Apply font-scale globally ──
   useEffect(() => {
     document.documentElement.style.setProperty('--app-font-scale', fontScale);
@@ -476,7 +503,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             setLoggedUser={setLoggedUser}
             profilePhoto={profilePhoto}
             onProfilePhotoChange={handleProfilePhotoChange}
-            theme={theme}
+            theme={appTheme}
             toggleTheme={toggleTheme}
             onLanguageChange={handleLanguageChange}
             onTimeZoneChange={handleTimeZoneChange}
@@ -518,6 +545,8 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
     setLoggedUser(sessionData.name || sessionData.username);
     setLoggedUserId(sessionData.id || null);
     setLoggedUserBarangay(sessionData.barangay || null);
+    setAppTheme(localStorage.getItem(`cdms_theme_${sessionData.id}`) || localStorage.getItem('cdms_theme') || 'dark');
+    if (sessionData.id) localStorage.setItem('cdms_last_user', String(sessionData.id));
     localStorage.setItem('cdms_session', JSON.stringify({
       id: sessionData.id,
       name: sessionData.name || sessionData.username,
@@ -538,6 +567,8 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
     }).catch(() => {});
     localStorage.removeItem('cdms_session');
     localStorage.removeItem('cdms_active_tab');
+    if (loggedUserId) localStorage.setItem('cdms_last_user', String(loggedUserId));
+    setLoginTheme(appTheme);
     setIsLoggedIn(false); 
     setSessionContext('');
     setLoggedUser('');
@@ -559,8 +590,8 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
       return (
         <RecoverAccount 
           onBackToLogin={() => setAuthView('login')} 
-          theme={theme} 
-          toggleTheme={toggleTheme} 
+          theme={loginTheme} 
+          toggleTheme={toggleLoginTheme} 
         />
       );
     }
@@ -568,8 +599,8 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
       <Login 
         onLoginSuccess={handleLoginSuccess} 
         onForgotPassword={() => setAuthView('recover')}
-        theme={theme} 
-        toggleTheme={toggleTheme} 
+        theme={loginTheme} 
+        toggleTheme={toggleLoginTheme} 
       />
     );
   }

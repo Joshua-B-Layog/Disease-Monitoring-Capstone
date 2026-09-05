@@ -23,12 +23,20 @@ export default function ResidentApp() {
 
   const scrollRef = useRef(null);
   const isScrollingRef = useRef(false);
-  const saved = localStorage.getItem('cdms_theme');
-  const [theme, setTheme] = useState(saved || 'light');
+  const [theme, setTheme] = useState(() => {
+    const own = localStorage.getItem('cdms_resident_theme');
+    if (own) return own;
+    const legacy = localStorage.getItem('cdms_theme');
+    if (legacy) {
+      localStorage.setItem('cdms_resident_theme', legacy);
+      return legacy;
+    }
+    return 'light';
+  });
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('cdms_theme', theme);
+    localStorage.setItem('cdms_resident_theme', theme);
   }, [theme]);
 
   const toggleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark');
