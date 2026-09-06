@@ -7,7 +7,7 @@ A web-based disease surveillance and mapping system built for the **City Health 
 ### CHO (City Health Officer)
 - **Dashboard** - Real-time stats with trend comparisons, interactive bar charts, and export options (Word, Excel, CSV, PDF, PowerPoint)
 - **Manage Cases** - Full CRUD for disease cases with auto-geocoding, patient auto-fill, and status tracking
-- **Map View** - Interactive Leaflet map with barangay boundaries, satellite/standard tiles, pin markers, and case clustering
+- **Map View** - Interactive Leaflet map with barangay boundaries, satellite (Esri)/street (OSM) tiles, pin markers, case clustering, and per-user scoping to your CHO Unit / barangay
 - **Audit Reports** - System-generated logs with Excel/PDF export and filtered search
 - **User Accounts** - Manage BHW accounts, approve/reject registrations
 - **Inbox** - Notifications, referrals, edit requests, and registration approvals
@@ -16,7 +16,7 @@ A web-based disease surveillance and mapping system built for the **City Health 
 ### BHW (Barangay Health Worker)
 - **Dashboard** - Scoped to assigned barangay with "Top Disease" view
 - **Manage Cases** - Add new cases, request edits via CHO
-- **Map View** - View-only map of assigned barangay
+- **Map View** - View-only map locked to the user's barangay (OSM street / Esri satellite)
 - **Settings** - Profile and password management
 
 ### Resident Portal
@@ -31,7 +31,7 @@ A web-based disease surveillance and mapping system built for the **City Health 
 | Backend | Node.js + Express.js |
 | Database | MySQL (mysql2) |
 | Frontend | React 18 + Vite |
-| Maps | React Leaflet + OpenStreetMap |
+| Maps | React Leaflet — Esri World Imagery satellite (HD) + OSM street (SD) |
 | Email | Nodemailer (Gmail SMTP) |
 | SMS | Brevo Transactional SMS API |
 | PWA | Workbox + vite-plugin-pwa |
@@ -101,18 +101,25 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 │   │   ├── BarangayReports.jsx# Audit logs and reports
 │   │   ├── WeeklySummary.jsx  # Weekly disease summary report
 │   │   ├── ChoSettings.jsx    # Profile and settings
+│   │   ├── WeeklySummary.jsx  # Weekly disease summary report
+│   │   ├── ResidentApp.jsx    # Resident portal (public)
+│   │   ├── diseaseSignal.js   # Cross-tab live-update signaling
 │   │   ├── syncEngine.js      # Offline sync queue
 │   │   ├── offlineSync.js     # IndexedDB cache helpers
 │   │   ├── config.js          # API URL config
 │   │   ├── components/
 │   │   │   ├── Login.jsx      # Login/signup/recovery flow
 │   │   │   ├── BackButton.jsx # Reusable back navigation
+│   │   │   ├── RecoverAccount.jsx # Password recovery
 │   │   │   └── Sidebar.jsx    # Navigation sidebar
 │   │   └── resident/
 │   │       ├── PreventionTips.jsx # Disease prevention cards
 │   │       ├── ResidentMap.jsx    # Public disease map
-│   │       └── ContactUs.jsx      # Resident contact form
+│   │       ├── ContactUs.jsx      # Resident contact form
+│   │       ├── AboutCho.jsx       # About the City Health Office
+│   │       └── Help.jsx           # Help/support page
 │   ├── public/
+│   │   ├── favicon.svg        # CHO 1 logo favicon
 │   │   └── icons/             # PWA icons (192x192, 512x512)
 │   └── vite.config.js         # Vite + PWA config
 ```
@@ -133,7 +140,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## 18 Barangays of Cabuyao
 
-Baclaran, Banay-Banay, Banlic, Barangay Dos (Poblacion), Barangay Tres (Poblacion), Barangay Uno (Poblacion), Bigaa, Butong, Casile, Diezmo, Gulod, Mamatid, Marinig, Niugan, Pitland, Pulo, Sala, San Isidro
+Baclaran, Banay-Banay, Banlic, Barangay Dos (Poblacion), Barangay Tres (Poblacion), Barangay Uno (Poblacion), Bigaa, Butong, Casile, Diezmo, Gulod, Mamatid, Marinig, Niugan, Pittland, Pulo, Sala, San Isidro
 
 ## 28 Communicable Diseases Tracked
 
@@ -146,6 +153,15 @@ Acute Respiratory Infection, Avian Influenza, Chickenpox, Cholera, Covid-19, Den
 - OpenStreetMap tiles cached for 30 days
 - IndexedDB (Dexie.js) for offline case data, audit logs, and sync queue
 - Automatic sync on reconnect with conflict detection
+
+## Deployment
+
+| Piece | Host | Details |
+|-------|------|---------|
+| Frontend | **Vercel** | Root directory `frontend`; env var `VITE_API_URL` points to the Railway backend |
+| Backend + MySQL | **Railway** | `https://disease-monitoring-capstone-production.up.railway.app`; secrets set in the Railway dashboard (DB\_\*/MYSQL\*, FRONTEND_URL, BREVO\_\*, Gmail) |
+
+Deployment is automatic: pushing to the `main` branch triggers both platforms to redeploy.
 
 ## License
 
