@@ -32,7 +32,7 @@ A web-based disease surveillance and mapping system built for the **City Health 
 | Database | MySQL (mysql2) |
 | Frontend | React 18 + Vite |
 | Maps | React Leaflet — Esri World Imagery satellite (HD) + OSM street (SD) |
-| Email | Nodemailer (Gmail SMTP) |
+| Email | Brevo Transactional Email API |
 | SMS | Brevo Transactional SMS API |
 | PWA | Workbox + vite-plugin-pwa |
 
@@ -57,18 +57,23 @@ cd frontend && npm install && cd ..
 ```
 
 ### 3. Configure environment variables
-Create a `.env` file in the project root:
+The backend reads its configuration from **`.env.local`** (see `server.js`). Copy the template and fill in real values:
+```bash
+cp .env.example .env.local
+```
 ```env
+# Example — see `.env.example`
+PORT=5000
 DB_HOST=localhost
 DB_USER=root
 DB_PASSWORD=your_mysql_password
 DB_NAME=cabuyao_cdms_db
 
-EMAIL_USER=your_gmail@gmail.com
-EMAIL_PASS=your_gmail_app_password
-
-BREVO_API_KEY=your_brevo_api_key
+# Brevo Transactional Email API (OTP, recovery, approvals, weekly summaries)
+BREVO_FROM=your_verified_sender@example.com
+BREVO_API_KEY=xkeysib-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-xxxxxxxxxxxxx
 ```
+> Note: the `BREVO_FROM` sender must be verified in the Brevo dashboard (Account → Senders). No Gmail/Gmail SMTP is used — email is sent via the Brevo Transactional Email API with `BREVO_API_KEY` only.
 
 ### 4. Set up the database
 Import the `cabuyao_cdms_db` schema into your MySQL server.
@@ -90,7 +95,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 ```
 ├── server.js                  # Backend API server
 ├── package.json               # Backend dependencies
-├── .env                       # Environment variables (not committed)
+├── .env.local                  # Environment variables (not committed; copy from .env.example)
 ├── frontend/
 │   ├── src/
 │   │   ├── App.jsx            # Main app controller
@@ -159,9 +164,15 @@ Acute Respiratory Infection, Avian Influenza, Chickenpox, Cholera, Covid-19, Den
 | Piece | Host | Details |
 |-------|------|---------|
 | Frontend | **Vercel** | Root directory `frontend`; env var `VITE_API_URL` points to the Railway backend |
-| Backend + MySQL | **Railway** | `https://disease-monitoring-capstone-production.up.railway.app`; secrets set in the Railway dashboard (DB\_\*/MYSQL\*, FRONTEND_URL, BREVO\_\*, Gmail) |
+| Backend + MySQL | **Railway** | `https://disease-monitoring-capstone-production.up.railway.app`; secrets set in the Railway dashboard (DB\_\*/MYSQL\*, FRONTEND_URL, BREVO\_\*) |
 
 Deployment is automatic: pushing to the `main` branch triggers both platforms to redeploy.
+
+## Troubleshooting: Brevo "Verify a new IP" email
+
+Brevo sends a "Verify a new IP" / "authorize this new IP address" email to the account owner whenever the `BREVO_API_KEY` is used from a network/IP it hasn't seen before (e.g. running the backend on a new laptop, or a Railway redeploy where the egress IP rotates). This is a **Brevo account-security notice, not a Gmail login prompt**.
+
+To stop these notices permanently: Brevo dashboard → **Organization Settings → Authorized IPs → API keys** → disable/unblock unauthorized IP addresses. After that, any IP may use the API key with no verification email.
 
 ## License
 
