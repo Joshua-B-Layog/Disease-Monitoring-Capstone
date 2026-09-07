@@ -466,6 +466,11 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const [showEditRequestForm, setShowEditRequestForm] = useState(false);
   const [editRequestNote, setEditRequestNote] = useState('');
   const [editRequestSuccess, setEditRequestSuccess] = useState(null);
+  const [addRequests, setAddRequests] = useState([]);
+  const [addRequestsLoading, setAddRequestsLoading] = useState(false);
+  const [myAddRequests, setMyAddRequests] = useState([]);
+  const [myAddRequestsLoading, setMyAddRequestsLoading] = useState(false);
+  const [approvalRequest, setApprovalRequest] = useState(null);
   const [isBhwReadOnly, setIsBhwReadOnly] = useState(false);
   const [pendingContactMessageId, setPendingContactMessageId] = useState(null);
   const [cardPage, setCardPage] = useState(0);
@@ -807,7 +812,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       });
       return;
     }
-    axios.get(API_URL + '/api/disease_cases')
+    axios.get(API_URL + '/api/disease_cases?user_id=' + (loggedUserId || ''))
       .then(res => { setAllCases(res.data); setLoadingCases(false); setLastUpdated(Date.now()); cacheCases(res.data).catch(() => {}); })
       .catch(async () => {
         const cached = await getCachedCases();
@@ -1018,6 +1023,21 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       });
   };
 
+  // ── ADD REQUESTS (BHW submits case → CHO approval) ──
+  const fetchAddRequests = () => {
+    if (loginRole === 'BHW') {
+      setMyAddRequestsLoading(true);
+      axios.get(`${API_URL}/api/case-add-requests?requested_by=${loggedUserId}`)
+        .then(res => { setMyAddRequests(res.data || []); setMyAddRequestsLoading(false); })
+        .catch(() => setMyAddRequestsLoading(false));
+    } else {
+      setAddRequestsLoading(true);
+      axios.get(`${API_URL}/api/case-add-requests?cho_unit=${sessionContext || ''}`)
+        .then(res => { setAddRequests(res.data || []); setAddRequestsLoading(false); })
+        .catch(() => setAddRequestsLoading(false));
+    }
+  };
+
   // ── EDIT REQUESTS (BHW → CHO) ──
   const fetchEditRequests = () => {
     setEditRequestsLoading(true);
@@ -1084,6 +1104,23 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       from_barangay_name: loginBarangay,
       target_cho_unit: targetCho,
       note: editRequestNote.trim(),
+      proposed_data: {
+        patient_name: formData.patientName,
+        disease_name: formData.diseaseType,
+        age: formData.age,
+        severity: formData.severity,
+        gender: formData.gender,
+        status: formData.status,
+        contact: formData.contact,
+        onset_date: formData.onsetDate,
+        address: formData.address,
+        purok: formData.purok,
+        barangay_id: formData.barangayId,
+        symptoms: formData.symptoms,
+        physician: formData.physician,
+        latitude: formData.lat,
+        longitude: formData.lng,
+      },
     };
     if (!isOnline()) {
       try {
@@ -1137,24 +1174,26 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         const caseId = res.data.case_id;
         fetchEditRequests();
         fetchCases();
+        const proposed = res.data.proposed_data || null;
         const c = allCases.find(x => x.case_id === caseId);
         if (c) {
           openEdit({
             case_id: c.case_id,
-            patient_name: c.patient_name,
-            disease_name: c.disease_name,
-            age: c.age,
-            severity: c.severity,
-            gender: c.gender,
-            status: c.status,
-            contact: c.contact,
-            onset_date: c.onset_date,
-            address: c.address,
+            patient_name: (proposed && proposed.patient_name) || c.patient_name,
+            disease_name: (proposed && proposed.disease_name) || c.disease_name,
+            age: (proposed && proposed.age) || c.age,
+            severity: (proposed && proposed.severity) || c.severity,
+            gender: (proposed && proposed.gender) || c.gender,
+            status: (proposed && proposed.status) || c.status,
+            contact: (proposed && proposed.contact) || c.contact,
+            onset_date: (proposed && proposed.onset_date) || c.onset_date,
+            address: (proposed && proposed.address) || c.address,
+            purok: (proposed && proposed.purok) || '',
             barangay_name: c.barangay_name || '',
-            symptoms: c.symptoms,
-            physician: c.physician,
-            latitude: c.latitude,
-            longitude: c.longitude,
+            symptoms: (proposed && proposed.symptoms) || c.symptoms,
+            physician: (proposed && proposed.physician) || c.physician,
+            latitude: (proposed && proposed.latitude) || c.latitude,
+            longitude: (proposed && proposed.longitude) || c.longitude,
           });
         } else {
           alert('Case found, but data not loaded yet. Please refresh.');
@@ -1167,6 +1206,59 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     axios.put(`${API_URL}/api/case-edit-requests/${req.id}/reject`)
       .then(() => fetchEditRequests())
       .catch(err => alert('Failed to reject edit request: ' + (err.response?.data?.error || err.message)));
+  };
+
+  // ── ADD REQUEST APPROVAL (CHO reviews a BHW-submitted case) ──
+  const openApprovalReview = (req) => {
+    setApprovalRequest(req);
+    setShowEditRequestForm(false);
+    setEditingCase(null);
+    setIsBhwReadOnly(false);
+    const brgy = barangayList.find(b => b.id === req.barangay_id);
+    let parsedAddress = req.address || '';
+    let parsedPurok = '';
+    if (parsedAddress.includes('|')) {
+      const [addrPart, purokPart] = parsedAddress.split('|');
+      parsedAddress = addrPart.trim();
+      parsedPurok = (purokPart || '').trim();
+    }
+    setFormData({
+      patientName: req.patient_name || '',
+      diseaseType: req.disease_name || '',
+      age: req.age || '',
+      severity: req.severity || 'Moderate',
+      gender: req.gender || 'Male',
+      status: req.case_status || 'Active',
+      contact: req.contact || '',
+      onsetDate: req.onset_date ? String(req.onset_date).slice(0, 10) : '',
+      address: parsedAddress,
+      purok: parsedPurok,
+      barangayId: brgy ? brgy.id : (req.barangay_id || ''),
+      symptoms: req.symptoms || '',
+      physician: req.physician || '',
+      lat: req.latitude || '',
+      lng: req.longitude || '',
+    });
+    setFormErrors({});
+    setView('add');
+  };
+
+  const closeApprovalReview = () => {
+    setApprovalRequest(null);
+    setView('inbox');
+    setInboxSubTab('add-requests');
+  };
+
+  const handleRejectAddRequest = (req) => {
+    const reason = (window.prompt('Reason for rejection (shown to the BHW):', '') || '').trim();
+    axios.put(`${API_URL}/api/case-add-requests/${req.id}/reject`, {
+      reason: reason || null,
+      actor_id: loggedUserId,
+      actor_name: loggedUser || 'CHO',
+      actor_role: loginRole || 'CHO',
+    })
+      .then(() => { fetchAddRequests(); })
+      .catch(err => alert('Failed to reject add request: ' + (err.response?.data?.error || err.message)));
   };
 
   // ── PASSWORD REQUEST HANDLERS ──
@@ -1237,6 +1329,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       fetchInbox();
       fetchContactMessages();
       fetchEditRequests();
+      fetchAddRequests();
       if (loginRole === 'CHO') { fetchPendingRegistrations(); fetchPasswordRequests(); }
       if (loginRole === 'BHW') fetchMyEditRequests();
     }
@@ -1353,7 +1446,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
       if (e.key === 'Escape') {
         if (deleteTarget) { setDeleteTarget(null); return; }
-        if (view === 'add' || view === 'edit') { setView('list'); setFilterPurok('All Puroks'); }
+        if (view === 'add' || view === 'edit') { setApprovalRequest(null); setView('list'); setFilterPurok('All Puroks'); }
       }
 
       if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
@@ -1929,6 +2022,36 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       user_id: loggedUserId || null,
     };
 
+    // CHO reviewing an add request → this submit is the final approval
+    if (approvalRequest) {
+      try {
+        if (!isOnline() || !appOnlineRef.current) {
+          setSubmitMsg('Error: approving an add request requires a connection.');
+          notify('You are offline. Reconnect to approve add requests.', 'error');
+          setSubmitLoading(false);
+          return;
+        }
+        await axios.put(`${API_URL}/api/case-add-requests/${approvalRequest.id}/approve`, {
+          ...payload,
+          actor_id: loggedUserId,
+          actor_name: loggedUser || 'CHO',
+          actor_role: loginRole || 'CHO',
+        });
+        setSubmitMsg('Add request approved - case added to records!');
+        notify('Add request approved!', 'success');
+        setApprovalRequest(null);
+        await fetchCases();
+        fetchAddRequests();
+        setTimeout(() => { setView('inbox'); setSubmitMsg(''); setSubmitLoading(false); setInboxSubTab('add-requests'); }, 1200);
+        return;
+      } catch (errApproval) {
+        setSubmitMsg('Error: ' + (errApproval.response?.data?.error || errApproval.message));
+        notify('Approval failed: ' + (errApproval.response?.data?.error || errApproval.message), 'error');
+        setSubmitLoading(false);
+        return;
+      }
+    }
+
     try {
       if (!isOnline() || !appOnlineRef.current) {
         const tempId = 'temp-' + Date.now();
@@ -1945,6 +2068,25 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           await applyLocalOfflineCase(op, editingCase);
           setSubmitMsg('Case saved offline - will sync when reconnected.');
           notify('Case saved offline - will sync when reconnected.', 'info');
+        } else if (loginRole === 'BHW' && !isDraft) {
+          const op = {
+            type: 'add_request',
+            endpoint: '/api/cases/request-add',
+            method: 'POST',
+            payload: {
+              ...payload, case_id: tempId,
+              requested_by: loggedUserId,
+              requested_by_name: loggedUser || 'Unknown BHW',
+              from_barangay_name: loginBarangay,
+              submitter_cho_unit: sessionContext,
+              note: '',
+            },
+            userId: loggedUserId,
+            userName: loggedUser,
+          };
+          await enqueueOperation(op);
+          setSubmitMsg('Case submitted to CHO for approval (offline) - will sync when reconnected.');
+          notify('Submitted to CHO for approval. Will sync when reconnected.', 'info');
         } else {
           const op = {
             type: 'create',
@@ -1968,6 +2110,22 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         await axios.put(`${API_URL}/api/cases/${editingCase.case_id}`, payload);
         setSubmitMsg('Case updated successfully!');
         notify('Case updated successfully!', 'success');
+      } else if (loginRole === 'BHW' && !isDraft) {
+        // BHW adds now go through CHO approval (leader requirement)
+        await axios.post(`${API_URL}/api/cases/request-add`, {
+          ...payload,
+          requested_by: loggedUserId,
+          requested_by_name: loggedUser || 'Unknown BHW',
+          submitter_cho_unit: sessionContext || null,
+          from_barangay_name: loginBarangay || null,
+        });
+        if (pendingContactMessageId) {
+          await axios.put(`${API_URL}/api/contact-messages/${pendingContactMessageId}/accept`).catch(() => {});
+          setPendingContactMessageId(null);
+          fetchOutbox();
+        }
+        setSubmitMsg('Case submitted to CHO for approval!');
+        notify('Submitted to CHO for approval.', 'success');
       } else {
         const newCaseRes = await axios.post(API_URL + '/api/cases', {
           ...payload,
@@ -2268,7 +2426,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start', marginBottom: '24px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
-            <div style={{ display: 'flex', gap: '10px' }}>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
               <div onClick={() => { setView('inbox'); setInboxSubTab('referrals'); }}
                 style={{ padding: '6px 14px', borderRadius: '20px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '15px', fontWeight: '500', color: 'var(--text-main)', whiteSpace: 'nowrap', textAlign: 'center', minWidth: '70px' }}>
                 Inbox
@@ -2279,7 +2437,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               </div>
             </div>
             {category && (
-              <BackButton onClick={() => { setSelectedCategory(null); setCategoryPage(0); setDiseasePage(0); setCarouselIndex(0); setBrowseAllCategories(false); setBrowseAllExclusive(false); }}>Back to Categories</BackButton>
+              <BackButton style={{ alignSelf: 'flex-end' }} onClick={() => { setSelectedCategory(null); setCategoryPage(0); setDiseasePage(0); setCarouselIndex(0); setBrowseAllCategories(false); setBrowseAllExclusive(false); }}>Back to Categories</BackButton>
             )}
             {category && showDiseasePagination && (
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -2759,7 +2917,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               borderBottom: inboxSubTab === 'referrals' ? '2px solid #129968' : '2px solid transparent',
               transition: 'all 0.15s',
             }}>
-            {loginRole === 'BHW' ? 'My Requests' : 'Referrals'} ({loginRole === 'BHW' ? myEditRequests.length : inboxItems.length})
+            {loginRole === 'BHW' ? 'My Requests' : 'Referrals'} ({loginRole === 'BHW' ? myEditRequests.length + myAddRequests.length : inboxItems.length})
           </div>
           {loginRole === 'BHW' && (
             <div onClick={() => setInboxSubTab('messages')}
@@ -2784,6 +2942,17 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             </div>
           )}
           {loginRole === 'CHO' && (
+            <div onClick={() => setInboxSubTab('add-requests')}
+              style={{
+                padding: '8px 20px', cursor: 'pointer', fontSize: '15px', fontWeight: inboxSubTab === 'add-requests' ? '700' : '500',
+                color: inboxSubTab === 'add-requests' ? 'var(--text-main)' : 'var(--text-muted)',
+                borderBottom: inboxSubTab === 'add-requests' ? '2px solid #3B82F6' : '2px solid transparent',
+                transition: 'all 0.15s',
+              }}>
+              Add Requests ({addRequests.length})
+            </div>
+          )}
+          {loginRole === 'CHO' && (
             <div onClick={() => setInboxSubTab('registrations')}
               style={{
                 padding: '8px 20px', cursor: 'pointer', fontSize: '15px', fontWeight: inboxSubTab === 'registrations' ? '700' : '500',
@@ -2796,45 +2965,57 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           )}
         </div>
 
-        {inboxSubTab === 'referrals' && loginRole === 'BHW' && (
-          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
-            {myEditRequestsLoading ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading edit requests...</div>
-            ) : myEditRequests.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No edit requests.</div>
-            ) : (
-              myEditRequests.map((req, idx) => (
-                <div key={req.id} className="cdms-row-in" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)', animationDelay: `${Math.min(idx, 10) * 45}ms` }}>
-                  <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: req.status === 'accepted' ? '#129968' : req.status === 'rejected' ? '#ef4444' : '#D97706', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '15px', flexShrink: 0 }}>
-                    {req.status === 'accepted' ? '✓' : req.status === 'rejected' ? '✕' : '…'}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '15px', color: 'var(--text-main)' }}>
-                      {req.patient_name || 'Unknown'} · {req.disease_name || req.disease_name_full || 'Unknown'}
+        {inboxSubTab === 'referrals' && loginRole === 'BHW' && (() => {
+          const merged = [
+            ...myEditRequests.map(r => ({ ...r, _kind: 'edit' })),
+            ...myAddRequests.map(r => ({ ...r, _kind: 'add' })),
+          ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+          return (
+            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
+              {(myEditRequestsLoading || myAddRequestsLoading) ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading requests...</div>
+              ) : merged.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No requests yet.</div>
+              ) : (
+                merged.map((req, idx) => (
+                  <div key={`${req._kind}-${req.id}`} className="cdms-row-in" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)', animationDelay: `${Math.min(idx, 10) * 45}ms` }}>
+                    <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: req.status === 'accepted' ? '#129968' : req.status === 'rejected' ? '#ef4444' : '#D97706', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '15px', flexShrink: 0 }}>
+                      {req.status === 'accepted' ? '✓' : req.status === 'rejected' ? '✕' : '…'}
                     </div>
-                    <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                      From {req.from_barangay_name || 'your barangay'} · <span style={{ textTransform: 'capitalize', fontWeight: '600', color: req.status === 'accepted' ? '#129968' : req.status === 'rejected' ? '#ef4444' : '#D97706' }}>{req.status}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '15px', color: 'var(--text-main)' }}>
+                        {req.patient_name || 'Unknown'} · {req.disease_name || req.disease_name_full || 'Unknown'}
+                      </div>
+                      <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        {req._kind === 'edit' ? 'Edit request from ' : 'Case submitted to '}{req.from_barangay_name || 'your CHO'} · <span style={{ textTransform: 'capitalize', fontWeight: '600', color: req.status === 'accepted' ? '#129968' : req.status === 'rejected' ? '#ef4444' : '#D97706' }}>{req.status}</span>
+                        {req._kind === 'add' && req.status === 'accepted' && req.case_id ? ` · Case ID #${req.case_id}` : ''}
+                      </div>
+                      {req.note && (
+                        <div style={{ fontSize: '15px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '2px' }}>"{req.note}"</div>
+                      )}
+                      {req.reject_reason && (
+                        <div style={{ fontSize: '15px', color: '#ef4444', marginTop: '2px' }}>Reason: {req.reject_reason}</div>
+                      )}
                     </div>
-                    {req.note && (
-                      <div style={{ fontSize: '15px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '2px' }}>"{req.note}"</div>
-                    )}
+                    <div style={{ fontSize: '15px', color: 'var(--text-muted)', flexShrink: 0 }}>
+                      {new Date(req.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+                    </div>
+                    <button onClick={() => {
+                      if (req._kind === 'edit') axios.put(`${API_URL}/api/case-edit-requests/${req.id}/read`);
+                      else axios.put(`${API_URL}/api/case-add-requests/${req.id}/read`);
+                      if (req._kind === 'edit') setMyEditRequests(prev => prev.filter(r => r.id !== req.id));
+                      else setMyAddRequests(prev => prev.filter(r => r.id !== req.id));
+                      setView('outbox');
+                    }} title="View in Outbox"
+                      style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #3B82F6', background: 'rgba(96,165,250,0.15)', color: '#3B82F6', cursor: 'pointer', fontSize: '16px', flexShrink: 0 }}>
+                      →
+                    </button>
                   </div>
-                  <div style={{ fontSize: '15px', color: 'var(--text-muted)', flexShrink: 0 }}>
-                    {new Date(req.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
-                  </div>
-                  <button onClick={() => {
-                    axios.put(`${API_URL}/api/case-edit-requests/${req.id}/read`);
-                    setMyEditRequests(prev => prev.filter(r => r.id !== req.id));
-                    setView('outbox');
-                  }} title="View in Outbox"
-                    style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #3B82F6', background: 'rgba(96,165,250,0.15)', color: '#3B82F6', cursor: 'pointer', fontSize: '16px', flexShrink: 0 }}>
-                    →
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-        )}
+                ))
+              )}
+            </div>
+          );
+        })()}
 
         {inboxSubTab === 'referrals' && loginRole !== 'BHW' && (
           <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
@@ -2957,6 +3138,52 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             </div>
           );
         })()}
+
+        {inboxSubTab === 'add-requests' && loginRole === 'CHO' && (
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
+            {addRequestsLoading ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading add requests...</div>
+            ) : addRequests.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No cases awaiting approval.</div>
+            ) : (
+              addRequests.map((req, idx) => (
+                <div key={req.id} className="cdms-row-in" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)', animationDelay: `${Math.min(idx, 10) * 45}ms` }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '15px', color: 'var(--text-muted)', lineHeight: 1, textAlign: 'left' }}>
+                      <span>New case from BHW ({req.from_barangay_name || 'Unknown Barangay'})</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '6px', alignItems: 'center' }}>
+                      <div className="inbox-avatar-circle" style={{ background: '#3B82F6' }}>
+                        {(req.from_barangay_name || 'U').slice(0, 2).toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '15px', color: 'var(--text-main)' }}>
+                          {req.patient_name || 'Unknown'} · {req.disease_name || 'Unknown Disease'} ({req.severity || 'Moderate'})
+                        </div>
+                        <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {req.address || 'No address'} · {req.barangay_name || ''}
+                        </div>
+                        <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          Submitted by {req.requested_by_name || 'BHW'} · {new Date(req.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                    <button onClick={() => openApprovalReview(req)} title="Review & Approve"
+                      style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #129968', background: 'rgba(18,153,104,0.1)', color: '#129968', cursor: 'pointer', fontSize: '15px', fontWeight: '600' }}>
+                      ✓ Review
+                    </button>
+                    <button onClick={() => handleRejectAddRequest(req)} title="Reject"
+                      style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #ef4444', background: 'rgba(239,68,68,0.1)', color: '#ef4444', cursor: 'pointer', fontSize: '16px' }}>
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
 
         {inboxSubTab === 'registrations' && loginRole === 'CHO' && (
           <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
@@ -3503,19 +3730,27 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
     return (
       <div style={{ padding: compactMode ? '14px' : '28px', fontSize: `calc(15px * ${fs})` }}>
-        <BackButton onClick={() => { setView('list'); setFilterPurok('All Puroks'); }} style={{ marginBottom: '20px' }}>Back to {selectedDisease?.name} Cases</BackButton>
+        <BackButton onClick={() => { if (approvalRequest) { closeApprovalReview(); return; } setView('list'); setFilterPurok('All Puroks'); }} style={{ marginBottom: '20px' }}>{approvalRequest ? 'Back to Add Requests' : `Back to ${selectedDisease?.name} Cases`}</BackButton>
 
         <div style={{ background: 'var(--bg-surface)', borderRadius: '12px', padding: '40px', color: 'var(--text-main)', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', maxWidth: '900px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '32px' }}>
             <h2 style={{ margin: '0 0 6px 0', fontSize: '24px', color: 'var(--text-main)' }}>
-              {isEdit ? 'Edit Case Report' : 'New Case Report'}
+              {approvalRequest ? 'Review Add Request' : (isEdit ? 'Edit Case Report' : 'New Case Report')}
             </h2>
             <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '15px' }}>
-              {isEdit
-                ? `Editing: Case #${String(editingCase?.case_id).padStart(3,'0')} - ${editingCase?.patient_name}`
-                : `Encoding new case under: ${selectedDisease?.name}`}
+              {approvalRequest
+                ? `Submitted by ${approvalRequest.requested_by_name || 'BHW'} (${approvalRequest.from_barangay_name || 'no barangay'}) - ${approvalRequest.patient_name}`
+                : isEdit
+                  ? `Editing: Case #${String(editingCase?.case_id).padStart(3,'0')} - ${editingCase?.patient_name}`
+                  : `Encoding new case under: ${selectedDisease?.name}`}
             </p>
           </div>
+
+          {approvalRequest && (
+            <div className="cdms-msg-in" style={{ background: 'rgba(59,130,246,0.12)', color: '#3B82F6', padding: '12px', borderRadius: '8px', marginBottom: '20px', textAlign: 'center', fontSize: '15px', fontWeight: '500' }}>
+              📋 Review and adjust the details below, then click <strong>✓ Approve Case</strong> to add it to the records. Rejected requests return to the BHW with your reason.
+            </div>
+          )}
 
           {submitMsg && (
             <div className={`cdms-msg-in ${submitMsg.startsWith('Error') ? 'cdms-msg-shake' : ''}`} style={{ background: submitMsg.startsWith('Error') ? '#fee2e2' : '#d1f5e9', color: submitMsg.startsWith('Error') ? '#991b1b' : '#0a5e42', padding: '12px', borderRadius: '8px', marginBottom: '20px', textAlign: 'center', fontSize: '15px', fontWeight: '500' }}>
@@ -4135,8 +4370,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
                 <div>
                   <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Date of Onset</label>
-                  <div style={{ position: 'relative', cursor: 'pointer' }}
-                    onClick={() => {
+                  <div style={{ position: 'relative' }}>
+                    <input id="onset-date-input" type="date" style={{ ...inputStyle, paddingRight: '36px', border: formErrors.onsetDate ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.onsetDate ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }} value={formData.onsetDate}
+                      onChange={e => { setFormData({ ...formData, onsetDate: e.target.value }); setFormErrors(prev => ({ ...prev, onsetDate: false })); }}
+                      readOnly={isBhwReadOnly} />
+                    <span title="Open date picker" onClick={() => {
+                      if (isBhwReadOnly) return;
                       const el = document.getElementById('onset-date-input');
                       if (el) {
                         if (typeof el.showPicker === 'function') {
@@ -4145,14 +4384,11 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           el.focus();
                         }
                       }
-                    }}>
-                    <input id="onset-date-input" type="date" style={{ ...inputStyle, paddingRight: '36px', cursor: 'pointer', border: formErrors.onsetDate ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.onsetDate ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }} value={formData.onsetDate}
-                      onChange={e => { setFormData({ ...formData, onsetDate: e.target.value }); setFormErrors(prev => ({ ...prev, onsetDate: false })); }}
-                      readOnly={isBhwReadOnly} />
-                    <span style={{
-                      position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
-                      pointerEvents: 'none', color: 'var(--text-muted)', display: 'flex', alignItems: 'center',
-                    }}>
+                    }}
+                      style={{
+                        position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
+                        cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: '4px', borderRadius: '4px',
+                      }}>
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
                         <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
@@ -4248,15 +4484,15 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 </>
               ) : (
                 <>
-                  {!isEdit && (
+                  {!isEdit && !approvalRequest && (
                     <button type="button" onClick={(e) => handleSave(e, true)} disabled={submitLoading}
                       style={{ padding: '10px 28px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', cursor: submitLoading ? 'not-allowed' : 'pointer', fontWeight: '500' }}>
                       Save As Draft
                     </button>
                   )}
                   <button type="submit" disabled={submitLoading}
-                    style={{ padding: '10px 40px', borderRadius: '6px', border: 'none', background: submitLoading ? '#6fd4a2' : '#129968', color: 'white', cursor: submitLoading ? 'not-allowed' : 'pointer', fontWeight: '600', fontSize: '15px' }}>
-                    {submitLoading ? 'Saving...' : (isEdit ? 'Update Case' : 'Save Case')}
+                    style={{ padding: '10px 40px', borderRadius: '6px', border: 'none', background: submitLoading ? '#6fd4a2' : approvalRequest ? '#2563EB' : '#129968', color: 'white', cursor: submitLoading ? 'not-allowed' : 'pointer', fontWeight: '600', fontSize: '15px' }}>
+                    {submitLoading ? 'Saving...' : (approvalRequest ? '✓ Approve Case' : (isEdit ? 'Update Case' : (loginRole === 'BHW' ? 'Submit to CHO' : 'Save Case')))}
                   </button>
                 </>
               )}

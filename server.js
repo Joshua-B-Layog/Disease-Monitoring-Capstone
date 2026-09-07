@@ -367,6 +367,121 @@ db.query(`CREATE TABLE IF NOT EXISTS case_edit_requests (
       });
     }
   });
+  // Migration: add proposed_data column to case_edit_requests (offline edits carry full proposed values)
+  db.query("SHOW COLUMNS FROM case_edit_requests LIKE 'proposed_data'", (e, r) => {
+    if (!e && r && r.length === 0) {
+      db.query("ALTER TABLE case_edit_requests ADD COLUMN proposed_data JSON NULL", (ae) => {
+        if (ae) console.error('Error adding proposed_data column to case_edit_requests:', ae.message);
+        else console.log('Added proposed_data column to case_edit_requests');
+      });
+    }
+  });
+});
+
+// Create case_add_requests table for BHW → CHO "Submit Case for Approval" workflow
+db.query(`CREATE TABLE IF NOT EXISTS case_add_requests (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  patient_name VARCHAR(255),
+  disease_name VARCHAR(100),
+  age INT,
+  severity VARCHAR(20),
+  gender VARCHAR(10),
+  case_status VARCHAR(20) DEFAULT 'Active',
+  contact VARCHAR(50),
+  onset_date DATE NULL,
+  address TEXT,
+  barangay_id INT NULL,
+  symptoms TEXT,
+  physician VARCHAR(255),
+  latitude DECIMAL(10,8) NULL,
+  longitude DECIMAL(11,8) NULL,
+  requested_by INT NOT NULL,
+  requested_by_name VARCHAR(255),
+  from_barangay_name VARCHAR(100),
+  target_cho_unit VARCHAR(100),
+  note TEXT,
+  reject_reason TEXT NULL,
+  status ENUM('pending','accepted','rejected') DEFAULT 'pending',
+  is_read TINYINT(1) DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  resolved_at TIMESTAMP NULL,
+  resolved_by INT NULL,
+  case_id INT NULL,
+  FOREIGN KEY (requested_by) REFERENCES users(user_id),
+  FOREIGN KEY (barangay_id) REFERENCES barangays(id)
+)`, (err) => {
+  if (err) console.error('Error creating case_add_requests table:', err.message);
+  else {
+    console.log('Case add requests table created/verified');
+    // Migration: ensure new columns exist on existing case_add_requests
+    ['patient_name','disease_name','age','severity','gender','case_status','contact','onset_date','address','barangay_id','symptoms','physician','latitude','longitude'].forEach(col => {
+      db.query("SHOW COLUMNS FROM case_add_requests LIKE ?", [col], (e, r) => {
+        if (!e && r && r.length === 0) {
+          const colDef =
+            col === 'age' ? 'INT' :
+            col === 'severity' ? 'VARCHAR(20)' :
+            col === 'gender' ? 'VARCHAR(10)' :
+            col === 'case_status' ? "VARCHAR(20) DEFAULT 'Active'" :
+            col === 'contact' ? 'VARCHAR(50)' :
+            col === 'onset_date' ? 'DATE NULL' :
+            col === 'address' ? 'TEXT' :
+            col === 'barangay_id' ? 'INT NULL' :
+            col === 'symptoms' ? 'TEXT' :
+            col === 'physician' ? 'VARCHAR(255)' :
+            col === 'latitude' ? 'DECIMAL(10,8) NULL' :
+            col === 'longitude' ? 'DECIMAL(11,8) NULL' :
+            col === 'disease_name' ? 'VARCHAR(100)' : 'VARCHAR(255)';
+          db.query(`ALTER TABLE case_add_requests ADD COLUMN ${col} ${colDef}`, (ae) => {
+            if (ae) console.error(`Error adding ${col} column to case_add_requests:`, ae.message);
+            else console.log(`Added ${col} column to case_add_requests`);
+          });
+        }
+      });
+    });
+    // Migration: add status, resolved_by, case_id columns to case_add_requests
+    db.query("SHOW COLUMNS FROM case_add_requests LIKE 'status'", (e, r) => {
+      if (!e && r && r.length === 0) {
+        db.query("ALTER TABLE case_add_requests ADD COLUMN status ENUM('pending','accepted','rejected') DEFAULT 'pending'", (ae) => {
+          if (ae) console.error('Error adding status column to case_add_requests:', ae.message);
+          else console.log('Added status column to case_add_requests');
+        });
+      }
+    });
+    db.query("SHOW COLUMNS FROM case_add_requests LIKE 'resolved_by'", (e, r) => {
+      if (!e && r && r.length === 0) {
+        db.query("ALTER TABLE case_add_requests ADD COLUMN resolved_by INT NULL", (ae) => {
+          if (ae) console.error('Error adding resolved_by column to case_add_requests:', ae.message);
+          else console.log('Added resolved_by column to case_add_requests');
+        });
+      }
+    });
+    db.query("SHOW COLUMNS FROM case_add_requests LIKE 'case_id'", (e, r) => {
+      if (!e && r && r.length === 0) {
+        db.query("ALTER TABLE case_add_requests ADD COLUMN case_id INT NULL", (ae) => {
+          if (ae) console.error('Error adding case_id column to case_add_requests:', ae.message);
+          else console.log('Added case_id column to case_add_requests');
+        });
+      }
+    });
+    db.query("SHOW COLUMNS FROM case_add_requests LIKE 'reject_reason'", (e, r) => {
+      if (!e && r && r.length === 0) {
+        db.query("ALTER TABLE case_add_requests ADD COLUMN reject_reason TEXT NULL", (ae) => {
+          if (ae) console.error('Error adding reject_reason column to case_add_requests:', ae.message);
+          else console.log('Added reject_reason column to case_add_requests');
+        });
+      }
+    });
+  }
+});
+
+// Migration: add created_by column to disease_cases (draft authorship + approval audit)
+db.query("SHOW COLUMNS FROM disease_cases LIKE 'created_by'", (err, rows) => {
+    if (!err && rows.length === 0) {
+        db.query("ALTER TABLE disease_cases ADD COLUMN created_by INT NULL AFTER date_reported", (alterErr) => {
+            if (alterErr) console.error('Migration error adding created_by:', alterErr.message);
+            else console.log('Migration: added created_by column to disease_cases table');
+        });
+    }
 });
 
 // Create password_change_requests table for BHW → CHO password change workflow
@@ -478,9 +593,11 @@ app.get('/api/ping', (req, res) => res.sendStatus(200));
 
 // ROUTE: Get all disease cases (with disease_name join)
 app.get('/api/disease_cases', (req, res) => {
+    const requesterId = req.query.user_id ? Number(req.query.user_id) : null;
     const sql = `
         SELECT 
             dc.case_id, 
+
             dc.patient_name,
             dc.age,
             dc.gender,
@@ -500,9 +617,10 @@ app.get('/api/disease_cases', (req, res) => {
         FROM disease_cases dc
         LEFT JOIN diseases d ON dc.disease_id = d.id
         LEFT JOIN barangays b ON dc.barangay_id = b.id
-ORDER BY dc.case_id DESC
+        WHERE (dc.status != 'Draft' OR dc.created_by = ?)
+        ORDER BY dc.case_id DESC
     `;
-    db.query(sql, (err, results) => {
+    db.query(sql, [requesterId], (err, results) => {
         if (err) {
             console.error("MySQL Query Error (/api/disease_cases):", err.message);
             return res.status(500).json({ error: err.message });
@@ -847,14 +965,14 @@ app.post('/api/cases', (req, res) => {
             const insertQuery = `
                 INSERT INTO disease_cases 
                 (patient_name, disease_id, age, severity, gender, status, contact, 
-                 onset_date, address, barangay_id, symptoms, physician, latitude, longitude, date_reported)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, NOW()))
+                 onset_date, address, barangay_id, symptoms, physician, latitude, longitude, date_reported, created_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, NOW()), ?)
             `;
             const vals = [
                 patient_name, dId, age || 0, severity, gender || 'Male',
                 status || 'Active', contact || null, onset_date || null, address || null,
                 barangay_id || null, symptoms || null, physician || null,
-                latitude || null, longitude || null, reportTs
+                latitude || null, longitude || null, reportTs, req.body.user_id || null
             ];
 
             db.query(insertQuery, vals, (insertErr, result) => {
@@ -1274,13 +1392,14 @@ app.put('/api/case-inbox/:id/reject', (req, res) => {
 // POST /api/cases/:id/request-edit — BHW requests CHO to edit a case
 app.post('/api/cases/:id/request-edit', (req, res) => {
   const caseId = req.params.id;
-  const { requested_by, requested_by_name, from_barangay_name, target_cho_unit, note } = req.body;
+  const { requested_by, requested_by_name, from_barangay_name, target_cho_unit, note, proposed_data } = req.body;
   if (!requested_by || !note) {
     return res.status(400).json({ error: 'requested_by and note are required.' });
   }
+  const proposedJson = (proposed_data && Object.keys(proposed_data).length > 0) ? JSON.stringify(proposed_data) : null;
   db.query(
-    'INSERT INTO case_edit_requests (case_id, requested_by, requested_by_name, from_barangay_name, target_cho_unit, note) VALUES (?, ?, ?, ?, ?, ?)',
-    [caseId, requested_by, requested_by_name || 'Unknown', from_barangay_name || null, target_cho_unit || null, note],
+    'INSERT INTO case_edit_requests (case_id, requested_by, requested_by_name, from_barangay_name, target_cho_unit, note, proposed_data) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [caseId, requested_by, requested_by_name || 'Unknown', from_barangay_name || null, target_cho_unit || null, note, proposedJson],
     (err, result) => {
       if (err) return res.status(500).json({ error: err.message });
 
@@ -1363,9 +1482,11 @@ app.put('/api/case-edit-requests/:id/accept', (req, res) => {
       if (err) return res.status(500).json({ error: err.message });
       if (result.affectedRows === 0) return res.status(404).json({ error: 'Edit request not found or already resolved.' });
       // Return case_id so frontend can open edit mode
-      db.query('SELECT case_id FROM case_edit_requests WHERE id = ?', [id], (sErr, rows) => {
+      db.query('SELECT case_id, proposed_data FROM case_edit_requests WHERE id = ?', [id], (sErr, rows) => {
         if (sErr || rows.length === 0) return res.json({ message: 'Request accepted.' });
-        res.json({ message: 'Edit request accepted.', case_id: rows[0].case_id });
+        let proposed = null;
+        try { proposed = rows[0].proposed_data ? JSON.parse(rows[0].proposed_data) : null; } catch (e) { proposed = null; }
+        res.json({ message: 'Edit request accepted.', case_id: rows[0].case_id, proposed_data: proposed });
       });
     }
   );
@@ -1394,6 +1515,294 @@ app.put('/api/case-edit-requests/:id/read', (req, res) => {
     (err, result) => {
       if (err) return res.status(500).json({ error: err.message });
       if (result.affectedRows === 0) return res.status(404).json({ error: 'Edit request not found.' });
+      res.json({ message: 'Marked as read.' });
+    }
+  );
+});
+
+// ══════════════════════════════════════════════════════════════
+// CASE ADD REQUESTS (BHW → CHO "Submit Case for Approval")
+// ══════════════════════════════════════════════════════════════
+
+// POST /api/cases/request-add — BHW submits a new case for CHO approval (no disease_cases insert yet)
+app.post('/api/cases/request-add', (req, res) => {
+  const {
+    patient_name, disease_name, age, severity, gender, case_status, contact,
+    onset_date, address, barangay_id, symptoms, physician, latitude, longitude,
+    requested_by, requested_by_name, from_barangay_name, submitter_cho_unit, note
+  } = req.body;
+
+  if (!requested_by || !patient_name || !disease_name) {
+    return res.status(400).json({ error: 'requested_by, patient_name and disease_name are required.' });
+  }
+
+  const resolveBarangay = (cb) => {
+    if (barangay_id) {
+      db.query('SELECT name FROM barangays WHERE id = ?', [barangay_id], (bErr, bRes) => {
+        cb((!bErr && bRes.length > 0) ? bRes[0].name : null);
+      });
+    } else cb(null);
+  };
+
+  resolveBarangay((barangayName) => {
+    const detectedBarangay = detectBarangayFromAddress(address);
+    let targetChoUnit = submitter_cho_unit || null;
+    if (detectedBarangay) targetChoUnit = getChoUnitForBarangayName(detectedBarangay) || targetChoUnit;
+    if (barangayName) targetChoUnit = getChoUnitForBarangayName(barangayName) || targetChoUnit;
+
+    db.query(
+      `INSERT INTO case_add_requests
+        (patient_name, disease_name, age, severity, gender, case_status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude,
+         requested_by, requested_by_name, from_barangay_name, target_cho_unit, note)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [patient_name, disease_name, age || 0, severity, gender || 'Male', case_status || 'Active', contact || null, onset_date || null, address || null,
+        barangay_id || null, symptoms || null, physician || null, latitude || null, longitude || null,
+        requested_by, requested_by_name || 'Unknown', from_barangay_name || null, targetChoUnit || null, note || null],
+      (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+
+        // Audit log: BHW submitted an add request
+        db.query('SELECT full_name, role, assigned_barangay_id FROM users WHERE user_id = ?', [requested_by], (aErr, aRes) => {
+          if (!aErr && aRes.length > 0) {
+            const actor = aRes[0];
+            createAuditLog(requested_by, actor.full_name, actor.role, null, from_barangay_name || null,
+              'Requested Add', 'Case Record',
+              `Submitted new case for approval: ${patient_name} - ${disease_name}`);
+          }
+        });
+
+        // Notify CHOs in the target unit (direct BHW→CHO request, bypasses preferences)
+        if (targetChoUnit) {
+          const unitBarangays = CHO_UNIT_BARANGAYS[targetChoUnit] || [];
+          if (unitBarangays.length > 0) {
+            db.query(
+              `SELECT u.user_id FROM users u
+               LEFT JOIN barangays b ON u.assigned_barangay_id = b.id
+               WHERE u.role = 'CHO' AND u.is_active = 1
+                 AND (LOWER(b.name) IN (?) OR u.assigned_barangay_id IS NULL)`,
+              [unitBarangays.map(b => b.toLowerCase())],
+              (nErr, users) => {
+                if (!nErr && users && users.length > 0) {
+                  const msg = `${requested_by_name || 'A BHW'} from ${from_barangay_name || 'your area'} submitted a new ${disease_name} case for approval. Note: "${note || '(no note)'}"`;
+                  users.forEach(u => {
+                    db.query(
+                      'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
+                      [u.user_id, 'New case awaiting approval', msg, 'info', 'Inbox']
+                    );
+                  });
+                }
+              }
+            );
+          }
+        }
+        res.json({ message: 'Case submitted to your CHO for approval.', request_id: result.insertId });
+      }
+    );
+  });
+});
+
+// GET /api/case-add-requests — Fetch add requests (CHO: pending by unit, BHW: all by user)
+app.get('/api/case-add-requests', (req, res) => {
+  const { cho_unit, requested_by, unread_only } = req.query;
+  let sql = `SELECT car.*, b.name AS barangay_name
+    FROM case_add_requests car
+    LEFT JOIN barangays b ON car.barangay_id = b.id
+    WHERE 1=1`;
+  const params = [];
+  if (cho_unit) {
+    sql += ' AND car.target_cho_unit = ? AND car.status = ?';
+    params.push(cho_unit, 'pending');
+  }
+  if (requested_by) {
+    sql += ' AND car.requested_by = ?';
+    params.push(requested_by);
+  }
+  if (unread_only === 'true') {
+    sql += ' AND car.is_read = 0';
+  }
+  sql += ' ORDER BY car.created_at DESC';
+  db.query(sql, params, (err, results) => {
+    if (err) {
+      console.error('case-add-requests query error:', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+    res.json(results);
+  });
+});
+
+// PUT /api/case-add-requests/:id/approve — CHO approves (may edit details first) → inserts into disease_cases
+app.put('/api/case-add-requests/:id/approve', (req, res) => {
+  const { id } = req.params;
+  const body = req.body || {};
+  const {
+    patient_name, disease_name, age, severity, gender, case_status, contact,
+    onset_date, address, barangay_id, symptoms, physician, latitude, longitude
+  } = body;
+
+  db.query('SELECT * FROM case_add_requests WHERE id = ? AND status = ?', [id, 'pending'], (qErr, rows) => {
+    if (qErr) return res.status(500).json({ error: qErr.message });
+    if (rows.length === 0) return res.status(404).json({ error: 'Add request not found or already resolved.' });
+    const reqRow = rows[0];
+    const final = {
+      patient_name: patient_name || reqRow.patient_name,
+      disease_name: disease_name || reqRow.disease_name,
+      age: (age !== undefined && age !== null && age !== '') ? age : reqRow.age,
+      severity: severity || reqRow.severity || 'Moderate',
+      gender: gender || reqRow.gender || 'Male',
+      case_status: case_status || reqRow.case_status || 'Active',
+      contact: contact || reqRow.contact,
+      onset_date: onset_date || reqRow.onset_date,
+      address: address || reqRow.address,
+      barangay_id: barangay_id ? Number(barangay_id) : (reqRow.barangay_id || null),
+      symptoms: symptoms || reqRow.symptoms,
+      physician: physician || reqRow.physician,
+      latitude: latitude || reqRow.latitude,
+      longitude: longitude || reqRow.longitude,
+    };
+
+    const checkDuplicate = (cb) => {
+      if (!final.patient_name || final.case_status === 'Draft') return cb();
+      db.query(
+        'SELECT case_id, status FROM disease_cases WHERE patient_name LIKE ? AND status IN (?, ?, ?) LIMIT 1',
+        [final.patient_name, 'Active', 'Under Treatment', 'Pending'],
+        (dupErr, dupRes) => {
+          if (dupErr) return res.status(500).json({ error: dupErr.message });
+          if (dupRes && dupRes.length > 0) {
+            return res.status(409).json({
+              error: `Patient "${final.patient_name}" already has an active case (Status: ${dupRes[0].status}). Please resolve the existing case before adding a new one.`
+            });
+          }
+          cb();
+        }
+      );
+    };
+
+    const checkContact = (cb) => {
+      if (final.contact && String(final.contact).trim()) {
+        db.query('SELECT case_id FROM disease_cases WHERE contact = ? AND contact IS NOT NULL AND contact != ? AND patient_name != ? LIMIT 1',
+          [String(final.contact).trim(), '', final.patient_name], (cErr, cRes) => {
+            if (cErr) return res.status(500).json({ error: cErr.message });
+            if (cRes && cRes.length > 0) {
+              return res.status(409).json({ error: 'That contact number is already in use by another patient. Please use a different contact number.' });
+            }
+            cb();
+          });
+      } else cb();
+    };
+
+    checkDuplicate(() => {
+      checkContact(() => {
+        const findDiseaseQuery = 'SELECT id FROM diseases WHERE LOWER(name) = LOWER(?)';
+        db.query(findDiseaseQuery, [final.disease_name], (dErr, dRes) => {
+          const dId = (dRes && dRes.length > 0) ? dRes[0].id : null;
+          const doInsert = (finalId) => {
+            db.query(
+              `INSERT INTO disease_cases
+                (patient_name, disease_id, age, severity, gender, status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude, created_by)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              [final.patient_name, finalId, final.age || 0, final.severity, final.gender, final.case_status,
+                final.contact || null, final.onset_date || null, final.address || null, final.barangay_id,
+                final.symptoms || null, final.physician || null, final.latitude || null, final.longitude || null, reqRow.requested_by || null],
+              (insErr, insResult) => {
+                if (insErr) return res.status(500).json({ error: insErr.message });
+                const newCaseId = insResult.insertId;
+                const resolverId = body.actor_id || null;
+                db.query(
+                  "UPDATE case_add_requests SET status = 'accepted', resolved_at = NOW(), resolved_by = ?, case_id = ? WHERE id = ? AND status = 'pending'",
+                  [resolverId, newCaseId, id],
+                  (uErr) => { if (uErr) console.error('Update add request status error:', uErr.message); }
+                );
+
+                // Notify + email the requesting BHW
+                db.query('SELECT user_id, full_name, email FROM users WHERE user_id = ?', [reqRow.requested_by], (bErr, bRes) => {
+                  if (!bErr && bRes.length > 0) {
+                    const bhw = bRes[0];
+                    if (bhw.email) {
+                      const html = `
+                        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f0fdf4;border-radius:12px">
+                          <h2 style="color:#16a34a;margin:0 0 8px 0">Case Approved</h2>
+                          <p style="color:#334155;font-size:14px">Hello ${bhw.full_name},</p>
+                          <p style="color:#334155;font-size:14px">Your submitted case for <strong>${final.patient_name}</strong> (<strong>${final.disease_name}</strong>) was approved and is now on record.</p>
+                          <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0" />
+                          <p style="color:#94a3b8;font-size:11px">Cabuyao City Disease Monitoring System</p>
+                        </div>`;
+                      sendBrevoEmail(bhw.email, 'Case Approved - Cabuyao CDMS', html)
+                        .catch(err => console.error('Add-approval email failed:', err.message));
+                    }
+                    db.query('INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
+                      [bhw.user_id, 'Case approved', `Your case for ${final.patient_name} (${final.disease_name}) was approved by the CHO. (Case ID: ${newCaseId})`, 'success', 'ManageCases']);
+                  }
+                });
+
+                // Audit log: approved add
+                createAuditLog(resolverId || null, body.actor_name || 'CHO', body.actor_role || 'CHO', null, reqRow.from_barangay_name || null,
+                  'Approved Add', 'Case Record', `Approved new case for ${final.patient_name} - ${final.disease_name} (from ${reqRow.requested_by_name || 'BHW'})`);
+                res.json({ message: 'Case approved and added to records.', case_id: newCaseId });
+              }
+            );
+          };
+          if (!dId && final.disease_name) {
+            db.query('INSERT IGNORE INTO diseases (name) VALUES (?)', [final.disease_name], (iErr, iRes) => {
+              doInsert(iRes && iRes.insertId ? iRes.insertId : null);
+            });
+          } else doInsert(dId);
+        });
+      });
+    });
+  });
+});
+
+// PUT /api/case-add-requests/:id/reject — CHO rejects (with optional reason)
+app.put('/api/case-add-requests/:id/reject', (req, res) => {
+  const { id } = req.params;
+  const { reason, actor_id, actor_name, actor_role } = req.body || {};
+  db.query(
+    "UPDATE case_add_requests SET status = 'rejected', resolved_at = NOW(), resolved_by = ?, reject_reason = ? WHERE id = ? AND status = 'pending'",
+    [actor_id || null, reason || null, id],
+    (err, result) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (result.affectedRows === 0) return res.status(404).json({ error: 'Add request not found or already resolved.' });
+      db.query('SELECT * FROM case_add_requests WHERE id = ?', [id], (sErr, rows) => {
+        if (sErr || rows.length === 0) return res.json({ message: 'Add request rejected.' });
+        const reqRow = rows[0];
+        db.query('SELECT user_id, full_name, email FROM users WHERE user_id = ?', [reqRow.requested_by], (bErr, bRes) => {
+          if (!bErr && bRes.length > 0) {
+            const bhw = bRes[0];
+            if (bhw.email) {
+              const reasonHtml = reason ? `<p style="color:#334155;font-size:14px"><strong>Reason:</strong> ${reason}</p>` : '';
+              const html = `
+                <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#fef2f2;border-radius:12px">
+                  <h2 style="color:#dc2626;margin:0 0 8px 0">Case Not Approved</h2>
+                  <p style="color:#334155;font-size:14px">Hello ${bhw.full_name},</p>
+                  <p style="color:#334155;font-size:14px">Your submitted case for <strong>${reqRow.patient_name}</strong> (<strong>${reqRow.disease_name}</strong>) was not approved.</p>
+                  ${reasonHtml}
+                  <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0" />
+                  <p style="color:#94a3b8;font-size:11px">Cabuyao City Disease Monitoring System</p>
+                </div>`;
+              sendBrevoEmail(bhw.email, 'Case Not Approved - Cabuyao CDMS', html)
+                .catch(err => console.error('Add-rejection email failed:', err.message));
+            }
+            db.query('INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
+              [bhw.user_id, 'Case not approved', `Your case for ${reqRow.patient_name} (${reqRow.disease_name}) was not approved${reason ? `: ${reason}` : '.'}`, 'info', 'ManageCases']);
+          }
+        });
+        createAuditLog(actor_id || null, actor_name || 'CHO', actor_role || 'CHO', null, reqRow.from_barangay_name || null,
+          'Rejected Add', 'Case Record', `Rejected new case for ${reqRow.patient_name} - ${reqRow.disease_name}${reason ? ` (Reason: ${reason})` : ''}`);
+        res.json({ message: 'Add request rejected.' });
+      });
+    }
+  );
+});
+
+// PUT /api/case-add-requests/:id/read — BHW marks add request as read
+app.put('/api/case-add-requests/:id/read', (req, res) => {
+  const { id } = req.params;
+  db.query(
+    'UPDATE case_add_requests SET is_read = 1 WHERE id = ?',
+    [id],
+    (err, result) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (result.affectedRows === 0) return res.status(404).json({ error: 'Add request not found.' });
       res.json({ message: 'Marked as read.' });
     }
   );
@@ -2355,15 +2764,15 @@ app.post('/api/sync', (req, res) => {
             const doInsert = (dId) => {
                 const insertQuery = `
                     INSERT INTO disease_cases
-                        (patient_name, disease_id, age, severity, gender, status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude, date_reported)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        (patient_name, disease_id, age, severity, gender, status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude, date_reported, created_by)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `;
                 const ts = p._offlineTimestamp ? new Date(p._offlineTimestamp) : new Date();
                 db.query(insertQuery, [
                     p.patient_name, dId, p.age, p.severity || 'Moderate',
                     p.gender || 'Other', p.status || 'Active', p.contact,
                     p.onset_date, p.address, p.barangay_id, p.symptoms,
-                    p.physician, p.latitude, p.longitude, ts
+                    p.physician, p.latitude, p.longitude, ts, p._offlineUserId || null
                 ], (err, result) => {
                     if (err) {
                         console.error('[Sync] Create failed:', err.message);
@@ -2475,6 +2884,66 @@ app.post('/api/sync', (req, res) => {
                     }
                     processNext(index + 1);
                 }
+            );
+        } else if (type === 'add_request' && endpoint === '/api/cases/request-add') {
+            // Offline BHW submission → creates a pending add request (CHOs approve later)
+            const p = payload || {};
+            const resolveBarangay = (cb) => {
+              if (p.barangay_id) {
+                db.query('SELECT name FROM barangays WHERE id = ?', [p.barangay_id], (bErr, bRes) => {
+                  cb((!bErr && bRes.length > 0) ? bRes[0].name : null);
+                });
+              } else cb(null);
+            };
+            resolveBarangay((barangayName) => {
+              const detectedBarangay = detectBarangayFromAddress(p.address);
+              let targetChoUnit = p.submitter_cho_unit || null;
+              if (detectedBarangay) targetChoUnit = getChoUnitForBarangayName(detectedBarangay) || targetChoUnit;
+              if (barangayName) targetChoUnit = getChoUnitForBarangayName(barangayName) || targetChoUnit;
+              db.query(
+                `INSERT INTO case_add_requests
+                  (patient_name, disease_name, age, severity, gender, case_status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude,
+                   requested_by, requested_by_name, from_barangay_name, target_cho_unit, note)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [p.patient_name, p.disease_name, p.age || 0, p.severity || 'Moderate', p.gender || 'Male', p.status || 'Active', p.contact || null, p.onset_date || null, p.address || null,
+                  p.barangay_id || null, p.symptoms || null, p.physician || null, p.latitude || null, p.longitude || null,
+                  p._offlineUserId || null, p._offlineUserName || 'Offline BHW', p.from_barangay_name || null, targetChoUnit || null, p.note || null],
+                (err, result) => {
+                  if (err) {
+                    results.push({ type, error: err.message });
+                  } else {
+                    processed++;
+                    results.push({ type, requestId: result.insertId });
+                    if (p._offlineUserId) {
+                      createAuditLog(p._offlineUserId, p._offlineUserName || 'Offline User', 'BHW', null, p.from_barangay_name || null, 'Synced Add Request (Offline)', 'Disease Case',
+                        `Offline case submission queued for approval: ${p.patient_name} - ${p.disease_name}`);
+                    }
+                  }
+                  processNext(index + 1);
+                }
+              );
+            });
+        } else if ((type === 'edit_request' || type === 'edit-request') && endpoint && endpoint.startsWith('/api/cases/') && endpoint.endsWith('/request-edit')) {
+            // Offline BHW edit → creates a pending edit request (with proposed values) for CHO review
+            const p = payload || {};
+            const caseId = endpoint.split('/')[3];
+            const proposedJson = (p.proposed_data && Object.keys(p.proposed_data).length > 0) ? JSON.stringify(p.proposed_data) : null;
+            db.query(
+              'INSERT INTO case_edit_requests (case_id, requested_by, requested_by_name, from_barangay_name, target_cho_unit, note, proposed_data) VALUES (?, ?, ?, ?, ?, ?, ?)',
+              [caseId, p._offlineUserId || null, p._offlineUserName || 'Offline BHW', p.from_barangay_name || null, p.target_cho_unit || null, p.note || '(offline edit)', proposedJson],
+              (err, result) => {
+                if (err) {
+                  results.push({ type, error: err.message });
+                } else {
+                  processed++;
+                  results.push({ type, requestId: result.insertId });
+                  if (p._offlineUserId) {
+                    createAuditLog(p._offlineUserId, p._offlineUserName || 'Offline User', 'BHW', null, p.from_barangay_name || null, 'Synced Edit Request (Offline)', 'Disease Case',
+                      `Offline edit request for case #${caseId} submitted for CHO review`);
+                  }
+                }
+                processNext(index + 1);
+              }
             );
         } else {
             results.push({ type, error: `Unsupported sync operation: ${type} ${endpoint}` });

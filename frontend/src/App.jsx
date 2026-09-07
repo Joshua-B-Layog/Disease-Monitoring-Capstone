@@ -761,7 +761,10 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                                    if (target === 'Inbox') {
                                      const isEditReq = n.title === 'A BHW needs your help';
                                      const isPwChangeReq = n.title === 'Password Change Request';
-                                     if (isEditReq || isPwChangeReq) {
+                                     const isAddReq = n.title === 'New case awaiting approval';
+                                     if (isAddReq) {
+                                       setPendingInboxView('inbox:add-requests');
+                                     } else if (isEditReq || isPwChangeReq) {
                                        setPendingInboxView('inbox:edit-requests');
                                      } else {
                                        setPendingInboxView('inbox');

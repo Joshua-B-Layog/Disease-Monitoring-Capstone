@@ -3,6 +3,7 @@ import { API_URL } from '../config';
 import ChoLogoIcon from '../assets/ChoLogo';
 import { getCachedUsers, upsertCachedUser } from '../offlineSync';
 import BackButton from './BackButton';
+import { notify, ToastHost } from './Toast';
 import L from 'leaflet';
 import { MapContainer, TileLayer, useMap, GeoJSON } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -345,6 +346,13 @@ function AnimatedMapView({ setFade, active, onSequenceComplete }) {
       return () => document.removeEventListener('mousedown', handler);
     }, []);
 
+    // ── Toast notifications for login/splash feedback ──
+    useEffect(() => { if (loginError) notify(loginError, 'error'); }, [loginError]);
+    useEffect(() => { if (otpError) notify(otpError, 'error'); }, [otpError]);
+    useEffect(() => { if (signupError) notify(signupError, 'error'); }, [signupError]);
+    useEffect(() => { if (recoverySuccess) notify(recoverySuccess, 'info'); }, [recoverySuccess]);
+    useEffect(() => { if (signupSuccess) notify(signupSuccess, 'success'); }, [signupSuccess]);
+
     // ── LEFT SIDE LOOP: City Health branding ↔ full map sequence ──
     useEffect(() => {
       if (leftPanel !== 0) return;
@@ -468,6 +476,7 @@ function AnimatedMapView({ setFade, active, onSequenceComplete }) {
                         body: JSON.stringify({ userId: data.user.id })
                     });
                 } catch (e) { /* fallback OTP will print server-side */ }
+                notify('A 6-digit code was sent to your email.', 'info');
                 setStep('otp_login');
             } else {
                 onLoginSuccess(sessionPayload);
@@ -526,6 +535,7 @@ const handleLoginOtpSubmit = async (e) => {
         });
         const data = await response.json();
         if (response.ok) {
+            notify('Login successful. Welcome back!', 'success');
             onLoginSuccess(pendingUser);
         } else {
             setOtpError(data.error || 'Invalid or expired code.');
@@ -682,6 +692,8 @@ const handleLoginOtpSubmit = async (e) => {
         <button onClick={toggleTheme} className="theme-toggle-btn" style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 100 }}>
           {theme === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode'}
         </button>
+
+        <ToastHost />
 
         <div className="login-left">
           <div style={{ position: 'absolute', inset: 0, opacity: leftPanel === 0 ? 1 : 0, transition: 'opacity 0.7s ease-in-out', pointerEvents: 'none' }}>
@@ -841,12 +853,6 @@ const handleLoginOtpSubmit = async (e) => {
                   <p style={{ color: 'var(--text-muted)' }}>Select your designated community operations sector.</p>
                 </div>
 
-                {loginError && (
-                  <div className="cdms-msg-shake" style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '15px', border: '1px solid rgba(239,68,68,0.35)' }}>
-                    {loginError}
-                  </div>
-                )}
-
                 <div style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', maxHeight: '220px', overflowY: 'auto', marginBottom: '24px', textAlign: 'left' }}>
                   {cabuyaoBarangays.map((b) => (
                     <div key={b.name} onClick={() => { setSelectedContext(`Brgy. ${b.name}`); setLoginError(''); }} className={`brgy-option-card ${selectedContext === `Brgy. ${b.name}` ? 'brgy-option-active' : ''}`}>
@@ -872,12 +878,6 @@ const handleLoginOtpSubmit = async (e) => {
                 </div>
 
                 <form onSubmit={handleFormSubmit}>
-                  {loginError && (
-                    <div className="cdms-msg-shake" style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '15px', border: '1px solid rgba(239,68,68,0.35)' }}>
-                      {loginError}
-                    </div>
-                  )}
-
                   <div className="form-group" style={{ textAlign: 'left' }}>
                     <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Username or Email address</label>
                     <input 
@@ -959,11 +959,6 @@ const handleLoginOtpSubmit = async (e) => {
       </p>
     </div>
     <form onSubmit={handleLoginOtpSubmit}>
-      {otpError && (
-        <div className="cdms-msg-shake" style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '15px', border: '1px solid rgba(239,68,68,0.35)' }}>
-          {otpError}
-        </div>
-      )}
       <div className="form-group" style={{ textAlign: 'left' }}>
         <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>
           Verification Code
@@ -999,9 +994,10 @@ const handleLoginOtpSubmit = async (e) => {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ userId: pendingUser.id })
             });
-            setOtpError('A new code has been sent to your email.');
+            setOtpError('');
+            notify('A new code has been sent to your email.', 'success');
           } catch {
-            setOtpError('Failed to resend code. Please try again.');
+            notify('Failed to resend code. Please try again.', 'error');
           }
         }}
         style={{ color: '#129968', cursor: 'pointer', fontSize: '15px', fontWeight: '500' }}
@@ -1093,17 +1089,6 @@ const handleLoginOtpSubmit = async (e) => {
                 </div>
 
                 <form onSubmit={handleRecoverySubmit}>
-                  {loginError && (
-                    <div className="cdms-msg-shake" style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '15px', border: '1px solid rgba(239,68,68,0.35)', textAlign: 'left' }}>
-                      {loginError}
-                    </div>
-                  )}
-                  {recoverySuccess && (
-                    <div className="cdms-msg-in" style={{ backgroundColor: 'var(--input-bg)', color: '#0369a1', padding: '12px', borderRadius: '6px', marginBottom: '15px', fontSize: '15px', border: '1px solid rgba(14,165,233,0.35)', textAlign: 'left' }}>
-                      {recoverySuccess}
-                    </div>
-                  )}
-
                   <div className="form-group" style={{ textAlign: 'left' }}>
                     <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>
                       Registered Email Address
@@ -1140,17 +1125,6 @@ const handleLoginOtpSubmit = async (e) => {
                     </div>
 
                     <form onSubmit={handleSignupSubmit}>
-                        {signupError && (
-                            <div className="cdms-msg-shake" style={{ backgroundColor: 'var(--input-bg)', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '15px', border: '1px solid rgba(239,68,68,0.35)', textAlign: 'left' }}>
-                                {signupError}
-                            </div>
-                        )}
-                        {signupSuccess && (
-                            <div className="cdms-msg-in" style={{ backgroundColor: 'var(--input-bg)', color: '#0a5e42', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '15px', border: '1px solid rgba(18,153,104,0.35)', textAlign: 'left' }}>
-                                {signupSuccess}
-                            </div>
-                        )}
-
                         {/* Full Name */}
                         <div className="form-group" style={{ textAlign: 'left' }}>
                             <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Full Name</label>

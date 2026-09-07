@@ -1,12 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_URL } from '../config';
 import BackButton from './BackButton';
+import { notify, ToastHost } from './Toast';
 
 export default function RecoverAccount() {
   const navigate = useNavigate();
   const [identity, setIdentity] = useState('');
   const [status, setStatus] = useState({ type: '', msg: '' });
+
+  useEffect(() => {
+    if (status.msg) notify(status.msg, status.type === 'error' ? 'error' : 'success');
+  }, [status]);
 
   const handleRequest = async (e) => {
     e.preventDefault();
@@ -29,23 +34,13 @@ export default function RecoverAccount() {
 
   return (
     <div style={containerStyle}>
+      <ToastHost />
       <div style={rightPaneStyle}>
         <div style={cardWrapperStyle}>
           <h2 style={{ color: 'white', marginBottom: '8px' }}>Recover Account</h2>
           <p style={{ color: '#9ca3af', marginBottom: '20px', fontSize: '15px' }}>
             Enter your registered email or username to receive a password reset link.
           </p>
-
-          {status.msg && (
-            <div style={{
-              color: status.type === 'error' ? '#ef4444' : '#129968',
-              background: status.type === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(18,153,104,0.1)',
-              padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '15px',
-              border: `1px solid ${status.type === 'error' ? '#ef4444' : '#129968'}`
-            }}>
-              {status.type === 'success' ? '✓ ' : '✗ '}{status.msg}
-            </div>
-          )}
 
           <form onSubmit={handleRequest}>
             <input
