@@ -1016,7 +1016,7 @@ export default function CHOSettings({
 
                     {pwRequestStatus === 'accepted' && (
                       <>
-                        <p style={{ fontSize: '15px', color: '#0a5e42', marginBottom: '16px', padding: '8px 12px', background: '#ecfdf5', borderRadius: '8px' }}>
+                        <p style={{ fontSize: '15px', color: 'var(--success-text)', marginBottom: '16px', padding: '8px 12px', background: 'var(--success-bg)', borderRadius: '8px' }}>
                           Your request was approved. Set your new password below.
                         </p>
                         {[
@@ -1955,12 +1955,12 @@ export default function CHOSettings({
                   </div>
 
                   {restoreMsg && (
-                    <div style={{ marginTop: '8px', padding: '8px 14px', borderRadius: '8px', fontSize: '15px', fontWeight: '500', background: 'var(--input-bg)', color: '#0a5e42' }}>
+                    <div style={{ marginTop: '8px', padding: '8px 14px', borderRadius: '8px', fontSize: '15px', fontWeight: '500', background: 'var(--input-bg)', color: 'var(--success-text)' }}>
                       {restoreMsg}
                     </div>
                   )}
                   {restoreError && (
-                    <div style={{ marginTop: '8px', padding: '8px 14px', borderRadius: '8px', fontSize: '15px', fontWeight: '500', background: 'var(--input-bg)', color: '#991b1b' }}>
+                    <div style={{ marginTop: '8px', padding: '8px 14px', borderRadius: '8px', fontSize: '15px', fontWeight: '500', background: 'var(--input-bg)', color: 'var(--warning-text)' }}>
                       {restoreError}
                     </div>
                   )}
@@ -2063,7 +2063,7 @@ export default function CHOSettings({
 
                   {clearSuccess && (
                     <div className="cdms-msg-in" style={{
-                      background:'var(--input-bg)', color:'#0a5e42',
+                      background:'var(--input-bg)', color:'var(--success-text)',
                       padding:'10px', borderRadius:'8px',
                       marginBottom:'16px', fontSize:'13px',
                       fontWeight:'500'

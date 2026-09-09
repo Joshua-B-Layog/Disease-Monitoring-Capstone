@@ -38,7 +38,7 @@ export default function RecoverAccount() {
       <div style={rightPaneStyle}>
         <div style={cardWrapperStyle}>
           <h2 style={{ color: 'white', marginBottom: '8px' }}>Recover Account</h2>
-          <p style={{ color: '#9ca3af', marginBottom: '20px', fontSize: '15px' }}>
+          <p style={{ color: 'var(--text-muted)', marginBottom: '20px', fontSize: '15px' }}>
             Enter your registered email or username to receive a password reset link.
           </p>
 
@@ -63,8 +63,8 @@ export default function RecoverAccount() {
   );
 }
 
-const containerStyle = { display: 'flex', height: '100vh', background: '#0B111E', justifyContent: 'center' };
-const rightPaneStyle = { width: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#111827' };
+const containerStyle = { display: 'flex', height: '100vh', background: 'var(--bg-main)', justifyContent: 'center' };
+const rightPaneStyle = { width: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-surface)' };
 const cardWrapperStyle = { width: '85%' };
-const inputStyle = { width: '100%', padding: '12px', marginBottom: '15px', borderRadius: '6px', background: '#1f2937', color: 'white', border: '1px solid #374151', boxSizing: 'border-box', fontSize: '15px' };
+const inputStyle = { width: '100%', padding: '12px', marginBottom: '15px', borderRadius: '6px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--input-border)', boxSizing: 'border-box', fontSize: '15px' };
 const actionBtn = { width: '100%', padding: '12px', background: '#129968', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' };

@@ -51,19 +51,19 @@ const Sidebar = ({ role, activeTab, setActiveTab, language, choUnit }) => {
   // Define menu configurations
   const menuConfig = {
     CHO: [
-      { name: 'Dashboard', icon: <DashboardIcon color="#1E3A8A" /> },
+      { name: 'Dashboard', icon: <DashboardIcon color="var(--text-h)" /> },
       { name: 'Manage Cases', icon: <CaseMgmtIcon color="#f59e0b" /> },
       { name: 'Audit Reports', icon: <AuditIcon color="#8b5cf6" /> },
       { name: 'Map View', icon: <MapIcon color="#10b981" /> },
       { name: 'User Accounts', icon: <UserIcon color="#0ea5e9" /> },
-      { name: 'Settings', icon: <SettingsIcon color="#64748b" /> }
+      { name: 'Settings', icon: <SettingsIcon color="var(--text-muted)" /> }
     ],
     BHW: [
-      { name: 'Dashboard', icon: <DashboardIcon color="#1E3A8A" /> },
+      { name: 'Dashboard', icon: <DashboardIcon color="var(--text-h)" /> },
       { name: 'Manage Cases', icon: <CaseMgmtIcon color="#f59e0b" /> },
       { name: 'Audit Reports', icon: <AuditIcon color="#8b5cf6" /> },
       { name: 'Map View', icon: <MapIcon color="#10b981" /> },
-      { name: 'Settings', icon: <SettingsIcon color="#64748b" /> },
+      { name: 'Settings', icon: <SettingsIcon color="var(--text-muted)" /> },
     ]
   };
 

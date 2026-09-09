@@ -341,7 +341,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
         setDeleteConfirm(null);
         if (viewReport && viewReport.id === deleteConfirm) { setViewReport(null); setModalShowAll(false); setModalPage(1); }
       })
-      .catch(err => alert('Delete failed: ' + (err.response?.data?.error || err.message)));
+      .catch(err => notify('Delete failed: ' + (err.response?.data?.error || err.message), 'error'));
   };
 
   // ── Report Logs filter / sort ──
@@ -1005,7 +1005,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
               ].map(stat => (
                 <div key={stat.label} style={{ background: stat.bg, borderRadius: '8px', padding: '14px', textAlign: 'center' }}>
                   <div style={{ fontSize: '26px', fontWeight: '800', color: stat.color }}>{stat.value}</div>
-                  <div style={{ fontSize: '15px', color: '#475569', marginTop: '4px', fontWeight: '600' }}>{stat.label}</div>
+                  <div style={{ fontSize: '15px', color: 'var(--text-main)', marginTop: '4px', fontWeight: '600' }}>{stat.label}</div>
                 </div>
               ))}
             </div>
@@ -1017,14 +1017,14 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
               <div style={{ background: 'var(--input-bg)', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
                 <div style={{ fontSize: '15px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '4px' }}>This Week</div>
                 <div style={{ fontSize: '22px', fontWeight: '800', color: '#5b8def' }}>{thisWeekCases}</div>
-                <div style={{ fontSize: '13px', fontWeight: '600', color: weekDiff > 0 ? '#dc2626' : weekDiff < 0 ? '#16a34a' : '#475569', marginTop: '2px' }}>
+                <div style={{ fontSize: '13px', fontWeight: '600', color: weekDiff > 0 ? '#dc2626' : weekDiff < 0 ? '#16a34a' : 'var(--text-muted)', marginTop: '2px' }}>
                   {weekDiff === 0 ? 'No change' : `${weekDiff > 0 ? '+' : ''}${weekDiff} (${weekPct > 0 ? '+' : ''}${weekPct}%) vs prev`}
                 </div>
               </div>
               <div style={{ background: 'var(--input-bg)', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
                 <div style={{ fontSize: '15px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '4px' }}>This Month</div>
                 <div style={{ fontSize: '22px', fontWeight: '800', color: '#38bdf8' }}>{thisMonthCases}</div>
-                <div style={{ fontSize: '13px', fontWeight: '600', color: monthDiff > 0 ? '#dc2626' : monthDiff < 0 ? '#16a34a' : '#475569', marginTop: '2px' }}>
+                <div style={{ fontSize: '13px', fontWeight: '600', color: monthDiff > 0 ? '#dc2626' : monthDiff < 0 ? '#16a34a' : 'var(--text-muted)', marginTop: '2px' }}>
                   {monthDiff === 0 ? 'No change' : `${monthDiff > 0 ? '+' : ''}${monthDiff} (${monthPct > 0 ? '+' : ''}${monthPct}%) vs prev`}
                 </div>
               </div>

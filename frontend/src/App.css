@@ -19,6 +19,9 @@
   --warning-bg: rgba(248,113,113,0.2);
   --warning-text: #FCA5A5;
   --warning-border: #FCA5A5;
+  --info-bg: rgba(59,130,246,0.15);
+  --info-text: #93C5FD;
+  --info-border: #3B82F6;
   --success-bg: rgba(52,211,153,0.2);
   --success-text: #34D399;
   --success-border: #34D399;
@@ -39,6 +42,9 @@
   --warning-bg: rgba(220,38,38,0.12);
   --warning-text: #DC2626;
   --warning-border: #DC2626;
+  --info-bg: rgba(59,130,246,0.12);
+  --info-text: #1d4ed8;
+  --info-border: #3b82f6;
   --success-bg: rgba(18,153,104,0.12);
   --success-text: #129968;
   --success-border: #129968;

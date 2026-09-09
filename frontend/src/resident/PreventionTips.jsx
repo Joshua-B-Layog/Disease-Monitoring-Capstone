@@ -1,8 +1,30 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import BackButton from '../components/BackButton';
 import { onDiseasesChanged } from '../diseaseSignal';
+import { FeverIcon, InfluenzaAIcon, LeptospirosisIcon, TuberculosisIcon, TyphoidIcon, RabiesIcon } from '../components/DiseaseIcons';
 
 const parseLines = (str) => (str ? String(str).split('\n').map(s => s.trim()).filter(Boolean) : []);
+
+const SVG_DISEASE_ICONS = {
+  Dengue: FeverIcon,
+  'Influenza A': InfluenzaAIcon,
+  Leptospirosis: LeptospirosisIcon,
+  Tuberculosis: TuberculosisIcon,
+  'Typhoid Fever': TyphoidIcon,
+  Rabies: RabiesIcon,
+};
+
+const renderDiseaseIcon = (disease, size = 26) => {
+  const Glyph = SVG_DISEASE_ICONS[disease.name];
+  if (Glyph) {
+    return (
+      <span style={{ display: 'inline-flex', verticalAlign: 'middle' }}>
+        <Glyph color={disease.color} size={size} />
+      </span>
+    );
+  }
+  return <span style={{ fontSize: size, lineHeight: 1 }}>{disease.icon}</span>;
+};
 
 export const DISEASES = [
   {
@@ -847,7 +869,7 @@ export default function PreventionTips() {
                 padding: '14px 18px', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: '12px',
               }}>
-              <span style={{ fontSize: '26px' }}>{disease.icon}</span>
+              <span style={{ fontSize: '26px' }}>{renderDiseaseIcon(disease, 26)}</span>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)' }}>{disease.name}</div>
                 <div style={{ fontSize: '15px', color: 'var(--text-main)' }}>
@@ -931,7 +953,7 @@ export default function PreventionTips() {
           background: '#129968', padding: '16px 24px', color: '#fff',
         }}>
           <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700' }}>
-            🩺 Symptom Checker
+            Symptom Checker
           </h3>
           <p style={{ margin: '4px 0 0', fontSize: '15px', color: 'rgba(255,255,255,0.85)' }}>
             Select a disease and answer a few questions to assess your risk level.
@@ -953,7 +975,7 @@ export default function PreventionTips() {
                       fontSize: '15px', color: 'var(--text-main)', fontWeight: '500',
                       transition: 'all 0.15s',
                     }}>
-                    {d.icon} {d.name}
+                    {renderDiseaseIcon(d, 22)} {d.name}
                   </button>
                 ))}
               </div>
@@ -968,7 +990,7 @@ export default function PreventionTips() {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                   <h4 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: 'var(--text-main)' }}>
-                    {disease.icon} {disease.name} - Symptom Check
+                    {renderDiseaseIcon(disease, 20)} {disease.name} - Symptom Check
                   </h4>
                   <BackButton onClick={resetQuiz}>Pick another disease</BackButton>
                 </div>

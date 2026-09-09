@@ -11,35 +11,7 @@ import { getPointInBarangay } from './data/coordinates';
 import { notify } from './components/Toast';
 import { DISEASES as DEFAULT_DISEASES } from './resident/PreventionTips';
 import { emitDiseasesChanged } from './diseaseSignal';
-const FeverIcon = ({ color = '#ef4444', size = 28 }) => (
-  <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
-    <path d="M23.909,10.583c-.104,.345-.297,.668-.587,.924l-.512,.451-1.277-1.451-1.5,1.322,1.277,1.45-1.646,1.45-1.263-1.434-1.5,1.322,1.262,1.433-1.793,1.718-.025-.036-.013,.014c-.02-.018-2.005-1.748-4.336-1.748s-4.316,1.73-4.336,1.748l-1.33-1.493c.103-.092,2.559-2.254,5.666-2.254,.741,0,1.44,.128,2.084,.316l6.598-5.81c.83-.73,2.093-.65,2.823,.179,.015,.017,.024,.036,.038,.054C22.117,3.698,17.495,0,12,0,5.373,0,0,5.373,0,12s5.373,12,12,12,12-5.373,12-12c0-.48-.036-.951-.091-1.417Zm-8.413-2.583c.828,0,1.5,.672,1.5,1.5s-.672,1.5-1.5,1.5-1.5-.672-1.5-1.5,.672-1.5,1.5-1.5Zm-7,0c.828,0,1.5,.672,1.5,1.5s-.672,1.5-1.5,1.5-1.5-.672-1.5-1.5,.672-1.5,1.5-1.5Z"/>
-  </svg>
-);
-
-const InfluenzaAIcon = ({ color = '#D97706', size = 28 }) => (
-  <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
-    <path d="m20.354,15.348l2.396.619c.083.022.168.032.25.032.445,0,.851-.299.968-.75.138-.534-.183-1.08-.718-1.218l-2.363-.611c.074-.463.113-.938.113-1.422s-.039-.958-.113-1.422l2.363-.611c.535-.138.856-.684.718-1.218-.139-.534-.683-.86-1.218-.718l-2.396.619c-.331-.822-.779-1.584-1.325-2.266l1.559-1.559c.283.111.591.173.913.173,1.379,0,2.5-1.121,2.5-2.5s-1.121-2.5-2.5-2.5-2.5,1.121-2.5,2.5c0,.322.062.63.173.913l-1.559,1.559c-.682-.546-1.444-.994-2.266-1.325l.619-2.397c.138-.534-.183-1.08-.718-1.218-.539-.144-1.08.183-1.219.718l-.611,2.363c-.463-.074-.938-.113-1.421-.113s-.958.039-1.421.113l-.611-2.363c-.138-.535-.682-.861-1.219-.718-.535.138-.856.684-.718,1.218l.619,2.397c-.822.331-1.584.779-2.266,1.325l-1.559-1.559c.111-.283.173-.591.173-.913,0-1.379-1.121-2.5-2.5-2.5S0,1.121,0,2.5s1.121,2.5,2.5,2.5c.322,0,.63-.062.913-.173l1.559,1.559c-.546.682-.994,1.444-1.325,2.266l-2.396-.619c-.534-.143-1.08.184-1.218.718s.183,1.08.718,1.218l2.363.611c-.074.463-.113.938-.113,1.422,0,.489.04,.97.115,1.438l-2.359.592c-.536.134-.861.678-.726,1.213.114.454.521.757.969.757.081,0,.163-.01.245-.03l2.41-.605c.33.816.776,1.572,1.318,2.25l-1.559,1.559c-.283-.111-.591-.173-.913-.173-1.379,0-2.5,1.121-2.5,2.5s1.121,2.5,2.5,2.5,2.5-1.121,2.5-2.5c0-.322-.062-.63-.173-.913l1.559-1.559c.682.546,1.444.994,2.266,1.325l-.619,2.397c-.138.534.183,1.08.718,1.218.084.022.168.032.251.032.445,0,.851-.299.968-.75l.611-2.363c.463.074.938.113,1.421.113s.958-.039,1.421-.113l.611,2.363c.117.451.522.75.968.75.083,0,.167-.01.251-.032.535-.138.856-.684.718-1.218l-.619-2.397c.822-.331,1.584-.779,2.266-1.325l1.559,1.559c-.111.283-.173.591-.173.913,0,1.379,1.121,2.5,2.5,2.5s2.5-1.121,2.5-2.5-1.121-2.5-2.5-2.5c-.322,0-.63.062-.913.173l-1.559-1.559c.546-.682.994-1.444,1.325-2.266ZM12,6.964c.828,0,1.5.672,1.5,1.5s-.672,1.5-1.5,1.5-1.5-.672-1.5-1.5.672-1.5,1.5-1.5Zm-5.036,5.036c0-.828.672-1.5,1.5-1.5.828,0,1.5.672,1.5,1.5,0,.828-.672,1.5-1.5,1.5-.828,0-1.5-.672-1.5-1.5Zm3.536,3.536c0-.828.672-1.5,1.5-1.5.828,0,1.5.672,1.5,1.5,0,.828-.672,1.5-1.5,1.5-.828,0-1.5-.672-1.5-1.5Zm3.536-3.536c0-.828.672-1.5,1.5-1.5s1.5.672,1.5,1.5c0,.828-.672,1.5-1.5,1.5s-1.5-.672-1.5-1.5Z"/>
-  </svg>
-);
-
-const LeptospirosisIcon = ({ color = '#129968', size = 28 }) => (
-  <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
-    <path d="m5.47,12.377L.244,21.337c-.689,1.181.163,2.663,1.53,2.663h10.453c1.367,0,2.218-1.483,1.53-2.663l-5.226-8.96c-.683-1.171-2.376-1.171-3.059,0Zm1.53,10.623h0c-.552,0-1-.448-1-1h0c0-.552.448-1,1-1h0c.552,0,1,.448,1,1h0c0,.552-.448,1-1,1Zm-1-4v-3c0-.552.448-1,1-1h0c.552,0,1,.448,1,1v3c0,.552-.448,1-1,1h0c-.552,0-1-.448-1-1Zm18-2.5c0,3.038-2.462,5.5-5.5,5.5-1,0-2.311-.497-2.61-.658-.085-.348-.218-.69-.406-1.013l-5.227-8.96c-.118-.201-.256-.383-.403-.556.932-.517,2.004-.813,3.146-.813,1.435,0,2.758.471,3.833,1.259.526-.167,1.086-.259,1.667-.259,3.038,0,5.5,2.462,5.5,5.5ZM7,9.498c-1.356,0-2.574.699-3.257,1.871l-1.384,2.373c-1.175-.906-2.016-2.225-2.27-3.753,0,0,0-.001,0-.002-.053-.322-.088-.651-.088-.988,0-.33.034-.651.085-.967C.49,5.217,2.623,3.157,5.424,3.009c1.126-1.847,3.15-3.009,5.326-3.009,1.444,0,2.81.488,3.919,1.39.573-.256,1.194-.39,1.831-.39,1.914,0,3.592,1.24,4.22,2.996,1.657.302,2.947,1.621,3.216,3.289.002.012.061.675.061.675,0,1.489-.701,2.258-.972,2.573-1.259-.957-2.824-1.532-4.524-1.532-.438,0-.873.038-1.303.114-1.278-.731-2.712-1.114-4.197-1.114-1.865,0-3.587.611-4.99,1.634-.323-.088-.662-.136-1.01-.136Z"/>
-  </svg>
-);
-
-const TuberculosisIcon = ({ color = '#f97316', size = 28 }) => (
-  <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
-    <path d="m18 12c-3.314 0-6 2.686-6 6s2.686 6 6 6 6-2.686 6-6-2.686-6-6-6zm-1.5 10c-.828 0-1.5-.672-1.5-1.5s.672-1.5 1.5-1.5 1.5.672 1.5 1.5-.672 1.5-1.5 1.5zm.5-4c-1.105 0-2-.895-2-2s.895-2 2-2 2 .895 2 2-.895 2-2 2zm4 2c-.828 0-1.5-.672-1.5-1.5s.672-1.5 1.5-1.5 1.5.672 1.5 1.5-.672 1.5-1.5 1.5zm-8-9.608v-6.396h3.022c2.794 0,5.219 1.929,5.847 4.651l.634 2.746c-1.284-.878-2.834-1.393-4.503-1.393-1.805 0-3.466.608-4.806 1.62-.125-.39-.194-.803-.194-1.228zm-2.453 10.494c-.531 1.067-1.494 1.895-2.703 2.218l-2.637.703c-.352.12-.777.189-1.204.19h-.006c-1.049 0-2.078-.428-2.826-1.176-.755-.753-1.17-1.757-1.17-2.827 0-1.402.16-2.805.475-4.169l1.656-7.177c.628-2.723 3.053-4.651 5.847-4.651h3.022v6.396c0 1.725-1.1 3.25-2.735 3.795l-2.581.86c-.523.175-.807.741-.632 1.265.174.529.754.807,1.265.632l2.581-.86c.587-.196 1.12-.483 1.6-.835-.316.859-.498 1.783-.498 2.751 0 1.018.199 1.989.547 2.885zm2.453-16.89h-2v-3c0-.553.447-1 1-1s1 .448 1 1z"/>
-  </svg>
-);
-
-const TyphoidIcon = ({ color = '#8b5cf6', size = 28 }) => (
-  <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
-    <path d="m24,10v-2h-2.075c-.081-.581-.226-1.146-.447-1.682l1.772-1.051-1.021-1.72-1.773,1.052c-.156-.193-.32-.379-.498-.557h0c-.237-.238-.491-.446-.752-.642l.993-1.814-1.754-.961-.995,1.817c-.472-.174-.958-.295-1.451-.363V0h-2v2.088c-.569.084-1.129.234-1.667.459l-1.092-1.794-1.708,1.04,1.085,1.782c-.178.146-.351.301-.518.467l-.779.779-1.422-1.422-1.414,1.414,1.422,1.422-1.672,1.672-1.422-1.422-1.414,1.414,1.422,1.422-.779.779c-.166.166-.321.339-.467.517l-1.782-1.085-1.04,1.708,1.794,1.092c-.225.538-.375,1.098-.459,1.667H0v2h2.079c.069.493.189.979.363,1.451l-1.817.995.961,1.754,1.814-.993c.196.261.405.515.642.752.178.178.365.344.557.499l-1.052,1.772,1.72,1.021,1.053-1.775c.542.222,1.107.367,1.68.446v2.078h2v-2.087c.576-.085,1.143-.239,1.686-.468l1.134,1.862,1.708-1.04-1.13-1.856c.173-.142.341-.293.502-.454l.779-.779,1.488,1.488,1.414-1.414-1.488-1.488,1.672-1.672,1.488,1.488,1.414-1.414-1.488-1.488.779-.779c.161-.161.312-.329.455-.502l1.855,1.129,1.04-1.708-1.858-1.131c.228-.538.381-1.105.467-1.689h2.083Zm-16.5,6c-.828,0-1.5-.672-1.5-1.5s.672-1.5,1.5-1.5,1.5.672,1.5,1.5-.672,1.5-1.5,1.5Zm6-1c-.828,0-1.5-.672-1.5-1.5s.672-1.5,1.5-1.5,1.5.672,1.5,1.5-.672,1.5-1.5,1.5Zm1-6c-.828,0-1.5-.672-1.5-1.5s.672-1.5,1.5-1.5,1.5.672,1.5,1.5-.672,1.5-1.5,1.5Z"/>
-  </svg>
-);
+import { FeverIcon, InfluenzaAIcon, LeptospirosisIcon, TuberculosisIcon, TyphoidIcon, RabiesIcon } from './components/DiseaseIcons';
 
 const AllDiseasesIcon = ({ color = '#121358', size = 28 }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
@@ -65,15 +37,6 @@ const VaccineIcon = ({ color = '#129968', size = 28 }) => (
   </svg>
 );
 
-const RabiesIcon = ({ color = '#DC2626', size = 28 }) => (
-  <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
-    <path d="m4.96,14.589c.425-.807.605-1.882.494-2.949-.209-1.995-1.349-3.335-2.836-3.335-.084,0-.169.004-.251.013-.111.012-.214.045-.321.071-.024-.129-.04-.26-.046-.39-.057-1.258.5-2.5.5-2.5,0,0-2.65,1.352-2.5,3.5.023.337.092.695.262,1.069-.23.615-.312,1.352-.23,2.138.222,2.12,1.514,3.78,2.942,3.78l.192-.01c.724-.076,1.361-.568,1.794-1.388Z"/>
-    <path d="m8.514,10.922c.071,0,.143-.003.212-.011.796-.083,1.497-.625,1.972-1.526.469-.889.667-2.071.544-3.244-.229-2.194-1.483-3.669-3.119-3.669-.041,0-.081.005-.122.006-.049-1.251.5-2.479.5-2.479,0,0-2.65,1.352-2.5,3.5.001.021.006.042.007.063-.052.069-.113.128-.16.203-.489.772-.691,1.837-.569,2.998.243,2.332,1.665,4.158,3.236,4.158Z"/>
-    <path d="m15.42,10.899c.068.006.134.01.202.01,1.571,0,2.993-1.827,3.236-4.158.121-1.16-.081-2.224-.569-2.998-.102-.161-.22-.302-.343-.435-.007-2.041-2.498-3.318-2.498-3.318,0,0,.549,1.228.5,2.479-1.59.04-2.827,1.488-3.053,3.65-.123,1.174.076,2.356.544,3.244.475.901,1.175,1.443,1.981,1.527Z"/>
-    <path d="m12,13c-4.038,0-8,3.887-8,7.847,0,1.438.553,3.153,3.188,3.153.74,0,1.434-.226,2.167-.464.811-.264,1.649-.536,2.645-.536s1.834.272,2.645.536c.734.238,1.427.464,2.167.464,2.634,0,3.188-1.715,3.188-3.153,0-3.96-3.962-7.847-8-7.847Z"/>
-    <path d="m24,9c.15-2.148-2.5-3.5-2.5-3.5,0,0,.557,1.242.5,2.5-.006.135-.023.269-.049.403-.102-.025-.202-.058-.309-.069-1.613-.18-2.866,1.211-3.085,3.315-.111,1.065.068,2.138.494,2.944.432.818,1.067,1.309,1.777,1.383l.204.012c1.425,0,2.715-1.658,2.936-3.773.083-.787,0-1.525-.232-2.141.172-.376.24-.735.264-1.073Z"/>
-  </svg>
-);
 
 // ── Icon token system: icons are stored as serializable tokens so they survive the DB round-trip ──
 const SVG_ICON_DEFS = [
@@ -941,7 +904,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           longitude: item.longitude,
         });
       })
-      .catch(err => alert('Accept failed: ' + (err.response?.data?.error || err.message)));
+      .catch(err => notify('Accept failed: ' + (err.response?.data?.error || err.message), 'error'));
   };
 
   const handlePendingContactMessage = (msg) => {
@@ -968,7 +931,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         });
         setView('add');
       })
-      .catch(err => alert('Failed to mark message pending: ' + (err.response?.data?.error || err.message)));
+      .catch(err => notify('Failed to mark message pending: ' + (err.response?.data?.error || err.message), 'error'));
   };
 
   const handleRejectContactMessage = (msg) => {
@@ -978,7 +941,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         fetchContactMessages();
         fetchOutbox();
       })
-      .catch(err => alert('Failed to reject message: ' + (err.response?.data?.error || err.message)));
+      .catch(err => notify('Failed to reject message: ' + (err.response?.data?.error || err.message), 'error'));
   };
 
   const handleMessageToCase = (msg) => {
@@ -1007,7 +970,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           longitude: null,
         });
       })
-      .catch(err => alert('Failed to add case: ' + (err.response?.data?.error || err.message)));
+      .catch(err => notify('Failed to add case: ' + (err.response?.data?.error || err.message), 'error'));
   };
 
   // ── BHW's OWN EDIT REQUESTS (for BHW Referrals tab) ──
@@ -1027,7 +990,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const fetchAddRequests = () => {
     if (loginRole === 'BHW') {
       setMyAddRequestsLoading(true);
-      axios.get(`${API_URL}/api/case-add-requests?requested_by=${loggedUserId}`)
+      axios.get(`${API_URL}/api/case-add-requests?requested_by=${loggedUserId}&unread_only=true`)
         .then(res => { setMyAddRequests(res.data || []); setMyAddRequestsLoading(false); })
         .catch(() => setMyAddRequestsLoading(false));
     } else {
@@ -1084,7 +1047,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const handleApproveRegistration = (reg) => {
     axios.put(`${API_URL}/api/pending-registrations/${reg.user_id}/approve`, { actor_id: loggedUserId })
       .then(() => { fetchPendingRegistrations(); })
-      .catch(err => alert('Approve failed: ' + (err.response?.data?.error || err.message)));
+      .catch(err => notify('Approve failed: ' + (err.response?.data?.error || err.message), 'error'));
   };
 
   const handleRejectRegistration = (reg) => {
@@ -1092,7 +1055,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     if (reason === null) return; // user cancelled
     axios.put(`${API_URL}/api/pending-registrations/${reg.user_id}/reject`, { reason, actor_id: loggedUserId })
       .then(() => { fetchPendingRegistrations(); })
-      .catch(err => alert('Reject failed: ' + (err.response?.data?.error || err.message)));
+      .catch(err => notify('Reject failed: ' + (err.response?.data?.error || err.message), 'error'));
   };
 
   const handleSendEditRequest = async () => {
@@ -1136,7 +1099,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         setShowEditRequestForm(false);
         setEditRequestNote('');
       } catch (err) {
-        alert('Failed to queue edit request: ' + err.message);
+        notify('Failed to queue edit request: ' + err.message, 'error');
       }
       return;
     }
@@ -1160,11 +1123,11 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           setShowEditRequestForm(false);
           setEditRequestNote('');
         } catch (queueErr) {
-          alert('Failed to queue edit request: ' + queueErr.message);
+          notify('Failed to queue edit request: ' + queueErr.message, 'error');
         }
         return;
       }
-      alert('Failed to send edit request: ' + (err.response?.data?.error || err.message));
+      notify('Failed to send edit request: ' + (err.response?.data?.error || err.message), 'error');
     }
   };
 
@@ -1196,16 +1159,16 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             longitude: (proposed && proposed.longitude) || c.longitude,
           });
         } else {
-          alert('Case found, but data not loaded yet. Please refresh.');
+          notify('Case found, but data not loaded yet. Please refresh.', 'error');
         }
       })
-      .catch(err => alert('Failed to accept edit request: ' + (err.response?.data?.error || err.message)));
+      .catch(err => notify('Failed to accept edit request: ' + (err.response?.data?.error || err.message), 'error'));
   };
 
   const handleRejectEditRequest = (req) => {
     axios.put(`${API_URL}/api/case-edit-requests/${req.id}/reject`)
       .then(() => fetchEditRequests())
-      .catch(err => alert('Failed to reject edit request: ' + (err.response?.data?.error || err.message)));
+      .catch(err => notify('Failed to reject edit request: ' + (err.response?.data?.error || err.message), 'error'));
   };
 
   // ── ADD REQUEST APPROVAL (CHO reviews a BHW-submitted case) ──
@@ -1258,19 +1221,19 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       actor_role: loginRole || 'CHO',
     })
       .then(() => { fetchAddRequests(); })
-      .catch(err => alert('Failed to reject add request: ' + (err.response?.data?.error || err.message)));
+      .catch(err => notify('Failed to reject add request: ' + (err.response?.data?.error || err.message), 'error'));
   };
 
   // ── PASSWORD REQUEST HANDLERS ──
   const handleAcceptPasswordRequest = (req) => {
     axios.put(`${API_URL}/api/password-change-requests/${req.id}/accept`)
       .then(() => { fetchPasswordRequests(); })
-      .catch(err => alert('Failed to accept request: ' + (err.response?.data?.error || err.message)));
+      .catch(err => notify('Failed to accept request: ' + (err.response?.data?.error || err.message), 'error'));
   };
   const handleRejectPasswordRequest = (req) => {
     axios.put(`${API_URL}/api/password-change-requests/${req.id}/reject`)
       .then(() => { fetchPasswordRequests(); })
-      .catch(err => alert('Failed to reject request: ' + (err.response?.data?.error || err.message)));
+      .catch(err => notify('Failed to reject request: ' + (err.response?.data?.error || err.message), 'error'));
   };
 
   const handleRoutingDelete = () => {
@@ -1321,7 +1284,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const handleRejectInboxItem = (item) => {
     axios.put(`${API_URL}/api/case-inbox/${item.id}/reject`)
       .then(() => fetchInbox())
-      .catch(err => alert('Reject failed: ' + (err.response?.data?.error || err.message)));
+      .catch(err => notify('Reject failed: ' + (err.response?.data?.error || err.message), 'error'));
   };
 
   useEffect(() => {
@@ -3340,6 +3303,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       </>
                     ) : item.item_type === 'resident' ? (
                       <>Resident message from {item.barangay_name || '-'} · {item.to_cho_unit || '-'}</>
+                    ) : item.item_type === 'add_request' ? (
+                      <>Submitted to CHO for approval{item.to_cho_unit ? ` → ${item.to_cho_unit}` : ''}</>
                     ) : item.item_type === 'edit_request' ? (
                       <>Edit request from BHW ({item.from_barangay_name || '-'})</>
                     ) : (
@@ -3644,7 +3609,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                                 }
                                 axios.delete(`${API_URL}/api/cases/${c.case_id}`)
                                   .then(() => fetchCases())
-                                  .catch(err => alert('Delete failed: ' + (err.response?.data?.error || err.message)));
+                                  .catch(err => notify('Delete failed: ' + (err.response?.data?.error || err.message), 'error'));
                               }
                             }} title="Delete case"
                             style={{ padding: '5px 10px', background: 'transparent', border: '1px solid #ef4444', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>

@@ -107,6 +107,10 @@ const db = mysql.createPool({
     queueLimit: 0
 });
 
+db.on('error', (err) => {
+    console.error('MySQL pool error:', err.message);
+});
+
 db.query('SELECT 1', (err) => {
     if (err) {
         console.error("Database connection failed:", err.message);
@@ -121,6 +125,16 @@ db.query("SHOW COLUMNS FROM users LIKE 'initial_password'", (err, rows) => {
         db.query("ALTER TABLE users ADD COLUMN initial_password VARCHAR(255) DEFAULT NULL AFTER password", (alterErr) => {
             if (alterErr) console.error('Migration error adding initial_password:', alterErr.message);
             else console.log('Migration: added initial_password column to users table');
+        });
+    }
+});
+
+// Add login_otp_attempts column to users table if missing (2FA brute-force guard)
+db.query("SHOW COLUMNS FROM users LIKE 'login_otp_attempts'", (err, rows) => {
+    if (!err && rows.length === 0) {
+        db.query("ALTER TABLE users ADD COLUMN login_otp_attempts INT DEFAULT 0", (alterErr) => {
+            if (alterErr) console.error('Migration error adding login_otp_attempts:', alterErr.message);
+            else console.log('Migration: added login_otp_attempts column to users table');
         });
     }
 });
@@ -623,7 +637,7 @@ app.get('/api/disease_cases', (req, res) => {
     db.query(sql, [requesterId], (err, results) => {
         if (err) {
             console.error("MySQL Query Error (/api/disease_cases):", err.message);
-            return res.status(500).json({ error: err.message });
+            return res.status(500).json({ error: 'Something went wrong. Please try again.' });
         }
         res.json(results);
     });
@@ -655,7 +669,7 @@ app.get('/api/patients/lookup', (req, res) => {
   db.query(sql, [searchTerm], (err, results) => {
     if (err) {
       console.error("Patient lookup error:", err.message);
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
     res.json(results);
   });
@@ -664,7 +678,7 @@ app.get('/api/patients/lookup', (req, res) => {
 // ROUTE: Get list of diseases
 app.get('/api/diseases', (req, res) => {
     db.query("SELECT * FROM diseases ORDER BY name", (err, results) => {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
         res.json(results);
     });
 });
@@ -680,7 +694,7 @@ app.post('/api/diseases', (req, res) => {
     const videoUrl = (req.body && req.body.videoUrl ? String(req.body.videoUrl).slice(0, 255) : null);
     if (!name) return res.status(400).json({ error: 'Disease name is required.' });
     db.query('INSERT IGNORE INTO diseases (name, icon, color, description, prevention_tips, symptoms, video_url) VALUES (?, ?, ?, ?, ?, ?, ?)', [name, icon, color, description, preventionTips, symptoms, videoUrl], (err, result) => {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
         if (result.affectedRows === 0) return res.status(409).json({ error: 'Disease already exists.' });
         res.status(201).json({ message: 'Disease added successfully.', id: result.insertId });
     });
@@ -698,7 +712,7 @@ app.put('/api/diseases/:id', requireRole('CHO'), (req, res) => {
         'UPDATE diseases SET description = ?, prevention_tips = ?, symptoms = ?, video_url = ? WHERE id = ?',
         [description, preventionTips, symptoms, videoUrl, id],
         (err, result) => {
-            if (err) return res.status(500).json({ error: err.message });
+            if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
             if (result.affectedRows === 0) return res.status(404).json({ error: 'Disease not found.' });
             createAuditLog(
                 req.headers['x-user-id'] || null, req.headers['x-user-name'] || 'Unknown', 'CHO', null, null,
@@ -717,7 +731,7 @@ app.patch('/api/diseases/:id/visibility', requireRole('CHO'), (req, res) => {
     const active = req.body && req.body.active !== undefined ? (req.body.active ? 1 : 0) : null;
     if (active === null) return res.status(400).json({ error: 'Missing active flag.' });
     db.query('UPDATE diseases SET active = ? WHERE id = ?', [active, id], (err, result) => {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
         if (result.affectedRows === 0) return res.status(404).json({ error: 'Disease not found.' });
         createAuditLog(
             req.headers['x-user-id'] || null, req.headers['x-user-name'] || 'Unknown', 'CHO', null, null,
@@ -731,7 +745,7 @@ app.patch('/api/diseases/:id/visibility', requireRole('CHO'), (req, res) => {
 // ROUTE: Get all custom disease categories (with their linked disease ids)
 app.get('/api/disease_categories', (req, res) => {
     db.query('SELECT * FROM disease_categories ORDER BY id', (err, categories) => {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
         db.query('SELECT category_id, disease_id FROM disease_category_items', (err2, items) => {
             if (err2) return res.status(500).json({ error: err2.message });
             const byCat = {};
@@ -755,7 +769,7 @@ app.post('/api/disease_categories', (req, res) => {
     db.query('INSERT INTO disease_categories (name, icon, color, description) VALUES (?, ?, ?, ?)', [name, icon, color, description], (err, result) => {
         if (err) {
             if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Category already exists.' });
-            return res.status(500).json({ error: err.message });
+            return res.status(500).json({ error: 'Something went wrong. Please try again.' });
         }
         const catId = result.insertId;
         if (diseaseIds.length === 0) return res.status(201).json({ message: 'Category added successfully.', id: catId });
@@ -770,7 +784,7 @@ app.post('/api/disease_categories', (req, res) => {
 // ROUTE: Get list of barangays
 app.get('/api/barangays', (req, res) => {
     db.query("SELECT * FROM barangays ORDER BY name", (err, results) => {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
         res.json(results);
     });
 });
@@ -786,7 +800,7 @@ app.get('/api/users', (req, res) => {
         ORDER BY u.user_id ASC
     `;
     db.query(query, (err, results) => {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
         res.json(results);
     });
 });
@@ -810,7 +824,7 @@ app.get('/api/users/:id/profile', (req, res) => {
         WHERE u.user_id = ?
     `;
     db.query(query, [id], (err, results) => {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
         if (results.length === 0) return res.status(404).json({ error: 'User not found.' });
         res.json(results[0]);
     });
@@ -839,7 +853,7 @@ app.put('/api/users/:id/profile', (req, res) => {
     db.query(updateQuery, [fullName, email || null, mobile || null, assignedBarangayId || null, id], (err, result) => {
         if (err) {
             console.error('Profile update error:', err.message);
-            return res.status(500).json({ error: err.message });
+            return res.status(500).json({ error: 'Something went wrong. Please try again.' });
         }
         if (result.affectedRows === 0) return res.status(404).json({ error: 'User not found.' });
         console.log(`Profile updated for user ${id}: ${fullName}`);
@@ -1192,7 +1206,7 @@ app.get('/api/case-inbox', (req, res) => {
     if (status) { sql += ' AND ci.status = ?'; params.push(status); }
     sql += ' ORDER BY ci.created_at DESC';
     db.query(sql, params, (err, results) => {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
         res.json(results);
     });
 });
@@ -1212,7 +1226,7 @@ app.get('/api/case-outbox', (req, res) => {
 
   (async () => {
     try {
-      let referrals, residents, editRequests;
+      let referrals, residents, editRequests, addRequests;
 
       if (barangay && user_id) {
         // ── BHW scope ──
@@ -1259,6 +1273,18 @@ app.get('/api/case-outbox', (req, res) => {
           LEFT JOIN diseases d ON dc.disease_id = d.id
           LEFT JOIN barangays b ON dc.barangay_id = b.id
           WHERE cer.requested_by = ?
+        `, [user_id]);
+
+        addRequests = await runQuery(`
+          SELECT CONCAT('ar-', car.id) AS id, 'add_request' AS item_type,
+            car.patient_name, car.disease_name,
+            car.status, b.name AS barangay_name,
+            NULL AS to_barangay_name, car.from_barangay_name,
+            car.target_cho_unit AS to_cho_unit, NULL AS from_cho_unit,
+            'sent' AS direction, car.created_at
+          FROM case_add_requests car
+          LEFT JOIN barangays b ON car.barangay_id = b.id
+          WHERE car.requested_by = ?
         `, [user_id]);
       } else {
         // ── CHO scope ──
@@ -1317,12 +1343,12 @@ app.get('/api/case-outbox', (req, res) => {
       }
 
       // Merge and sort by created_at desc
-      const all = [...referrals, ...residents, ...editRequests];
+      const all = [...referrals, ...residents, ...editRequests, ...(addRequests || [])];
       all.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       res.json(all);
     } catch (err) {
       console.error('Unified outbox error:', err.message);
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
   })();
 });
@@ -1334,7 +1360,7 @@ app.put('/api/case-inbox/:id/accept', (req, res) => {
         'SELECT * FROM case_inbox WHERE id = ?',
         [id],
         (err, rows) => {
-            if (err) return res.status(500).json({ error: err.message });
+            if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
             if (rows.length === 0) return res.status(404).json({ error: 'Inbox item not found.' });
             const item = rows[0];
 
@@ -1380,7 +1406,7 @@ app.put('/api/case-inbox/:id/reject', (req, res) => {
         "UPDATE case_inbox SET status = 'rejected', resolved_at = NOW() WHERE id = ?",
         [id],
         (err, result) => {
-            if (err) return res.status(500).json({ error: err.message });
+            if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
             if (result.affectedRows === 0) return res.status(404).json({ error: 'Inbox item not found.' });
             res.json({ message: 'Case rejected.' });
         }
@@ -1401,7 +1427,7 @@ app.post('/api/cases/:id/request-edit', (req, res) => {
     'INSERT INTO case_edit_requests (case_id, requested_by, requested_by_name, from_barangay_name, target_cho_unit, note, proposed_data) VALUES (?, ?, ?, ?, ?, ?, ?)',
     [caseId, requested_by, requested_by_name || 'Unknown', from_barangay_name || null, target_cho_unit || null, note, proposedJson],
     (err, result) => {
-      if (err) return res.status(500).json({ error: err.message });
+      if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
 
       // Audit log: BHW submitted an edit request
       db.query('SELECT full_name, role, assigned_barangay_id FROM users WHERE user_id = ?', [requested_by], (aErr, aRes) => {
@@ -1466,7 +1492,7 @@ app.get('/api/case-edit-requests', (req, res) => {
   db.query(sql, params, (err, results) => {
     if (err) {
       console.error('case-edit-requests query error:', err.message);
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
     res.json(results);
   });
@@ -1479,7 +1505,7 @@ app.put('/api/case-edit-requests/:id/accept', (req, res) => {
     "UPDATE case_edit_requests SET status = 'accepted', resolved_at = NOW() WHERE id = ? AND status = 'pending'",
     [id],
     (err, result) => {
-      if (err) return res.status(500).json({ error: err.message });
+      if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
       if (result.affectedRows === 0) return res.status(404).json({ error: 'Edit request not found or already resolved.' });
       // Return case_id so frontend can open edit mode
       db.query('SELECT case_id, proposed_data FROM case_edit_requests WHERE id = ?', [id], (sErr, rows) => {
@@ -1499,7 +1525,7 @@ app.put('/api/case-edit-requests/:id/reject', (req, res) => {
     "UPDATE case_edit_requests SET status = 'rejected', resolved_at = NOW() WHERE id = ? AND status = 'pending'",
     [id],
     (err, result) => {
-      if (err) return res.status(500).json({ error: err.message });
+      if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
       if (result.affectedRows === 0) return res.status(404).json({ error: 'Edit request not found or already resolved.' });
       res.json({ message: 'Edit request rejected.' });
     }
@@ -1513,7 +1539,7 @@ app.put('/api/case-edit-requests/:id/read', (req, res) => {
     'UPDATE case_edit_requests SET is_read = 1 WHERE id = ?',
     [id],
     (err, result) => {
-      if (err) return res.status(500).json({ error: err.message });
+      if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
       if (result.affectedRows === 0) return res.status(404).json({ error: 'Edit request not found.' });
       res.json({ message: 'Marked as read.' });
     }
@@ -1559,7 +1585,7 @@ app.post('/api/cases/request-add', (req, res) => {
         barangay_id || null, symptoms || null, physician || null, latitude || null, longitude || null,
         requested_by, requested_by_name || 'Unknown', from_barangay_name || null, targetChoUnit || null, note || null],
       (err, result) => {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
 
         // Audit log: BHW submitted an add request
         db.query('SELECT full_name, role, assigned_barangay_id FROM users WHERE user_id = ?', [requested_by], (aErr, aRes) => {
@@ -1624,7 +1650,7 @@ app.get('/api/case-add-requests', (req, res) => {
   db.query(sql, params, (err, results) => {
     if (err) {
       console.error('case-add-requests query error:', err.message);
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
     res.json(results);
   });
@@ -1760,7 +1786,7 @@ app.put('/api/case-add-requests/:id/reject', (req, res) => {
     "UPDATE case_add_requests SET status = 'rejected', resolved_at = NOW(), resolved_by = ?, reject_reason = ? WHERE id = ? AND status = 'pending'",
     [actor_id || null, reason || null, id],
     (err, result) => {
-      if (err) return res.status(500).json({ error: err.message });
+      if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
       if (result.affectedRows === 0) return res.status(404).json({ error: 'Add request not found or already resolved.' });
       db.query('SELECT * FROM case_add_requests WHERE id = ?', [id], (sErr, rows) => {
         if (sErr || rows.length === 0) return res.json({ message: 'Add request rejected.' });
@@ -1801,7 +1827,7 @@ app.put('/api/case-add-requests/:id/read', (req, res) => {
     'UPDATE case_add_requests SET is_read = 1 WHERE id = ?',
     [id],
     (err, result) => {
-      if (err) return res.status(500).json({ error: err.message });
+      if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
       if (result.affectedRows === 0) return res.status(404).json({ error: 'Add request not found.' });
       res.json({ message: 'Marked as read.' });
     }
@@ -1831,7 +1857,7 @@ app.post('/api/password-change-request', (req, res) => {
         'INSERT INTO password_change_requests (user_id, user_name) VALUES (?, ?)',
         [user_id, user_name || 'Unknown'],
         (err, result) => {
-          if (err) return res.status(500).json({ error: err.message });
+          if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
 
           // Notify all active CHO users (bypass preferences — same as case edit requests)
           db.query(
@@ -1871,7 +1897,7 @@ app.get('/api/password-change-requests', (req, res) => {
   }
   sql += ' ORDER BY created_at DESC';
   db.query(sql, params, (err, results) => {
-    if (err) return res.status(500).json({ error: err.message });
+    if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     res.json(results);
   });
 });
@@ -1883,7 +1909,7 @@ app.put('/api/password-change-requests/:id/accept', (req, res) => {
     "UPDATE password_change_requests SET status = 'accepted', resolved_at = NOW() WHERE id = ? AND status = 'pending'",
     [id],
     (err, result) => {
-      if (err) return res.status(500).json({ error: err.message });
+      if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
       if (result.affectedRows === 0) return res.status(404).json({ error: 'Request not found or already resolved.' });
 
       // Notify the BHW
@@ -1909,7 +1935,7 @@ app.put('/api/password-change-requests/:id/reject', (req, res) => {
     "UPDATE password_change_requests SET status = 'rejected', resolved_at = NOW() WHERE id = ? AND status = 'pending'",
     [id],
     (err, result) => {
-      if (err) return res.status(500).json({ error: err.message });
+      if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
       if (result.affectedRows === 0) return res.status(404).json({ error: 'Request not found or already resolved.' });
 
       // Notify the BHW
@@ -1931,7 +1957,7 @@ app.put('/api/password-change-requests/:id/reject', (req, res) => {
 app.put('/api/password-change-requests/:id/read', (req, res) => {
   const { id } = req.params;
   db.query('UPDATE password_change_requests SET is_read = 1 WHERE id = ?', [id], (err, result) => {
-    if (err) return res.status(500).json({ error: err.message });
+    if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     if (result.affectedRows === 0) return res.status(404).json({ error: 'Request not found.' });
     res.json({ message: 'Marked as read.' });
   });
@@ -1947,7 +1973,7 @@ app.put('/api/users/:id/set-password', (req, res) => {
 
   // Gate: verify an accepted request exists before allowing password change
   db.query('SELECT id FROM password_change_requests WHERE user_id = ? AND status = \'accepted\' LIMIT 1', [id], (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
+    if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     if (!rows || rows.length === 0) {
       return res.status(403).json({ error: 'No approved password change request found. Please wait for CHO approval.' });
     }
@@ -2189,7 +2215,7 @@ app.get('/api/cases/:id/status-history', (req, res) => {
      FROM case_status_history WHERE case_id = ? ORDER BY changed_at ASC`,
     [id],
     (err, rows) => {
-      if (err) return res.status(500).json({ error: err.message });
+      if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
       res.json(rows);
     }
   );
@@ -2244,7 +2270,7 @@ app.put('/api/users/:id', requireRole('CHO'), async (req, res) => {
             if (err.code === 'ER_DUP_ENTRY') {
                 return res.status(409).json({ error: 'A user with this username or email already exists.' });
             }
-            return res.status(500).json({ error: err.message });
+            return res.status(500).json({ error: 'Something went wrong. Please try again.' });
         }
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: 'User not found.' });
@@ -2324,7 +2350,7 @@ app.put('/api/users/:id/change-password', (req, res) => {
     const { currentPassword, newPassword } = req.body;
 
     db.query('SELECT password FROM users WHERE user_id = ?', [id], (err, results) => {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
         if (results.length === 0) return res.status(404).json({ error: 'User not found.' });
 
         const pwValid = bcrypt.compareSync(currentPassword, results[0].password) || results[0].password === currentPassword;
@@ -2359,7 +2385,7 @@ app.delete('/api/cases/:id', (req, res) => {
     db.query(fetchCaseQuery, [id], (err, caseResults) => {
         if (err) {
             console.error("Fetch case error before delete:", err.message);
-            return res.status(500).json({ error: err.message });
+            return res.status(500).json({ error: 'Something went wrong. Please try again.' });
         }
         
         if (!caseResults || caseResults.length === 0) {
@@ -2413,7 +2439,7 @@ app.delete('/api/users/:id', requireRole('CHO'), (req, res) => {
     db.query('DELETE FROM users WHERE user_id = ?', [id], (err, result) => {
         if (err) {
             console.error("Delete user error:", err.message);
-            return res.status(500).json({ error: err.message });
+            return res.status(500).json({ error: 'Something went wrong. Please try again.' });
         }
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: 'User not found.' });
@@ -2432,7 +2458,7 @@ app.delete('/api/users/:id', requireRole('CHO'), (req, res) => {
 // GET all audit logs (newest first)
 app.get('/api/audit-logs', (req, res) => {
   db.query('SELECT * FROM audit_logs ORDER BY created_at DESC', (err, results) => {
-    if (err) return res.status(500).json({ error: err.message });
+    if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     res.json(results);
   });
 });
@@ -2444,7 +2470,7 @@ app.post('/api/audit-logs', (req, res) => {
     'INSERT INTO audit_logs (user_id, user_name, user_role, cho_unit, barangay, action, entity, details) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     [user_id || null, user_name || 'System', user_role || 'System', cho_unit || null, barangay || null, action, entity, details],
     (err, result) => {
-      if (err) return res.status(500).json({ error: err.message });
+      if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
       res.status(201).json({ message: 'Audit log created', id: result.insertId });
     }
   );
@@ -2468,7 +2494,7 @@ app.get('/api/generated-reports', (req, res) => {
   sql += ' ORDER BY created_at DESC';
 
   db.query(sql, params, (err, results) => {
-    if (err) return res.status(500).json({ error: err.message });
+    if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     // Parse snapshot_logs back into an array for the frontend
     const parsed = results.map(r => ({
       ...r,
@@ -2506,7 +2532,7 @@ app.post('/api/generated-reports', (req, res) => {
   db.query(sql, vals, (err, result) => {
     if (err) {
       console.error('Error creating generated report:', err.message);
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
     res.status(201).json({ message: 'Report generated successfully', id: result.insertId });
   });
@@ -2516,7 +2542,7 @@ app.post('/api/generated-reports', (req, res) => {
 app.delete('/api/generated-reports/:id', (req, res) => {
   const { id } = req.params;
   db.query('DELETE FROM generated_reports WHERE id = ?', [id], (err, result) => {
-    if (err) return res.status(500).json({ error: err.message });
+    if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Report not found.' });
     }
@@ -2576,7 +2602,8 @@ app.post('/api/login', (req, res) => {
         }
 
         if (role === 'BHW') {
-            const selectedBarangay = context.replace(/^Brgy\.\s*/i, '').trim().toLowerCase();
+            const ctx = (context || '').toString().trim();
+            const selectedBarangay = ctx.replace(/^Brgy\.\s*/i, '').toLowerCase();
             const assignedBarangay = (user.assigned_barangay_name || '').trim().toLowerCase();
 
             if (!assignedBarangay) {
@@ -2586,8 +2613,9 @@ app.post('/api/login', (req, res) => {
             }
 
             if (selectedBarangay !== assignedBarangay) {
+                const ctxLabel = ctx.replace(/^Brgy\.\s*/i, '').trim();
                 return res.status(403).json({ 
-                    error: `Access denied. You are assigned to Brgy. ${user.assigned_barangay_name}, not Brgy. ${context.replace(/^Brgy\.\s*/i, '').trim()}.` 
+                    error: `Access denied. You are assigned to Brgy. ${user.assigned_barangay_name}, not Brgy. ${ctxLabel}.` 
                 });
             }
         }
@@ -2687,7 +2715,7 @@ app.post('/api/register', (req, res) => {
     db.query(checkUsernameQuery, [username], (err, rows) => {
         if (err) {
             console.error("Username check error:", err.message);
-            return res.status(500).json({ message: 'Registration failed: ' + err.message });
+            return res.status(500).json({ message: 'Registration failed. Please try again.' });
         }
         if (rows.length > 0) {
             return res.status(409).json({ message: 'This username is already taken.' });
@@ -2700,13 +2728,13 @@ app.post('/api/register', (req, res) => {
     `;
 
     const hashedPw = bcrypt.hashSync(password, 10);
-    db.query(insertQuery, [username, name, email, mobile || null, hashedPw, hashedPw, enforcedRole, assignedBarangayId], (err, result) => {
+    db.query(insertQuery, [username, name, email, mobile || null, hashedPw, password, enforcedRole, assignedBarangayId], (err, result) => {
         if (err) {
             console.error("MySQL Registration Error:", err.message);
             if (err.code === 'ER_DUP_ENTRY') {
                 return res.status(409).json({ message: 'An account with this email already exists.' });
             }
-            return res.status(500).json({ message: 'Registration failed: ' + err.message });
+            return res.status(500).json({ message: 'Registration failed. Please try again.' });
         }
 
         const newUserId = result.insertId;
@@ -2977,7 +3005,7 @@ app.get('/api/pending-registrations', (req, res) => {
     }
     sql += ' ORDER BY u.user_id DESC';
     db.query(sql, params, (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
         res.json(rows);
     });
 });
@@ -2989,7 +3017,7 @@ app.put('/api/pending-registrations/:id/approve', (req, res) => {
         `SELECT user_id, full_name, email, assigned_barangay_id FROM users WHERE user_id = ? AND status = 'pending'`,
         [id],
         (err, rows) => {
-            if (err) return res.status(500).json({ error: err.message });
+            if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
             if (rows.length === 0) return res.status(404).json({ error: 'Registration not found or already processed.' });
             const user = rows[0];
 
@@ -3044,7 +3072,7 @@ app.put('/api/pending-registrations/:id/reject', (req, res) => {
         `SELECT user_id, full_name, email FROM users WHERE user_id = ? AND status = 'pending'`,
         [id],
         (err, rows) => {
-            if (err) return res.status(500).json({ error: err.message });
+            if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
             if (rows.length === 0) return res.status(404).json({ error: 'Registration not found or already processed.' });
             const user = rows[0];
 
@@ -3110,7 +3138,7 @@ app.post('/api/forgot-password', (req, res) => {
     db.query(findUserQuery, [identity, identity, identity], (err, results) => {
         if (err) {
             console.error("DB lookup error:", err.message);
-            return res.status(500).json({ error: 'Database error: ' + err.message });
+            return res.status(500).json({ error: 'Account not found. Please try again.' });
         }
 
         if (results.length === 0) {
@@ -3169,7 +3197,7 @@ app.post('/api/forgot-password', (req, res) => {
                     routingTarget: 'email'
                 });
             } catch (err) {
-                return res.status(500).json({ error: 'Email failed: ' + (err.response?.data || err.message) });
+                return res.status(500).json({ error: 'Email delivery failed. Please try again or contact support.' });
             }
         });
     });
@@ -3218,7 +3246,7 @@ app.post('/api/users', requireRole('CHO'), async (req, res) => {
     let tempPasswordGenerated = null;
 
     if (generateTempPassword || !password) {
-        tempPasswordGenerated = crypto.randomBytes(4).toString('hex');
+        tempPasswordGenerated = crypto.randomBytes(6).toString('hex');
         finalPassword = tempPasswordGenerated;
     }
 
@@ -3260,7 +3288,7 @@ app.post('/api/users', requireRole('CHO'), async (req, res) => {
             if (err.code === 'ER_DUP_ENTRY') {
                 return res.status(409).json({ error: 'A user with this username or email already exists.' });
             }
-            return res.status(500).json({ error: err.message });
+            return res.status(500).json({ error: 'Something went wrong. Please try again.' });
         }
 
         if (tempPasswordGenerated) {
@@ -3363,10 +3391,10 @@ app.post('/api/send-login-otp', (req, res) => {
         if (err || results.length === 0) return res.status(404).json({ error: 'User not found.' });
         const user = results[0];
 
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otp = crypto.randomInt(100000, 1000000).toString();
         const expiry = new Date(Date.now() + 600000); // 10 minutes
 
-        db.query('UPDATE users SET login_otp = ?, login_otp_expiry = ? WHERE user_id = ?',
+        db.query('UPDATE users SET login_otp = ?, login_otp_expiry = ?, login_otp_attempts = 0 WHERE user_id = ?',
             [otp, expiry, userId], async (updateErr) => {
             if (updateErr) return res.status(500).json({ error: 'Failed to generate code.' });
 
@@ -3403,10 +3431,22 @@ app.post('/api/verify-login-otp', (req, res) => {
     db.query(query, [userId, otp], (err, results) => {
         if (err) return res.status(500).json({ error: 'Database error.' });
         if (results.length === 0) {
-            return res.status(400).json({ error: 'Invalid or expired code.' });
+            db.query('UPDATE users SET login_otp_attempts = login_otp_attempts + 1 WHERE user_id = ?', [userId], (attemptErr) => {
+                if (attemptErr) return res.status(500).json({ error: 'Database error.' });
+                db.query('SELECT login_otp_attempts FROM users WHERE user_id = ?', [userId], (err2, rows) => {
+                    if (err2) return res.status(500).json({ error: 'Database error.' });
+                    const attempts = (rows && rows[0] && rows[0].login_otp_attempts) || 0;
+                    if (attempts >= 5) {
+                        return res.status(429).json({ error: 'Too many incorrect attempts. Please request a new code and try again.' });
+                    }
+                    const remaining = 5 - attempts;
+                    return res.status(400).json({ error: `Invalid or expired code. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.` });
+                });
+            });
+            return;
         }
 
-        db.query('UPDATE users SET login_otp = NULL, login_otp_expiry = NULL WHERE user_id = ?', [userId]);
+        db.query('UPDATE users SET login_otp = NULL, login_otp_expiry = NULL, login_otp_attempts = 0 WHERE user_id = ?', [userId]);
 
         const user = results[0];
         return res.status(200).json({
@@ -3609,7 +3649,7 @@ app.get('/api/notifications', (req, res) => {
         'SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC',
         [userId],
         (err, results) => {
-            if (err) return res.status(500).json({ error: err.message });
+            if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
             return res.json(results);
         }
     );
@@ -3622,7 +3662,7 @@ app.post('/api/notifications', (req, res) => {
         'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
         [user_id, title, message, type || 'info', link_to || null],
         (err, result) => {
-            if (err) return res.status(500).json({ error: err.message });
+            if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
             return res.status(201).json({ message: 'Notification created', id: result.insertId });
         }
     );
@@ -3635,7 +3675,7 @@ app.put('/api/notifications/:id/read', (req, res) => {
         'UPDATE notifications SET is_read = 1 WHERE id = ?',
         [id],
         (err, result) => {
-            if (err) return res.status(500).json({ error: err.message });
+            if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
             return res.json({ message: 'Notification marked as read' });
         }
     );
@@ -3648,7 +3688,7 @@ app.delete('/api/notifications/:id', (req, res) => {
         'DELETE FROM notifications WHERE id = ?',
         [id],
         (err, result) => {
-            if (err) return res.status(500).json({ error: err.message });
+            if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
             return res.json({ message: 'Notification dismissed' });
         }
     );
@@ -3664,7 +3704,7 @@ app.delete('/api/notifications', (req, res) => {
         'DELETE FROM notifications WHERE user_id = ?',
         [userId],
         (err, result) => {
-            if (err) return res.status(500).json({ error: err.message });
+            if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
             return res.json({ message: 'All notifications dismissed' });
         }
     );
@@ -3675,7 +3715,7 @@ app.delete('/api/notifications', (req, res) => {
 app.get('/api/notification-preferences/:userId', (req, res) => {
     const { userId } = req.params;
     db.query('SELECT * FROM notification_preferences WHERE user_id = ?', [userId], (err, results) => {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
         if (results.length === 0) {
             return res.json({
                 push_notifications: false, email_notifications: false, sms_notifications: false,
@@ -3717,7 +3757,7 @@ app.put('/api/notification-preferences/:userId', (req, res) => {
          new_case_reported ? 1 : 0, case_status_updated ? 1 : 0, high_risk_alert ? 1 : 0,
          weekly_summary ? 1 : 0, system_maintenance ? 1 : 0, updated_case_reported ? 1 : 0],
         (err, result) => {
-            if (err) return res.status(500).json({ error: err.message });
+            if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
             return res.json({ message: 'Preferences saved successfully' });
         }
     );
@@ -3762,7 +3802,7 @@ app.get('/api/storage-stats', (req, res) => {
       usedPercent: Math.min(((totalKB / 1024 / 1024) / 10) * 100, 100).toFixed(1),
     });
   })
-  .catch(err => res.status(500).json({ error: err.message }));
+  .catch(err => res.status(500).json({ error: 'Something went wrong. Please try again.' }));
 });
 
 // GET /api/export-all — export all cases as JSON or CSV
@@ -3783,7 +3823,7 @@ app.get('/api/export-all', (req, res) => {
   `;
 
   db.query(sql, (err, results) => {
-    if (err) return res.status(500).json({ error: err.message });
+    if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
 
     if (format === 'csv') {
       const headers = 'Case ID,Patient Name,Age,Gender,Contact,Address,' +
@@ -3814,28 +3854,28 @@ app.get('/api/backup', (req, res) => {
   const results = {};
 
   db.query('SELECT * FROM disease_cases', (err, cases) => {
-    if (err) return res.status(500).json({ error: err.message });
+    if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     results.disease_cases = cases;
 
     db.query('SELECT user_id, username, full_name, role, assigned_barangay_id, is_active, email, mobile_number, last_login FROM users',
       (err, users) => {
-      if (err) return res.status(500).json({ error: err.message });
+      if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
       results.users = users;
 
       db.query('SELECT * FROM barangays', (err, barangays) => {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
         results.barangays = barangays;
 
         db.query('SELECT * FROM diseases', (err, diseases) => {
-          if (err) return res.status(500).json({ error: err.message });
+          if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
           results.diseases = diseases;
 
           db.query('SELECT * FROM disease_categories', (err, disease_categories) => {
-            if (err) return res.status(500).json({ error: err.message });
+            if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
             results.disease_categories = disease_categories;
 
             db.query('SELECT * FROM disease_category_items', (err, disease_category_items) => {
-              if (err) return res.status(500).json({ error: err.message });
+              if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
               results.disease_category_items = disease_category_items;
 
               results.backup_date = new Date().toISOString();
@@ -3860,12 +3900,14 @@ app.delete('/api/users/:id/my-data', (req, res) => {
 
   db.query('SELECT user_id, username, full_name, email, role, assigned_barangay_id, password, initial_password FROM users WHERE user_id = ?',
     [id], (err, userResults) => {
-    if (err) return res.status(500).json({ error: err.message });
+    if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     if (userResults.length === 0)
       return res.status(404).json({ error: 'User not found.' });
 
     const user = userResults[0];
-    const resetPassword = user.initial_password || user.password;
+    let resetPassword = user.initial_password || user.password;
+    const looksHashed = typeof resetPassword === 'string' && /^\$2[abxy]\$/.test(resetPassword);
+    if (looksHashed) resetPassword = crypto.randomBytes(6).toString('hex');
 
     // 1. Final audit log before clearing
     createAuditLog(id, user.full_name || 'User', user.role, null, null, 'Cleared', 'Account Data', 'User cleared all personal account data and was logged out');
@@ -4028,7 +4070,7 @@ app.get('/api/contact-messages', (req, res) => {
   }
 
   db.query(sql, params, (err, results) => {
-    if (err) return res.status(500).json({ error: err.message });
+    if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     res.json(results);
   });
 });
@@ -4036,7 +4078,7 @@ app.get('/api/contact-messages', (req, res) => {
 // PUT /api/contact-messages/:id/read — Mark message as read
 app.put('/api/contact-messages/:id/read', (req, res) => {
   db.query('UPDATE contact_messages SET is_read = 1 WHERE id = ?', [req.params.id], (err) => {
-    if (err) return res.status(500).json({ error: err.message });
+    if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     res.json({ message: 'Message marked as read.' });
   });
 });
@@ -4044,7 +4086,7 @@ app.put('/api/contact-messages/:id/read', (req, res) => {
 // PUT /api/contact-messages/:id/pending — Mark message as pending (BHW reviewing)
 app.put('/api/contact-messages/:id/pending', (req, res) => {
   db.query("UPDATE contact_messages SET status = 'pending' WHERE id = ?", [req.params.id], (err) => {
-    if (err) return res.status(500).json({ error: err.message });
+    if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     res.json({ message: 'Message marked as pending.' });
   });
 });
@@ -4052,7 +4094,7 @@ app.put('/api/contact-messages/:id/pending', (req, res) => {
 // PUT /api/contact-messages/:id/reject — Reject a resident message
 app.put('/api/contact-messages/:id/reject', (req, res) => {
   db.query("UPDATE contact_messages SET status = 'rejected', is_read = 1 WHERE id = ?", [req.params.id], (err) => {
-    if (err) return res.status(500).json({ error: err.message });
+    if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     res.json({ message: 'Message rejected.' });
   });
 });
@@ -4061,7 +4103,7 @@ app.put('/api/contact-messages/:id/reject', (req, res) => {
 app.put('/api/contact-messages/:id/accept', (req, res) => {
   const { id } = req.params;
   db.query('SELECT * FROM contact_messages WHERE id = ?', [id], (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
+    if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     if (rows.length === 0) return res.status(404).json({ error: 'Message not found.' });
     const msg = rows[0];
 
@@ -4101,7 +4143,7 @@ app.get('/api/disease_cases/public-summary', (req, res) => {
     ORDER BY b.name
   `;
   db.query(sql, (err, results) => {
-    if (err) return res.status(500).json({ error: err.message });
+    if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     res.json(results);
   });
 });
@@ -4126,7 +4168,7 @@ app.get('/api/disease_cases/public-disease-counts', (req, res) => {
     params = [];
   }
   db.query(sql, params, (err, results) => {
-    if (err) return res.status(500).json({ error: err.message });
+    if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     res.json(results);
   });
 });
@@ -4153,7 +4195,7 @@ app.get('/api/weekly-summary', (req, res) => {
          FROM users u LEFT JOIN barangays b ON u.assigned_barangay_id = b.id
          WHERE u.user_id = ?`, [user_id],
         (err, rows) => {
-            if (err) return res.status(500).json({ error: err.message });
+            if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
             if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
 
             const user = rows[0];
@@ -4295,7 +4337,7 @@ app.get('/api/weekly-summary', (req, res) => {
                     generatedBy: user.full_name,
                     generatedAt: new Date().toISOString(),
                 });
-            }).catch(err => res.status(500).json({ error: err.message }));
+            }).catch(err => res.status(500).json({ error: 'Something went wrong. Please try again.' }));
         }
     );
 });
@@ -4520,7 +4562,7 @@ app.post('/api/notifications/system-maintenance', (req, res) => {
          FROM users u
          WHERE u.is_active = 1`,
         (err, users) => {
-            if (err) return res.status(500).json({ error: err.message });
+            if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
 
             let sentCount = 0;
             users.forEach(user => {
@@ -4673,6 +4715,21 @@ app.post('/api/restore/preview', (req, res) => {
 // 10. START SERVER
 // ==========================================
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+
+// Global error handler — masks internal details from clients
+app.use((err, req, res, next) => {
+    console.error('Unhandled error:', err.message);
+    if (res.headersSent) return next(err);
+    res.status(err.status || 500).json({ error: 'Something went wrong. Please try again.' });
+});
+
+const server = app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+});
+
+server.on('error', (err) => {
+    console.error('Server failed to start:', err.message);
+    if (err.code === 'EADDRINUSE') {
+        console.error(`Port ${PORT} is already in use.`);
+    }
 });

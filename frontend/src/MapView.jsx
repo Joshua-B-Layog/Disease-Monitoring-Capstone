@@ -4,6 +4,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import axios from 'axios';
 import { API_URL } from './config';
+import { notify } from './components/Toast';
 import { cacheCases, getCachedCases } from './offlineSync';
 import { GeoJSON } from 'react-leaflet';
 import cabuyaoBoundaries from './data/cabuyao_barangays.geojson.json';
@@ -764,7 +765,7 @@ function ChoroplethLayer({ barangayData, onHover, onLeave, onClick }) {
   );
 }
 
-export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginBarangay, sessionContext }) {
+export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginBarangay, sessionContext, compactMode }) {
   const [allCases, setAllCases]         = useState([]);
   const [barangayData, setBarangayData] = useState([]);
   const [purokData, setPurokData]       = useState([]);
@@ -1022,7 +1023,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const showAutoPurok = loginRole !== 'BHW' && filterBarangay === 'All Barangays' && mapZoom >= PUROK_ZOOM_THRESHOLD && autoDetectedBrgy;
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 64px)' }}>
+    <div style={{ display: 'flex', height: compactMode ? 'calc(100vh - 56px)' : 'calc(100vh - 70px)' }}>
 
       {/* ── SIDEBAR — fixed 280px, never shrinks ── */}
       <div style={{
@@ -1413,7 +1414,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                   link.click();
                 });
               }).catch(() => {
-                alert('Export requires html2canvas. Please use the Print option instead.');
+                notify('Export requires html2canvas. Please use the Print option instead.', 'info');
               });
             }}
             style={{

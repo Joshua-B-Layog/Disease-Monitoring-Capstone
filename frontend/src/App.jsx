@@ -41,6 +41,8 @@ const extractDiseaseFromMessage = (message) => {
   if (m) return m[1].trim();
   m = message.match(/^Case for .+? \((.+?)\)/);
   if (m) return m[1].trim();
+  m = message.match(/^Your case for .+? \((.+?)\)/);
+  if (m) return m[1].trim();
   m = message.match(/regarding (.+?)\.?$/);
   if (m) return m[1].trim();
   return '';
@@ -345,26 +347,6 @@ useEffect(() => {
     return () => clearInterval(interval);
   }, []);
 
-  // ── 30-minute session timeout ──
-  useEffect(() => {
-    if (!isLoggedIn) return;
-    let timeout;
-    const resetTimer = () => {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => {
-        window.alert('Your session has expired due to inactivity. Please log in again.');
-        handleLogout();
-      }, 30 * 60 * 1000);
-    };
-    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
-    events.forEach(e => document.addEventListener(e, resetTimer));
-    resetTimer();
-    return () => {
-      clearTimeout(timeout);
-      events.forEach(e => document.removeEventListener(e, resetTimer));
-    };
-  }, [isLoggedIn]);
-
   // ── Session idle timeout (30 min) ──
   const [idleWarning, setIdleWarning] = useState(false);
   const idleTimerRef = useRef(null);
@@ -608,8 +590,8 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
   // ── Profile field row helper ──
   const ProfileRow = ({ label, value }) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '16px' }}>
-      <span style={{ fontSize: '15px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
-      <span style={{ fontSize: '15px', color: '#0f172a', fontWeight: '500' }}>{value || '-'}</span>
+      <span style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
+      <span style={{ fontSize: '15px', color: 'var(--text-main)', fontWeight: '500' }}>{value || '-'}</span>
     </div>
   );
 
@@ -641,7 +623,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                 }}
                 style={{
                   position: 'relative', background: 'none', border: 'none',
-                  cursor: 'pointer', padding: '6px', color: '#ffffff',
+                  cursor: 'pointer', padding: '6px', color: 'var(--text-main)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center'
                 }}
               >
@@ -875,7 +857,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
           </div>
         </div>
 
-        <div className="content-scroller" style={{ zoom: parseFloat(fontScale) }}>
+        <div className="content-scroller" style={{ zoom: parseFloat(fontScale), paddingBottom: activeTab === 'Map View' ? '0px' : undefined }}>
           <div key={`page-${activeTab}`} className="app-page-enter">
             {renderContent()}
           </div>
@@ -917,9 +899,9 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
           style={{
             position: 'fixed', bottom: '80px', right: '24px', zIndex: 9001,
             padding: '12px 18px', borderRadius: '10px',
-            background: syncResult.type === 'error' ? '#FEF2F2' : syncResult.type === 'conflict' ? '#FFFBEB' : '#F0FDF4',
-            border: `1px solid ${syncResult.type === 'error' ? '#FECACA' : syncResult.type === 'conflict' ? '#FDE68A' : '#baf0d7'}`,
-            color: syncResult.type === 'error' ? '#DC2626' : syncResult.type === 'conflict' ? '#D97706' : '#129968',
+            background: syncResult.type === 'error' ? 'var(--warning-bg)' : syncResult.type === 'conflict' ? 'var(--warning-bg)' : 'var(--success-bg)',
+            border: `1px solid ${syncResult.type === 'error' ? 'var(--warning-border)' : syncResult.type === 'conflict' ? 'var(--warning-border)' : 'var(--success-border)'}`,
+            color: syncResult.type === 'error' ? 'var(--warning-text)' : syncResult.type === 'conflict' ? 'var(--warning-text)' : 'var(--success-text)',
             fontSize: '15px', fontWeight: '500', maxWidth: '340px',
             boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
           }}
@@ -948,7 +930,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             className="cdms-modal-card"
             onClick={e => e.stopPropagation()}
             style={{
-              background: '#ffffff', borderRadius: '16px', width: '520px', maxWidth: '95vw',
+              background: 'var(--bg-surface)', borderRadius: '16px', width: '520px', maxWidth: '95vw',
               boxShadow: '0 24px 60px rgba(0,0,0,0.25)', overflow: 'hidden',
             }}
           >
@@ -984,7 +966,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             {/* ── Profile details body ── */}
             <div style={{ padding: '28px 32px' }}>
               {profileLoading ? (
-                <div style={{ textAlign: 'center', padding: '24px', color: '#64748b', fontSize: '15px' }}>
+                <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '15px' }}>
                   Loading profile...
                 </div>
               ) : profileData ? (
@@ -999,13 +981,13 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                   </div>
                 </>
               ) : (
-                <div style={{ textAlign: 'center', padding: '16px', color: '#64748b', fontSize: '15px' }}>
+                <div style={{ textAlign: 'center', padding: '16px', color: 'var(--text-muted)', fontSize: '15px' }}>
                   Could not load profile details.
                 </div>
               )}
 
               {/* ── Action buttons ── */}
-              <div style={{ display: 'flex', gap: '12px', marginTop: '24px', paddingTop: '20px', borderTop: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', gap: '12px', marginTop: '24px', paddingTop: '20px', borderTop: '1px solid var(--border-color)' }}>
                 <button
                   onClick={() => { setShowProfileModal(false); setActiveTab('Settings'); setOpenProfileView(true); }}
                   style={{
@@ -1019,8 +1001,8 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                 <button
                   onClick={() => setShowProfileModal(false)}
                   style={{
-                    padding: '12px 24px', background: '#f1f5f9', color: '#475569',
-                    border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '15px',
+                    padding: '12px 24px', background: 'var(--input-bg)', color: 'var(--text-main)',
+                    border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '15px',
                     cursor: 'pointer',
                   }}
                 >

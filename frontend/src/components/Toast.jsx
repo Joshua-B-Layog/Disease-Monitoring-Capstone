@@ -20,10 +20,10 @@ export function dismissToast(id) {
 }
 
 const THEME = {
-  success: { icon: '✅', bg: '#e9f8f0', border: '#129968', color: '#0b5c3f' },
-  error:   { icon: '❌', bg: '#fdecec', border: '#ef4444', color: '#b91c1c' },
-  info:    { icon: 'ℹ️', bg: '#ebf3fe', border: '#3b82f6', color: '#1d4ed8' },
-  warning: { icon: '⚠️', bg: '#fef5e6', border: '#f59e0b', color: '#b45309' },
+  success: { icon: '✅', bg: 'var(--success-bg)', border: 'var(--success-border)', color: 'var(--success-text)' },
+  error:   { icon: '❌', bg: 'var(--warning-bg)', border: 'var(--warning-border)', color: 'var(--warning-text)' },
+  info:    { icon: 'ℹ️', bg: 'var(--info-bg)', border: 'var(--info-border)', color: 'var(--info-text)' },
+  warning: { icon: '⚠️', bg: 'var(--warning-bg)', border: 'var(--warning-border)', color: 'var(--warning-text)' },
 };
 
 function ToastCard({ t, style }) {

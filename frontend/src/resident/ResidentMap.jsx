@@ -788,16 +788,16 @@ export default function ResidentMap() {
             {/* Stat cards */}
             <div className="resident-stat-cards" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '20px' }}>
               {[
-                { label: 'Total Cases', value: totalCases, color: '#1e3a8a', bg: '#eff6ff' },
+                { label: 'Total Cases', value: totalCases, color: 'var(--text-h)', bg: 'var(--bg-surface)' },
                 { label: 'Most Affected', value: mostAffected ? mostAffected.barangayName : '-', sub: mostAffected ? `${mostAffected.totalCases} cases` : '', color: '#dc2626', bg: '#fef2f2' },
                 { label: 'Top Disease', value: topDiseaseCitywide ? topDiseaseCitywide[0] : '-', sub: topDiseaseCitywide ? `${topDiseaseCitywide[1]} cases` : '', color: '#7c3aed', bg: '#f5f3ff' },
                 { label: 'Active Cases', value: activeCases, color: '#f59e0b', bg: '#fffbeb' },
                 { label: 'Affected Barangays', value: `${affectedBrgyCount} / ${ALL_BARANGAYS.length}`, color: '#10b981', bg: '#ecfdf5' },
               ].map(card => (
-                <div key={card.label} style={{ flex: '1 1 120px', background: card.bg, borderRadius: '10px', padding: '10px 10px', textAlign: 'center' }}>
+                <div key={card.label} style={{ flex: '1 1 120px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '10px 10px', textAlign: 'center' }}>
                   <div style={{ fontSize: '24px', fontWeight: '800', color: card.color, lineHeight: '1.2' }}>{card.value}</div>
-                  {card.sub && <div style={{ fontSize: '13px', fontWeight: '600', color: '#475569', marginTop: '3px' }}>{card.sub}</div>}
-                  <div style={{ fontSize: '14px', fontWeight: '600', color: '#475569', marginTop: '4px' }}>{card.label}</div>
+                  {card.sub && <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-muted)', marginTop: '3px' }}>{card.sub}</div>}
+                  <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-muted)', marginTop: '4px' }}>{card.label}</div>
                 </div>
               ))}
             </div>
