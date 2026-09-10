@@ -507,6 +507,13 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   const activeCases = displayCases.filter(c => ['Active', 'Pending', 'Under Treatment'].includes(c.status)).length;
   const recoveredCases = displayCases.filter(c => c.status === 'Recovered').length;
   const deathCases = displayCases.filter(c => c.status === 'Deceased').length;
+  const STATUS_DIST = [
+    ['Active', displayCases.filter(c => c.status === 'Active').length, '#3B82F6'],
+    ['Pending', displayCases.filter(c => c.status === 'Pending').length, '#f59e0b'],
+    ['Under Treatment', displayCases.filter(c => c.status === 'Under Treatment').length, '#10b981'],
+    ['Recovered', displayCases.filter(c => c.status === 'Recovered').length, '#0D7A4E'],
+    ['Deceased', displayCases.filter(c => c.status === 'Deceased').length, '#DC2626'],
+  ].filter(([, n]) => n > 0);
 
   // --- TREND COMPARISON: previous period ---
   const prevDateRange = (() => {
@@ -1609,6 +1616,53 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         );
       })()}
 
+      {/* ── STATUS DISTRIBUTION DONUT ── */}
+      <div key={`donut-${statSignature}`} className="cdms-view-in" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative', width: '150px', height: '150px', flexShrink: 0 }}>
+          <svg viewBox="0 0 120 120" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
+            {(function () {
+              const segs = STATUS_DIST;
+              const total = segs.reduce((s, x) => s + x[1], 0);
+              const C = 2 * Math.PI * 44;
+              let acc = 0;
+              if (total === 0) return <circle cx="60" cy="60" r="44" fill="none" stroke="var(--border-color)" strokeWidth="16" />;
+              return segs.map(([label, n, color]) => {
+                const len = (n / total) * C;
+                const seg = (
+                  <circle key={label} cx="60" cy="60" r="44" fill="none" stroke={color} strokeWidth="16"
+                    strokeDasharray={`${len} ${C - len}`} strokeDashoffset={-acc}
+                    style={{ transition: 'stroke-dasharray 0.5s ease' }} />
+                );
+                acc += len;
+                return seg;
+              });
+            })()}
+          </svg>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ fontSize: '26px', fontWeight: '800', color: 'var(--text-main)' }}>{totalCases}</span>
+            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Total Cases</span>
+          </div>
+        </div>
+        <div style={{ flex: 1, minWidth: '220px' }}>
+          <h4 style={{ margin: '0 0 12px 0', fontSize: '15px', fontWeight: '600', color: 'var(--text-main)' }}>Case Status Distribution</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {STATUS_DIST.map(([label, n, color]) => {
+              const pct = totalCases > 0 ? Math.round((n / totalCases) * 100) : 0;
+              return (
+                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: color, flexShrink: 0 }} />
+                  <span style={{ minWidth: '130px', fontSize: '15px', color: 'var(--text-main)' }}>{label}</span>
+                  <div style={{ flex: 1, background: 'var(--input-bg)', height: '16px', borderRadius: '6px', overflow: 'hidden' }}>
+                    <div style={{ width: `${pct}%`, background: color, height: '100%', borderRadius: '6px', transition: 'width 0.5s ease' }} />
+                  </div>
+                  <span style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', width: '44px', textAlign: 'right' }}>{n}</span>
+                  <span style={{ fontSize: '13px', color: 'var(--text-muted)', width: '40px', textAlign: 'right' }}>{pct}%</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
       {/* ── RECENT CASE REPORTS ── */}
           <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>

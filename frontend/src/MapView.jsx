@@ -1013,6 +1013,14 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const mediumCount = activeData.filter(b => b.totalCases >= 10 && b.totalCases < 20).length;
   const lowCount    = activeData.filter(b => b.totalCases < 10).length;
 
+  // Ranked disease hotspots across the current filter scope
+  const hotspotRanked = useMemo(() => {
+    const pool = {};
+    activeData.forEach(g => Object.entries(g.diseases || {}).forEach(([d, n]) => { pool[d] = (pool[d] || 0) + n; }));
+    return Object.entries(pool).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  }, [activeData]);
+  const hotspotMax = hotspotRanked.length ? hotspotRanked[0][1] : 0;
+
   const SEL = {
     width: '100%', padding: '9px 12px',
     background: 'var(--input-bg)', border: '1px solid var(--border-color)',
@@ -1265,6 +1273,30 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           </div>
           <p style={{ margin: '8px 0 0 0', fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
             Pin color = total cases per barangay. Thresholds: &gt;20 red, 10–20 amber, &lt;10 green.
+          </p>
+        </div>
+
+        {/* Disease Hotspots — ranked top 5 by case count in current scope */}
+        <div style={{ paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
+          <p style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Disease Hotspots</p>
+          {hotspotRanked.length === 0 && (
+            <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>No cases match the current filters.</p>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {hotspotRanked.map(([disease, count], i) => (
+              <div key={disease}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                  <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '170px' }}>{i + 1}. {disease}</span>
+                  <span style={{ fontSize: '13px', fontWeight: '700', color: i === 0 ? '#DC2626' : 'var(--text-muted)' }}>{count}</span>
+                </div>
+                <div style={{ height: '7px', background: 'var(--input-bg)', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{ width: `${hotspotMax > 0 ? Math.max(4, Math.round((count / hotspotMax) * 100)) : 0}%`, height: '100%', background: i === 0 ? '#DC2626' : i === 1 ? '#f59e0b' : 'var(--accent, #60a5fa)', borderRadius: '4px' }} />
+                </div>
+              </div>
+            ))}
+          </div>
+          <p style={{ margin: '8px 0 0 0', fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+            Top {hotspotRanked.length} diseases by case count across the current filter scope.
           </p>
         </div>
 

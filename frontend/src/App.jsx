@@ -7,6 +7,7 @@ import BarangayReports from './BarangayReports';
 import ChoSettings from './ChoSettings';
 import Login from './components/Login'; 
 import RecoverAccount from './components/RecoverAccount';
+import RolesPermissions from './components/RolesPermissions';
 import MapView from './MapView';
 import WeeklySummary from './WeeklySummary';
 import { ToastHost } from './components/Toast';
@@ -474,7 +475,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             </div>
           );
         }
-        return <UserManagement dateFormat={dateFormat} confirmDelete={confirmDelete} fontScale={fontScale} compactMode={compactMode} loggedUserId={loggedUserId} loginRole={loginRole} />;
+        return <UserManagement dateFormat={dateFormat} confirmDelete={confirmDelete} fontScale={fontScale} compactMode={compactMode} loggedUserId={loggedUserId} loginRole={loginRole} setActiveTab={setActiveTab} />;
       case 'Audit Reports':
         return <BarangayReports dateFormat={dateFormat} activeUser={{ role: loginRole, context: sessionContext }} fontScale={fontScale} compactMode={compactMode} loggedUserId={loggedUserId} />;
       case 'Settings':
@@ -514,6 +515,8 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             onSecurityViewOpened={() => setOpenSecurityView(false)}
           />
         );
+      case 'Roles & Permissions':
+        return <RolesPermissions compactMode={compactMode} loginRole={loginRole} onBack={() => setActiveTab('User Accounts')} />;
       case 'Weekly Summary':
         return <WeeklySummary userId={loggedUserId} loginRole={loginRole} compactMode={compactMode} fontScale={fontScale} onBack={() => setActiveTab('Dashboard')} />;
       default:

@@ -4,13 +4,25 @@ import axios from 'axios';
 import { API_URL } from './config';
 import BackButton from './components/BackButton';
 import { getAllQueueItems, clearCompleted, getSyncHistory, clearSyncHistory } from './syncEngine';
-import { cacheUserProfile, getCachedUserProfile, getCachedBarangays, isOnline } from './offlineSync';
+import { cacheUserProfile, getCachedUserProfile, getCachedBarangays, isOnline, getCachedAtMap } from './offlineSync';
 import { authHeaders } from './auth';
 import './ChoSettings.css';
+
+const CACHE_STORES = [
+  { key: 'cases_cached_at', label: 'Cases' },
+  { key: 'diseases_cached_at', label: 'Diseases' },
+  { key: 'barangays_cached_at', label: 'Barangays' },
+  { key: 'users_cached_at', label: 'Users' },
+  { key: 'auditLogs_cached_at', label: 'Audit Logs' },
+  { key: 'generatedReports_cached_at', label: 'Generated Reports' },
+  { key: 'notifications_cached_at', label: 'Notifications' },
+  { key: 'contactMessages_cached_at', label: 'Contact Messages' },
+];
 
 function OfflineSyncPanel() {
   const [items, setItems] = useState([]);
   const [history, setHistory] = useState([]);
+  const [cachedAt, setCachedAt] = useState({});
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('queue');
 
@@ -20,6 +32,7 @@ function OfflineSyncPanel() {
       const [all, hist] = await Promise.all([getAllQueueItems(), getSyncHistory()]);
       setItems(all.reverse());
       setHistory(hist);
+      setCachedAt(await getCachedAtMap(CACHE_STORES.map(s => s.key)));
     } catch {}
     setLoading(false);
   };
@@ -61,6 +74,28 @@ function OfflineSyncPanel() {
 
   return (
     <div>
+      <div style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '12px 14px', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <span style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-main)' }}>Last Sync &amp; Local Cache</span>
+          <span style={{ fontSize: '17px', fontWeight: '600', color: isOnline() ? '#129968' : '#EF4444' }}>
+            {isOnline() ? '● Online' : '● Offline'}
+          </span>
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+          {CACHE_STORES.map(s => {
+            const t = cachedAt[s.key];
+            return (
+              <span key={s.key} style={{ padding: '4px 10px', borderRadius: '10px', fontSize: '15px', fontWeight: '600', background: t ? 'rgba(18,153,104,0.12)' : 'rgba(239,68,68,0.1)', color: t ? '#129968' : '#EF4444', border: `1px solid ${t ? 'rgba(18,153,104,0.35)' : 'rgba(239,68,68,0.35)'}` }}>
+                {s.label}: {t ? new Date(t).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'not cached yet'}
+              </span>
+            );
+          })}
+        </div>
+        <p style={{ margin: '8px 0 0 0', fontSize: '15px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+          Point-in-time copies of each dataset are saved locally so the app keeps working offline and syncs changes automatically once back online.
+        </p>
+      </div>
+
       <div style={{ display: 'flex', gap: '4px', marginBottom: '12px', background: 'var(--input-bg)', borderRadius: '8px', padding: '3px' }}>
         <button onClick={() => setTab('queue')} style={{ flex: 1, padding: '6px 12px', borderRadius: '6px', border: 'none', fontSize: '17px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s', background: tab === 'queue' ? 'var(--bg-surface)' : 'transparent', color: tab === 'queue' ? 'var(--text-main)' : 'var(--text-muted)', boxShadow: tab === 'queue' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
           Queue ({items.filter(i => i.status === 'pending').length})

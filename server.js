@@ -83,6 +83,60 @@ function isSameBarangay(name1, name2) {
   return norm(name1) === norm(name2);
 }
 
+// ── Case payload validation (minimize encoding errors — mirrors frontend checks) ──
+const PH_MOBILE_RE = /^(?:\+?63|0)9\d{9}$/;
+const PH_LANDLINE_RE = /^(?:\+?632|02)\d{7,8}$/;
+const VALID_GENDERS = ['Male', 'Female', 'Other'];
+const VALID_SEVERITIES = ['Asymptomatic', 'Mild', 'Moderate', 'Severe', 'Critical'];
+const VALID_CASE_STATUSES = ['Active', 'Pending', 'Under Treatment', 'Recovered', 'Deceased', 'Draft'];
+
+function validateCasePayload(payload = {}) {
+  const errors = [];
+  const {
+    patient_name, age, gender, contact, onset_date, severity, case_status, status, disease_name,
+  } = payload;
+  const st = case_status || status || 'Active';
+
+  if (patient_name === undefined || patient_name === null || !String(patient_name).trim()) {
+    errors.push('Patient name is required.');
+  } else if (String(patient_name).trim().length < 2) {
+    errors.push('Patient name must be at least 2 characters.');
+  }
+  if (!disease_name) errors.push('Disease is required.');
+
+  if (age !== undefined && age !== null && age !== '') {
+    const a = Number(age);
+    if (!Number.isInteger(a) || String(age).trim() === '' || a < 0 || a > 130) {
+      errors.push('Age must be a whole number between 0 and 130.');
+    }
+  }
+  if (gender !== undefined && gender !== null && gender !== '' && !VALID_GENDERS.includes(gender)) {
+    errors.push(`Gender must be one of: ${VALID_GENDERS.join(', ')}.`);
+  }
+  if (severity !== undefined && severity !== null && severity !== '' && !VALID_SEVERITIES.includes(severity)) {
+    errors.push(`Severity must be one of: ${VALID_SEVERITIES.join(', ')}.`);
+  }
+  if (st && !VALID_CASE_STATUSES.includes(st)) {
+    errors.push(`Status must be one of: ${VALID_CASE_STATUSES.join(', ')}.`);
+  }
+  if (contact !== undefined && contact !== null && String(contact).trim()) {
+    const c = String(contact).trim().replace(/[\s-]/g, '');
+    if (!PH_MOBILE_RE.test(c) && !PH_LANDLINE_RE.test(c)) {
+      errors.push('Contact number must be a valid Philippine number (e.g. 09171234567).');
+    }
+  }
+  if (onset_date !== undefined && onset_date !== null && onset_date !== '') {
+    const od = new Date(onset_date);
+    if (isNaN(od.getTime())) {
+      errors.push('Onset date is invalid.');
+    } else {
+      const endOfToday = new Date(); endOfToday.setHours(23, 59, 59, 999);
+      if (od.getTime() > endOfToday.getTime()) errors.push('Onset date cannot be in the future.');
+    }
+  }
+  return errors;
+}
+
 const app = express();
 
 const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
@@ -947,6 +1001,12 @@ app.post('/api/cases', authenticate, (req, res) => {
 
     console.log("--- Add Case ---", { patient_name, disease_name, barangay_id });
 
+    // ── Server-side validation mirror (2.4) ──
+    const addValidation = validateCasePayload(req.body);
+    if (addValidation.length > 0) {
+      return res.status(400).json({ error: addValidation.join(' '), validationErrors: addValidation });
+    }
+
     // ── Duplicate active case check ──
     const activeStatuses = ['Active', 'Under Treatment', 'Pending'];
     const checkDuplicate = (callback) => {
@@ -1615,6 +1675,12 @@ app.post('/api/cases/request-add', authenticate, (req, res) => {
     return res.status(400).json({ error: 'requested_by, patient_name and disease_name are required.' });
   }
 
+  // ── Server-side validation mirror (2.4) ──
+  const addRequestValidation = validateCasePayload(req.body);
+  if (addRequestValidation.length > 0) {
+    return res.status(400).json({ error: addRequestValidation.join(' '), validationErrors: addRequestValidation });
+  }
+
   const resolveBarangay = (cb) => {
     if (barangay_id) {
       db.query('SELECT name FROM barangays WHERE id = ?', [barangay_id], (bErr, bRes) => {
@@ -1720,6 +1786,12 @@ app.put('/api/case-add-requests/:id/approve', authenticate, (req, res) => {
       longitude: longitude || reqRow.longitude,
     };
 
+    // ── Server-side validation mirror (2.4) ──
+    const approveValidation = validateCasePayload(final);
+    if (approveValidation.length > 0) {
+      return res.status(400).json({ error: approveValidation.join(' '), validationErrors: approveValidation });
+    }
+
     const checkDuplicate = (cb) => {
       if (!final.patient_name || final.case_status === 'Draft') return cb();
       db.query(
@@ -1767,6 +1839,13 @@ app.put('/api/case-add-requests/:id/approve', authenticate, (req, res) => {
                 if (insErr) return res.status(500).json({ error: insErr.message });
                 const newCaseId = insResult.insertId;
                 const resolverId = body.actor_id || null;
+
+                // Seed the status history with the approval transition so every case has a full timeline
+                db.query(
+                  'INSERT INTO case_status_history (case_id, old_status, new_status, changed_by, changed_by_name, changed_by_role, notes) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                  [newCaseId, reqRow.case_status || 'Pending', final.case_status, resolverId, body.actor_name || 'CHO', body.actor_role || 'CHO', 'Add request approved by CHO'],
+                  (hErr) => { if (hErr) console.error('Status history on approval error:', hErr.message); }
+                );
                 db.query(
                   "UPDATE case_add_requests SET status = 'accepted', resolved_at = NOW(), resolved_by = ?, case_id = ? WHERE id = ? AND status = 'pending'",
                   [resolverId, newCaseId, id],
@@ -2035,6 +2114,12 @@ app.put('/api/cases/:id', authenticate, (req, res) => {
     } = req.body;
 
     console.log("--- Update Case ---", { id, patient_name });
+
+    // ── Server-side validation mirror (2.4) ──
+    const updateValidation = validateCasePayload(req.body);
+    if (updateValidation.length > 0) {
+      return res.status(400).json({ error: updateValidation.join(' '), validationErrors: updateValidation });
+    }
 
     const findDiseaseQuery = 'SELECT id FROM diseases WHERE LOWER(name) = LOWER(?)';
     

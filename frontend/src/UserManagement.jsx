@@ -46,7 +46,7 @@ const EMPTY_FORM = {
   role: 'BHW',
 };
 
-export default function UserManagement({ confirmDelete, fontScale, compactMode, dateFormat, loggedUserId, loginRole }) {
+export default function UserManagement({ confirmDelete, fontScale, compactMode, dateFormat, loggedUserId, loginRole, setActiveTab }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [barangayList, setBarangayList] = useState([]);
@@ -398,14 +398,24 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
             Offline - showing cached data
           </span>
         )}
-        <button onClick={handleExportUsers}
-          onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
-          onMouseLeave={e => e.currentTarget.style.opacity = '1'}
-          className="cdms-export-btn"
-          style={{ padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', display: 'flex', gap: '8px', alignItems: 'center', fontSize: '15px', fontWeight: '500' }}>
-          <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-          Export Accounts List
-        </button>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button onClick={() => setActiveTab && setActiveTab('Roles & Permissions')}
+            onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+            onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+            className="cdms-export-btn"
+            style={{ padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', display: 'flex', gap: '8px', alignItems: 'center', fontSize: '15px', fontWeight: '500' }}>
+            <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14a3 3 0 003-3V6a3 3 0 10-6 0v5a3 3 0 003 3z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14v5m-4 0h8"/></svg>
+            Roles &amp; Permissions
+          </button>
+          <button onClick={handleExportUsers}
+            onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+            onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+            className="cdms-export-btn"
+            style={{ padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', display: 'flex', gap: '8px', alignItems: 'center', fontSize: '15px', fontWeight: '500' }}>
+            <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Export Accounts List
+          </button>
+        </div>
       </div>
 
       <div style={{ background: 'var(--bg-surface)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', border: '1px solid var(--border-color)' }}>

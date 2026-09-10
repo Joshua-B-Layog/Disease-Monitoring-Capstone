@@ -323,6 +323,48 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
     setShowDownloadMenu(null);
   };
 
+  // ── Audit log export (PDF / Excel / CSV) ──
+  const handleAuditExport = (format) => {
+    const rows = filteredAuditLogs.map(l => ({
+      'Timestamp': l.created_at ? new Date(l.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '',
+      'User ID': l.user_id || '',
+      'Name': l.user_name || '',
+      'Role': l.user_role === 'CHO' ? 'CHO Admin' : 'BHW',
+      'Action': l.action,
+      'Entity': l.entity,
+      'Details': (l.details || '').replace(/\s*\(User ID:\s*\d+\)/gi, '').replace(/\s*\(Case ID:\s*\d+\)/gi, ''),
+    }));
+    const stamp = new Date().toISOString().split('T')[0];
+    if (format === 'csv') {
+      const header = Object.keys(rows[0] || {});
+      const body = rows.map(r => header.map(k => `"${String(r[k] ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+      const blob = new Blob(['\ufeff' + header.join(',') + '\n' + body], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `audit_logs_${stamp}.csv`; a.click();
+    } else if (format === 'xlsx') {
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Audit Logs');
+      XLSX.writeFile(wb, `audit_logs_${stamp}.xlsx`);
+    } else {
+      const headRow = `<tr>${Object.keys(rows[0] || {}).map(k => `<th>${k}</th>`).join('')}</tr>`;
+      const bodyRows = rows.map(r => `<tr>${Object.values(r).map(v => `<td>${String(v ?? '')}</td>`).join('')}</tr>`).join('');
+      const htmlStr = `<html><head><meta charset="utf-8"><title>Audit Logs</title>
+      <style>body{font-family:Arial,sans-serif;padding:32px;font-size:12px;color:#111;}h1{color:#1e3a8a;font-size:20px;margin-bottom:4px;}p{color:#555;margin:0 0 16px;font-size:12px;}table{width:100%;border-collapse:collapse;}th{background:#1e3a8a;color:white;padding:8px;text-align:left;font-size:11px;}td{padding:7px;border-bottom:1px solid #e5e7eb;font-size:11px;}tr:nth-child(even) td{background:#f9fafb;}</style></head><body>
+      <h1>Cabuyao CDMS — Audit Log Export</h1>
+      <p>${rows.length} entries · Generated ${new Date().toLocaleString('en-PH')}</p>
+      <table><thead>${headRow}</thead><tbody>${bodyRows}</tbody></table>
+      </body></html>`;
+      const element = document.createElement('div');
+      element.innerHTML = htmlStr;
+      element.style.position = 'fixed';
+      element.style.left = '-9999px';
+      document.body.appendChild(element);
+      html2pdf().set({ margin: 0.5, filename: `audit_logs_${stamp}.pdf`, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'letter' } }).from(element).save().then(() => { document.body.removeChild(element); });
+    }
+    setShowExportDrop(false);
+  };
+
   // ── Delete confirmation ──
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
@@ -376,6 +418,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
   const [showUserDrop,    setShowUserDrop]    = useState(false);
   const [showSubDrop,     setShowSubDrop]     = useState(false);
   const [showDatePicker,  setShowDatePicker]  = useState(false);
+  const [showExportDrop,  setShowExportDrop]  = useState(false);
   const [dateRange, setDateRange]             = useState({ start: '', end: '' });
   const [logPage, setLogPage]                 = useState(1);
   const [logEllipsisOpen, setLogEllipsisOpen] = useState(false);
@@ -391,6 +434,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
   const userDropRef    = useRef(null);
   const subDropRef     = useRef(null);
   const datePickerRef  = useRef(null);
+  const exportDropRef  = useRef(null);
   const [periodOpen, setPeriodOpen] = useState(false);
   const periodRef = useRef(null);
   const [typeOpen, setTypeOpen] = useState(false);
@@ -403,6 +447,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
       if (userDropRef.current    && !userDropRef.current.contains(e.target))    setShowUserDrop(false);
       if (subDropRef.current     && !subDropRef.current.contains(e.target))     setShowSubDrop(false);
       if (datePickerRef.current  && !datePickerRef.current.contains(e.target))  setShowDatePicker(false);
+      if (exportDropRef.current  && !exportDropRef.current.contains(e.target))  setShowExportDrop(false);
       if (reportSortRef.current  && !reportSortRef.current.contains(e.target))  setShowReportSortDrop(false);
       if (periodRef.current      && !periodRef.current.contains(e.target))      setPeriodOpen(false);
       if (typeRef.current        && !typeRef.current.contains(e.target))        setTypeOpen(false);
@@ -590,6 +635,48 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
 
   const sortedReportLogs = getSortedReportLogs();
 
+  // ── Seasonal (Quarterly/Monthly/Yearly) comparison from live case data ──
+  const buildSeasonalData = (period) => {
+    const nowDate = new Date();
+    const y = nowDate.getFullYear();
+    const m = nowDate.getMonth();
+    let curStart, curEnd, prevStart, prevEnd, curLabel, prevLabel;
+    if (period === 'Quarterly') {
+      const q = Math.floor(m / 3);
+      curStart = new Date(y, q * 3, 1);
+      curEnd = new Date(y, q * 3 + 3, 0, 23, 59, 59, 999);
+      prevStart = new Date(y, q * 3 - 3, 1);
+      prevEnd = new Date(y, q * 3, 0, 23, 59, 59, 999);
+      curLabel = `Q${q + 1} ${y}`;
+      prevLabel = `Q${((q + 2) % 4) + 1} ${q === 0 ? y - 1 : y}`;
+    } else if (period === 'Monthly') {
+      curStart = new Date(y, m, 1);
+      curEnd = new Date(y, m + 1, 0, 23, 59, 59, 999);
+      prevStart = new Date(y, m - 1, 1);
+      prevEnd = new Date(y, m, 0, 23, 59, 59, 999);
+      curLabel = curStart.toLocaleString('en-PH', { month: 'long', year: 'numeric' });
+      prevLabel = prevStart.toLocaleString('en-PH', { month: 'long', year: 'numeric' });
+    } else {
+      curStart = new Date(y, 0, 1);
+      curEnd = new Date(y, 11, 31, 23, 59, 59, 999);
+      prevStart = new Date(y - 1, 0, 1);
+      prevEnd = new Date(y - 1, 11, 31, 23, 59, 59, 999);
+      curLabel = String(y);
+      prevLabel = String(y - 1);
+    }
+    const inRange = (c, s, e) => {
+      const t = c.date_reported ? new Date(c.date_reported).getTime() : 0;
+      return t >= s.getTime() && t <= e.getTime();
+    };
+    const cur = allCases.filter(c => inRange(c, curStart, curEnd));
+    const prev = allCases.filter(c => inRange(c, prevStart, prevEnd));
+    const dMap = {};
+    cur.forEach(c => { const d = c.disease_name || 'Unknown'; dMap[d] = (dMap[d] || 0) + 1; });
+    const topDiseases = Object.entries(dMap).sort((a, b) => b[1] - a[1]).slice(0, 3);
+    const change = prev.length > 0 ? Math.round(((cur.length - prev.length) / prev.length) * 100) : (cur.length > 0 ? 100 : 0);
+    return { curCount: cur.length, prevCount: prev.length, curLabel, prevLabel, change, topDiseases };
+  };
+
   const s = {
     card:    { background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' },
     label:   { fontSize: '15px', fontWeight: '600', color: 'var(--text-muted)', letterSpacing: '0.04em', textTransform: 'uppercase' },
@@ -625,6 +712,32 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                 </div>
               )}
             </div>
+
+            {viewReport.period && ['Quarterly', 'Monthly', 'Yearly'].includes(viewReport.period) && allCases.length > 0 && (() => {
+              const season = buildSeasonalData(viewReport.period);
+              const changeColor = season.change > 0 ? '#dc2626' : season.change < 0 ? '#10b981' : '#64748b';
+              return (
+                <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderLeft: '4px solid #0d9488', borderRadius: '8px', padding: '14px 18px', marginBottom: '20px' }}>
+                  <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '8px' }}>Seasonal ({viewReport.period}) Comparison — live case data</div>
+                  <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+                    {[{ label: `Current (${season.curLabel})`, value: season.curCount, color: '#0d9488' },
+                      { label: `Previous (${season.prevLabel})`, value: season.prevCount, color: '#64748b' },
+                      { label: 'Change', value: `${season.change >= 0 ? '+' : ''}${season.change}%`, color: changeColor }].map(sm => (
+                      <div key={sm.label} style={{ flex: '1 1 120px', background: 'var(--input-bg)', borderRadius: '8px', padding: '8px 12px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '20px', fontWeight: '800', color: sm.color }}>{sm.value}</div>
+                        <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-muted)', marginTop: '2px' }}>{sm.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {season.topDiseases.length > 0 && (
+                    <div style={{ marginTop: '8px', fontSize: '15px', color: 'var(--text-muted)' }}>
+                      <strong style={{ color: 'var(--text-main)' }}>Top diseases this period:</strong>{' '}
+                      {season.topDiseases.map(([d, n], i) => `${i + 1}. ${d} (${n})`).join('  ·  ')}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             <h4 style={{ margin: '0 0 10px 0', fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               System Activity Log Snapshot
@@ -1260,7 +1373,34 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
             </div>
           )}
 
-          <span style={{ marginLeft: 'auto', fontSize: '15px', color: 'var(--text-muted)' }}>
+          {/* Active export dropdown */}
+          <div style={{ position: 'relative', marginLeft: 'auto' }} ref={exportDropRef}>
+            <button
+              onClick={() => { setShowExportDrop(!showExportDrop); setShowActionDrop(false); setShowUserDrop(false); setShowSubDrop(false); setShowDatePicker(false); }}
+              style={{ ...s.dropBtn(false), fontWeight: '600' }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export
+            </button>
+            {showExportDrop && (
+              <div style={s.dropMenu}>
+                <div style={{ padding: '8px 16px', fontSize: '15px', color: 'var(--text-muted)', fontWeight: '600', borderBottom: '1px solid var(--border-color)' }}>
+                  {filteredAuditLogs.length} entries
+                </div>
+                {[{ fmt: 'pdf', label: 'Export as PDF', color: '#dc2626' }, { fmt: 'xlsx', label: 'Export as Excel', color: '#129968' }, { fmt: 'csv', label: 'Export as CSV', color: '#2563eb' }].map(opt => (
+                  <button key={opt.fmt} style={s.dropItem(false)}
+                    onClick={() => handleAuditExport(opt.fmt)}
+                    onMouseEnter={e => { e.target.style.background = 'var(--input-bg)'; }}
+                    onMouseLeave={e => { e.target.style.background = 'transparent'; }}>
+                    <span style={{ display: 'inline-block', width: '9px', height: '9px', borderRadius: '50%', marginRight: '8px', background: opt.color }} />
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <span style={{ fontSize: '15px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
             Showing {Math.min((logPage - 1) * ITEMS_PER_PAGE + 1, filteredAuditLogs.length)}–{Math.min(logPage * ITEMS_PER_PAGE, filteredAuditLogs.length)} of {filteredAuditLogs.length} entries
           </span>
         </div>

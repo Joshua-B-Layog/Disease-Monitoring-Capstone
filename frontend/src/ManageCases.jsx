@@ -2010,7 +2010,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       if (!formData.age) errors.age = true;
       else {
         const ageNum = Number(formData.age);
-        if (isNaN(ageNum) || ageNum < 0 || ageNum > 120) errors.age = true;
+        if (isNaN(ageNum) || ageNum < 0 || ageNum > 130) errors.age = true;
       }
       if (!formData.contact.trim()) errors.contact = true;
       else {
@@ -2019,14 +2019,19 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       }
       if (!formData.address.trim()) errors.address = true;
       if (!formData.onsetDate) errors.onsetDate = true;
+      else {
+        const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
+        if (new Date(formData.onsetDate).getTime() > todayEnd.getTime()) errors.onsetDate = true;
+      }
       if (!formData.physician.trim()) errors.physician = true;
       if (!formData.symptoms.trim()) errors.symptoms = true;
       if (!formData.lat || !formData.lng) errors.location = true;
       if (Object.keys(errors).length > 0) {
         setFormErrors(errors);
         const msgs = [];
-        if (errors.age) msgs.push('Age must be 0–120');
+        if (errors.age) msgs.push('Age must be 0–130');
         if (errors.contact) msgs.push('Use valid PH phone (e.g., 09123456789)');
+        if (errors.onsetDate) msgs.push('Onset date cannot be in the future');
         setSubmitMsg(msgs.length > 0 ? `Error: ${msgs.join('. ')}.` : 'Error: Please fill in all required fields highlighted in red.');
         setSubmitLoading(false);
         return;
@@ -4403,21 +4408,25 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 {/* Status Transition Log */}
                 {editingCase && statusHistory.length > 0 && (
                   <div style={{ gridColumn: '1 / -1', marginTop: '4px', marginBottom: '4px' }}>
-                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: '600' }}>Status History</label>
+                    <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: '600' }}>Status History</label>
                     <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
                       {statusHistory.map((entry, idx) => (
-                        <div key={entry.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', borderBottom: idx < statusHistory.length - 1 ? '1px solid var(--border-color)' : 'none', fontSize: '13px' }}>
-                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: idx === statusHistory.length - 1 ? '#129968' : '#94a3b8', flexShrink: 0 }}></div>
+                        <div key={entry.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px', borderBottom: idx < statusHistory.length - 1 ? '1px solid var(--border-color)' : 'none', fontSize: '15px' }}>
+                          <div style={{ width: '9px', height: '9px', borderRadius: '50%', background: idx === statusHistory.length - 1 ? '#129968' : '#94a3b8', flexShrink: 0, marginTop: '6px' }}></div>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <span style={{ color: 'var(--text-muted)' }}>{entry.old_status || 'Initial'} → </span>
-                            <span style={{ fontWeight: '600', color: 'var(--text-main)' }}>{entry.new_status}</span>
-                            {entry.changed_by_name && (
-                              <span style={{ color: 'var(--text-muted)', marginLeft: '6px' }}>by {entry.changed_by_name}</span>
-                            )}
+                            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                              <span style={{ color: 'var(--text-muted)' }}>{entry.old_status || 'Initial'} → </span>
+                              <span style={{ fontWeight: '600', color: 'var(--text-main)' }}>{entry.new_status}</span>
+                              {entry.changed_by_role && (
+                                <span style={{ fontSize: '12px', padding: '1px 8px', borderRadius: '10px', background: entry.changed_by_role === 'CHO' ? 'rgba(37,99,235,0.15)' : 'rgba(18,153,104,0.15)', color: entry.changed_by_role === 'CHO' ? 'var(--text-main)' : 'var(--text-main)', fontWeight: '600' }}>{entry.changed_by_role}</span>
+                              )}
+                            </div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
+                              {entry.changed_by_name && <span>by {entry.changed_by_name}</span>}
+                              {entry.changed_at && <span>{entry.changed_by_name ? ' · ' : ''}{new Date(entry.changed_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>}
+                            </div>
+                            {entry.notes && <div style={{ color: 'var(--text-muted)', fontSize: '14px', fontStyle: 'italic', marginTop: '2px' }}>{entry.notes}</div>}
                           </div>
-                          <span style={{ fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                            {new Date(entry.changed_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                          </span>
                         </div>
                       ))}
                     </div>

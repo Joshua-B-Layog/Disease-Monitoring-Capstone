@@ -338,3 +338,15 @@ export async function getCachedNotifications() {
     return [];
   }
 }
+
+// ── Cache freshness timestamps (2.1 offline status) ──
+export async function getCachedAtMap(keys) {
+  try {
+    const rows = await db.referenceData.bulkGet(keys);
+    const map = {};
+    (keys || []).forEach((k, i) => { map[k] = rows[i] && rows[i].value ? rows[i].value : null; });
+    return map;
+  } catch {
+    return {};
+  }
+}
