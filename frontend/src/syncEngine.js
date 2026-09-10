@@ -1,5 +1,6 @@
 import { API_URL } from './config';
 import db from './db';
+import { authHeaders } from './auth';
 
 let syncing = false;
 
@@ -78,7 +79,7 @@ export async function processSyncQueue(onProgress, onConflict) {
       await db.syncQueue.update(item.id, { status: 'syncing' });
       if (onProgress) onProgress({ current: synced + failed + 1, total: pending.length, item });
 
-      const headers = { 'Content-Type': 'application/json' };
+      const headers = { 'Content-Type': 'application/json', ...authHeaders() };
       const fetchOpts = {
         method: item.method,
         headers,

@@ -5,6 +5,7 @@ import { API_URL } from './config';
 import BackButton from './components/BackButton';
 import { getAllQueueItems, clearCompleted, getSyncHistory, clearSyncHistory } from './syncEngine';
 import { cacheUserProfile, getCachedUserProfile, getCachedBarangays, isOnline } from './offlineSync';
+import { authHeaders } from './auth';
 import './ChoSettings.css';
 
 function OfflineSyncPanel() {
@@ -40,10 +41,10 @@ function OfflineSyncPanel() {
     return t;
   };
 
-  if (loading) return <div style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '15px' }}>Loading sync queue...</div>;
+  if (loading) return <div style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '17px' }}>Loading sync queue...</div>;
 
   const renderRow = (item, idx) => (
-    <div key={item.id || idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderBottom: '1px solid var(--border-color)', fontSize: '15px' }}>
+    <div key={item.id || idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderBottom: '1px solid var(--border-color)', fontSize: '17px' }}>
       <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: statusColor(item.status), flexShrink: 0 }}></span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <span style={{ fontWeight: '600', color: 'var(--text-main)' }}>{typeLabel(item.type)}</span>
@@ -51,20 +52,20 @@ function OfflineSyncPanel() {
           {new Date(item.timestamp).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
         </span>
       </div>
-      <span style={{ fontSize: '15px', padding: '2px 8px', borderRadius: '10px', background: statusColor(item.status) + '22', color: statusColor(item.status), fontWeight: '600', textTransform: 'capitalize' }}>
+      <span style={{ fontSize: '17px', padding: '2px 8px', borderRadius: '10px', background: statusColor(item.status) + '22', color: statusColor(item.status), fontWeight: '600', textTransform: 'capitalize' }}>
         {item.status}
       </span>
-      {item.error && <span style={{ fontSize: '15px', color: '#EF4444', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.error}>{item.error}</span>}
+      {item.error && <span style={{ fontSize: '17px', color: '#EF4444', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.error}>{item.error}</span>}
     </div>
   );
 
   return (
     <div>
       <div style={{ display: 'flex', gap: '4px', marginBottom: '12px', background: 'var(--input-bg)', borderRadius: '8px', padding: '3px' }}>
-        <button onClick={() => setTab('queue')} style={{ flex: 1, padding: '6px 12px', borderRadius: '6px', border: 'none', fontSize: '15px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s', background: tab === 'queue' ? 'var(--bg-surface)' : 'transparent', color: tab === 'queue' ? 'var(--text-main)' : 'var(--text-muted)', boxShadow: tab === 'queue' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
+        <button onClick={() => setTab('queue')} style={{ flex: 1, padding: '6px 12px', borderRadius: '6px', border: 'none', fontSize: '17px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s', background: tab === 'queue' ? 'var(--bg-surface)' : 'transparent', color: tab === 'queue' ? 'var(--text-main)' : 'var(--text-muted)', boxShadow: tab === 'queue' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
           Queue ({items.filter(i => i.status === 'pending').length})
         </button>
-        <button onClick={() => setTab('history')} style={{ flex: 1, padding: '6px 12px', borderRadius: '6px', border: 'none', fontSize: '15px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s', background: tab === 'history' ? 'var(--bg-surface)' : 'transparent', color: tab === 'history' ? 'var(--text-main)' : 'var(--text-muted)', boxShadow: tab === 'history' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
+        <button onClick={() => setTab('history')} style={{ flex: 1, padding: '6px 12px', borderRadius: '6px', border: 'none', fontSize: '17px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s', background: tab === 'history' ? 'var(--bg-surface)' : 'transparent', color: tab === 'history' ? 'var(--text-main)' : 'var(--text-muted)', boxShadow: tab === 'history' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
           History ({history.length})
         </button>
       </div>
@@ -72,12 +73,12 @@ function OfflineSyncPanel() {
       {tab === 'queue' && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
-            <button onClick={async () => { await clearCompleted(); refresh(); }} style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '15px', fontWeight: '500' }}>
+            <button onClick={async () => { await clearCompleted(); refresh(); }} style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '17px', fontWeight: '500' }}>
               Archive & Clear Completed
             </button>
           </div>
           {items.length === 0 ? (
-            <div style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '15px' }}>No offline operations in queue.</div>
+            <div style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '17px' }}>No offline operations in queue.</div>
           ) : (
             <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
               {items.slice(0, 20).map((item, idx) => renderRow(item, idx))}
@@ -89,12 +90,12 @@ function OfflineSyncPanel() {
       {tab === 'history' && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
-            <button onClick={async () => { await clearSyncHistory(); refresh(); }} style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '15px', fontWeight: '500' }}>
+            <button onClick={async () => { await clearSyncHistory(); refresh(); }} style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '17px', fontWeight: '500' }}>
               Clear History
             </button>
           </div>
           {history.length === 0 ? (
-            <div style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '15px' }}>No sync history yet. Completed syncs will appear here.</div>
+            <div style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '17px' }}>No sync history yet. Completed syncs will appear here.</div>
           ) : (
             <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
               {history.slice(0, 50).map((item, idx) => renderRow(item, idx))}
@@ -255,7 +256,7 @@ export default function CHOSettings({
     setNotifSaveMsg('');
     setSystemPrefsSaveMsg('');
     setNotifLoading(true);
-    fetch(`${API_URL}/api/notification-preferences/${userId}`)
+    fetch(`${API_URL}/api/notification-preferences/${userId}`, { headers: authHeaders() })
       .then(r => r.json())
       .then(data => {
         setNotifications({
@@ -283,7 +284,7 @@ export default function CHOSettings({
     if (currentView !== 'security' || !userId) return;
     if (activeUser?.role === 'BHW') {
       setPwRequestMsg('');
-      fetch(`${API_URL}/api/password-change-requests?user_id=${userId}`)
+      fetch(`${API_URL}/api/password-change-requests?user_id=${userId}`, { headers: authHeaders() })
         .then(r => r.json())
         .then(data => {
           const pending = Array.isArray(data) ? data.find(r => r.status === 'pending') : null;
@@ -422,7 +423,7 @@ export default function CHOSettings({
 
   const handleCreateBackup = (silent = false) => {
     setBackupLoading(true);
-    fetch(API_URL + '/api/backup')
+    fetch(API_URL + '/api/backup', { headers: authHeaders() })
       .then(res => res.blob())
       .then(blob => {
         const url = URL.createObjectURL(blob);
@@ -813,7 +814,7 @@ export default function CHOSettings({
       {toastMsg && (
         <div style={{
           position: 'fixed', top: '20px', right: '20px', zIndex: 10000,
-          padding: '12px 20px', borderRadius: '8px', fontSize: '15px', fontWeight: '500',
+          padding: '12px 20px', borderRadius: '8px', fontSize: '17px', fontWeight: '500',
           background: toastType === 'success' ? '#129968' : '#ef4444',
           color: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
         }}>
@@ -827,7 +828,7 @@ export default function CHOSettings({
           <div>
             <h1 className="settings-title">Settings</h1>
             {offlineMode && (
-              <div style={{ padding: '10px 14px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '15px', color: '#D97706', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ padding: '10px 14px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '17px', color: '#D97706', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '16px' }}>⚠</span>
                 Offline - settings changes require an internet connection.
               </div>
@@ -882,19 +883,19 @@ export default function CHOSettings({
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <h2 style={{ fontSize: '26px', fontWeight: '600', color: 'var(--text-main)', margin: 0 }}>{displayName}</h2>
-                    <p style={{ fontSize: '15px', color: 'var(--text-muted)', margin: 0 }}>
+                    <p style={{ fontSize: '17px', color: 'var(--text-muted)', margin: 0 }}>
                       {activeUser?.role === 'BHW'
                         ? `BHW - ${profile.assignment || activeUser?.context || ''}`
                         : `${activeUser?.role || 'CHO'} Specialist - ${profile.assignment || activeUser?.context || ''}`
                       }
                     </p>
                     <button onClick={() => fileInputRef.current.click()}
-                      style={{ background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '8px 18px', fontSize: '15px', fontWeight: '500', cursor: 'pointer', marginTop: '6px', width: 'fit-content' }}>
+                      style={{ background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '8px 18px', fontSize: '17px', fontWeight: '500', cursor: 'pointer', marginTop: '6px', width: 'fit-content' }}>
                       Change Photo
                     </button>
                     {profilePhoto && (
                       <button onClick={() => onProfilePhotoChange(null)}
-                        style={{ background: 'transparent', color: '#ef4444', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '6px 14px', fontSize: '15px', cursor: 'pointer', width: 'fit-content' }}>
+                        style={{ background: 'transparent', color: '#ef4444', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '6px 14px', fontSize: '17px', cursor: 'pointer', width: 'fit-content' }}>
                         Remove Photo
                       </button>
                     )}
@@ -905,7 +906,7 @@ export default function CHOSettings({
                 <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '24px 0' }} />
 
                 {saveMsg && (
-                  <div className={`cdms-msg-in ${saveMsg.startsWith('✅') ? '' : 'cdms-msg-shake'}`} style={{ background: 'var(--input-bg)', color: saveMsg.startsWith('✅') ? '#0a5e42' : '#991b1b', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px', fontSize: '15px', fontWeight: '500' }}>
+                  <div className={`cdms-msg-in ${saveMsg.startsWith('✅') ? '' : 'cdms-msg-shake'}`} style={{ background: 'var(--input-bg)', color: saveMsg.startsWith('✅') ? '#0a5e42' : '#991b1b', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px', fontSize: '17px', fontWeight: '500' }}>
                     {saveMsg}
                   </div>
                 )}
@@ -919,7 +920,7 @@ export default function CHOSettings({
                     { label: 'Contact Number', key: 'phone', type: 'text' },
                   ].map(field => (
                     <div key={field.key} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '15px', fontWeight: '500', color: 'var(--text-muted)' }}>{field.label}</label>
+                      <label style={{ fontSize: '17px', fontWeight: '500', color: 'var(--text-muted)' }}>{field.label}</label>
                       <input type={field.type} value={profile[field.key]} readOnly={field.readOnly}
                         onChange={e => !field.readOnly && setProfile({ ...profile, [field.key]: e.target.value })}
                         style={{ ...fieldStyle, background: 'var(--input-bg)', color: field.readOnly ? 'var(--text-muted)' : 'var(--text-main)', cursor: field.readOnly ? 'not-allowed' : 'text' }} />
@@ -927,7 +928,7 @@ export default function CHOSettings({
                   ))}
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '15px', fontWeight: '500', color: 'var(--text-muted)' }}>Unit Office Assignment</label>
+                    <label style={{ fontSize: '17px', fontWeight: '500', color: 'var(--text-muted)' }}>Unit Office Assignment</label>
                     <div style={{ position: 'relative' }}>
                       <select value={profile.assignedBarangayId || ''}
                         onChange={e => {
@@ -938,18 +939,18 @@ export default function CHOSettings({
                         <option value="">- Select Assignment -</option>
                         {barangayList.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                       </select>
-                      <span style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', fontSize: '13px', pointerEvents: 'none', opacity: 0.6 }}>▼</span>
+                      <span style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', fontSize: '15px', pointerEvents: 'none', opacity: 0.6 }}>▼</span>
                     </div>
                   </div>
                 </div>
 
                 <div style={{ display: 'flex', gap: '16px', marginTop: '24px' }}>
                   <button onClick={() => { setCurrentView('menu'); setSaveMsg(''); }}
-                    style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '12px', padding: '12px 48px', fontSize: '15px', fontWeight: '500', cursor: 'pointer' }}>
+                    style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '12px', padding: '12px 48px', fontSize: '17px', fontWeight: '500', cursor: 'pointer' }}>
                     {t('Cancel')}
                   </button>
                   <button onClick={handleSaveProfile} disabled={saving}
-                    style={{ background: saving ? '#6fd4a2' : '#129968', border: 'none', color: '#ffffff', borderRadius: '12px', padding: '12px', fontSize: '15px', fontWeight: '500', cursor: saving ? 'not-allowed' : 'pointer', flexGrow: 1 }}>
+                    style={{ background: saving ? '#6fd4a2' : '#129968', border: 'none', color: '#ffffff', borderRadius: '12px', padding: '12px', fontSize: '17px', fontWeight: '500', cursor: saving ? 'not-allowed' : 'pointer', flexGrow: 1 }}>
                     {saving ? 'Saving...' : t('Save Changes')}
                   </button>
                 </div>
@@ -977,7 +978,7 @@ export default function CHOSettings({
 
               {passwordMsg && (
                 <div style={{
-                  margin: '0 0 16px 0', padding: '10px 14px', borderRadius: '8px', fontSize: '15px', fontWeight: '500',
+                  margin: '0 0 16px 0', padding: '10px 14px', borderRadius: '8px', fontSize: '17px', fontWeight: '500',
                   background: 'var(--input-bg)',
                   color: passwordMsg.startsWith('✅') ? '#0a5e42' : '#991b1b',
                 }}>
@@ -987,7 +988,7 @@ export default function CHOSettings({
 
               {pwRequestMsg && (
                 <div style={{
-                  margin: '0 0 16px 0', padding: '10px 14px', borderRadius: '8px', fontSize: '15px', fontWeight: '500',
+                  margin: '0 0 16px 0', padding: '10px 14px', borderRadius: '8px', fontSize: '17px', fontWeight: '500',
                   background: 'var(--input-bg)',
                   color: pwRequestMsg.startsWith('✅') ? '#0a5e42' : '#991b1b',
                 }}>
@@ -1001,14 +1002,14 @@ export default function CHOSettings({
                   <>
                     {pwRequestStatus === 'pending' && (
                       <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                        <div style={{ fontSize: '15px', color: 'var(--text-main)', fontWeight: '600', marginBottom: '8px' }}>
+                        <div style={{ fontSize: '17px', color: 'var(--text-main)', fontWeight: '600', marginBottom: '8px' }}>
                           Request Pending
                         </div>
-                        <p style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                        <p style={{ fontSize: '17px', color: 'var(--text-muted)', marginBottom: '16px' }}>
                           Your password change request is awaiting CHO approval.
                         </p>
                         <button onClick={handleCancelPasswordRequest} disabled={pwRequestLoading || offlineMode}
-                          style={{ padding: '10px 24px', borderRadius: '8px', border: '1px solid #ef4444', background: 'transparent', color: '#ef4444', fontSize: '15px', fontWeight: '600', cursor: pwRequestLoading ? 'not-allowed' : 'pointer', opacity: offlineMode ? 0.5 : 1 }}>
+                          style={{ padding: '10px 24px', borderRadius: '8px', border: '1px solid #ef4444', background: 'transparent', color: '#ef4444', fontSize: '17px', fontWeight: '600', cursor: pwRequestLoading ? 'not-allowed' : 'pointer', opacity: offlineMode ? 0.5 : 1 }}>
                           {pwRequestLoading ? 'Cancelling...' : 'Cancel Request'}
                         </button>
                       </div>
@@ -1016,7 +1017,7 @@ export default function CHOSettings({
 
                     {pwRequestStatus === 'accepted' && (
                       <>
-                        <p style={{ fontSize: '15px', color: 'var(--success-text)', marginBottom: '16px', padding: '8px 12px', background: 'var(--success-bg)', borderRadius: '8px' }}>
+                        <p style={{ fontSize: '17px', color: 'var(--success-text)', marginBottom: '16px', padding: '8px 12px', background: 'var(--success-bg)', borderRadius: '8px' }}>
                           Your request was approved. Set your new password below.
                         </p>
                         {[
@@ -1044,7 +1045,7 @@ export default function CHOSettings({
                               </button>
                             </div>
                             {field === 'confirmPassword' && security.confirmPassword && (
-                              <p style={{ fontSize: '15px', marginTop: '5px', color: security.newPassword === security.confirmPassword ? '#129968' : '#ef4444' }}>
+                              <p style={{ fontSize: '17px', marginTop: '5px', color: security.newPassword === security.confirmPassword ? '#129968' : '#ef4444' }}>
                                 {security.newPassword === security.confirmPassword ? '✓ Passwords match' : '✗ Passwords do not match'}
                               </p>
                             )}
@@ -1059,11 +1060,11 @@ export default function CHOSettings({
 
                     {pwRequestStatus === 'none' && (
                       <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                        <p style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                        <p style={{ fontSize: '17px', color: 'var(--text-muted)', marginBottom: '16px' }}>
                           To change your password, send a request to the City Health Office for approval.
                         </p>
                         <button onClick={handleRequestPasswordChange} disabled={pwRequestLoading || offlineMode}
-                          style={{ padding: '10px 28px', borderRadius: '8px', border: 'none', background: '#129968', color: '#fff', fontSize: '15px', fontWeight: '600', cursor: pwRequestLoading ? 'not-allowed' : 'pointer', opacity: offlineMode ? 0.5 : 1 }}>
+                          style={{ padding: '10px 28px', borderRadius: '8px', border: 'none', background: '#129968', color: '#fff', fontSize: '17px', fontWeight: '600', cursor: pwRequestLoading ? 'not-allowed' : 'pointer', opacity: offlineMode ? 0.5 : 1 }}>
                           {pwRequestLoading ? 'Sending...' : 'Request Password Change'}
                         </button>
                       </div>
@@ -1098,7 +1099,7 @@ export default function CHOSettings({
                           </button>
                         </div>
                         {field === 'confirmPassword' && security.confirmPassword && (
-                          <p style={{ fontSize: '15px', marginTop: '5px', color: security.newPassword === security.confirmPassword ? '#129968' : '#ef4444' }}>
+                          <p style={{ fontSize: '17px', marginTop: '5px', color: security.newPassword === security.confirmPassword ? '#129968' : '#ef4444' }}>
                             {security.newPassword === security.confirmPassword ? '✓ Passwords match' : '✗ Passwords do not match'}
                           </p>
                         )}
@@ -1139,7 +1140,7 @@ export default function CHOSettings({
 
               {twoFaMsg && (
                 <div style={{
-                  padding: '12px 16px', borderRadius: '8px', fontSize: '15px', fontWeight: '500', marginTop: '12px',
+                  padding: '12px 16px', borderRadius: '8px', fontSize: '17px', fontWeight: '500', marginTop: '12px',
                   background: 'var(--input-bg)',
                   color: twoFaMsg.startsWith('✅') ? '#0a5e42' : twoFaMsg.startsWith('📧') ? '#1e40af' : '#991b1b',
                 }}>
@@ -1148,18 +1149,18 @@ export default function CHOSettings({
               )}
 
               {twoFaStep === 'email_sent' && !isTwoFactorEnabled && (
-                <div style={{ marginTop: '14px', padding: '14px 16px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '15px', color: '#1e40af' }}>
+                <div style={{ marginTop: '14px', padding: '14px 16px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '17px', color: '#1e40af' }}>
                   📧 Check your email and click <strong>"Verify Email"</strong> to complete 2FA setup. Once verified, 2FA will be active on your next login.
                 </div>
               )}
 
               {twoFaStep === 'disable_otp_sent' && (
                 <div style={{ marginTop: '14px', padding: '16px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
-                  <label style={{ display: 'block', fontSize: '15px', fontWeight: '600', color: '#991b1b', marginBottom: '8px' }}>
+                  <label style={{ display: 'block', fontSize: '17px', fontWeight: '600', color: '#991b1b', marginBottom: '8px' }}>
                     Enter the 6-digit code to confirm disabling 2FA
                   </label>
                   {disableOtpError && (
-                    <div style={{ fontSize: '15px', color: '#dc2626', marginBottom: '8px' }}>{disableOtpError}</div>
+                    <div style={{ fontSize: '17px', color: '#dc2626', marginBottom: '8px' }}>{disableOtpError}</div>
                   )}
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <input
@@ -1179,7 +1180,7 @@ export default function CHOSettings({
                       disabled={disableOtpLoading}
                       style={{
                         padding: '10px 20px', background: disableOtpLoading ? '#fca5a5' : '#dc2626',
-                        color: '#fff', border: 'none', borderRadius: '6px', fontSize: '15px',
+                        color: '#fff', border: 'none', borderRadius: '6px', fontSize: '17px',
                         fontWeight: '600', cursor: disableOtpLoading ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap',
                       }}
                     >
@@ -1190,7 +1191,7 @@ export default function CHOSettings({
                     onClick={handleCancelDisable2FA}
                     style={{
                       marginTop: '10px', background: 'none', border: 'none', color: 'var(--text-muted)',
-                      fontSize: '15px', cursor: 'pointer', padding: 0, textDecoration: 'underline',
+                      fontSize: '17px', cursor: 'pointer', padding: 0, textDecoration: 'underline',
                     }}
                   >
                     Cancel and keep 2FA enabled
@@ -1231,24 +1232,24 @@ export default function CHOSettings({
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-h)' }}>
+                    <span style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-h)' }}>
                       {sessionData.last_login_device || 'Current Device'}
                     </span>
-                    <span style={{ fontSize: '15px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px', background: '#129968', color: 'white' }}>
+                    <span style={{ fontSize: '17px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px', background: '#129968', color: 'white' }}>
                       THIS DEVICE
                     </span>
                   </div>
-                  <div style={{ fontSize: '15px', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '17px', color: 'var(--text-muted)' }}>
                     {sessionData.last_login_location || 'Cabuyao, Calabarzon, Philippines'}
                   </div>
-                  <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  <div style={{ fontSize: '17px', color: 'var(--text-muted)', marginTop: '2px' }}>
                     {formatLoginTime(sessionData.last_login)}
                   </div>
                 </div>
               </div>
 
               {!sessionData.previous_login && (
-                <p style={{ margin: '10px 0 0 0', fontSize: '15px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                <p style={{ margin: '10px 0 0 0', fontSize: '17px', color: 'var(--text-muted)', textAlign: 'center' }}>
                   No other active sessions found.
                 </p>
               )}
@@ -1276,13 +1277,13 @@ export default function CHOSettings({
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: 'var(--text-h)' }}>Manage Sessions</h3>
+                    <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: 'var(--text-h)' }}>Manage Sessions</h3>
                     <button onClick={() => setShowSessionsModal(false)}
                       style={{ background: 'none', border: 'none', fontSize: '22px', color: 'var(--text-muted)', cursor: 'pointer', lineHeight: 1, padding: 0 }}>
                       ×
                     </button>
                   </div>
-                  <p style={{ margin: '0 0 20px 0', fontSize: '15px', color: 'var(--text-muted)' }}>
+                  <p style={{ margin: '0 0 20px 0', fontSize: '17px', color: 'var(--text-muted)' }}>
                     Devices currently signed in to your account.
                   </p>
 
@@ -1297,20 +1298,20 @@ export default function CHOSettings({
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-h)' }}>
+                        <span style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-h)' }}>
                           {sessionData.last_login_device || 'Current Device'}
                         </span>
-                        <span style={{ fontSize: '13px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px', background: '#129968', color: 'white' }}>
+                        <span style={{ fontSize: '15px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px', background: '#129968', color: 'white' }}>
                           TRUSTED
                         </span>
-                        <span style={{ fontSize: '13px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px', background: '#dcf7eb', color: '#129968' }}>
+                        <span style={{ fontSize: '15px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px', background: '#dcf7eb', color: '#129968' }}>
                           THIS DEVICE
                         </span>
                       </div>
-                        <div style={{ fontSize: '15px', color: 'var(--text-muted)' }}>
+                        <div style={{ fontSize: '17px', color: 'var(--text-muted)' }}>
                         {sessionData.last_login_location || 'Cabuyao, Calabarzon, Philippines'}
                       </div>
-                        <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        <div style={{ fontSize: '17px', color: 'var(--text-muted)', marginTop: '2px' }}>
                         {formatLoginTime(sessionData.last_login)}
                       </div>
                     </div>
@@ -1327,32 +1328,32 @@ export default function CHOSettings({
                         {getDeviceIcon(sessionData.previous_login_device)}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-h)', marginBottom: '3px' }}>
+                        <div style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-h)', marginBottom: '3px' }}>
                           {sessionData.previous_login_device || 'Unknown Device'}
                         </div>
-                      <div style={{ fontSize: '15px', color: 'var(--text-muted)' }}>
+                      <div style={{ fontSize: '17px', color: 'var(--text-muted)' }}>
                           {sessionData.previous_login_location || 'Unknown Location'}
                         </div>
-                      <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      <div style={{ fontSize: '17px', color: 'var(--text-muted)', marginTop: '2px' }}>
                           {formatLoginTime(sessionData.previous_login)}
                         </div>
                       </div>
                       <button
                         onClick={() => setRevokedSessionIds(prev => [...prev, 'previous'])}
-                        style={{ padding: '7px 14px', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '15px', fontWeight: '600', color: '#dc2626', cursor: 'pointer', flexShrink: 0 }}>
+                        style={{ padding: '7px 14px', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '17px', fontWeight: '600', color: '#dc2626', cursor: 'pointer', flexShrink: 0 }}>
                         Revoke
                       </button>
                     </div>
                   )}
 
                   {(otherSessionsCleared || revokedSessionIds.includes('previous')) && sessionData.previous_login && (
-                    <div style={{ padding: '12px 16px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '15px', color: '#129968', fontWeight: '500', marginBottom: '12px' }}>
+                    <div style={{ padding: '12px 16px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '17px', color: '#129968', fontWeight: '500', marginBottom: '12px' }}>
                       ✅ This session has been logged out.
                     </div>
                   )}
 
                   {!sessionData.previous_login && (
-                    <div style={{ padding: '14px 16px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '15px', color: 'var(--text-muted)', textAlign: 'center', marginBottom: '12px' }}>
+                    <div style={{ padding: '14px 16px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '17px', color: 'var(--text-muted)', textAlign: 'center', marginBottom: '12px' }}>
                       No other active sessions found.
                     </div>
                   )}
@@ -1364,7 +1365,7 @@ export default function CHOSettings({
                       style={{
                         width: '100%', marginTop: '8px', padding: '12px',
                         background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px',
-                        fontSize: '15px', fontWeight: '600', color: '#dc2626', cursor: 'pointer',
+                        fontSize: '17px', fontWeight: '600', color: '#dc2626', cursor: 'pointer',
                       }}>
                       Log Out of All Other Sessions
                     </button>
@@ -1373,7 +1374,7 @@ export default function CHOSettings({
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
                     <button
                       onClick={() => setShowSessionsModal(false)}
-                      style={{ padding: '10px 24px', background: '#1e3a8a', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: '600', color: '#fff', cursor: 'pointer' }}>
+                      style={{ padding: '10px 24px', background: '#1e3a8a', border: 'none', borderRadius: '8px', fontSize: '17px', fontWeight: '600', color: '#fff', cursor: 'pointer' }}>
                       Done
                     </button>
                   </div>
@@ -1450,14 +1451,14 @@ export default function CHOSettings({
             ))}
 
             <div className="notifications-action-container">
-              {notifLoading && <span style={{ fontSize: '15px', color: 'var(--text-muted)', marginRight: '12px' }}>Loading...</span>}
-              {notifSaveMsg && <span style={{ fontSize: '15px', color: 'var(--text-muted)', marginRight: '12px' }}>{notifSaveMsg}</span>}
+              {notifLoading && <span style={{ fontSize: '17px', color: 'var(--text-muted)', marginRight: '12px' }}>Loading...</span>}
+              {notifSaveMsg && <span style={{ fontSize: '17px', color: 'var(--text-muted)', marginRight: '12px' }}>{notifSaveMsg}</span>}
               <button className="notifications-save-btn" disabled={offlineMode} style={offlineBtnStyle} title={offlineMode ? 'Unavailable offline' : ''} onClick={async () => {
                 setNotifSaveMsg('');
                 try {
                   const res = await fetch(`${API_URL}/api/notification-preferences/${userId}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', ...authHeaders() },
                     body: JSON.stringify({
                       push_notifications: notifications.pushNotifications,
                       email_notifications: notifications.emailNotifications,
@@ -1496,16 +1497,16 @@ export default function CHOSettings({
                 </div>
                 <div style={{ padding: '0 0 12px 0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <input type="text" placeholder="Subject (e.g. Scheduled Maintenance)" id="maint-title"
-                    style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '15px', background: 'var(--input-bg)', color: 'var(--text-main)', outline: 'none' }} />
+                    style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '17px', background: 'var(--input-bg)', color: 'var(--text-main)', outline: 'none' }} />
                   <textarea placeholder="Message describing the maintenance..." id="maint-message" rows={3}
-                    style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '15px', background: 'var(--input-bg)', color: 'var(--text-main)', outline: 'none', resize: 'vertical' }} />
+                    style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '17px', background: 'var(--input-bg)', color: 'var(--text-main)', outline: 'none', resize: 'vertical' }} />
                   <button onClick={async () => {
                     const title = document.getElementById('maint-title').value.trim();
                     const message = document.getElementById('maint-message').value.trim();
                     if (!title || !message) { setToastMsg('Please enter both a subject and message.'); setToastType('error'); setTimeout(() => setToastMsg(''), 3000); return; }
                     try {
                       const res = await fetch(`${API_URL}/api/notifications/system-maintenance`, {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, message }),
+                        method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ title, message }),
                       });
                       const data = await res.json();
                       if (res.ok) {
@@ -1524,7 +1525,7 @@ export default function CHOSettings({
                       setToastType('error');
                       setTimeout(() => setToastMsg(''), 3000);
                     }
-                  }} style={{ padding: '10px 20px', background: '#d97706', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', alignSelf: 'flex-start' }}>
+                  }} style={{ padding: '10px 20px', background: '#d97706', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '17px', fontWeight: '600', cursor: 'pointer', alignSelf: 'flex-start' }}>
                     Send Notice
                   </button>
                 </div>
@@ -1588,10 +1589,10 @@ export default function CHOSettings({
                       setSystemPrefs({ ...systemPrefs, fontSize: label });
                       if (onFontSizeChange) onFontSizeChange(scale);
                     }}
-                      style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '15px', cursor: 'pointer', appearance: 'none', color: 'var(--text-main)', minWidth: '120px' }}>
+                      style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '17px', cursor: 'pointer', appearance: 'none', color: 'var(--text-main)', minWidth: '120px' }}>
                       <option>Small</option><option>Medium</option><option>Large</option>
                     </select>
-                    <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-muted)', fontSize: '15px' }}>▼</span>
+                    <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-muted)', fontSize: '17px' }}>▼</span>
                   </div>
                 </div>
                 <div className="session-list-row">
@@ -1624,40 +1625,40 @@ export default function CHOSettings({
                   <div className="session-info-meta"><h4>Display Language</h4></div>
                   <div style={{ position: 'relative' }}>
                       <select value={systemPrefs.displayLanguage} onChange={e => setSystemPrefs({ ...systemPrefs, displayLanguage: e.target.value })}
-                        style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '15px', cursor: 'pointer', appearance: 'none', color: 'var(--text-main)', minWidth: '120px' }}>
+                        style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '17px', cursor: 'pointer', appearance: 'none', color: 'var(--text-main)', minWidth: '120px' }}>
                         <option>English</option>
                         <option>Filipino</option>
                         <option>Bahasa Indonesia</option>
                         <option>Tiếng Việt</option>
                         <option>ไทย</option>
                       </select>
-                    <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-muted)', fontSize: '15px' }}>▼</span>
+                    <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-muted)', fontSize: '17px' }}>▼</span>
                   </div>
                 </div>
                 <div className="session-list-row">
                   <div className="session-info-meta"><h4>Time Zone</h4></div>
                   <div style={{ position: 'relative' }}>
                       <select value={systemPrefs.timeZone} onChange={e => setSystemPrefs({ ...systemPrefs, timeZone: e.target.value })}
-                        style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '15px', cursor: 'pointer', appearance: 'none', color: 'var(--text-main)', minWidth: '120px' }}>
+                        style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '17px', cursor: 'pointer', appearance: 'none', color: 'var(--text-main)', minWidth: '120px' }}>
                         <option value="Asia/Manila">Asia/Manila (GMT+8)</option>
                         <option value="Asia/Jakarta">Asia/Jakarta (GMT+7)</option>
                         <option value="Asia/Ho_Chi_Minh">Asia/Ho_Chi_Minh (GMT+7)</option>
                         <option value="Asia/Bangkok">Asia/Bangkok (GMT+7)</option>
                         <option value="Asia/Kolkata">Asia/Kolkata (GMT+5:30)</option>
                       </select>
-                    <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-muted)', fontSize: '15px' }}>▼</span>
+                    <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-muted)', fontSize: '17px' }}>▼</span>
                   </div>
                 </div>
                 <div className="session-list-row">
                   <div className="session-info-meta"><h4>Date Format</h4></div>
                   <div style={{ position: 'relative' }}>
                       <select value={systemPrefs.dateFormat} onChange={e => setSystemPrefs({ ...systemPrefs, dateFormat: e.target.value })}
-                        style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '15px', cursor: 'pointer', appearance: 'none', color: 'var(--text-main)', minWidth: '120px' }}>
+                        style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '17px', cursor: 'pointer', appearance: 'none', color: 'var(--text-main)', minWidth: '120px' }}>
                         <option>MM/DD/YY</option>
                         <option>DD/MM/YY</option>
                         <option>YYYY-MM-DD</option>
                       </select>
-                    <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-muted)', fontSize: '15px' }}>▼</span>
+                    <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-muted)', fontSize: '17px' }}>▼</span>
                   </div>
                 </div>
               </div>
@@ -1700,7 +1701,7 @@ export default function CHOSettings({
             </div>
 
             <div className="notifications-action-container">
-              {systemPrefsSaveMsg && <span style={{ fontSize: '15px', color: 'var(--text-muted)', marginRight: '12px' }}>{systemPrefsSaveMsg}</span>}
+              {systemPrefsSaveMsg && <span style={{ fontSize: '17px', color: 'var(--text-muted)', marginRight: '12px' }}>{systemPrefsSaveMsg}</span>}
               <button className="notifications-save-btn" onClick={() => {
                 setSystemPrefsSnapshot(takeSystemSnapshot());
                 setSystemPrefsSaveMsg('Preferences saved!');
@@ -1727,7 +1728,7 @@ export default function CHOSettings({
                 </div>
               </div>
               <div style={{ padding: '0 16px 20px 16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', marginBottom: '8px', color: 'var(--text-muted)', fontWeight: '500' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '17px', marginBottom: '8px', color: 'var(--text-muted)', fontWeight: '500' }}>
                   <span>Storage Used</span>
                   <span style={{ color: 'var(--text-main)', fontWeight: '600' }}>{storageLoading ? 'Loading...' : storageStats ? `${storageStats.totalMB} MB of 10 GB` : '— of 10 GB'}</span>
                 </div>
@@ -1742,8 +1743,8 @@ export default function CHOSettings({
                   ].map(item => (
                     <div key={item.lbl} style={{ background: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
                       <div style={{ fontSize: '22px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '4px' }}>{item.val}</div>
-                      <div style={{ fontSize: '15px', color: 'var(--text-muted)' }}>{item.lbl}</div>
-                      <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '2px' }}>{item.sub}</div>
+                      <div style={{ fontSize: '17px', color: 'var(--text-muted)' }}>{item.lbl}</div>
+                      <div style={{ fontSize: '17px', color: 'var(--text-muted)', marginTop: '2px' }}>{item.sub}</div>
                     </div>
                   ))}
                 </div>
@@ -1874,7 +1875,7 @@ export default function CHOSettings({
                         setToastType('error');
                         setTimeout(() => setToastMsg(''), 3000);
                       }
-                    }} style={{ ...offlineBtnStyle, padding: '8px 18px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', cursor: 'pointer' }} disabled={offlineMode} title={offlineMode ? 'Unavailable offline' : ''}>
+                    }} style={{ ...offlineBtnStyle, padding: '8px 18px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '17px', fontWeight: '600', color: 'var(--text-main)', cursor: 'pointer' }} disabled={offlineMode} title={offlineMode ? 'Unavailable offline' : ''}>
                       Export
                     </button>
                   </div>
@@ -1897,17 +1898,17 @@ export default function CHOSettings({
                 <div style={{ padding: '0 0 16px 0' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderTop: '1px solid var(--border-color)' }}>
                     <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)' }}>Last Backup</div>
-                      <div style={{ fontSize: '15px', color: 'var(--text-muted)' }}>{lastBackupDate ? new Date(lastBackupDate).toLocaleString('en-PH', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'No backup yet'}</div>
+                      <div style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-main)' }}>Last Backup</div>
+                      <div style={{ fontSize: '17px', color: 'var(--text-muted)' }}>{lastBackupDate ? new Date(lastBackupDate).toLocaleString('en-PH', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'No backup yet'}</div>
                     </div>
                     {lastBackupDate
-                      ? <span style={{ fontSize: '15px', fontWeight: '600', padding: '4px 12px', borderRadius: '16px', background: 'var(--input-bg)', color: '#027a48' }}>Successful</span>
-                      : <span style={{ fontSize: '15px', color: 'var(--text-muted)' }}>Never</span>
+                      ? <span style={{ fontSize: '17px', fontWeight: '600', padding: '4px 12px', borderRadius: '16px', background: 'var(--input-bg)', color: '#027a48' }}>Successful</span>
+                      : <span style={{ fontSize: '17px', color: 'var(--text-muted)' }}>Never</span>
                     }
                   </div>
 
                   <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
-                    <button onClick={() => handleCreateBackup(false)} disabled={backupLoading || offlineMode} style={{ ...offlineBtnStyle, flex: 1, padding: '12px', background: '#003cb4', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: '600', cursor: backupLoading || offlineMode ? 'not-allowed' : 'pointer', opacity: backupLoading ? 0.7 : offlineBtnStyle.opacity || 1 }} title={offlineMode ? 'Unavailable offline' : ''}>
+                    <button onClick={() => handleCreateBackup(false)} disabled={backupLoading || offlineMode} style={{ ...offlineBtnStyle, flex: 1, padding: '12px', background: '#003cb4', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '17px', fontWeight: '600', cursor: backupLoading || offlineMode ? 'not-allowed' : 'pointer', opacity: backupLoading ? 0.7 : offlineBtnStyle.opacity || 1 }} title={offlineMode ? 'Unavailable offline' : ''}>
                       {backupLoading ? 'Creating Backup...' : 'Create Backup'}
                     </button>
                     <input type="file" ref={restoreInputRef} accept=".json" style={{ display: 'none' }}
@@ -1921,7 +1922,7 @@ export default function CHOSettings({
                           const text = await file.text();
                           const data = JSON.parse(text);
                           const previewRes = await fetch(`${API_URL}/api/restore/preview`, {
-                            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+                            method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(data),
                           });
                           if (!previewRes.ok) throw new Error('Invalid backup file');
                           const preview = await previewRes.json();
@@ -1936,7 +1937,7 @@ export default function CHOSettings({
                           );
                           if (!confirmed) { setRestoreLoading(false); return; }
                           const res = await fetch(`${API_URL}/api/restore`, {
-                            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+                            method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(data),
                           });
                           if (!res.ok) throw new Error((await res.json()).error || 'Restore failed');
                           setRestoreMsg('✅ Restore completed successfully!');
@@ -1949,26 +1950,26 @@ export default function CHOSettings({
                           e.target.value = '';
                         }
                       }} />
-                    <button onClick={() => restoreInputRef.current?.click()} disabled={restoreLoading || offlineMode} style={{ ...offlineBtnStyle, flex: 1, padding: '12px', background: restoreLoading ? '#64748b' : 'var(--bg-surface)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '15px', fontWeight: '600', cursor: restoreLoading || offlineMode ? 'not-allowed' : 'pointer' }} title={offlineMode ? 'Unavailable offline' : ''}>
+                    <button onClick={() => restoreInputRef.current?.click()} disabled={restoreLoading || offlineMode} style={{ ...offlineBtnStyle, flex: 1, padding: '12px', background: restoreLoading ? '#64748b' : 'var(--bg-surface)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '17px', fontWeight: '600', cursor: restoreLoading || offlineMode ? 'not-allowed' : 'pointer' }} title={offlineMode ? 'Unavailable offline' : ''}>
                       {restoreLoading ? 'Restoring...' : 'Restore'}
                     </button>
                   </div>
 
                   {restoreMsg && (
-                    <div style={{ marginTop: '8px', padding: '8px 14px', borderRadius: '8px', fontSize: '15px', fontWeight: '500', background: 'var(--input-bg)', color: 'var(--success-text)' }}>
+                    <div style={{ marginTop: '8px', padding: '8px 14px', borderRadius: '8px', fontSize: '17px', fontWeight: '500', background: 'var(--input-bg)', color: 'var(--success-text)' }}>
                       {restoreMsg}
                     </div>
                   )}
                   {restoreError && (
-                    <div style={{ marginTop: '8px', padding: '8px 14px', borderRadius: '8px', fontSize: '15px', fontWeight: '500', background: 'var(--input-bg)', color: 'var(--warning-text)' }}>
+                    <div style={{ marginTop: '8px', padding: '8px 14px', borderRadius: '8px', fontSize: '17px', fontWeight: '500', background: 'var(--input-bg)', color: 'var(--warning-text)' }}>
                       {restoreError}
                     </div>
                   )}
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0 0 0', marginTop: '12px', borderTop: '1px solid var(--border-color)' }}>
                     <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)' }}>Auto-Backup</div>
-                      <div style={{ fontSize: '15px', color: 'var(--text-muted)' }}>Automatically backup data weekly</div>
+                      <div style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-main)' }}>Auto-Backup</div>
+                      <div style={{ fontSize: '17px', color: 'var(--text-muted)' }}>Automatically backup data weekly</div>
                     </div>
                     <label className="figma-toggle-switch">
                       <input type="checkbox" checked={autoBackupEnabled} onChange={e => { setAutoBackupEnabled(e.target.checked); localStorage.setItem('cdms_auto_backup', String(e.target.checked)); }} />
@@ -1985,8 +1986,8 @@ export default function CHOSettings({
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="#2563EB"><path d="M0,7v-3c0-.552,.448-1,1-1s1,.448,1,1v1.412C4.21,2.067,7.966,0,12,0c6.253,0,11.391,4.69,11.951,10.91,.05,.55-.356,1.036-.906,1.086-.03,.002-.061,.004-.091,.004-.512,0-.948-.391-.995-.91-.467-5.182-4.748-9.09-9.959-9.09-3.559,0-6.878,1.916-8.662,5h1.662c.552,0,1,.448,1,1s-.448,1-1,1H2c-1.103,0-2-.897-2-2ZM22,15h-3c-.553,0-1,.447-1,1s.447,1,1,1h1.662c-1.785,3.084-5.104,5-8.662,5-5.21,0-9.492-3.908-9.959-9.09-.049-.549-.523-.944-1.086-.906C.405,12.054,0,12.54,.049,13.09c.561,6.22,5.699,10.91,11.951,10.91,4.033,0,7.79-2.068,10-5.413v1.413c0,.553,.447,1,1,1s1-.447,1-1v-3c0-1.103-.897-2-2-2ZM14,7c1.105,0,2,.895,2,2v6c0,1.105-.895,2-2,2h-4c-1.105,0-2-.895-2-2v-6c0-1.105,.895-2,2-2h4Zm-1,7c0-.552-.448-1-1-1h-1c-.552,0-1,.448-1,1s.448,1,1,1h1c.552,0,1-.448,1-1Zm1-4c0-.552-.448-1-1-1h-2c-.552,0-1,.448-1,1s.448,1,1,1h2c.552,0,1-.448,1-1Z"/></svg>
                   </div>
                   <div>
-                    <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: 'var(--text-main)' }}>Offline Sync</h3>
-                    <span style={{ fontSize: '15px', color: 'var(--text-muted)' }}>View offline operation queue and sync history</span>
+                    <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: 'var(--text-main)' }}>Offline Sync</h3>
+                    <span style={{ fontSize: '17px', color: 'var(--text-muted)' }}>View offline operation queue and sync history</span>
                   </div>
                 </div>
 
@@ -1998,17 +1999,17 @@ export default function CHOSettings({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="#DC2626"><path d="M20.5,8.48V3.5h-4.98L12-.02l-3.52,3.52H3.5v4.98L-.02,12l3.52,3.52v4.98h4.98l3.52,3.52,3.52-3.52h4.98v-4.98l3.52-3.52-3.52-3.52Zm-7.5,9.52h-2v-2h2v2Zm0-4h-2V6h2V14Z"/></svg>
                   <div>
-                    <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#dc2626' }}>Danger Zone</h3>
-                    <span style={{ fontSize: '15px', color: 'var(--text-muted)' }}>Irreversible actions</span>
+                    <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#dc2626' }}>Danger Zone</h3>
+                    <span style={{ fontSize: '17px', color: 'var(--text-muted)' }}>Irreversible actions</span>
                   </div>
                 </div>
 
                 <div style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '16px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
                   <div style={{ textAlign: 'left' }}>
-                    <div style={{ fontSize: '15px', fontWeight: '700', color: '#b91c1c', marginBottom: '4px' }}>Clear All Data</div>
-                    <div style={{ fontSize: '15px', color: '#991b1b' }}>This will permanently delete all your data. This action cannot be undone.</div>
+                    <div style={{ fontSize: '17px', fontWeight: '700', color: '#b91c1c', marginBottom: '4px' }}>Clear All Data</div>
+                    <div style={{ fontSize: '17px', color: '#991b1b' }}>This will permanently delete all your data. This action cannot be undone.</div>
                   </div>
-                  <button onClick={() => setShowClearModal(true)} disabled={offlineMode} style={{ ...offlineBtnStyle, padding: '10px 20px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '15px', fontWeight: '600', color: '#dc2626', cursor: offlineMode ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }} title={offlineMode ? 'Unavailable offline' : ''}>
+                  <button onClick={() => setShowClearModal(true)} disabled={offlineMode} style={{ ...offlineBtnStyle, padding: '10px 20px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '17px', fontWeight: '600', color: '#dc2626', cursor: offlineMode ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }} title={offlineMode ? 'Unavailable offline' : ''}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                     Clear Data
                   </button>
@@ -2116,7 +2117,7 @@ export default function CHOSettings({
 
 const fieldStyle = {
   background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '12px',
-  padding: '12px 16px', fontSize: '15px', color: 'var(--text-main)',
+  padding: '12px 16px', fontSize: '17px', color: 'var(--text-main)',
   boxShadow: '0 2px 4px rgba(0,0,0,0.02)', outline: 'none', width: '100%',
   boxSizing: 'border-box',
 };

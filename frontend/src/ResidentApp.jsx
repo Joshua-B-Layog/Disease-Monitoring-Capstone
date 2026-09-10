@@ -6,6 +6,8 @@ import ContactUs from './resident/ContactUs';
 import Help from './resident/Help';
 import PreventionTips from './resident/PreventionTips';
 import ChoLogoIcon from './assets/ChoLogo';
+import { API_URL } from './config';
+import { getPendingCount, processSyncQueue } from './syncEngine';
 import './resident.css';
 
 const SECTIONS = [
@@ -40,6 +42,66 @@ export default function ResidentApp() {
   }, [theme]);
 
   const toggleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark');
+
+  // ── Online/Offline status + auto-sync queued messages ──
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [pendingSyncCount, setPendingSyncCount] = useState(0);
+
+  const refreshPendingCount = async () => {
+    try {
+      const count = await getPendingCount();
+      setPendingSyncCount(count);
+    } catch {}
+  };
+
+  useEffect(() => {
+    const checkOnline = async () => {
+      let online = false;
+      try {
+        const res = await fetch(`${API_URL}/api/ping`, { method: 'HEAD', cache: 'no-store' });
+        online = res.ok;
+      } catch {
+        online = false;
+      }
+      setIsOnline(online);
+      window.dispatchEvent(new CustomEvent('cdms-online-status', { detail: { online } }));
+    };
+    checkOnline();
+    const interval = setInterval(checkOnline, 15000);
+    window.addEventListener('online', checkOnline);
+    window.addEventListener('offline', () => {
+      setIsOnline(false);
+      window.dispatchEvent(new CustomEvent('cdms-online-status', { detail: { online: false } }));
+    });
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('online', checkOnline);
+      window.removeEventListener('offline', () => setIsOnline(false));
+    };
+  }, []);
+
+  // Auto-sync queued messages once back online
+  const prevOnlineRef = useRef(isOnline);
+  useEffect(() => {
+    if (isOnline && !prevOnlineRef.current) {
+      refreshPendingCount().then(() => {
+        getPendingCount().then(count => {
+          if (count > 0) {
+            processSyncQueue(() => {}, () => {}).finally(() => refreshPendingCount());
+          }
+        });
+      });
+    }
+    prevOnlineRef.current = isOnline;
+  }, [isOnline]);
+
+  // Poll pending count every 30s (only when online)
+  useEffect(() => {
+    if (!isOnline) return;
+    refreshPendingCount();
+    const interval = setInterval(refreshPendingCount, 30000);
+    return () => clearInterval(interval);
+  }, [isOnline]);
 
   // Scroll to section from URL path on initial load
   useEffect(() => {
@@ -275,6 +337,20 @@ export default function ResidentApp() {
           </div>
         </div>
       </footer>
+
+      {/* ── Offline pending sync indicator ── */}
+      {pendingSyncCount > 0 && (
+        <div style={{
+          position: 'fixed', bottom: '20px', right: '20px', zIndex: 1000,
+          background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
+          borderRadius: '999px', padding: '8px 16px', fontSize: '15px',
+          color: 'var(--text-main)', boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+          display: 'flex', alignItems: 'center', gap: '8px',
+        }}>
+          <span style={{ color: '#D97706', fontWeight: '700' }}>↻</span>
+          {pendingSyncCount} {pendingSyncCount === 1 ? 'message' : 'messages'} pending — will send when back online
+        </div>
+      )}
     </div>
   );
 }

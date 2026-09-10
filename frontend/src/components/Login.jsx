@@ -460,7 +460,8 @@ function AnimatedMapView({ setFade, active, onSequenceComplete }) {
                 context: selectedContext,
                 username: email,
                 name: data.user.name,
-                barangay: data.user.barangay
+                barangay: data.user.barangay,
+                token: data.token || null
             };
 
             // Cache user credentials for offline login
@@ -536,7 +537,7 @@ const handleLoginOtpSubmit = async (e) => {
         const data = await response.json();
         if (response.ok) {
             notify('Login successful. Welcome back!', 'success');
-            onLoginSuccess(pendingUser);
+            onLoginSuccess({ ...pendingUser, token: data.token || null });
         } else {
             setOtpError(data.error || 'Invalid or expired code.');
         }

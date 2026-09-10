@@ -735,13 +735,13 @@ export default function PreventionTips() {
         onChange={e => setSearch(e.target.value)}
         style={{
           width: '100%', padding: '12px 16px', border: '1px solid var(--border-color)',
-          borderRadius: '10px', fontSize: '15px', marginBottom: '12px',
+          borderRadius: '10px', fontSize: '17px', marginBottom: '12px',
           outline: 'none', boxSizing: 'border-box',
         }}
       />
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
-        <label style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Barangay:</label>
+        <label style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Barangay:</label>
         <div style={{ position: 'relative' }} ref={barangayRef}>
           <button className="mc-custom-dropdown-btn" onClick={() => setBarangayOpen(!barangayOpen)}>
             <span>{selectedBarangay}</span>
@@ -762,7 +762,7 @@ export default function PreventionTips() {
           )}
         </div>
         {selectedBarangay !== 'All Barangays' && (
-          <span style={{ fontSize: '15px', color: '#3B82F6', fontWeight: '500' }}>
+          <span style={{ fontSize: '17px', color: '#3B82F6', fontWeight: '500' }}>
             Showing cases in {selectedBarangay}
           </span>
         )}
@@ -813,18 +813,18 @@ export default function PreventionTips() {
             <span style={{ fontSize: '20px', lineHeight: 1.2, flexShrink: 0 }}>{tier.icon}</span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '15px', fontWeight: '700', color: tier.color }}>{tier.label}</span>
-                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>- {scopeLabel}</span>
+                <span style={{ fontSize: '17px', fontWeight: '700', color: tier.color }}>{tier.label}</span>
+                <span style={{ fontSize: '15px', color: 'var(--text-muted)' }}>- {scopeLabel}</span>
               </div>
               {totalActive > 0 && (
-                <div style={{ fontSize: '14px', color: 'var(--text-main)', marginTop: '4px' }}>
+                <div style={{ fontSize: '16px', color: 'var(--text-main)', marginTop: '4px' }}>
                   <strong>{totalActive}</strong> case{totalActive !== 1 ? 's' : ''} on record
                   {top3.length > 0 && (
                     <> · Most common: {top3.map(([name, count]) => `${name} (${count})`).join(', ')}{activeDiseases.length > 3 ? `, +${activeDiseases.length - 3} more` : ''}</>
                   )}
                 </div>
               )}
-              <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>{tier.msg}</div>
+              <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '4px' }}>{tier.msg}</div>
             </div>
           </div>
         );
@@ -836,7 +836,7 @@ export default function PreventionTips() {
             key={cat}
             onClick={() => setCatFilter(cat)}
             style={{
-              padding: '6px 16px', borderRadius: '20px', fontSize: '13px', fontWeight: '600',
+              padding: '6px 16px', borderRadius: '20px', fontSize: '15px', fontWeight: '600',
               cursor: 'pointer', transition: 'all 0.2s ease',
               background: catFilter === cat ? '#129968' : 'transparent',
               color: catFilter === cat ? '#fff' : 'var(--text-muted)',
@@ -849,7 +849,7 @@ export default function PreventionTips() {
       </div>
 
       {filtered.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-muted)', fontSize: '15px' }}>
+        <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-muted)', fontSize: '17px' }}>
           <div style={{ fontSize: '36px', marginBottom: '12px' }}>🔍</div>
           <div style={{ fontWeight: '600', marginBottom: '4px' }}>No diseases found</div>
           <div>Try a different search term or category.</div>
@@ -871,12 +871,12 @@ export default function PreventionTips() {
               }}>
               <span style={{ fontSize: '26px' }}>{renderDiseaseIcon(disease, 26)}</span>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)' }}>{disease.name}</div>
-                <div style={{ fontSize: '15px', color: 'var(--text-main)' }}>
+                <div style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-main)' }}>{disease.name}</div>
+                <div style={{ fontSize: '17px', color: 'var(--text-main)' }}>
                   {disease.tips.length} prevention tips
                 </div>
                 {selectedBarangay !== 'All Barangays' && (
-                  <div style={{ fontSize: '13px', color: diseaseCounts[disease.name] > 0 ? '#ef4444' : '#10b981', fontWeight: '500', marginTop: '2px' }}>
+                  <div style={{ fontSize: '15px', color: diseaseCounts[disease.name] > 0 ? '#ef4444' : '#10b981', fontWeight: '500', marginTop: '2px' }}>
                     {diseaseCounts[disease.name] || 0} case{(diseaseCounts[disease.name] || 0) !== 1 ? 's' : ''} in {selectedBarangay}
                   </div>
                 )}
@@ -887,7 +887,7 @@ export default function PreventionTips() {
             </div>
             {expanded === idx && (
               <div style={{ padding: '0 18px 16px', borderTop: '1px solid var(--border-color)' }}>
-                <ul style={{ margin: '12px 0', paddingLeft: '18px', fontSize: '15px', color: 'var(--text-main)', lineHeight: '1.8' }}>
+                <ul style={{ margin: '12px 0', paddingLeft: '18px', fontSize: '17px', color: 'var(--text-main)', lineHeight: '1.8' }}>
                   {disease.tips.map((tip, i) => (
                     <li key={i}>{tip}</li>
                   ))}
@@ -919,7 +919,7 @@ export default function PreventionTips() {
                       borderRadius: '8px',
                       background: '#121358',
                       color: '#fff',
-                      fontSize: '15px',
+                      fontSize: '17px',
                       fontWeight: 600,
                       textDecoration: 'none'
                     }}
@@ -952,10 +952,10 @@ export default function PreventionTips() {
         <div style={{
           background: '#129968', padding: '16px 24px', color: '#fff',
         }}>
-          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700' }}>
+          <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700' }}>
             Symptom Checker
           </h3>
-          <p style={{ margin: '4px 0 0', fontSize: '15px', color: 'rgba(255,255,255,0.85)' }}>
+          <p style={{ margin: '4px 0 0', fontSize: '17px', color: 'rgba(255,255,255,0.85)' }}>
             Select a disease and answer a few questions to assess your risk level.
           </p>
         </div>
@@ -963,7 +963,7 @@ export default function PreventionTips() {
         <div style={{ padding: '24px' }}>
           {scStep === 'pick' && (
             <div>
-              <p style={{ fontSize: '15px', color: 'var(--text-main)', marginBottom: '16px' }}>
+              <p style={{ fontSize: '17px', color: 'var(--text-main)', marginBottom: '16px' }}>
                 Choose a disease to check your symptoms against:
               </p>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px' }}>
@@ -972,7 +972,7 @@ export default function PreventionTips() {
                     style={{
                       padding: '10px 14px', background: 'var(--bg-main)', border: '1px solid var(--border-color)',
                       borderRadius: '8px', cursor: 'pointer', textAlign: 'left',
-                      fontSize: '15px', color: 'var(--text-main)', fontWeight: '500',
+                      fontSize: '17px', color: 'var(--text-main)', fontWeight: '500',
                       transition: 'all 0.15s',
                     }}>
                     {renderDiseaseIcon(d, 22)} {d.name}
@@ -989,12 +989,12 @@ export default function PreventionTips() {
             return (
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                  <h4 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: 'var(--text-main)' }}>
+                  <h4 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: 'var(--text-main)' }}>
                     {renderDiseaseIcon(disease, 20)} {disease.name} - Symptom Check
                   </h4>
                   <BackButton onClick={resetQuiz}>Pick another disease</BackButton>
                 </div>
-                <p style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                <p style={{ fontSize: '17px', color: 'var(--text-muted)', marginBottom: '16px' }}>
                   Answer Yes or No to each question ({answeredCount}/{disease.symptoms.length} answered).
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -1003,7 +1003,7 @@ export default function PreventionTips() {
                       padding: '12px 16px', background: 'var(--bg-main)', borderRadius: '8px',
                       border: scAnswers[idx] !== undefined ? '1px solid #129968' : '1px solid var(--border-color)',
                     }}>
-                      <div style={{ fontSize: '15px', color: 'var(--text-main)', marginBottom: '8px' }}>
+                      <div style={{ fontSize: '17px', color: 'var(--text-main)', marginBottom: '8px' }}>
                         {idx + 1}. {q}
                       </div>
                       <div style={{ display: 'flex', gap: '10px' }}>
@@ -1014,7 +1014,7 @@ export default function PreventionTips() {
                             background: scAnswers[idx] === true ? 'rgba(18,153,104,0.12)' : 'var(--bg-surface)',
                             color: scAnswers[idx] === true ? '#129968' : 'var(--text-muted)',
                             fontWeight: scAnswers[idx] === true ? '600' : '400',
-                            cursor: 'pointer', fontSize: '15px',
+                            cursor: 'pointer', fontSize: '17px',
                           }}>
                           Yes
                         </button>
@@ -1025,7 +1025,7 @@ export default function PreventionTips() {
                             background: scAnswers[idx] === false ? 'rgba(239,68,68,0.12)' : 'var(--bg-surface)',
                             color: scAnswers[idx] === false ? '#dc2626' : 'var(--text-muted)',
                             fontWeight: scAnswers[idx] === false ? '600' : '400',
-                            cursor: 'pointer', fontSize: '15px',
+                            cursor: 'pointer', fontSize: '17px',
                           }}>
                           No
                         </button>
@@ -1039,7 +1039,7 @@ export default function PreventionTips() {
                     style={{
                       padding: '12px 40px', background: answeredCount < disease.symptoms.length ? '#64748b' : '#129968',
                       color: '#fff', border: 'none', borderRadius: '8px',
-                      fontSize: '15px', fontWeight: '700', cursor: answeredCount < disease.symptoms.length ? 'not-allowed' : 'pointer',
+                      fontSize: '17px', fontWeight: '700', cursor: answeredCount < disease.symptoms.length ? 'not-allowed' : 'pointer',
                     }}>
                     {answeredCount < disease.symptoms.length
                       ? `Answer all questions (${answeredCount}/${disease.symptoms.length})`
@@ -1066,21 +1066,21 @@ export default function PreventionTips() {
                 <h4 style={{ fontSize: '22px', fontWeight: '700', margin: '0 0 8px', color: level.color }}>
                   {level.label}
                 </h4>
-                <p style={{ fontSize: '15px', color: 'var(--text-muted)', maxWidth: '480px', margin: '0 auto 20px', lineHeight: '1.6' }}>
+                <p style={{ fontSize: '17px', color: 'var(--text-muted)', maxWidth: '480px', margin: '0 auto 20px', lineHeight: '1.6' }}>
                   {level.text}
                 </p>
                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
                   <button onClick={() => { resetQuiz(); }}
                     style={{
                       padding: '10px 24px', background: '#129968', color: '#fff',
-                      border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: '600',
+                      border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '17px', fontWeight: '600',
                     }}>
                     Try Another Disease
                   </button>
                   <button onClick={() => window.location.href = '/Resident/contact'}
                     style={{
                       padding: '10px 24px', background: 'var(--input-bg)', color: 'var(--text-muted)',
-                      border: '1px solid var(--border-color)', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: '600',
+                      border: '1px solid var(--border-color)', borderRadius: '8px', cursor: 'pointer', fontSize: '17px', fontWeight: '600',
                     }}>
                     Contact Us
                   </button>

@@ -10,6 +10,7 @@ const crypto = require('crypto');
 const axios = require('axios');
 const cron = require('node-cron');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 async function sendBrevoEmail(to, subject, htmlContent) {
   try {
@@ -85,6 +86,11 @@ function isSameBarangay(name1, name2) {
 const app = express();
 
 const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-only-insecure-secret-change-me';
+if (!process.env.JWT_SECRET) {
+  console.warn('⚠ WARNING: JWT_SECRET is not set. Using an insecure development secret. Set JWT_SECRET in your environment.');
+}
 
 // ==========================================
 // 2. MIDDLEWARE
@@ -579,13 +585,55 @@ function createAuditLog(userId, userName, userRole, choUnit, barangay, action, e
   );
 }
 
+function signToken(user) {
+  return jwt.sign(
+    {
+      user_id: user.user_id,
+      role: user.role,
+      name: user.full_name,
+      barangay: user.assigned_barangay_name || null,
+    },
+    JWT_SECRET,
+    { expiresIn: '24h' }
+  );
+}
+
+function authenticate(req, res, next) {
+  const header = req.headers['authorization'] || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token) {
+    return res.status(401).json({ error: 'Not authenticated.' });
+  }
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    req.user = {
+      user_id: payload.user_id,
+      role: payload.role,
+      name: payload.name,
+      barangay: payload.barangay,
+    };
+    next();
+  } catch (err) {
+    createAuditLog(
+      null,
+      'Unknown',
+      'Unknown',
+      null, null,
+      'Auth Failed',
+      req.originalUrl,
+      `Invalid or expired token for ${req.method} ${req.originalUrl}`
+    );
+    return res.status(401).json({ error: 'Not authenticated. Please log in again.' });
+  }
+}
+
 function requireRole(...roles) {
   return (req, res, next) => {
-    const userRole = req.headers['x-user-role'];
+    const userRole = req.user ? req.user.role : req.headers['x-user-role'];
     if (!userRole || !roles.includes(userRole)) {
       createAuditLog(
-        req.headers['x-user-id'] || null,
-        req.headers['x-user-name'] || 'Unknown',
+        (req.user && req.user.user_id) || req.headers['x-user-id'] || null,
+        (req.user && req.user.name) || req.headers['x-user-name'] || 'Unknown',
         userRole || 'Unknown',
         null, null,
         'Access Denied',
@@ -596,6 +644,30 @@ function requireRole(...roles) {
     }
     next();
   };
+}
+
+function notifyTargetUnitCho(unit, title, msg) {
+  if (!unit) return;
+  db.query(
+    `SELECT u.user_id, u.assigned_barangay_id, b.name AS barangay_name
+     FROM users u
+     LEFT JOIN barangays b ON u.assigned_barangay_id = b.id
+     WHERE u.role = 'CHO' AND u.is_active = 1`,
+    (err, users) => {
+      if (err || !users || users.length === 0) return;
+      const recipients = users.filter(u => {
+        const unitName = getChoUnitForBarangayName(u.barangay_name);
+        // CHOs scoped to another unit are excluded; unscoped admins still get notified
+        return !unitName || unitName === unit;
+      });
+      recipients.forEach(u => {
+        db.query(
+          'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
+          [u.user_id, title, msg, 'info', 'Inbox']
+        );
+      });
+    }
+  );
 }
 
 // ==========================================
@@ -644,7 +716,7 @@ app.get('/api/disease_cases', (req, res) => {
 });
 
 // ROUTE: Lookup patient by name/surname for auto-fill
-app.get('/api/patients/lookup', (req, res) => {
+app.get('/api/patients/lookup', authenticate, (req, res) => {
   const { name } = req.query;
   if (!name || name.trim().length < 2) {
     return res.json([]);
@@ -684,7 +756,7 @@ app.get('/api/diseases', (req, res) => {
 });
 
 // ROUTE: Add a new disease
-app.post('/api/diseases', (req, res) => {
+app.post('/api/diseases', authenticate, (req, res) => {
     const name = (req.body && req.body.name ? req.body.name : '').trim();
     const icon = (req.body && req.body.icon ? String(req.body.icon).slice(0, 100) : null);
     const color = (req.body && req.body.color ? String(req.body.color).slice(0, 20) : null);
@@ -701,7 +773,7 @@ app.post('/api/diseases', (req, res) => {
 });
 
 // ROUTE: Update a disease (prevention tips / symptoms / video) — CHO only
-app.put('/api/diseases/:id', requireRole('CHO'), (req, res) => {
+app.put('/api/diseases/:id', authenticate, requireRole('CHO'), (req, res) => {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: 'Invalid disease id.' });
     const description = (req.body != null && req.body.description != null && String(req.body.description).trim() !== '' ? String(req.body.description).slice(0, 255) : null);
@@ -725,7 +797,7 @@ app.put('/api/diseases/:id', requireRole('CHO'), (req, res) => {
 });
 
 // ROUTE: Hide/unhide a disease (soft delete) — CHO only. Affects Resident portal only.
-app.patch('/api/diseases/:id/visibility', requireRole('CHO'), (req, res) => {
+app.patch('/api/diseases/:id/visibility', authenticate, requireRole('CHO'), (req, res) => {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: 'Invalid disease id.' });
     const active = req.body && req.body.active !== undefined ? (req.body.active ? 1 : 0) : null;
@@ -743,7 +815,7 @@ app.patch('/api/diseases/:id/visibility', requireRole('CHO'), (req, res) => {
 });
 
 // ROUTE: Get all custom disease categories (with their linked disease ids)
-app.get('/api/disease_categories', (req, res) => {
+app.get('/api/disease_categories', authenticate, (req, res) => {
     db.query('SELECT * FROM disease_categories ORDER BY id', (err, categories) => {
         if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
         db.query('SELECT category_id, disease_id FROM disease_category_items', (err2, items) => {
@@ -759,7 +831,7 @@ app.get('/api/disease_categories', (req, res) => {
 });
 
 // ROUTE: Create a custom disease category and link diseases to it
-app.post('/api/disease_categories', (req, res) => {
+app.post('/api/disease_categories', authenticate, (req, res) => {
     const name = (req.body && req.body.name ? req.body.name : '').trim();
     const icon = (req.body && req.body.icon ? String(req.body.icon).slice(0, 100) : null);
     const color = (req.body && req.body.color ? String(req.body.color).slice(0, 20) : null);
@@ -790,7 +862,7 @@ app.get('/api/barangays', (req, res) => {
 });
 
 // ROUTE: Get all users (no passwords)
-app.get('/api/users', (req, res) => {
+app.get('/api/users', authenticate, (req, res) => {
     const query = `
         SELECT u.user_id, u.username, u.full_name, u.email, u.mobile_number,
                u.role, u.is_active, u.last_login, u.assigned_barangay_id,
@@ -810,7 +882,7 @@ app.get('/api/users', (req, res) => {
 // ==========================================
 
 // ROUTE: Get single user profile by ID
-app.get('/api/users/:id/profile', (req, res) => {
+app.get('/api/users/:id/profile', authenticate, (req, res) => {
     const { id } = req.params;
     const query = `
         SELECT u.user_id, u.username, u.full_name, u.email, u.mobile_number,
@@ -831,7 +903,7 @@ app.get('/api/users/:id/profile', (req, res) => {
 });
 
 // ROUTE: Update user profile (name, email, phone, barangay assignment)
-app.put('/api/users/:id/profile', (req, res) => {
+app.put('/api/users/:id/profile', authenticate, (req, res) => {
     const { id } = req.params;
     const { firstName, lastName, email, mobile, assignedBarangayId } = req.body;
 
@@ -866,7 +938,7 @@ app.put('/api/users/:id/profile', (req, res) => {
 // ==========================================
 
 // ROUTE: Add new disease case
-app.post('/api/cases', (req, res) => {
+app.post('/api/cases', authenticate, (req, res) => {
     const {
         patient_name, disease_name, age, severity, gender,
         status, contact, onset_date, address, barangay_id,
@@ -1053,7 +1125,7 @@ app.post('/api/cases', (req, res) => {
 });
 
 // ROUTE: Route case to inbox (cross-unit) — stores all case data in case_inbox, no disease_cases entry yet
-app.post('/api/cases/route-to-inbox', (req, res) => {
+app.post('/api/cases/route-to-inbox', authenticate, (req, res) => {
     const {
         patient_name, disease_name, age, severity, gender, status, contact,
         onset_date, address, symptoms, physician, latitude, longitude,
@@ -1098,7 +1170,7 @@ app.post('/api/cases/route-to-inbox', (req, res) => {
     );
 });
 
-app.post('/api/cases/route-to-barangay-inbox', (req, res) => {
+app.post('/api/cases/route-to-barangay-inbox', authenticate, (req, res) => {
     const {
         patient_name, disease_name, age, severity, gender, status, contact,
         onset_date, address, symptoms, physician, latitude, longitude,
@@ -1167,7 +1239,7 @@ app.post('/api/cases/route-to-barangay-inbox', (req, res) => {
 });
 
 // GET inbox items for a CHO unit
-app.get('/api/case-inbox', (req, res) => {
+app.get('/api/case-inbox', authenticate, (req, res) => {
     const { cho_unit, barangay_id, status } = req.query;
     let sql = `
     SELECT ci.*,
@@ -1212,7 +1284,7 @@ app.get('/api/case-inbox', (req, res) => {
 });
 
 // GET unified outbox — merges referrals + resident messages + edit requests
-app.get('/api/case-outbox', (req, res) => {
+app.get('/api/case-outbox', authenticate, (req, res) => {
   const { cho_unit, barangay, user_id } = req.query;
   if (!cho_unit) return res.status(400).json({ error: 'cho_unit is required.' });
   const unitBarangays = CHO_UNIT_BARANGAYS[cho_unit] || [];
@@ -1354,7 +1426,7 @@ app.get('/api/case-outbox', (req, res) => {
 });
 
 // Accept: create disease_cases entry from inbox data, then mark accepted
-app.put('/api/case-inbox/:id/accept', (req, res) => {
+app.put('/api/case-inbox/:id/accept', authenticate, (req, res) => {
     const { id } = req.params;
     db.query(
         'SELECT * FROM case_inbox WHERE id = ?',
@@ -1400,7 +1472,7 @@ app.put('/api/case-inbox/:id/accept', (req, res) => {
 });
 
 // Reject: mark inbox item rejected
-app.put('/api/case-inbox/:id/reject', (req, res) => {
+app.put('/api/case-inbox/:id/reject', authenticate, (req, res) => {
     const { id } = req.params;
     db.query(
         "UPDATE case_inbox SET status = 'rejected', resolved_at = NOW() WHERE id = ?",
@@ -1416,7 +1488,7 @@ app.put('/api/case-inbox/:id/reject', (req, res) => {
 // ── CASE EDIT REQUESTS (BHW → CHO) ──
 
 // POST /api/cases/:id/request-edit — BHW requests CHO to edit a case
-app.post('/api/cases/:id/request-edit', (req, res) => {
+app.post('/api/cases/:id/request-edit', authenticate, (req, res) => {
   const caseId = req.params.id;
   const { requested_by, requested_by_name, from_barangay_name, target_cho_unit, note, proposed_data } = req.body;
   if (!requested_by || !note) {
@@ -1441,27 +1513,8 @@ app.post('/api/cases/:id/request-edit', (req, res) => {
 
       // Notify CHOs in the target unit (direct BHW→CHO request, bypasses user preferences)
       if (target_cho_unit) {
-        const unitBarangays = CHO_UNIT_BARANGAYS[target_cho_unit] || [];
-        if (unitBarangays.length > 0) {
-          db.query(
-            `SELECT u.user_id FROM users u
-             LEFT JOIN barangays b ON u.assigned_barangay_id = b.id
-             WHERE u.role = 'CHO' AND u.is_active = 1
-               AND (LOWER(b.name) IN (?) OR u.assigned_barangay_id IS NULL)`,
-            [unitBarangays.map(b => b.toLowerCase())],
-            (nErr, users) => {
-              if (!nErr && users && users.length > 0) {
-                const msg = `${requested_by_name || 'A BHW'} from ${from_barangay_name || 'your area'} requested an update for this case. Note: "${note}"`;
-                users.forEach(u => {
-                  db.query(
-                    'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
-                    [u.user_id, 'A BHW needs your help', msg, 'info', 'Inbox']
-                  );
-                });
-              }
-            }
-          );
-        }
+        const msg = `${requested_by_name || 'A BHW'} from ${from_barangay_name || 'your area'} requested an update for this case. Note: "${note}"`;
+        notifyTargetUnitCho(target_cho_unit, 'A BHW needs your help', msg);
       }
       res.json({ message: 'Edit request sent to your CHO.', request_id: result.insertId });
     }
@@ -1469,7 +1522,7 @@ app.post('/api/cases/:id/request-edit', (req, res) => {
 });
 
 // GET /api/case-edit-requests — Fetch edit requests (CHO: pending by unit, BHW: all by user)
-app.get('/api/case-edit-requests', (req, res) => {
+app.get('/api/case-edit-requests', authenticate, (req, res) => {
   const { cho_unit, requested_by, unread_only } = req.query;
   let sql = `SELECT cer.*, dc.patient_name, d.name AS disease_name, d.name AS disease_name_full
     FROM case_edit_requests cer
@@ -1499,7 +1552,7 @@ app.get('/api/case-edit-requests', (req, res) => {
 });
 
 // PUT /api/case-edit-requests/:id/accept — CHO accepts edit request
-app.put('/api/case-edit-requests/:id/accept', (req, res) => {
+app.put('/api/case-edit-requests/:id/accept', authenticate, (req, res) => {
   const { id } = req.params;
   db.query(
     "UPDATE case_edit_requests SET status = 'accepted', resolved_at = NOW() WHERE id = ? AND status = 'pending'",
@@ -1519,7 +1572,7 @@ app.put('/api/case-edit-requests/:id/accept', (req, res) => {
 });
 
 // PUT /api/case-edit-requests/:id/reject — CHO rejects edit request
-app.put('/api/case-edit-requests/:id/reject', (req, res) => {
+app.put('/api/case-edit-requests/:id/reject', authenticate, (req, res) => {
   const { id } = req.params;
   db.query(
     "UPDATE case_edit_requests SET status = 'rejected', resolved_at = NOW() WHERE id = ? AND status = 'pending'",
@@ -1533,7 +1586,7 @@ app.put('/api/case-edit-requests/:id/reject', (req, res) => {
 });
 
 // PUT /api/case-edit-requests/:id/read — BHW marks edit request as read
-app.put('/api/case-edit-requests/:id/read', (req, res) => {
+app.put('/api/case-edit-requests/:id/read', authenticate, (req, res) => {
   const { id } = req.params;
   db.query(
     'UPDATE case_edit_requests SET is_read = 1 WHERE id = ?',
@@ -1551,7 +1604,7 @@ app.put('/api/case-edit-requests/:id/read', (req, res) => {
 // ══════════════════════════════════════════════════════════════
 
 // POST /api/cases/request-add — BHW submits a new case for CHO approval (no disease_cases insert yet)
-app.post('/api/cases/request-add', (req, res) => {
+app.post('/api/cases/request-add', authenticate, (req, res) => {
   const {
     patient_name, disease_name, age, severity, gender, case_status, contact,
     onset_date, address, barangay_id, symptoms, physician, latitude, longitude,
@@ -1599,27 +1652,8 @@ app.post('/api/cases/request-add', (req, res) => {
 
         // Notify CHOs in the target unit (direct BHW→CHO request, bypasses preferences)
         if (targetChoUnit) {
-          const unitBarangays = CHO_UNIT_BARANGAYS[targetChoUnit] || [];
-          if (unitBarangays.length > 0) {
-            db.query(
-              `SELECT u.user_id FROM users u
-               LEFT JOIN barangays b ON u.assigned_barangay_id = b.id
-               WHERE u.role = 'CHO' AND u.is_active = 1
-                 AND (LOWER(b.name) IN (?) OR u.assigned_barangay_id IS NULL)`,
-              [unitBarangays.map(b => b.toLowerCase())],
-              (nErr, users) => {
-                if (!nErr && users && users.length > 0) {
-                  const msg = `${requested_by_name || 'A BHW'} from ${from_barangay_name || 'your area'} submitted a new ${disease_name} case for approval. Note: "${note || '(no note)'}"`;
-                  users.forEach(u => {
-                    db.query(
-                      'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
-                      [u.user_id, 'New case awaiting approval', msg, 'info', 'Inbox']
-                    );
-                  });
-                }
-              }
-            );
-          }
+          const msg = `${requested_by_name || 'A BHW'} from ${from_barangay_name || 'your area'} submitted a new ${disease_name} case for approval. Note: "${note || '(no note)'}"`;
+          notifyTargetUnitCho(targetChoUnit, 'New case awaiting approval', msg);
         }
         res.json({ message: 'Case submitted to your CHO for approval.', request_id: result.insertId });
       }
@@ -1628,7 +1662,7 @@ app.post('/api/cases/request-add', (req, res) => {
 });
 
 // GET /api/case-add-requests — Fetch add requests (CHO: pending by unit, BHW: all by user)
-app.get('/api/case-add-requests', (req, res) => {
+app.get('/api/case-add-requests', authenticate, (req, res) => {
   const { cho_unit, requested_by, unread_only } = req.query;
   let sql = `SELECT car.*, b.name AS barangay_name
     FROM case_add_requests car
@@ -1657,7 +1691,7 @@ app.get('/api/case-add-requests', (req, res) => {
 });
 
 // PUT /api/case-add-requests/:id/approve — CHO approves (may edit details first) → inserts into disease_cases
-app.put('/api/case-add-requests/:id/approve', (req, res) => {
+app.put('/api/case-add-requests/:id/approve', authenticate, (req, res) => {
   const { id } = req.params;
   const body = req.body || {};
   const {
@@ -1779,7 +1813,7 @@ app.put('/api/case-add-requests/:id/approve', (req, res) => {
 });
 
 // PUT /api/case-add-requests/:id/reject — CHO rejects (with optional reason)
-app.put('/api/case-add-requests/:id/reject', (req, res) => {
+app.put('/api/case-add-requests/:id/reject', authenticate, (req, res) => {
   const { id } = req.params;
   const { reason, actor_id, actor_name, actor_role } = req.body || {};
   db.query(
@@ -1821,7 +1855,7 @@ app.put('/api/case-add-requests/:id/reject', (req, res) => {
 });
 
 // PUT /api/case-add-requests/:id/read — BHW marks add request as read
-app.put('/api/case-add-requests/:id/read', (req, res) => {
+app.put('/api/case-add-requests/:id/read', authenticate, (req, res) => {
   const { id } = req.params;
   db.query(
     'UPDATE case_add_requests SET is_read = 1 WHERE id = ?',
@@ -1839,7 +1873,7 @@ app.put('/api/case-add-requests/:id/read', (req, res) => {
 // ══════════════════════════════════════════════════════════════
 
 // POST /api/password-change-request — BHW requests password change
-app.post('/api/password-change-request', (req, res) => {
+app.post('/api/password-change-request', authenticate, (req, res) => {
   const { user_id, user_name } = req.body;
   if (!user_id) return res.status(400).json({ error: 'user_id is required.' });
 
@@ -1884,7 +1918,7 @@ app.post('/api/password-change-request', (req, res) => {
 });
 
 // GET /api/password-change-requests — Fetch password change requests
-app.get('/api/password-change-requests', (req, res) => {
+app.get('/api/password-change-requests', authenticate, (req, res) => {
   const { user_id, pending_only } = req.query;
   let sql = 'SELECT * FROM password_change_requests WHERE 1=1';
   const params = [];
@@ -1903,7 +1937,7 @@ app.get('/api/password-change-requests', (req, res) => {
 });
 
 // PUT /api/password-change-requests/:id/accept — CHO accepts
-app.put('/api/password-change-requests/:id/accept', (req, res) => {
+app.put('/api/password-change-requests/:id/accept', authenticate, (req, res) => {
   const { id } = req.params;
   db.query(
     "UPDATE password_change_requests SET status = 'accepted', resolved_at = NOW() WHERE id = ? AND status = 'pending'",
@@ -1929,7 +1963,7 @@ app.put('/api/password-change-requests/:id/accept', (req, res) => {
 });
 
 // PUT /api/password-change-requests/:id/reject — CHO rejects
-app.put('/api/password-change-requests/:id/reject', (req, res) => {
+app.put('/api/password-change-requests/:id/reject', authenticate, (req, res) => {
   const { id } = req.params;
   db.query(
     "UPDATE password_change_requests SET status = 'rejected', resolved_at = NOW() WHERE id = ? AND status = 'pending'",
@@ -1954,7 +1988,7 @@ app.put('/api/password-change-requests/:id/reject', (req, res) => {
 });
 
 // PUT /api/password-change-requests/:id/read — BHW marks as read
-app.put('/api/password-change-requests/:id/read', (req, res) => {
+app.put('/api/password-change-requests/:id/read', authenticate, (req, res) => {
   const { id } = req.params;
   db.query('UPDATE password_change_requests SET is_read = 1 WHERE id = ?', [id], (err, result) => {
     if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
@@ -1964,7 +1998,7 @@ app.put('/api/password-change-requests/:id/read', (req, res) => {
 });
 
 // PUT /api/users/:id/set-password — BHW sets new password after approval (no current password check)
-app.put('/api/users/:id/set-password', (req, res) => {
+app.put('/api/users/:id/set-password', authenticate, (req, res) => {
   const { id } = req.params;
   const { newPassword } = req.body;
   if (!newPassword || newPassword.length < 6) {
@@ -1992,7 +2026,7 @@ app.put('/api/users/:id/set-password', (req, res) => {
 });
 
 // ROUTE: Update existing case
-app.put('/api/cases/:id', (req, res) => {
+app.put('/api/cases/:id', authenticate, (req, res) => {
     const { id } = req.params;
     const {
         patient_name, disease_name, age, severity, gender,
@@ -2208,7 +2242,7 @@ app.put('/api/cases/:id', (req, res) => {
 });
 
 // ROUTE: Get status history for a case
-app.get('/api/cases/:id/status-history', (req, res) => {
+app.get('/api/cases/:id/status-history', authenticate, (req, res) => {
   const { id } = req.params;
   db.query(
     `SELECT id, case_id, old_status, new_status, changed_by, changed_by_name, changed_by_role, changed_at, notes
@@ -2222,7 +2256,7 @@ app.get('/api/cases/:id/status-history', (req, res) => {
 });
 
 // ROUTE: Admin-edit a user account
-app.put('/api/users/:id', requireRole('CHO'), async (req, res) => {
+app.put('/api/users/:id', authenticate, requireRole('CHO'), async (req, res) => {
     const { id } = req.params;
     const { firstName, lastName, username, email, mobile, barangayId, isActive, role, loggedUserId, newPassword } = req.body;
     const fullName = `${firstName.trim()} ${lastName.trim()}`;
@@ -2345,7 +2379,7 @@ app.put('/api/users/:id', requireRole('CHO'), async (req, res) => {
 
 
 // ROUTE: Change password (verified against current password)
-app.put('/api/users/:id/change-password', (req, res) => {
+app.put('/api/users/:id/change-password', authenticate, (req, res) => {
     const { id } = req.params;
     const { currentPassword, newPassword } = req.body;
 
@@ -2370,7 +2404,7 @@ app.put('/api/users/:id/change-password', (req, res) => {
 
 
 // ROUTE: Delete disease case
-app.delete('/api/cases/:id', (req, res) => {
+app.delete('/api/cases/:id', authenticate, (req, res) => {
     const { id } = req.params;
     console.log("--- Delete Case ---", { id });
 
@@ -2434,7 +2468,7 @@ app.delete('/api/cases/:id', (req, res) => {
 });
 
 // ROUTE: Delete a user account
-app.delete('/api/users/:id', requireRole('CHO'), (req, res) => {
+app.delete('/api/users/:id', authenticate, requireRole('CHO'), (req, res) => {
     const { id } = req.params;
     db.query('DELETE FROM users WHERE user_id = ?', [id], (err, result) => {
         if (err) {
@@ -2456,7 +2490,7 @@ app.delete('/api/users/:id', requireRole('CHO'), (req, res) => {
 // ==========================================
 
 // GET all audit logs (newest first)
-app.get('/api/audit-logs', (req, res) => {
+app.get('/api/audit-logs', authenticate, (req, res) => {
   db.query('SELECT * FROM audit_logs ORDER BY created_at DESC', (err, results) => {
     if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     res.json(results);
@@ -2464,7 +2498,7 @@ app.get('/api/audit-logs', (req, res) => {
 });
 
 // POST a manual audit log entry (for frontend-triggered events)
-app.post('/api/audit-logs', (req, res) => {
+app.post('/api/audit-logs', authenticate, (req, res) => {
   const { user_id, user_name, user_role, cho_unit, barangay, action, entity, details } = req.body;
   db.query(
     'INSERT INTO audit_logs (user_id, user_name, user_role, cho_unit, barangay, action, entity, details) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -2481,7 +2515,7 @@ app.post('/api/audit-logs', (req, res) => {
 // ==========================================
 
 // GET all generated reports (newest first), optionally filtered by cho_unit
-app.get('/api/generated-reports', (req, res) => {
+app.get('/api/generated-reports', authenticate, (req, res) => {
   const { cho_unit } = req.query;
   let sql = 'SELECT * FROM generated_reports';
   const params = [];
@@ -2508,7 +2542,7 @@ app.get('/api/generated-reports', (req, res) => {
 });
 
 // POST a new generated report
-app.post('/api/generated-reports', (req, res) => {
+app.post('/api/generated-reports', authenticate, (req, res) => {
   const { title, period, entity, details, cho_unit, snapshotLogs, created_by } = req.body;
 
   if (!title) {
@@ -2539,7 +2573,7 @@ app.post('/api/generated-reports', (req, res) => {
 });
 
 // DELETE a generated report
-app.delete('/api/generated-reports/:id', (req, res) => {
+app.delete('/api/generated-reports/:id', authenticate, (req, res) => {
   const { id } = req.params;
   db.query('DELETE FROM generated_reports WHERE id = ?', [id], (err, result) => {
     if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
@@ -2580,11 +2614,24 @@ app.post('/api/login', (req, res) => {
         const user = results[0];
 
         // Verify password: try bcrypt first, fallback to plaintext for legacy accounts
-        const passwordMatch = bcrypt.compareSync(password, user.password);
+        let passwordMatch = false;
+        try {
+          passwordMatch = bcrypt.compareSync(password, user.password);
+        } catch (pwErr) {
+          console.warn('[AUTH] bcrypt compare for', email, 'threw:', pwErr.message);
+        }
         const plaintextMatch = !passwordMatch && user.password === password;
 
         if (!passwordMatch && !plaintextMatch) {
-            return res.status(401).json({ error: 'Invalid credentials or account not found.' });
+          const stored = user.password || '';
+          console.warn('[AUTH-FAIL]', JSON.stringify({
+            email,
+            role,
+            storedPrefix: stored.slice(0, 7),
+            storedLen: stored.length,
+            looksLikeBcrypt: /^\$2[abxy]\$/.test(stored),
+          }));
+          return res.status(401).json({ error: 'Invalid credentials or account not found.' });
         }
 
         // Auto-upgrade plaintext password to bcrypt on first login after hashing was added
@@ -2665,6 +2712,7 @@ app.post('/api/login', (req, res) => {
         return res.status(200).json({
             message: 'Success',
             requires2FA: !!user.two_fa_enabled,
+            token: user.two_fa_enabled ? null : signToken(user),
             user: {
                 id: user.user_id,
                 name: user.full_name,
@@ -2766,7 +2814,7 @@ app.post('/api/register', (req, res) => {
 // ==========================================
 // OFFLINE SYNC ENDPOINT
 // ==========================================
-app.post('/api/sync', (req, res) => {
+app.post('/api/sync', authenticate, (req, res) => {
     const { operations } = req.body;
     if (!Array.isArray(operations) || operations.length === 0) {
         return res.status(400).json({ error: 'No operations provided.' });
@@ -2987,7 +3035,7 @@ app.post('/api/sync', (req, res) => {
 // ==========================================
 
 // GET /api/pending-registrations?cho_unit=...
-app.get('/api/pending-registrations', (req, res) => {
+app.get('/api/pending-registrations', authenticate, (req, res) => {
     const { cho_unit } = req.query;
     let sql = `SELECT u.user_id, u.username, u.full_name, u.email, u.mobile_number, u.status,
                       u.assigned_barangay_id, b.name AS barangay_name, u.created_at
@@ -3011,7 +3059,7 @@ app.get('/api/pending-registrations', (req, res) => {
 });
 
 // PUT /api/pending-registrations/:id/approve
-app.put('/api/pending-registrations/:id/approve', (req, res) => {
+app.put('/api/pending-registrations/:id/approve', authenticate, (req, res) => {
     const { id } = req.params;
     db.query(
         `SELECT user_id, full_name, email, assigned_barangay_id FROM users WHERE user_id = ? AND status = 'pending'`,
@@ -3065,7 +3113,7 @@ app.put('/api/pending-registrations/:id/approve', (req, res) => {
 });
 
 // PUT /api/pending-registrations/:id/reject
-app.put('/api/pending-registrations/:id/reject', (req, res) => {
+app.put('/api/pending-registrations/:id/reject', authenticate, (req, res) => {
     const { id } = req.params;
     const { reason } = req.body || {};
     db.query(
@@ -3234,7 +3282,7 @@ app.post('/api/reset-password', (req, res) => {
 // ==========================================
 
 // ROUTE: Admin-create a user account
-app.post('/api/users', requireRole('CHO'), async (req, res) => {
+app.post('/api/users', authenticate, requireRole('CHO'), async (req, res) => {
     const { firstName, lastName, username, email, mobile, barangayId, isActive, password, generateTempPassword, role } = req.body;
 
     if (!firstName || !lastName || !username || !email || !barangayId) {
@@ -3303,7 +3351,7 @@ app.post('/api/users', requireRole('CHO'), async (req, res) => {
             `).catch(err => console.error('Temp password email failed:', err.message));
         }
 
-        console.log("User added:", { username, fullName, barangayId });
+        console.log("User added:", { username, fullName, barangayId, tempPassword: tempPasswordGenerated || null });
         createAuditLog(null, 'CHO Admin', 'CHO', null, null, 'Created', 'User Account', `Created account for ${fullName} (${role}) assigned to barangay ID ${barangayId}`);
         res.status(200).json({ message: 'User account created successfully.', user_id: result.insertId, tempPassword: tempPasswordGenerated });
     });
@@ -3375,7 +3423,7 @@ app.post('/api/verify-2fa-token', (req, res) => {
 });
 
 // ROUTE: Disable 2FA
-app.post('/api/disable-2fa', (req, res) => {
+app.post('/api/disable-2fa', authenticate, (req, res) => {
     const { userId } = req.body;
     db.query('UPDATE users SET two_fa_enabled = 0, two_fa_token = NULL, two_fa_token_expiry = NULL WHERE user_id = ?',
         [userId], (err) => {
@@ -3451,6 +3499,7 @@ app.post('/api/verify-login-otp', (req, res) => {
         const user = results[0];
         return res.status(200).json({
             message: 'Login verified.',
+            token: signToken(user),
             user: {
                 id: user.user_id,
                 name: user.full_name,
@@ -3640,7 +3689,7 @@ function checkAndAlertHighRisk(barangay_id, barangay_name) {
 }
 
 // GET: Fetch all notifications for a user
-app.get('/api/notifications', (req, res) => {
+app.get('/api/notifications', authenticate, (req, res) => {
     const { userId } = req.query;
     if (!userId) {
         return res.status(400).json({ error: 'userId is required' });
@@ -3656,7 +3705,7 @@ app.get('/api/notifications', (req, res) => {
 });
 
 // POST: Manually create a notification (optional but useful)
-app.post('/api/notifications', (req, res) => {
+app.post('/api/notifications', authenticate, (req, res) => {
     const { user_id, title, message, type, link_to } = req.body;
     db.query(
         'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
@@ -3669,7 +3718,7 @@ app.post('/api/notifications', (req, res) => {
 });
 
 // PUT: Mark notification as read
-app.put('/api/notifications/:id/read', (req, res) => {
+app.put('/api/notifications/:id/read', authenticate, (req, res) => {
     const { id } = req.params;
     db.query(
         'UPDATE notifications SET is_read = 1 WHERE id = ?',
@@ -3682,7 +3731,7 @@ app.put('/api/notifications/:id/read', (req, res) => {
 });
 
 // DELETE: Dismiss a specific notification
-app.delete('/api/notifications/:id', (req, res) => {
+app.delete('/api/notifications/:id', authenticate, (req, res) => {
     const { id } = req.params;
     db.query(
         'DELETE FROM notifications WHERE id = ?',
@@ -3695,7 +3744,7 @@ app.delete('/api/notifications/:id', (req, res) => {
 });
 
 // DELETE (bulk): Dismiss all notifications for a specific user
-app.delete('/api/notifications', (req, res) => {
+app.delete('/api/notifications', authenticate, (req, res) => {
     const { userId } = req.query;
     if (!userId) {
         return res.status(400).json({ error: 'userId is required' });
@@ -3712,7 +3761,7 @@ app.delete('/api/notifications', (req, res) => {
 
 
 // GET: Fetch notification preferences for a user
-app.get('/api/notification-preferences/:userId', (req, res) => {
+app.get('/api/notification-preferences/:userId', authenticate, (req, res) => {
     const { userId } = req.params;
     db.query('SELECT * FROM notification_preferences WHERE user_id = ?', [userId], (err, results) => {
         if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
@@ -3728,7 +3777,7 @@ app.get('/api/notification-preferences/:userId', (req, res) => {
 });
 
 // PUT: Save notification preferences for a user
-app.put('/api/notification-preferences/:userId', (req, res) => {
+app.put('/api/notification-preferences/:userId', authenticate, (req, res) => {
     const { userId } = req.params;
     const {
         push_notifications, email_notifications, sms_notifications,
@@ -3768,7 +3817,7 @@ app.put('/api/notification-preferences/:userId', (req, res) => {
 // ==========================================
 
 // GET /api/storage-stats — real counts and estimated storage usage
-app.get('/api/storage-stats', (req, res) => {
+app.get('/api/storage-stats', authenticate, (req, res) => {
   const queries = {
     cases: 'SELECT COUNT(*) AS count FROM disease_cases',
     users: 'SELECT COUNT(*) AS count FROM users',
@@ -3806,7 +3855,7 @@ app.get('/api/storage-stats', (req, res) => {
 });
 
 // GET /api/export-all — export all cases as JSON or CSV
-app.get('/api/export-all', (req, res) => {
+app.get('/api/export-all', authenticate, (req, res) => {
   const { format } = req.query;
 
   const sql = `
@@ -3850,7 +3899,7 @@ app.get('/api/export-all', (req, res) => {
 // ==========================================
 
 // GET /api/backup — full data export as JSON download
-app.get('/api/backup', (req, res) => {
+app.get('/api/backup', authenticate, (req, res) => {
   const results = {};
 
   db.query('SELECT * FROM disease_cases', (err, cases) => {
@@ -3895,7 +3944,7 @@ app.get('/api/backup', (req, res) => {
 });
 
 // DELETE /api/users/:id/my-data — clear current user's personal data & reset account
-app.delete('/api/users/:id/my-data', (req, res) => {
+app.delete('/api/users/:id/my-data', authenticate, (req, res) => {
   const { id } = req.params;
 
   db.query('SELECT user_id, username, full_name, email, role, assigned_barangay_id, password, initial_password FROM users WHERE user_id = ?',
@@ -4042,7 +4091,7 @@ app.post('/api/contact-messages', (req, res) => {
 });
 
 // GET /api/contact-messages — Retrieve contact messages (for CHO/BHW inbox)
-app.get('/api/contact-messages', (req, res) => {
+app.get('/api/contact-messages', authenticate, (req, res) => {
   const { choUnit, barangay, limit } = req.query;
   let sql = 'SELECT * FROM contact_messages';
   const params = [];
@@ -4076,7 +4125,7 @@ app.get('/api/contact-messages', (req, res) => {
 });
 
 // PUT /api/contact-messages/:id/read — Mark message as read
-app.put('/api/contact-messages/:id/read', (req, res) => {
+app.put('/api/contact-messages/:id/read', authenticate, (req, res) => {
   db.query('UPDATE contact_messages SET is_read = 1 WHERE id = ?', [req.params.id], (err) => {
     if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     res.json({ message: 'Message marked as read.' });
@@ -4084,7 +4133,7 @@ app.put('/api/contact-messages/:id/read', (req, res) => {
 });
 
 // PUT /api/contact-messages/:id/pending — Mark message as pending (BHW reviewing)
-app.put('/api/contact-messages/:id/pending', (req, res) => {
+app.put('/api/contact-messages/:id/pending', authenticate, (req, res) => {
   db.query("UPDATE contact_messages SET status = 'pending' WHERE id = ?", [req.params.id], (err) => {
     if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     res.json({ message: 'Message marked as pending.' });
@@ -4092,7 +4141,7 @@ app.put('/api/contact-messages/:id/pending', (req, res) => {
 });
 
 // PUT /api/contact-messages/:id/reject — Reject a resident message
-app.put('/api/contact-messages/:id/reject', (req, res) => {
+app.put('/api/contact-messages/:id/reject', authenticate, (req, res) => {
   db.query("UPDATE contact_messages SET status = 'rejected', is_read = 1 WHERE id = ?", [req.params.id], (err) => {
     if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     res.json({ message: 'Message rejected.' });
@@ -4100,7 +4149,7 @@ app.put('/api/contact-messages/:id/reject', (req, res) => {
 });
 
 // PUT /api/contact-messages/:id/accept — Convert contact message to a disease case
-app.put('/api/contact-messages/:id/accept', (req, res) => {
+app.put('/api/contact-messages/:id/accept', authenticate, (req, res) => {
   const { id } = req.params;
   db.query('SELECT * FROM contact_messages WHERE id = ?', [id], (err, rows) => {
     if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
@@ -4182,7 +4231,7 @@ app.get('/api/disease_cases/public-disease-counts', (req, res) => {
 // ==========================================
 
 // GET /api/weekly-summary?user_id=...&start_date=...&end_date=...
-app.get('/api/weekly-summary', (req, res) => {
+app.get('/api/weekly-summary', authenticate, (req, res) => {
     const { user_id, start_date, end_date } = req.query;
     if (!user_id) return res.status(400).json({ error: 'user_id is required' });
 
@@ -4551,7 +4600,7 @@ cron.schedule('0 17 * * 5', () => {
 // ==========================================
 
 // POST /api/notifications/system-maintenance — broadcast to all users with preference
-app.post('/api/notifications/system-maintenance', (req, res) => {
+app.post('/api/notifications/system-maintenance', authenticate, (req, res) => {
     const { title, message } = req.body;
     if (!title || !message) {
         return res.status(400).json({ error: 'Title and message are required.' });
@@ -4594,7 +4643,7 @@ app.post('/api/notifications/system-maintenance', (req, res) => {
 // ==========================================
 
 // POST /api/restore — restore from a backup JSON
-app.post('/api/restore', (req, res) => {
+app.post('/api/restore', authenticate, (req, res) => {
     const backup = req.body;
 
     if (!backup || !backup.system || !backup.backup_date) {
@@ -4690,7 +4739,7 @@ app.post('/api/restore', (req, res) => {
 });
 
 // POST /api/restore/confirm — preview what will be restored before committing
-app.post('/api/restore/preview', (req, res) => {
+app.post('/api/restore/preview', authenticate, (req, res) => {
     const backup = req.body;
     if (!backup || !backup.system || !backup.backup_date) {
         return res.status(400).json({ error: 'Invalid backup file.' });

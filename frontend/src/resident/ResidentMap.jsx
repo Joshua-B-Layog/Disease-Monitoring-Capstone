@@ -525,7 +525,7 @@ const getTop5 = (diseases) =>
 
 function LegendItem({ color, label }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '15px', color: 'var(--text-muted)' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '17px', color: 'var(--text-muted)' }}>
       <div style={{ width: '14px', height: '14px', borderRadius: '3px', background: color, opacity: 0.6 }} />
       {label}
     </div>
@@ -757,7 +757,7 @@ export default function ResidentMap() {
       <h2 style={{ margin: '0 0 16px', fontSize: '26px', fontWeight: '700' }}>
         Disease Map
       </h2>
-<p style={{ margin: '0 0 20px', color: 'var(--text-main)', fontSize: '15px' }}>
+<p style={{ margin: '0 0 20px', color: 'var(--text-main)', fontSize: '17px' }}>
   Hover over a barangay for a quick summary. Click for full disease breakdown. Zoom in (≥17) to see purok-level pulse markers.
 </p>
 
@@ -796,8 +796,8 @@ export default function ResidentMap() {
               ].map(card => (
                 <div key={card.label} style={{ flex: '1 1 120px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '10px 10px', textAlign: 'center' }}>
                   <div style={{ fontSize: '24px', fontWeight: '800', color: card.color, lineHeight: '1.2' }}>{card.value}</div>
-                  {card.sub && <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-muted)', marginTop: '3px' }}>{card.sub}</div>}
-                  <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-muted)', marginTop: '4px' }}>{card.label}</div>
+                  {card.sub && <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-muted)', marginTop: '3px' }}>{card.sub}</div>}
+                  <div style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-muted)', marginTop: '4px' }}>{card.label}</div>
                 </div>
               ))}
             </div>
@@ -805,9 +805,9 @@ export default function ResidentMap() {
             {/* Barangay Risk Classification Table */}
             {sortedBarangays.length > 0 && (
               <div style={{ marginBottom: '20px' }}>
-                <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Barangay Risk Classification</div>
+                <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Barangay Risk Classification</div>
                 <div className="resident-table-wrap" style={{ maxHeight: '200px', overflowY: 'auto', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '15px' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '17px' }}>
                     <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
                       <tr style={{ background: 'var(--input-bg)' }}>
                         <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: '600', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>No.</th>
@@ -827,12 +827,12 @@ export default function ResidentMap() {
                             <td style={{ padding: '7px 10px', borderBottom: '1px solid var(--border-color)', fontWeight: '600', color: 'var(--text-main)', textAlign: 'center' }}>{b.barangayName}</td>
                             <td style={{ padding: '7px 10px', borderBottom: '1px solid var(--border-color)', textAlign: 'center', fontWeight: '700', color: 'var(--text-main)' }}>{b.totalCases}</td>
                             <td style={{ padding: '7px 10px', borderBottom: '1px solid var(--border-color)', textAlign: 'center' }}>
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '2px 10px', borderRadius: '12px', fontSize: '13px', fontWeight: '600', color: risk.color, background: risk.ring }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '2px 10px', borderRadius: '12px', fontSize: '15px', fontWeight: '600', color: risk.color, background: risk.ring }}>
                                 <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: risk.color }} />
                                 {risk.label.replace(' Risk', '')}
                               </span>
                             </td>
-                            <td style={{ padding: '7px 10px', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '14px', textAlign: 'center' }}>
+                            <td style={{ padding: '7px 10px', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '16px', textAlign: 'center' }}>
                               {topD ? `${topD[0]} (${topD[1]})` : '-'}
                             </td>
                           </tr>
@@ -847,15 +847,15 @@ export default function ResidentMap() {
             {/* Top Diseases Distribution */}
             {top8Diseases.length > 0 && (
               <div>
-                <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Top Diseases City-Wide</div>
+                <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Top Diseases City-Wide</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {top8Diseases.map(([disease, count]) => (
                     <div key={disease} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span className="resident-disease-label" style={{ fontSize: '14px', color: 'var(--text-main)', fontWeight: '500' }}>{disease}</span>
+                      <span className="resident-disease-label" style={{ fontSize: '16px', color: 'var(--text-main)', fontWeight: '500' }}>{disease}</span>
                       <div style={{ flex: 1, height: '18px', background: 'var(--input-bg)', borderRadius: '4px', overflow: 'hidden' }}>
                         <div style={{ width: `${(count / maxDiseaseCount) * 100}%`, height: '100%', background: getDiseaseColor(disease), borderRadius: '4px', minWidth: '2px' }} />
                       </div>
-                      <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)', width: '30px', textAlign: 'right' }}>{count}</span>
+                      <span style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-main)', width: '30px', textAlign: 'right' }}>{count}</span>
                     </div>
                   ))}
                 </div>
@@ -869,9 +869,9 @@ export default function ResidentMap() {
                 <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '100px' }}>
                   {Object.entries(ageGroups).map(([label, count]) => (
                     <div key={label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
-                      <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '2px' }}>{count}</span>
+                      <span style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '2px' }}>{count}</span>
                       <div style={{ width: '100%', height: `${(count / maxAgeCount) * 100}%`, background: '#3b82f6', borderRadius: '3px 3px 0 0', minHeight: count > 0 ? '4px' : '0' }} />
-                      <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px', textAlign: 'center' }}>{label}</span>
+                      <span style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '4px', textAlign: 'center' }}>{label}</span>
                     </div>
                   ))}
                 </div>
@@ -889,7 +889,7 @@ export default function ResidentMap() {
                     return (
                       <div key={gender} style={{ flex: 1, background: 'var(--input-bg)', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
                         <div style={{ fontSize: '22px', fontWeight: '800', color }}>{count}</div>
-                        <div style={{ fontSize: '14px', color: 'var(--text-muted)', fontWeight: '600' }}>{gender} ({pct}%)</div>
+                        <div style={{ fontSize: '16px', color: 'var(--text-muted)', fontWeight: '600' }}>{gender} ({pct}%)</div>
                       </div>
                     );
                   })}
@@ -904,8 +904,8 @@ export default function ResidentMap() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {brgyAdvisories.map(b => (
                     <div key={b.name} style={{ padding: '10px 14px', background: 'var(--input-bg)', borderRadius: '8px', borderLeft: `3px solid ${b.count > 10 ? '#dc2626' : b.count > 5 ? '#d97706' : '#129968'}` }}>
-                      <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)' }}>{b.name}</div>
-                      <div style={{ fontSize: '14px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      <div style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-main)' }}>{b.name}</div>
+                      <div style={{ fontSize: '16px', color: 'var(--text-muted)', marginTop: '2px' }}>
                         {b.count} case{b.count !== 1 ? 's' : ''}, Top: {b.topDisease} ({b.topCount})
                       </div>
                     </div>
@@ -916,7 +916,7 @@ export default function ResidentMap() {
           </div>
         </div>
       {offlineMode && (
-        <div style={{ padding: '8px 14px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '15px', color: '#F59E0B' }}>
+        <div style={{ padding: '8px 14px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '17px', color: '#F59E0B' }}>
           Offline - showing cached data. Will refresh when reconnected.
         </div>
       )}
@@ -930,7 +930,7 @@ export default function ResidentMap() {
         }}>
           <div>
             <strong style={{ fontSize: '16px' }}>{selectedBrgy}</strong>
-            <span style={{ marginLeft: '12px', fontSize: '15px', color: 'var(--text-muted)' }}>
+            <span style={{ marginLeft: '12px', fontSize: '17px', color: 'var(--text-muted)' }}>
               {brgyCases} case{brgyCases !== 1 ? 's' : ''}
             </span>
           </div>
@@ -949,9 +949,9 @@ export default function ResidentMap() {
           value={searchQuery}
           onChange={e => { setSearchQuery(e.target.value); handleSearch(e.target.value); }}
           onKeyDown={e => { if (e.key === 'Enter') handleSearch(); }}
-          style={{ flex: 1, padding: '12px 16px', border: '1px solid var(--border-color)', borderRadius: '10px', fontSize: '15px', outline: 'none', boxSizing: 'border-box', background: 'var(--bg-surface)', color: 'var(--text-main)' }}
+          style={{ flex: 1, padding: '12px 16px', border: '1px solid var(--border-color)', borderRadius: '10px', fontSize: '17px', outline: 'none', boxSizing: 'border-box', background: 'var(--bg-surface)', color: 'var(--text-main)' }}
         />
-        <button onClick={handleSearch} style={{ padding: '12px 24px', background: '#10B981', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', fontSize: '15px', whiteSpace: 'nowrap' }}>
+        <button onClick={handleSearch} style={{ padding: '12px 24px', background: '#10B981', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', fontSize: '17px', whiteSpace: 'nowrap' }}>
           Search
         </button>
       </div>
@@ -960,14 +960,14 @@ export default function ResidentMap() {
       {searchMatches.length > 1 && (
         <div style={{ marginBottom: '12px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
           {searchMatches.map(b => (
-            <button key={b} onClick={() => zoomToBrgy(b)} style={{ padding: '6px 14px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '20px', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer' }}>
+            <button key={b} onClick={() => zoomToBrgy(b)} style={{ padding: '6px 14px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '20px', fontSize: '17px', color: 'var(--text-main)', cursor: 'pointer' }}>
               {b}
             </button>
           ))}
         </div>
       )}
       {searchMatches.length === 0 && searchQuery.trim() && (
-        <div style={{ marginBottom: '12px', fontSize: '15px', color: '#ef4444' }}>No barangay found matching "{searchQuery}".</div>
+        <div style={{ marginBottom: '12px', fontSize: '17px', color: '#ef4444' }}>No barangay found matching "{searchQuery}".</div>
       )}
 
       {/* Map area */}
@@ -1073,7 +1073,7 @@ export default function ResidentMap() {
           <button onClick={() => setMapLayer('SD')}
             style={{
               padding: '6px 14px', border: 'none', borderRadius: '7px', cursor: 'pointer',
-              fontSize: '15px', fontWeight: '700',
+              fontSize: '17px', fontWeight: '700',
               background: mapLayer === 'SD' ? '#1e3a8a' : 'transparent',
               color: mapLayer === 'SD' ? '#fff' : 'var(--text-muted)',
             }}>
@@ -1082,7 +1082,7 @@ export default function ResidentMap() {
           <button onClick={() => setMapLayer('HD')}
             style={{
               padding: '6px 14px', border: 'none', borderRadius: '7px', cursor: 'pointer',
-              fontSize: '15px', fontWeight: '700',
+              fontSize: '17px', fontWeight: '700',
               background: mapLayer === 'HD' ? '#1e3a8a' : 'transparent',
               color: mapLayer === 'HD' ? '#fff' : 'var(--text-muted)',
             }}>
@@ -1098,25 +1098,25 @@ export default function ResidentMap() {
             borderRadius: '10px', padding: '14px 16px', minWidth: '210px',
             boxShadow: '0 8px 24px rgba(0,0,0,0.3)', pointerEvents: 'none',
           }}>
-            <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '3px' }}>
+            <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '3px' }}>
               {tooltip.barangayName}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '15px', color: 'var(--text-muted)', marginBottom: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '17px', color: 'var(--text-muted)', marginBottom: '10px' }}>
               <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: getRisk(tooltip.totalCases).color, display: 'inline-block' }} />
               {getRisk(tooltip.totalCases).label} · {tooltip.totalCases} case{tooltip.totalCases !== 1 ? 's' : ''}
             </div>
-            <div style={{ fontSize: '15px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '7px' }}>
+            <div style={{ fontSize: '17px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '7px' }}>
               Top Diseases
             </div>
             {getTop5(tooltip.diseases).map(([disease, count], i) => (
               <div key={disease} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
-                <span style={{ fontSize: '15px', color: 'var(--text-main)' }}>
+                <span style={{ fontSize: '17px', color: 'var(--text-main)' }}>
                   <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>{i + 1}.</span>{disease}
                 </span>
-                <span style={{ fontSize: '15px', fontWeight: '700', color: '#10b981', marginLeft: '12px' }}>{count}</span>
+                <span style={{ fontSize: '17px', fontWeight: '700', color: '#10b981', marginLeft: '12px' }}>{count}</span>
               </div>
             ))}
-            <div style={{ marginTop: '8px', fontSize: '15px', color: 'var(--text-muted)', fontStyle: 'italic' }}>Click pin for full details</div>
+            <div style={{ marginTop: '8px', fontSize: '17px', color: 'var(--text-muted)', fontStyle: 'italic' }}>Click pin for full details</div>
           </div>
         )}
 
@@ -1139,10 +1139,10 @@ export default function ResidentMap() {
               boxShadow: '0 8px 20px rgba(0,0,0,0.35)',
               pointerEvents: 'none',
             }}>
-              <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '4px' }}>
+              <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '4px' }}>
                 {diseaseName} <span style={{ color: '#10b981', fontWeight: '700' }}>({count})</span>
               </div>
-              <div style={{ fontSize: '15px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+              <div style={{ fontSize: '17px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
                 {getDiseaseCause(diseaseName)}
               </div>
             </div>
@@ -1168,7 +1168,7 @@ export default function ResidentMap() {
                   <h3 style={{ margin: '0 0 5px 0', fontSize: '22px', fontWeight: '700', color: 'var(--text-main)' }}>{popup.barangayName}</h3>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
                     <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: getRisk(popup.totalCases).color, display: 'inline-block' }} />
-                    <span style={{ fontSize: '15px', color: 'var(--text-muted)' }}>
+                    <span style={{ fontSize: '17px', color: 'var(--text-muted)' }}>
                       {getRisk(popup.totalCases).label} · {popup.totalCases} total case{popup.totalCases !== 1 ? 's' : ''}
                     </span>
                   </div>
@@ -1181,7 +1181,7 @@ export default function ResidentMap() {
 
               <div style={{ borderTop: '1px solid var(--border-color)', marginBottom: '14px' }} />
 
-              <p style={{ margin: '0 0 10px 0', fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <p style={{ margin: '0 0 10px 0', fontSize: '17px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 All Diseases in this Barangay
               </p>
 
@@ -1198,16 +1198,16 @@ export default function ResidentMap() {
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '9px', flex: 1, minWidth: 0 }}>
                         {isTop && (
-                          <span style={{ fontSize: '15px', background: '#121358', color: 'white', padding: '2px 6px', borderRadius: '10px', fontWeight: '700', flexShrink: 0 }}>
+                          <span style={{ fontSize: '17px', background: '#121358', color: 'white', padding: '2px 6px', borderRadius: '10px', fontWeight: '700', flexShrink: 0 }}>
                             TOP {i + 1}
                           </span>
                         )}
-                        <span style={{ fontSize: '15px', color: 'var(--text-main)', fontWeight: isTop ? '600' : '400', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: '17px', color: 'var(--text-main)', fontWeight: isTop ? '600' : '400', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {disease}
                         </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, marginLeft: '10px' }}>
-                        <span style={{ fontSize: '15px', fontWeight: '700', color: '#10b981' }}>{count}</span>
+                        <span style={{ fontSize: '17px', fontWeight: '700', color: '#10b981' }}>{count}</span>
                       </div>
                     </div>
                   );
@@ -1220,7 +1220,7 @@ export default function ResidentMap() {
       {/* Legend */}
       <div style={{ marginTop: '16px', display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '24px', padding: '0 16px', alignItems: 'start' }}>
         <div>
-          <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Risk Levels</div>
+          <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Risk Levels</div>
           <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
             <LegendItem color="#DC2626" label="High Risk (20+)" />
             <LegendItem color="#f59e0b" label="Medium (10-20)" />
@@ -1230,10 +1230,10 @@ export default function ResidentMap() {
         </div>
         {usedDiseaseColors.length > 0 && (
           <div>
-            <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Top Diseases</div>
+            <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Top Diseases</div>
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
               {usedDiseaseColors.map(({ disease, color }) => (
-                <div key={disease} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '15px', color: 'var(--text-muted)' }}>
+                <div key={disease} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '17px', color: 'var(--text-muted)' }}>
                   <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: color, flexShrink: 0 }} />
                   {disease}
                 </div>

@@ -70,7 +70,8 @@ CREATE TABLE `diseases` (
   `description` varchar(255) DEFAULT NULL,
   `prevention_tips` text DEFAULT NULL,
   `symptoms` text DEFAULT NULL,
-  `video_url` varchar(255) DEFAULT NULL
+  `video_url` varchar(255) DEFAULT NULL,
+  `active` tinyint(1) NOT NULL DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -152,6 +153,8 @@ CREATE TABLE `disease_cases` (
   `barangay_id` int(11) NOT NULL,
   `status` enum('Active','Pending','Approved','Recovered','Deceased','Under Treatment','Draft') DEFAULT 'Active',
   `date_reported` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `created_by` int(11) DEFAULT NULL,
   `disease_id` int(11) DEFAULT NULL,
   `severity` varchar(50) DEFAULT NULL,
   `age` int(3) NOT NULL,
@@ -199,6 +202,7 @@ CREATE TABLE `users` (
   `role` enum('CHO','BHW') NOT NULL,
   `assigned_barangay_id` int(11) NOT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `status` varchar(20) DEFAULT NULL,
   `email` varchar(255) DEFAULT NULL,
   `mobile_number` varchar(20) DEFAULT NULL,
   `reset_token` varchar(255) DEFAULT NULL,
@@ -214,7 +218,8 @@ CREATE TABLE `users` (
   `two_fa_token` varchar(255) DEFAULT NULL,
   `two_fa_token_expiry` datetime DEFAULT NULL,
   `login_otp` varchar(6) DEFAULT NULL,
-  `login_otp_expiry` datetime DEFAULT NULL
+  `login_otp_expiry` datetime DEFAULT NULL,
+  `login_otp_attempts` int(11) DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -266,7 +271,7 @@ CREATE TABLE IF NOT EXISTS generated_reports (
   entity VARCHAR(100),
   details TEXT,
   cho_unit VARCHAR(100),
-  snapshot_logs JSON,
+  snapshot_logs LONGTEXT,
   created_by INT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -367,6 +372,116 @@ ALTER TABLE `case_inbox`
 
 ALTER TABLE `case_inbox` 
 ADD FOREIGN KEY (to_barangay_id) REFERENCES `barangays`(id);
+
+
+CREATE TABLE IF NOT EXISTS notification_preferences (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL UNIQUE,
+  push_notifications BOOLEAN DEFAULT FALSE,
+  email_notifications BOOLEAN DEFAULT FALSE,
+  sms_notifications BOOLEAN DEFAULT FALSE,
+  new_case_reported BOOLEAN DEFAULT FALSE,
+  case_status_updated BOOLEAN DEFAULT FALSE,
+  high_risk_alert BOOLEAN DEFAULT FALSE,
+  weekly_summary BOOLEAN DEFAULT FALSE,
+  system_maintenance BOOLEAN DEFAULT FALSE,
+  updated_case_reported BOOLEAN DEFAULT FALSE,
+  FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+
+CREATE TABLE IF NOT EXISTS contact_messages (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  target_cho_unit VARCHAR(100),
+  disease_name VARCHAR(255),
+  message TEXT NOT NULL,
+  age INT,
+  gender VARCHAR(10),
+  contact_no VARCHAR(50),
+  address TEXT,
+  is_read TINYINT DEFAULT 0,
+  status VARCHAR(20) DEFAULT 'new',
+  barangay VARCHAR(100),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+
+CREATE TABLE IF NOT EXISTS case_edit_requests (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  case_id INT NOT NULL,
+  requested_by INT NOT NULL,
+  requested_by_name VARCHAR(255),
+  from_barangay_name VARCHAR(100),
+  target_cho_unit VARCHAR(100),
+  note TEXT,
+  status ENUM('pending','accepted','rejected') DEFAULT 'pending',
+  is_read TINYINT(1) DEFAULT 0,
+  proposed_data JSON NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  resolved_at TIMESTAMP NULL,
+  FOREIGN KEY (case_id) REFERENCES disease_cases(case_id) ON DELETE CASCADE,
+  FOREIGN KEY (requested_by) REFERENCES users(user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+
+CREATE TABLE IF NOT EXISTS case_add_requests (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  patient_name VARCHAR(255),
+  disease_name VARCHAR(100),
+  age INT,
+  severity VARCHAR(20),
+  gender VARCHAR(10),
+  case_status VARCHAR(20) DEFAULT 'Active',
+  contact VARCHAR(50),
+  onset_date DATE NULL,
+  address TEXT,
+  barangay_id INT NULL,
+  symptoms TEXT,
+  physician VARCHAR(255),
+  latitude DECIMAL(10,8) NULL,
+  longitude DECIMAL(11,8) NULL,
+  requested_by INT NOT NULL,
+  requested_by_name VARCHAR(255),
+  from_barangay_name VARCHAR(100),
+  target_cho_unit VARCHAR(100),
+  note TEXT,
+  reject_reason TEXT NULL,
+  status ENUM('pending','accepted','rejected') DEFAULT 'pending',
+  is_read TINYINT(1) DEFAULT 0,
+  resolved_by INT NULL,
+  case_id INT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  resolved_at TIMESTAMP NULL,
+  FOREIGN KEY (requested_by) REFERENCES users(user_id),
+  FOREIGN KEY (barangay_id) REFERENCES barangays(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+
+CREATE TABLE IF NOT EXISTS password_change_requests (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  user_name VARCHAR(255),
+  status ENUM('pending','accepted','rejected','resolved') DEFAULT 'pending',
+  is_read TINYINT(1) DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  resolved_at TIMESTAMP NULL,
+  FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+
+CREATE TABLE IF NOT EXISTS case_status_history (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  case_id INT NOT NULL,
+  old_status VARCHAR(30),
+  new_status VARCHAR(30) NOT NULL,
+  changed_by INT,
+  changed_by_name VARCHAR(255),
+  changed_by_role VARCHAR(20),
+  notes TEXT,
+  changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (case_id) REFERENCES disease_cases(case_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;

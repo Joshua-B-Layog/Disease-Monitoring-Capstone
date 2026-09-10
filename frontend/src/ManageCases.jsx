@@ -450,6 +450,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const [routingDescription, setRoutingDescription] = useState('');
   const [routingTargetType, setRoutingTargetType] = useState(null);
   const [routingTargetBarangay, setRoutingTargetBarangay] = useState('');
+  const [crossUnit, setCrossUnit] = useState(null);
   const [carouselIndex, setCarouselIndex] = useState(0); // 0 = categories grid, 1 = exclusive diseases, 2 = add disease form
   const [newDiseaseName, setNewDiseaseName] = useState('');
   const [newDiseaseIcon, setNewDiseaseIcon] = useState('🦠');
@@ -861,6 +862,22 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     return null;
   };
 
+  const detectBarangayFromAddressLocal = (address) => {
+    const addr = (address || '').trim();
+    if (!addr) return null;
+    const addrLower = addr.toLowerCase().replace(/[\-\s]/g, '');
+    const matched = barangayList.find(b => {
+      const bNorm = b.name.replace(/\(.*?\)/g, '').toLowerCase().replace(/[\-\s().]/g, '').trim();
+      return addrLower.includes(bNorm);
+    });
+    if (matched) return matched.name;
+    const BARANGAY_ALIASES = { 'bugtong': 'Butong', 'pitland': 'Pittland', 'poblacion1': 'Barangay Uno (Poblacion)', 'poblacion 1': 'Barangay Uno (Poblacion)', 'poblacion2': 'Barangay Dos (Poblacion)', 'poblacion 2': 'Barangay Dos (Poblacion)', 'poblacion3': 'Barangay Tres (Poblacion)', 'poblacion 3': 'Barangay Tres (Poblacion)' };
+    for (const [alias, realName] of Object.entries(BARANGAY_ALIASES)) {
+      if (addrLower.includes(alias)) return realName;
+    }
+    return null;
+  };
+
   const fetchOutbox = () => {
     const choUnit = loginRole === 'BHW' && loginBarangay
       ? getChoUnitForBarangay(loginBarangay)
@@ -905,6 +922,65 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         });
       })
       .catch(err => notify('Accept failed: ' + (err.response?.data?.error || err.message), 'error'));
+  };
+
+  const performAddRequestSubmit = async (pendingPayload) => {
+    const ownedUnit = sessionContext || getChoUnitForBarangay(loginBarangay);
+    const detectedName = detectBarangayFromAddressLocal(pendingPayload.address);
+    const selectedName = barangayList.find(b => String(b.id) === String(pendingPayload.barangay_id))?.name || null;
+    const targetUnit = getChoUnitForBarangay(selectedName) || getChoUnitForBarangay(detectedName) || ownedUnit;
+    try {
+      await axios.post(`${API_URL}/api/cases/request-add`, {
+        ...pendingPayload,
+        requested_by: loggedUserId,
+        requested_by_name: loggedUser || 'Unknown BHW',
+        submitter_cho_unit: sessionContext || null,
+        from_barangay_name: loginBarangay || null,
+      });
+      if (pendingContactMessageId) {
+        await axios.put(`${API_URL}/api/contact-messages/${pendingContactMessageId}/accept`).catch(() => {});
+        setPendingContactMessageId(null);
+        fetchOutbox();
+      }
+      const routedMsg = ownedUnit && targetUnit && targetUnit !== ownedUnit
+        ? `Case submitted to ${targetUnit} for approval!`
+        : 'Case submitted to your CHO for approval!';
+      setSubmitMsg(routedMsg);
+      notify(routedMsg, 'success');
+      await fetchCases();
+      const diseaseEntry = findDiseaseEntry(formData.diseaseType);
+      if (diseaseEntry) { setSelectedDisease(diseaseEntry); setSelectedCategory(null); setCategoryPage(0); }
+      setTimeout(() => { setView('list'); setSubmitMsg(''); setSubmitLoading(false); }, 1200);
+    } catch (err) {
+      setSubmitLoading(false);
+      if (!err.response) {
+        await enqueueOperation({
+          type: 'add_request',
+          endpoint: '/api/cases/request-add',
+          method: 'POST',
+          payload: {
+            ...pendingPayload, case_id: 'temp-' + Date.now(),
+            requested_by: loggedUserId,
+            requested_by_name: loggedUser || 'Unknown BHW',
+            from_barangay_name: loginBarangay,
+            submitter_cho_unit: sessionContext,
+            note: '',
+          },
+          userId: loggedUserId,
+          userName: loggedUser,
+        });
+        setSubmitMsg('Case submitted to CHO for approval (offline) - will sync when reconnected.');
+        notify('Submitted to CHO for approval. Will sync when reconnected.', 'info');
+        setOfflineMode(true);
+        setTimeout(() => { setView('list'); setSubmitMsg(''); setSubmitLoading(false); }, 1800);
+      } else {
+        const errMsg = 'Submit failed: ' + (err.response?.data?.error || err.message);
+        setSubmitMsg(errMsg);
+        notify(errMsg, 'error');
+      }
+    } finally {
+      setCrossUnit(null);
+    }
   };
 
   const handlePendingContactMessage = (msg) => {
@@ -2075,6 +2151,18 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         notify('Case updated successfully!', 'success');
       } else if (loginRole === 'BHW' && !isDraft) {
         // BHW adds now go through CHO approval (leader requirement)
+        // Cross-unit: confirm when the address belongs to another CHO unit's barangay
+        const ownedUnit = sessionContext || getChoUnitForBarangay(loginBarangay);
+        const detectedName = detectBarangayFromAddressLocal(payload.address);
+        const selectedName = barangayList.find(b => String(b.id) === String(payload.barangay_id))?.name || null;
+        const targetUnit = getChoUnitForBarangay(selectedName) || getChoUnitForBarangay(detectedName) || ownedUnit;
+        const routeBrgy = selectedName || detectedName;
+        if (ownedUnit && targetUnit && targetUnit !== ownedUnit) {
+          // In-page confirm box instead of a native alert
+          setCrossUnit({ routeBrgy, targetUnit, payload });
+          setSubmitLoading(false);
+          return;
+        }
         await axios.post(`${API_URL}/api/cases/request-add`, {
           ...payload,
           requested_by: loggedUserId,
@@ -2087,8 +2175,11 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           setPendingContactMessageId(null);
           fetchOutbox();
         }
-        setSubmitMsg('Case submitted to CHO for approval!');
-        notify('Submitted to CHO for approval.', 'success');
+        const routedMsg = ownedUnit && targetUnit && targetUnit !== ownedUnit
+          ? `Case submitted to ${targetUnit} for approval!`
+          : 'Case submitted to your CHO for approval!';
+        setSubmitMsg(routedMsg);
+        notify(routedMsg, 'success');
       } else {
         const newCaseRes = await axios.post(API_URL + '/api/cases', {
           ...payload,
@@ -4519,6 +4610,35 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   </div>
                 </>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Cross-unit submit confirm modal */}
+        {crossUnit && (
+          <div className="cdms-modal-backdrop" style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)' }}>
+            <div className="cdms-modal-card" style={{ background: 'var(--bg-surface)', borderRadius: '12px', padding: '28px', maxWidth: '480px', width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }}>
+              <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px', color: 'var(--text-main)' }}>
+                Submit to another CHO unit?
+              </div>
+              <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '20px', lineHeight: '1.6' }}>
+                {crossUnit.routeBrgy ? (
+                  <>This case is located in <strong style={{ color: 'var(--text-main)' }}>Brgy. {crossUnit.routeBrgy}</strong> - under <strong style={{ color: 'var(--text-main)' }}>{crossUnit.targetUnit}</strong>.</>
+                ) : (
+                  <>This case appears to belong to a different CHO unit (<strong style={{ color: 'var(--text-main)' }}>{crossUnit.targetUnit}</strong>).</>
+                )}{' '}
+                Submit to that unit's CHO for approval?
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+                <button onClick={() => setCrossUnit(null)}
+                  style={{ padding: '10px 24px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-main)', cursor: 'pointer', fontWeight: '500', fontSize: '15px' }}>
+                  Cancel
+                </button>
+                <button onClick={() => performAddRequestSubmit(crossUnit.payload)}
+                  style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#129968', color: '#fff', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
+                  ✓ Submit to {crossUnit.targetUnit}
+                </button>
+              </div>
             </div>
           </div>
         )}

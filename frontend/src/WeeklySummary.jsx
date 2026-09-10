@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { API_URL } from './config';
 import BackButton from './components/BackButton';
 import { cacheWeeklySummary, getCachedWeeklySummary } from './offlineSync';
+import { authHeaders } from './auth';
 
 export default function WeeklySummary({ userId, loginRole, compactMode, fontScale, onBack }) {
   const defaultStart = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
@@ -18,7 +19,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
     setLoading(true);
     setError(null);
     const cacheKey = `weekly_${userId}_${startDate}_${endDate}`;
-    fetch(`${API_URL}/api/weekly-summary?user_id=${userId}&start_date=${startDate}&end_date=${endDate}`)
+    fetch(`${API_URL}/api/weekly-summary?user_id=${userId}&start_date=${startDate}&end_date=${endDate}`, { headers: authHeaders() })
       .then(r => r.json())
       .then(d => {
         if (d.error) throw new Error(d.error);

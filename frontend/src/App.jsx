@@ -14,6 +14,7 @@ import { ToastHost } from './components/Toast';
 import { API_URL } from './config';
 import { getPendingCount, processSyncQueue } from './syncEngine';
 import { cacheNotifications, getCachedNotifications } from './offlineSync';
+import { setAuthToken, getAuthToken, authHeaders } from './auth';
 import './App.css';
 
 const getSavedFontScale = () => {
@@ -308,7 +309,7 @@ useEffect(() => {
   if (!loggedUserId) return;
 
   const fetchNotifications = () => {
-    fetch(`${API_URL}/api/notifications?userId=${loggedUserId}`)
+    fetch(`${API_URL}/api/notifications?userId=${loggedUserId}`, { headers: authHeaders() })
       .then(res => res.json())
       .then(data => {
         const arr = Array.isArray(data) ? data : [];
@@ -395,7 +396,7 @@ useEffect(() => {
     if (!loggedUserId) return;
     setProfileLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/users/${loggedUserId}/profile`);
+      const res = await fetch(`${API_URL}/api/users/${loggedUserId}/profile`, { headers: authHeaders() });
       const data = await res.json();
       setProfileData(data);
     } catch (e) {
@@ -406,17 +407,17 @@ useEffect(() => {
   };
 
   const handleDismissNotification = (id) => {
-  fetch(`${API_URL}/api/notifications/${id}`, { method: 'DELETE' })
+  fetch(`${API_URL}/api/notifications/${id}`, { method: 'DELETE', headers: authHeaders() })
     .then(() => setNotifications(prev => prev.filter(n => n.id !== id)));
   };
 
   const handleDismissAll = () => {
-    fetch(`${API_URL}/api/notifications?userId=${loggedUserId}`, { method: 'DELETE' })
+    fetch(`${API_URL}/api/notifications?userId=${loggedUserId}`, { method: 'DELETE', headers: authHeaders() })
       .then(() => setNotifications([]));
   };
 
   const handleMarkRead = (id) => {
-    fetch(`${API_URL}/api/notifications/${id}/read`, { method: 'PUT' })
+    fetch(`${API_URL}/api/notifications/${id}/read`, { method: 'PUT', headers: authHeaders() })
       .then(() => setNotifications(prev =>
         prev.map(n => n.id === id ? { ...n, is_read: 1 } : n)
       ))
@@ -529,14 +530,59 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
     setLoggedUserBarangay(sessionData.barangay || null);
     setAppTheme(localStorage.getItem(`cdms_theme_${sessionData.id}`) || localStorage.getItem('cdms_theme') || 'dark');
     if (sessionData.id) localStorage.setItem('cdms_last_user', String(sessionData.id));
+    setAuthToken(sessionData.token || null);
     localStorage.setItem('cdms_session', JSON.stringify({
       id: sessionData.id,
       name: sessionData.name || sessionData.username,
       role: sessionData.role,
       context: sessionData.context,
       barangay: sessionData.barangay || null,
+      token: sessionData.token || null,
     }));
   };
+
+  // ── Silent re-auth: restore a live token for offline-created sessions ──
+  const silentReauthRef = useRef(false);
+  const silentReauth = async () => {
+    if (silentReauthRef.current) return;
+    if (getAuthToken()) return;
+    const raw = localStorage.getItem('cdms_session');
+    if (!raw || !navigator.onLine) return;
+    let saved;
+    try { saved = JSON.parse(raw); } catch { return; }
+    if (!saved || !saved.id) return;
+    silentReauthRef.current = true;
+    try {
+      const cached = await import('./offlineSync').then(m => m.getCachedUsers()).catch(() => []);
+      const match = (cached || []).find(u => (u.id === saved.id) || (u.user_id === saved.id));
+      if (!match || !match.email || !match.password) return;
+      const res = await fetch(`${API_URL}/api/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: match.email,
+          password: match.password,
+          role: saved.role,
+          context: saved.context,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.token) {
+          setAuthToken(data.token);
+          localStorage.setItem('cdms_session', JSON.stringify({ ...saved, token: data.token }));
+        }
+      }
+    } catch {
+      /* silent re-auth failed — user can log in again later */
+    } finally {
+      silentReauthRef.current = false;
+    }
+  };
+
+  useEffect(() => {
+    silentReauth();
+  }, [isOnline]);
 
   const handleLogout = () => { 
     if (!navigator.onLine) {
@@ -544,9 +590,10 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
     }
     fetch(`${API_URL}/api/logout`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ userId: loggedUserId, userName: loggedUser, userRole: loginRole, barangay: null }),
     }).catch(() => {});
+    setAuthToken(null);
     localStorage.removeItem('cdms_session');
     localStorage.removeItem('cdms_active_tab');
     if (loggedUserId) localStorage.setItem('cdms_last_user', String(loggedUserId));

@@ -26,13 +26,13 @@
 /* Body text */
 .resident-page p {
   font-family: var(--sans);
-  font-size: 15px;
+  font-size: 17px;
 }
 
 /* Buttons */
 .resident-page button {
   font-family: var(--heading);
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 600;
 }
 
@@ -41,7 +41,7 @@
 .resident-page .badge,
 .resident-page .tag {
   font-family: var(--heading);
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 600;
 }
 
@@ -50,7 +50,7 @@
 .resident-page textarea,
 .resident-page select {
   font-family: var(--sans);
-  font-size: 15px;
+  font-size: 17px;
 }
 
 /* =========================================================
@@ -215,7 +215,7 @@
 .mc-custom-dropdown-btn {
   padding: 8px 12px; background: var(--input-bg);
   border: 1px solid var(--border-color); border-radius: 6px;
-  color: var(--text-main); font-size: 15px; cursor: pointer;
+  color: var(--text-main); font-size: 17px; cursor: pointer;
   display: flex; align-items: center; justify-content: space-between;
   gap: 6px; white-space: nowrap; box-sizing: border-box;
 }
@@ -228,7 +228,7 @@
   animation: cdmsPopIn 0.15s ease;
 }
 .mc-custom-dropdown-item {
-  padding: 8px 12px; cursor: pointer; font-size: 15px;
+  padding: 8px 12px; cursor: pointer; font-size: 17px;
   color: var(--text-main);
 }
 .mc-custom-dropdown-item:hover { background: var(--input-bg); }

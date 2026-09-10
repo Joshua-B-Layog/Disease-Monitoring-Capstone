@@ -104,7 +104,7 @@
 }
 
 .sub-view-subtitle {
-  font-size: 15px;
+  font-size: 17px;
   color: var(--text-muted);
   margin: -16px 0 8px 0;
   text-align: left;
@@ -178,7 +178,7 @@
 }
 
 .profile-display-role {
-  font-size: 15px;
+  font-size: 17px;
   color: var(--text-muted);
   margin: 0 0 12px 0;
 }
@@ -187,7 +187,7 @@
   background-color: var(--bg-surface);
   border: 1px solid var(--input-border);
   padding: 6px 12px;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 600;
   color: var(--text-main);
   border-radius: 6px;
@@ -217,7 +217,7 @@
 }
 
 .input-field-group label {
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 600;
   color: var(--text-muted);
 }
@@ -227,7 +227,7 @@
   padding: 10px 14px;
   border: 1px solid var(--input-border);
   border-radius: 8px;
-  font-size: 15px;
+  font-size: 17px;
   color: var(--text-main);
   outline: none;
   background-color: var(--input-bg);
@@ -301,14 +301,14 @@
 }
 
 .security-header-text h3 {
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 600;
   color: var(--text-main);
   margin: 0 0 2px 0;
 }
 
 .security-timestamp {
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-muted);
 }
 
@@ -327,7 +327,7 @@
 }
 
 .security-input-row label {
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 500;
   color: var(--text-main);
 }
@@ -344,7 +344,7 @@
   border: 1px solid var(--input-border);
   border-radius: 8px;
   background-color: var(--input-bg);
-  font-size: 15px;
+  font-size: 17px;
   color: var(--text-main);
   outline: none;
   box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
@@ -369,7 +369,7 @@
   border: none;
   border-radius: 6px;
   padding: 12px 24px;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 600;
   cursor: pointer;
   width: fit-content;
@@ -381,7 +381,7 @@
   border: 1px solid var(--input-border);
   border-radius: 8px;
   padding: 8px 16px;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 600;
   color: var(--text-main);
   cursor: pointer;
@@ -463,14 +463,14 @@
 }
 
 .session-info-meta h4 {
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 600;
   color: var(--text-main);
   margin: 0 0 4px 0;
 }
 
 .session-info-meta p {
-  font-size: 15px;
+  font-size: 17px;
   color: var(--text-muted);
   margin: 0;
 }
@@ -478,7 +478,7 @@
 .session-badge-active {
   background-color: #ecfdf3;
   color: #027a48;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 500;
   padding: 4px 12px;
   border-radius: 16px;
@@ -488,7 +488,7 @@
   background: none;
   border: none;
   color: #d92d20;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -508,7 +508,7 @@
   border: none;
   border-radius: 8px;
   padding: 12px 28px;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 600;
   cursor: pointer;
   box-shadow: 0 1px 3px rgba(16, 24, 40, 0.1);
@@ -532,7 +532,7 @@
   border: 1px solid var(--input-border);
   padding: 10px 20px;
   border-radius: 8px;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 600;
   color: var(--text-muted);
   cursor: pointer;
@@ -543,7 +543,7 @@
   border: none;
   padding: 10px 20px;
   border-radius: 8px;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 600;
   color: var(--bg-surface);
   cursor: pointer;
@@ -569,7 +569,7 @@
 }
 
 .utility-row-action-card span:first-child {
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 600;
   color: var(--text-main);
 }

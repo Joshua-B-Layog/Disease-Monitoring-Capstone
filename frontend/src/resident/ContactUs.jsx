@@ -94,7 +94,25 @@ export default function ContactUs() {
       setForm({ name: '', age: '', gender: '', contact: '', address: '', targetCho: 'BHW', targetBarangay: '', disease: '', message: '' });
       setFormErrors({});
     } catch (err) {
-      setError('Failed to send message. Please try again later.');
+      if (!err.response) {
+        try {
+          await enqueueOperation({
+            type: 'message',
+            endpoint: '/api/contact-messages',
+            method: 'POST',
+            payload: form,
+          });
+          setSent(true);
+          setOfflineQueued(true);
+          setForm({ name: '', age: '', gender: '', contact: '', address: '', targetCho: 'BHW', targetBarangay: '', disease: '', message: '' });
+          setFormErrors({});
+          setError('');
+        } catch (qErr) {
+          setError('Failed to queue your message. Please try again later.');
+        }
+      } else {
+        setError('Failed to send message. Please try again later.');
+      }
     }
     setSending(false);
   };
@@ -134,14 +152,14 @@ export default function ContactUs() {
           background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '12px',
           padding: '24px',
         }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: '700', color: 'var(--text-main)' }}>
+          <h3 style={{ margin: '0 0 16px', fontSize: '17px', fontWeight: '700', color: 'var(--text-main)' }}>
             Send a Message
           </h3>
 
           {sent ? (
             <div style={{ textAlign: 'center', padding: '24px' }}>
               <div style={{ fontSize: '36px', marginBottom: '8px' }}>✅</div>
-              <p style={{ fontSize: '15px', color: 'var(--text-muted)' }}>
+              <p style={{ fontSize: '17px', color: 'var(--text-muted)' }}>
                 {offlineQueued
                   ? 'Your message has been saved and will be sent when you reconnect to the internet.'
                   : 'Your message has been sent successfully! The health office will respond to you soon.'}
@@ -149,7 +167,7 @@ export default function ContactUs() {
               <button onClick={() => { setSent(false); setOfflineQueued(false); }}
                 style={{
                   marginTop: '12px', padding: '8px 20px', background: '#129968',
-                  color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '15px',
+                  color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '17px',
                 }}
                 onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                 onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
@@ -165,7 +183,7 @@ export default function ContactUs() {
                   <input required type="number" placeholder="Age"
                     value={form.age} onChange={e => { setForm({...form, age: e.target.value}); setFormErrors(prev => ({...prev, age: false})); }}
                     style={{ ...inputStyle, border: formErrors.age ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.age ? 'rgba(239,68,68,0.1)' : 'var(--bg-surface)' }} min="0" max="150" />
-                  {formErrors.age && <span style={{ fontSize: '13px', color: '#ef4444' }}>Age must be between 0 and 150</span>}
+                  {formErrors.age && <span style={{ fontSize: '15px', color: '#ef4444' }}>Age must be between 0 and 150</span>}
                   <select required value={form.gender} onChange={e => { setForm({...form, gender: e.target.value}); setFormErrors(prev => ({...prev, gender: false})); }}
                     style={{ ...inputStyle, cursor: 'pointer', border: formErrors.gender ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.gender ? 'rgba(239,68,68,0.1)' : 'var(--bg-surface)' }}>
                     <option value="" disabled>- Select Gender -</option>
@@ -176,7 +194,7 @@ export default function ContactUs() {
                   <input required type="tel" placeholder="Contact Number"
                     value={form.contact} onChange={e => { setForm({...form, contact: e.target.value}); setFormErrors(prev => ({...prev, contact: false})); }}
                     style={{ ...inputStyle, border: formErrors.contact ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.contact ? 'rgba(239,68,68,0.1)' : 'var(--bg-surface)' }} />
-                  {formErrors.contact && <span style={{ fontSize: '13px', color: '#ef4444' }}>Enter a valid PH number (e.g., 09123456789)</span>}
+                  {formErrors.contact && <span style={{ fontSize: '15px', color: '#ef4444' }}>Enter a valid PH number (e.g., 09123456789)</span>}
                   <input required placeholder="Your Address"
                     value={form.address} onChange={e => { setForm({...form, address: e.target.value}); setFormErrors(prev => ({...prev, address: false})); }}
                     style={{ ...inputStyle, border: formErrors.address ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.address ? 'rgba(239,68,68,0.1)' : 'var(--bg-surface)' }} />
@@ -198,7 +216,7 @@ export default function ContactUs() {
                         {ALL_BARANGAYS.map(b => (
                           <div key={b} onClick={() => { setForm({...form, targetBarangay: b}); setTargetBarangayOpen(false); }}
                             style={{
-                              padding: '10px 12px', cursor: 'pointer', fontSize: '15px',
+                              padding: '10px 12px', cursor: 'pointer', fontSize: '17px',
                               color: 'var(--text-main)',
                               background: form.targetBarangay === b ? 'rgba(18,153,104,0.18)' : 'transparent',
                             }}>
@@ -226,7 +244,7 @@ export default function ContactUs() {
                       {DISEASE_OPTIONS.map(d => (
                         <div key={d} onClick={() => { setForm({...form, disease: d}); setDiseaseOpen(false); setFormErrors(prev => ({...prev, disease: false})); }}
                           style={{
-                            padding: '10px 12px', cursor: 'pointer', fontSize: '15px',
+                            padding: '10px 12px', cursor: 'pointer', fontSize: '17px',
                             color: 'var(--text-main)',
                             background: form.disease === d ? 'rgba(18,153,104,0.18)' : 'transparent',
                           }}>
@@ -239,11 +257,11 @@ export default function ContactUs() {
                   <textarea required placeholder="Your Message"
                     value={form.message} onChange={e => { setForm({...form, message: e.target.value}); setFormErrors(prev => ({...prev, message: false})); }}
                     rows={4} style={{...inputStyle, resize: 'vertical', border: formErrors.message ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.message ? 'rgba(239,68,68,0.1)' : 'var(--bg-surface)'}} />
-                  {error && <div style={{ color: '#ef4444', fontSize: '15px' }}>{error}</div>}
+                  {error && <div style={{ color: '#ef4444', fontSize: '17px' }}>{error}</div>}
                 <button type="submit" disabled={sending}
                   style={{
                     padding: '12px', background: '#129968', color: '#fff',
-                    border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: '600',
+                    border: 'none', borderRadius: '8px', fontSize: '17px', fontWeight: '600',
                     cursor: sending ? 'not-allowed' : 'pointer', opacity: sending ? 0.7 : 1,
                   }}
                   onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
@@ -260,10 +278,10 @@ export default function ContactUs() {
           background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '12px',
           padding: '24px',
         }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: '700', color: 'var(--text-main)' }}>
+          <h3 style={{ margin: '0 0 16px', fontSize: '17px', fontWeight: '700', color: 'var(--text-main)' }}>
             Connect with Us
           </h3>
-          <p style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+          <p style={{ fontSize: '17px', color: 'var(--text-muted)', marginBottom: '16px' }}>
             Follow us on Facebook for the latest health updates and announcements.
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -271,7 +289,7 @@ export default function ContactUs() {
               style={{
                 display: 'flex', alignItems: 'center', gap: '10px',
                 padding: '12px 16px', background: '#1877f2', color: '#fff',
-                borderRadius: '8px', textDecoration: 'none', fontWeight: '600', fontSize: '15px',
+                borderRadius: '8px', textDecoration: 'none', fontWeight: '600', fontSize: '17px',
               }}>
               <ChoLogoIcon size={22} />
               <span style={{ fontSize: '18px'}}>f</span>
@@ -281,7 +299,7 @@ export default function ContactUs() {
               style={{
                 display: 'flex', alignItems: 'center', gap: '10px',
                 padding: '12px 16px', background: '#1877f2', color: '#fff',
-                borderRadius: '8px', textDecoration: 'none', fontWeight: '600', fontSize: '15px',
+                borderRadius: '8px', textDecoration: 'none', fontWeight: '600', fontSize: '17px',
               }}>
               <ChoLogoIconII size={22} />
               <span style={{ fontSize: '18px'}}>f</span>
@@ -295,7 +313,7 @@ export default function ContactUs() {
           background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '12px',
           padding: '24px',
         }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: '700', color: 'var(--text-main)' }}>
+          <h3 style={{ margin: '0 0 16px', fontSize: '17px', fontWeight: '700', color: 'var(--text-main)' }}>
             Our Location
           </h3>
           <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
@@ -306,7 +324,7 @@ export default function ContactUs() {
                 background: locationView === 'cho1' ? 'rgba(18,153,104,0.18)' : 'var(--bg-surface)',
                 color: locationView === 'cho1' ? '#3cb882' : 'var(--text-muted)',
                 fontWeight: locationView === 'cho1' ? '600' : '400',
-                cursor: 'pointer', fontSize: '15px',
+                cursor: 'pointer', fontSize: '17px',
               }}>
               CHO Unit I
             </button>
@@ -317,7 +335,7 @@ export default function ContactUs() {
                 background: locationView === 'cho2' ? 'rgba(18,153,104,0.18)' : 'var(--bg-surface)',
                 color: locationView === 'cho2' ? '#3cb882' : 'var(--text-muted)',
                 fontWeight: locationView === 'cho2' ? '600' : '400',
-                cursor: 'pointer', fontSize: '15px',
+                cursor: 'pointer', fontSize: '17px',
               }}>
               CHO Unit II
             </button>
@@ -341,12 +359,12 @@ export default function ContactUs() {
           <div style={{ textAlign: 'right', marginBottom: '12px' }}>
             <a href={`https://www.google.com/maps?q=${currentLoc.coords[0]},${currentLoc.coords[1]}`}
               target="_blank" rel="noopener noreferrer"
-              style={{ fontSize: '15px', color: 'var(--text-muted)', textDecoration: 'none' }}>
+              style={{ fontSize: '17px', color: 'var(--text-muted)', textDecoration: 'none' }}>
               Get directions ↗
             </a>
           </div>
 
-          <div style={{ fontSize: '15px', color: 'var(--text-muted)', lineHeight: '1.7' }}>
+          <div style={{ fontSize: '17px', color: 'var(--text-muted)', lineHeight: '1.7' }}>
             <div><strong style={{ color: 'var(--text-main)' }}>Address:</strong> {currentLoc.address}</div>
             <div><strong style={{ color: 'var(--text-main)' }}>Phone:</strong> {currentLoc.phone}</div>
             <div><strong style={{ color: 'var(--text-main)' }}>Email:</strong> {currentLoc.email}</div>
@@ -361,10 +379,10 @@ export default function ContactUs() {
         padding: '16px', background: 'var(--warning-bg)', border: '1px solid var(--warning-border)',
         borderRadius: '10px',
       }}>
-        <div style={{ fontSize: '15px', color: 'var(--warning-text)', fontWeight: '600' }}>
+        <div style={{ fontSize: '17px', color: 'var(--warning-text)', fontWeight: '600' }}>
           National Emergency Hotline: <strong style={{ fontSize: '22px' }}>911</strong>
         </div>
-        <div style={{ fontSize: '15px', color: 'var(--warning-text)', marginTop: '4px' }}>
+        <div style={{ fontSize: '17px', color: 'var(--warning-text)', marginTop: '4px' }}>
           DOH: 1555 | Red Cross: 143 | PNP: 117
         </div>
       </div>
@@ -374,6 +392,6 @@ export default function ContactUs() {
 
 const inputStyle = {
   padding: '10px 14px', border: '1px solid var(--border-color)', borderRadius: '6px',
-  fontSize: '15px', color: 'var(--text-main)', background: 'var(--bg-surface)',
+  fontSize: '17px', color: 'var(--text-main)', background: 'var(--bg-surface)',
   outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
 };
