@@ -1159,11 +1159,11 @@ export default function ResidentMap() {
             <div style={{
               background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '14px',
               padding: '28px', width: '440px', maxWidth: '95vw', maxHeight: '80vh',
-              overflowY: 'auto', boxShadow: '0 24px 60px rgba(0,0,0,0.3)',
+              display: 'flex', flexDirection: 'column', boxShadow: '0 24px 60px rgba(0,0,0,0.3)',
             }} onClick={e => e.stopPropagation()}>
 
               {/* Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px', flexShrink: 0 }}>
                 <div>
                   <h3 style={{ margin: '0 0 5px 0', fontSize: '22px', fontWeight: '700', color: 'var(--text-main)' }}>{popup.barangayName}</h3>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
@@ -1179,8 +1179,9 @@ export default function ResidentMap() {
                 </button>
               </div>
 
-              <div style={{ borderTop: '1px solid var(--border-color)', marginBottom: '14px' }} />
+              <div style={{ borderTop: '1px solid var(--border-color)', marginBottom: '14px', flexShrink: 0 }} />
 
+              <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
               <p style={{ margin: '0 0 10px 0', fontSize: '17px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 All Diseases in this Barangay
               </p>
@@ -1212,6 +1213,7 @@ export default function ResidentMap() {
                     </div>
                   );
                 })}
+              </div>
             </div>
           </div>
         )}

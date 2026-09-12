@@ -619,8 +619,8 @@ export default function CHOSettings({
       setPasswordMsg('❌ New passwords do not match.');
       return;
     }
-    if (security.newPassword.length < 6) {
-      setPasswordMsg('❌ New password must be at least 6 characters.');
+    if (security.newPassword.length < 8 || !/[A-Z]/.test(security.newPassword) || !/[a-z]/.test(security.newPassword) || !/[0-9]/.test(security.newPassword) || !/[^A-Za-z0-9]/.test(security.newPassword)) {
+      setPasswordMsg('❌ New password must be 8+ characters with uppercase, lowercase, a number, and a special character.');
       return;
     }
 
@@ -679,14 +679,15 @@ export default function CHOSettings({
       setPasswordMsg('❌ Both password fields are required.');
       return;
     }
-    if (security.newPassword !== security.confirmPassword) {
+if (security.newPassword !== security.confirmPassword) {
       setPasswordMsg('❌ Passwords do not match.');
       return;
     }
-    if (security.newPassword.length < 6) {
-      setPasswordMsg('❌ Password must be at least 6 characters.');
+    if (security.newPassword.length < 8 || !/[A-Z]/.test(security.newPassword) || !/[a-z]/.test(security.newPassword) || !/[0-9]/.test(security.newPassword) || !/[^A-Za-z0-9]/.test(security.newPassword)) {
+      setPasswordMsg('❌ New password must be 8+ characters with uppercase, lowercase, a number, and a special character.');
       return;
     }
+
     setPasswordLoading(true);
     try {
       await axios.put(`${API_URL}/api/users/${userId}/set-password`, { newPassword: security.newPassword });

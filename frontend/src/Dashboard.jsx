@@ -119,6 +119,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   const [allYearOpen, setAllYearOpen] = useState(false);
   const [yearOpen, setYearOpen] = useState(false);
   const yearRef = useRef(null);
+  const [hoveredCard, setHoveredCard] = useState(null);
 
   const CHO_UNIT_BARANGAYS = {
     'CHO Unit I (Sala)': [
@@ -269,7 +270,12 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           if (/^\d{4}$/.test(y)) yrs.add(Number(y));
         }
       });
-      return [...yrs].sort((a, b) => b - a);
+      const currentYear = new Date().getFullYear();
+      yrs.add(currentYear);
+      const floor = Math.min(Math.min(...yrs), 1900);
+      const all = [];
+      for (let y = currentYear; y >= floor; y--) all.push(y);
+      return all;
     })();
 
     const allGridLines = (() => {
@@ -575,6 +581,10 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     const best = findBestDisease(c.disease_name);
     return best && best.toLowerCase() === selectedDisease.toLowerCase();
   });
+  // Disease filter applies ONLY to the weekly chart (Mon-Fri shows just the selected disease);
+  // monthly/quarterly/yearly continue aggregating all 28 diseases.
+  const chartCases = (dashPeriod === 'weekly' && selectedDisease) ? diseaseFilteredCases : displayCases;
+  const chartTotal = chartCases.length;
   const barangayCounts = {};
   diseaseFilteredCases.forEach(item => {
     const name = item.barangay_name || `Barangay ${item.barangay_id}`;
@@ -624,7 +634,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       const key = d.toISOString().slice(0, 10);
       const dayLabel = DAY_SHORT[d.getDay()];
       const dateLabel = `${d.getDate()}/${d.getMonth() + 1}`;
-      const count = displayCases.filter(c => c.date_reported && c.date_reported.slice(0, 10) === key).length;
+      const count = chartCases.filter(c => c.date_reported && c.date_reported.slice(0, 10) === key).length;
       bars.push({ label: `${dayLabel} ${dateLabel}`, full: `${dayLabel}, ${MONTH_FULL[d.getMonth()]} ${d.getDate()}`, count });
     }
     return bars;
@@ -789,7 +799,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   const exportBars = periodChart ? monthBars : (isBhw ? diseaseBars : sortedBars);
   const exportTitle = periodChart
     ? (dashPeriod === 'weekly'
-        ? `Weekly Cases (${dateRange.start || ''} to ${dateRange.end || ''})`
+        ? `Weekly Cases - ${selectedDisease} (${dateRange.start || ''} to ${dateRange.end || ''})`
         : dashPeriod === 'monthly'
           ? `Monthly Cases (${MONTH_FULL[new Date(dateRange.start || Date.now()).getMonth()]} ${dashYear})`
           : dashPeriod === 'quarterly'
@@ -1087,7 +1097,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             ? { label: 'Top Disease', value: topDiseaseName ? topDiseaseName.count : 0, color: '#0EA5E9', trend: null, subtitle: topDiseaseName ? topDiseaseName.name : 'N/A' }
             : { label: 'Top Barangay', value: topBarangayName ? topBarangayName.count : 0, color: '#0EA5E9', trend: null, subtitle: topBarangayName ? topBarangayName.name : 'N/A' },
         ].map((card, i) => (
-            <div key={`${card.label}-${statSignature}`} className="cdms-view-in" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', animationDelay: `${i * 80}ms` }}>
+            <div key={`${card.label}-${statSignature}`} className="cdms-view-in" onClick={() => { if (i === 0 && setActiveTab) setActiveTab('Manage Cases'); }} onMouseEnter={() => { if (i === 0) setHoveredCard(i); }} onMouseLeave={() => { if (i === 0) setHoveredCard(null); }} style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', animationDelay: `${i * 80}ms`, cursor: i === 0 ? 'pointer' : 'default', transform: (i === 0 && hoveredCard === i) ? 'translateY(-2px)' : 'none', boxShadow: (i === 0 && hoveredCard === i) ? '0 4px 12px rgba(0,0,0,0.15)' : 'none', transition: 'transform 0.15s ease, box-shadow 0.15s ease' }}>
             <div style={{ color: 'var(--text-muted)', fontSize: '15px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{card.label}</div>
             <AnimatedNumber value={card.value} style={{ color: card.color, fontSize: '32px', fontWeight: '700', marginTop: '6px' }} />
             {card.subtitle && <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={card.subtitle}>{card.subtitle}</div>}
@@ -1144,7 +1154,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'flex-end', gap: '12px' }}>
                       {monthBars.map((b, i) => {
                         const h = chartMounted ? Math.max((b.count / gridLines.top) * 184, b.count > 0 ? 4 : 2) : 0;
-                        const barPct = totalCases > 0 ? Math.round((b.count / totalCases) * 100) : 0;
+                        const barPct = chartTotal > 0 ? Math.round((b.count / chartTotal) * 100) : 0;
                         return (
                           <div key={b.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
                             <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '4px', opacity: chartMounted ? 1 : 0, transition: 'opacity 0.5s ease 0.2s' }}>{b.count}</div>
@@ -1278,7 +1288,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           <div key={`filters-${statSignature}`} className="cdms-view-in" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <h4 style={{ color: 'var(--text-main)', margin: '0', fontSize: '15px', fontWeight: '600' }}>Filter & Controls</h4>
 
-          {!isBhw && <div>
+          {!isBhw && dashPeriod === 'weekly' && <div>
             <label style={{ color: 'var(--text-muted)', fontSize: '15px', display: 'block', marginBottom: '4px' }}>Disease</label>
             <div style={{ position: 'relative' }} ref={diseaseRef}>
               <button

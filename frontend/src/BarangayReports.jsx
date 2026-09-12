@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import html2pdf from 'html2pdf.js';
 import * as XLSX from 'xlsx';
 import { API_URL } from './config';
 import { cacheCases, getCachedCases, cacheAuditLogs, getCachedAuditLogs, cacheGeneratedReports, getCachedGeneratedReports } from './offlineSync';
@@ -225,6 +224,22 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
     });
   };
 
+  // ── Shared report letterhead ──
+  const buildReportLetterhead = (title, period) => `
+    <div style="text-align:center; margin-bottom:8px;">
+      <div style="font-size:13px; color:#333; margin-bottom:2px;">Republic of the Philippines</div>
+      <div style="font-size:13px; color:#333; margin-bottom:2px;">City of Cabuyao, Laguna</div>
+      <div style="font-size:18px; font-weight:bold; color:#1e3a8a; margin-bottom:12px;">City Health Office</div>
+      <div style="font-size:16px; font-weight:bold; color:#111; margin-bottom:4px;">${title}</div>
+      <div style="font-size:13px; color:#555; margin-bottom:14px;">${period}</div>
+    </div>
+    <hr style="border:none; border-top:2px solid #1e3a8a; margin:0 0 20px 0;" />`;
+
+  const buildReportFooter = () => `
+    <div style="text-align:center; margin-top:24px; padding-top:12px; border-top:1px solid #e5e7eb; font-size:11px; color:#999;">
+      Cabuyao City Disease Monitoring System
+    </div>`;
+
   // ── Download helpers ──
   const [showDownloadMenu, setShowDownloadMenu] = useState(null);
 
@@ -236,7 +251,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
     const blob = new Blob([headers + logRows], { type: 'text/csv;charset=utf-8;' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
-    a.href = url; a.download = `${report.title.replace(/\s+/g, '_')}.csv`; a.click();
+    a.href = url; a.download = `${report.title.replace(/\s+/g, '_').replace(/—/g, '-')}.csv`; a.click();
     setShowDownloadMenu(null);
   };
 
@@ -244,27 +259,27 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
     const rows = (report.snapshotLogs || []).map(l =>
       `<tr><td>${l.created_at ? new Date(l.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</td><td>${l.user_id || ''}</td><td>${l.user_name || ''}</td><td>${l.action}</td><td>${l.entity}</td><td>${l.details}</td></tr>`
     ).join('');
+    const letterhead = buildReportLetterhead(report.title, `${report.period} | ${report.entity} | ${report.timestamp}`);
+    const footer = buildReportFooter();
     const html = `<html><head><meta charset="utf-8"><title>${report.title}</title>
     <style>
       body{font-family:Arial,sans-serif;padding:32px;font-size:13px;color:#111;}
-      h1{color:#1e3a8a;font-size:20px;margin-bottom:4px;}
-      p{color:#555;margin:0 0 20px 0;font-size:12px;}
       table{width:100%;border-collapse:collapse;margin-top:12px;}
       th{background:#1e3a8a;color:white;padding:9px 10px;text-align:left;font-size:12px;}
       td{padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;}
       tr:nth-child(even) td{background:#f9fafb;}
     </style></head><body>
-    <h1>${report.title}</h1>
-    <p><strong>Period:</strong> ${report.period} &nbsp;|&nbsp; <strong>Category:</strong> ${report.entity} &nbsp;|&nbsp; <strong>Generated:</strong> ${report.timestamp}</p>
+    ${letterhead}
     <table>
       <thead><tr><th>Timestamp</th><th>User ID</th><th>Name</th><th>Action</th><th>Entity</th><th>Details</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
+    ${footer}
     </body></html>`;
     const blob = new Blob(['\ufeff' + html], { type: 'application/msword' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
-    a.href = url; a.download = `${report.title.replace(/\s+/g, '_')}.doc`; a.click();
+    a.href = url; a.download = `${report.title.replace(/\s+/g, '_').replace(/—/g, '-')}.doc`; a.click();
     setShowDownloadMenu(null);
   };
 
@@ -272,29 +287,32 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
     const rows = (report.snapshotLogs || []).map(l =>
       `<tr><td>${l.created_at ? new Date(l.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</td><td>${l.user_id || ''}</td><td>${l.user_name || ''}</td><td>${l.action}</td><td>${l.entity}</td><td>${l.details}</td></tr>`
     ).join('');
+    const letterhead = buildReportLetterhead(report.title, `${report.period} | ${report.entity} | ${report.timestamp}`);
+    const footer = buildReportFooter();
     const htmlStr = `<html><head><meta charset="utf-8"><title>${report.title}</title>
     <style>
       body{font-family:Arial,sans-serif;padding:32px;font-size:13px;color:#111;}
-      h1{color:#1e3a8a;font-size:20px;margin-bottom:4px;}
-      p{color:#555;margin:0 0 20px 0;font-size:12px;}
       table{width:100%;border-collapse:collapse;margin-top:12px;}
       th{background:#1e3a8a;color:white;padding:9px 10px;text-align:left;font-size:12px;}
       td{padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;}
       tr:nth-child(even) td{background:#f9fafb;}
     </style></head><body>
-    <h1>${report.title}</h1>
-    <p><strong>Period:</strong> ${report.period} &nbsp;|&nbsp; <strong>Category:</strong> ${report.entity} &nbsp;|&nbsp; <strong>Generated:</strong> ${report.timestamp}</p>
+    ${letterhead}
     <table>
       <thead><tr><th>Timestamp</th><th>User ID</th><th>Name</th><th>Action</th><th>Entity</th><th>Details</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
+    ${footer}
     </body></html>`;
-    const element = document.createElement('div');
-    element.innerHTML = htmlStr;
-    element.style.position = 'fixed';
-    element.style.left = '-9999px';
-    document.body.appendChild(element);
-    html2pdf().set({ margin: 0.5, filename: `${report.title.replace(/\s+/g, '_')}.pdf`, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'letter' } }).from(element).save().then(() => { document.body.removeChild(element); });
+    const filename = `${report.title.replace(/\s+/g, '_').replace(/—/g, '-')}.pdf`;
+    const printWin = window.open('', '_blank');
+    if (printWin) {
+      printWin.document.open();
+      printWin.document.write(htmlStr);
+      printWin.document.close();
+      printWin.document.title = filename.replace(/\.pdf$/, '');
+      setTimeout(() => { printWin.focus(); printWin.print(); }, 350);
+    }
     setShowDownloadMenu(null);
   };
 
@@ -319,7 +337,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
     }));
     const logSheet = XLSX.utils.json_to_sheet(logData);
     XLSX.utils.book_append_sheet(wb, logSheet, 'Logs');
-    XLSX.writeFile(wb, `${report.title.replace(/\s+/g, '_')}.xlsx`);
+    XLSX.writeFile(wb, `${report.title.replace(/\s+/g, '_').replace(/—/g, '-')}.xlsx`);
     setShowDownloadMenu(null);
   };
 
@@ -349,18 +367,23 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
     } else {
       const headRow = `<tr>${Object.keys(rows[0] || {}).map(k => `<th>${k}</th>`).join('')}</tr>`;
       const bodyRows = rows.map(r => `<tr>${Object.values(r).map(v => `<td>${String(v ?? '')}</td>`).join('')}</tr>`).join('');
+      const letterhead = buildReportLetterhead('Cabuyao CDMS - Audit Log Export', `${rows.length} entries | Generated ${new Date().toLocaleString('en-PH')}`);
+      const footer = buildReportFooter();
       const htmlStr = `<html><head><meta charset="utf-8"><title>Audit Logs</title>
-      <style>body{font-family:Arial,sans-serif;padding:32px;font-size:12px;color:#111;}h1{color:#1e3a8a;font-size:20px;margin-bottom:4px;}p{color:#555;margin:0 0 16px;font-size:12px;}table{width:100%;border-collapse:collapse;}th{background:#1e3a8a;color:white;padding:8px;text-align:left;font-size:11px;}td{padding:7px;border-bottom:1px solid #e5e7eb;font-size:11px;}tr:nth-child(even) td{background:#f9fafb;}</style></head><body>
-      <h1>Cabuyao CDMS — Audit Log Export</h1>
-      <p>${rows.length} entries · Generated ${new Date().toLocaleString('en-PH')}</p>
+      <style>body{font-family:Arial,sans-serif;padding:32px;font-size:12px;color:#111;}table{width:100%;border-collapse:collapse;}th{background:#1e3a8a;color:white;padding:8px;text-align:left;font-size:11px;}td{padding:7px;border-bottom:1px solid #e5e7eb;font-size:11px;}tr:nth-child(even) td{background:#f9fafb;}</style></head><body>
+      ${letterhead}
       <table><thead>${headRow}</thead><tbody>${bodyRows}</tbody></table>
+      ${footer}
       </body></html>`;
-      const element = document.createElement('div');
-      element.innerHTML = htmlStr;
-      element.style.position = 'fixed';
-      element.style.left = '-9999px';
-      document.body.appendChild(element);
-      html2pdf().set({ margin: 0.5, filename: `audit_logs_${stamp}.pdf`, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'letter' } }).from(element).save().then(() => { document.body.removeChild(element); });
+      const filename = `audit_logs_${stamp}.pdf`;
+      const printWin = window.open('', '_blank');
+      if (printWin) {
+        printWin.document.open();
+        printWin.document.write(htmlStr);
+        printWin.document.close();
+        printWin.document.title = filename.replace(/\.pdf$/, '');
+        setTimeout(() => { printWin.focus(); printWin.print(); }, 350);
+      }
     }
     setShowExportDrop(false);
   };
@@ -609,8 +632,11 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
   const actionBadgeStyle = (action) => {
     if (action === 'Created')   return { background: 'rgba(18,153,104,0.15)', color: '#16b877' };
     if (action === 'Updated')   return { background: 'rgba(37,99,235,0.15)', color: '#5b8def' };
+    if (action === 'Archived')   return { background: 'rgba(245,158,11,0.15)', color: '#d97706' };
+    if (action === 'Restored')   return { background: 'rgba(18,153,104,0.15)', color: '#16b877' };
     if (action === 'Deleted')   return { background: 'rgba(220,38,38,0.15)', color: '#ef4444' };
-    if (action === 'Logged In') return { background: 'rgba(124,58,237,0.15)', color: '#a78bfa' };
+    if (action === 'Logged In')  return { background: 'rgba(124,58,237,0.15)', color: '#a78bfa' };
+    if (action === 'Logged Out') return { background: 'rgba(239,68,68,0.15)', color: '#f87171' };
     if (action === 'Requested Edit') return { background: 'rgba(217,119,6,0.15)', color: '#fbbf24' };
     if (action === 'Approved')  return { background: 'rgba(20,184,166,0.15)', color: '#2dd4bf' };
     if (action === 'Rejected')  return { background: 'rgba(220,38,38,0.15)', color: '#f87171' };
@@ -826,6 +852,17 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                 </div>
               ) : null;
             })()}
+
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '16px' }}>
+              <button onClick={() => handleDownloadPDF(viewReport)}
+                style={{ padding: '8px 16px', background: 'rgba(220,38,38,0.15)', border: '1px solid rgba(220,38,38,0.35)', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#ef4444', cursor: 'pointer' }}>⬇ PDF</button>
+              <button onClick={() => handleDownloadWord(viewReport)}
+                style={{ padding: '8px 16px', background: 'rgba(37,99,235,0.15)', border: '1px solid rgba(37,99,235,0.35)', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#5b8def', cursor: 'pointer' }}>⬇ Word</button>
+              <button onClick={() => handleDownloadExcel(viewReport)}
+                style={{ padding: '8px 16px', background: 'rgba(18,153,104,0.15)', border: '1px solid rgba(18,153,104,0.35)', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#16b877', cursor: 'pointer' }}>⬇ Excel</button>
+              <button onClick={() => handleDownloadCSV(viewReport)}
+                style={{ padding: '8px 16px', background: 'rgba(217,119,6,0.15)', border: '1px solid rgba(217,119,6,0.35)', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#fbbf24', cursor: 'pointer' }}>⬇ CSV</button>
+            </div>
 
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
               <button onClick={() => handleDeleteReport(viewReport.id)}
@@ -1170,7 +1207,10 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
             { label: 'Created', count: filteredAuditLogs.filter(l => l.action === 'Created').length, color: '#16b877', bg: 'rgba(18,153,104,0.15)' },
             { label: 'Updated', count: filteredAuditLogs.filter(l => l.action === 'Updated').length, color: '#5b8def', bg: 'rgba(37,99,235,0.15)' },
             { label: 'Deleted', count: filteredAuditLogs.filter(l => l.action === 'Deleted').length, color: '#ef4444', bg: 'rgba(220,38,38,0.15)' },
-            { label: 'Logged In', count: filteredAuditLogs.filter(l => l.action === 'Logged In').length, color: '#a78bfa', bg: 'rgba(124,58,237,0.15)' },
+            { label: 'Archived', count: filteredAuditLogs.filter(l => l.action === 'Archived').length, color: '#d97706', bg: 'rgba(245,158,11,0.15)' },
+            { label: 'Restored', count: filteredAuditLogs.filter(l => l.action === 'Restored').length, color: '#16b877', bg: 'rgba(18,153,104,0.15)' },
+            { label: 'Logged In', count: filteredAuditLogs.filter(l => l.action === 'Logged In' || l.action === 'Logged In (2FA)').length, color: '#a78bfa', bg: 'rgba(124,58,237,0.15)' },
+            { label: 'Logged Out', count: filteredAuditLogs.filter(l => l.action === 'Logged Out').length, color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
             { label: 'Edit Requests', count: filteredAuditLogs.filter(l => l.action === 'Requested Edit').length, color: '#fbbf24', bg: 'rgba(217,119,6,0.15)' },
             { label: 'Registrations', count: filteredAuditLogs.filter(l => l.action === 'Approved' || l.action === 'Rejected').length, color: '#2dd4bf', bg: 'rgba(20,184,166,0.15)' },
           ].map(chip => (
@@ -1200,14 +1240,14 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
             </button>
             {showActionDrop && (
               <div style={s.dropMenu}>
-                {['All Actions', 'Created', 'Updated', 'Deleted', 'Logged In', 'Requested Edit', 'Approved', 'Rejected'].map(a => (
+                {['All Actions', 'Created', 'Updated', 'Deleted', 'Archived', 'Restored', 'Logged In', 'Logged Out', 'Requested Edit', 'Approved', 'Rejected'].map(a => (
                   <button key={a} style={s.dropItem(filterAction === a)}
                     onClick={() => { setFilterAction(a); setShowActionDrop(false); setLogPage(1); }}
                     onMouseEnter={e => { if (filterAction !== a) e.target.style.background = 'var(--input-bg)'; }}
                     onMouseLeave={e => { if (filterAction !== a) e.target.style.background = 'transparent'; }}>
                     {a !== 'All Actions' && (
                       <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', marginRight: '8px',
-                        background: a === 'Created' ? '#129968' : a === 'Updated' ? '#2563eb' : a === 'Deleted' ? '#dc2626' : a === 'Requested Edit' ? '#fbbf24' : a === 'Approved' ? '#2dd4bf' : a === 'Rejected' ? '#ef4444' : '#7c3aed' }} />
+                        background: a === 'Created' ? '#129968' : a === 'Updated' ? '#2563eb' : a === 'Deleted' ? '#dc2626' : a === 'Archived' ? '#d97706' : a === 'Restored' ? '#16b877' : a === 'Requested Edit' ? '#fbbf24' : a === 'Approved' ? '#2dd4bf' : a === 'Rejected' ? '#ef4444' : a === 'Logged Out' ? '#ef4444' : '#7c3aed' }} />
                     )}
                     {a}
                   </button>

@@ -66,6 +66,9 @@ function App() {
   const [loggedUser, setLoggedUser]       = useState(savedSession?.name || '');
   const [loggedUserId, setLoggedUserId]   = useState(savedSession?.id || null);
   const [loggedUserBarangay, setLoggedUserBarangay] = useState(savedSession?.barangay || null);
+  const [mustChangePassword, setMustChangePassword] = useState(!!savedSession?.mustChangePassword);
+  const [isGeneratorPassword, setIsGeneratorPassword] = useState(!!savedSession?.isGeneratorPassword);
+  const [pwRequestPending, setPwRequestPending] = useState(false);
 
   const CHO_UNIT_BARANGAYS = {
     'CHO Unit I (Sala)': ['Barangay Uno (Poblacion)', 'Barangay Dos (Poblacion)', 'Barangay Tres (Poblacion)', 'Sala', 'Bigaa', 'Butong', 'Marinig', 'Gulod', 'Niugan', 'Baclaran'],
@@ -475,7 +478,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             </div>
           );
         }
-        return <UserManagement dateFormat={dateFormat} confirmDelete={confirmDelete} fontScale={fontScale} compactMode={compactMode} loggedUserId={loggedUserId} loginRole={loginRole} setActiveTab={setActiveTab} />;
+        return <UserManagement dateFormat={dateFormat} confirmDelete={confirmDelete} fontScale={fontScale} compactMode={compactMode} loggedUserId={loggedUserId} loginRole={loginRole} sessionContext={sessionContext} setActiveTab={setActiveTab} />;
       case 'Audit Reports':
         return <BarangayReports dateFormat={dateFormat} activeUser={{ role: loginRole, context: sessionContext }} fontScale={fontScale} compactMode={compactMode} loggedUserId={loggedUserId} />;
       case 'Settings':
@@ -534,6 +537,8 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
     setAppTheme(localStorage.getItem(`cdms_theme_${sessionData.id}`) || localStorage.getItem('cdms_theme') || 'dark');
     if (sessionData.id) localStorage.setItem('cdms_last_user', String(sessionData.id));
     setAuthToken(sessionData.token || null);
+    setMustChangePassword(!!sessionData.mustChangePassword);
+    setIsGeneratorPassword(!!sessionData.isGeneratorPassword);
     localStorage.setItem('cdms_session', JSON.stringify({
       id: sessionData.id,
       name: sessionData.name || sessionData.username,
@@ -541,6 +546,8 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
       context: sessionData.context,
       barangay: sessionData.barangay || null,
       token: sessionData.token || null,
+      mustChangePassword: !!sessionData.mustChangePassword,
+      isGeneratorPassword: !!sessionData.isGeneratorPassword,
     }));
   };
 
@@ -573,7 +580,10 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
         const data = await res.json();
         if (data && data.token) {
           setAuthToken(data.token);
-          localStorage.setItem('cdms_session', JSON.stringify({ ...saved, token: data.token }));
+          const next = { ...saved, token: data.token, mustChangePassword: !!data.mustChangePassword, isGeneratorPassword: !!data.isGeneratorPassword };
+          setMustChangePassword(!!data.mustChangePassword);
+          setIsGeneratorPassword(!!data.isGeneratorPassword);
+          localStorage.setItem('cdms_session', JSON.stringify(next));
         }
       }
     } catch {
@@ -588,24 +598,33 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
   }, [isOnline]);
 
   const handleLogout = () => { 
+    const teardown = () => {
+      setAuthToken(null);
+      localStorage.removeItem('cdms_session');
+      localStorage.removeItem('cdms_active_tab');
+      if (loggedUserId) localStorage.setItem('cdms_last_user', String(loggedUserId));
+      setMustChangePassword(false);
+      setIsGeneratorPassword(false);
+      setPwRequestPending(false);
+      setLoginTheme(appTheme);
+      setIsLoggedIn(false); 
+      setSessionContext('');
+      setLoggedUser('');
+      setLoggedUserId(null);
+      window.location.reload();
+    };
     if (!navigator.onLine) {
       if (!window.confirm('You are currently offline. Logging out will prevent you from logging back in until reconnected. Continue?')) return;
+      teardown();
+      return;
     }
-    fetch(`${API_URL}/api/logout`, {
+    const logoutFetch = fetch(`${API_URL}/api/logout`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ userId: loggedUserId, userName: loggedUser, userRole: loginRole, barangay: null }),
     }).catch(() => {});
-    setAuthToken(null);
-    localStorage.removeItem('cdms_session');
-    localStorage.removeItem('cdms_active_tab');
-    if (loggedUserId) localStorage.setItem('cdms_last_user', String(loggedUserId));
-    setLoginTheme(appTheme);
-    setIsLoggedIn(false); 
-    setSessionContext('');
-    setLoggedUser('');
-    setLoggedUserId(null);
-    window.location.reload();
+    const timeout = new Promise(resolve => setTimeout(resolve, 2500));
+    Promise.race([logoutFetch, timeout]).finally(teardown);
   };
 
   const handleLanguageChange = (langCode) => { setLanguage(langCode); localStorage.setItem('cdms_language', langCode); };
@@ -614,6 +633,87 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
   const handleAutoSaveChange = (val) => { setAutoSave(val); localStorage.setItem('cdms_autoSave', String(val)); };
   const handleConfirmDeleteChange = (val) => { setConfirmDelete(val); localStorage.setItem('cdms_confirm_delete', String(val)); };
   const handleKeyboardShortcutsChange = (val) => { setKeyboardShortcuts(val); localStorage.setItem('cdms_keyboardShortcuts', String(val)); };
+
+  // ── Forced password change (must_change_password on first login) ──
+  const [forcePw, setForcePw] = useState({ current: '', next: '', confirm: '' });
+  const [forcePwMsg, setForcePwMsg] = useState('');
+  const [forcePwLoading, setForcePwLoading] = useState(false);
+  const handleForcedPasswordChange = async () => {
+    setForcePwMsg('');
+    if (!forcePw.current || !forcePw.next || !forcePw.confirm) { setForcePwMsg('❌ All password fields are required.'); return; }
+    if (forcePw.next !== forcePw.confirm) { setForcePwMsg('❌ New passwords do not match.'); return; }
+    setForcePwLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/users/${loggedUserId}/change-password`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ currentPassword: forcePw.current, newPassword: forcePw.next }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to update password.');
+      setMustChangePassword(false);
+      setIsGeneratorPassword(false);
+      setPwRequestPending(false);
+      setForcePw({ current: '', next: '', confirm: '' });
+      const raw = localStorage.getItem('cdms_session');
+      if (raw) {
+        const s = JSON.parse(raw);
+        localStorage.setItem('cdms_session', JSON.stringify({ ...s, mustChangePassword: false, isGeneratorPassword: false }));
+      }
+    } catch (err) {
+      setForcePwMsg('❌ ' + err.message);
+    } finally {
+      setForcePwLoading(false);
+    }
+  };
+
+  // ── First-login temp-password prompt: request a CHANGE from the CHO ──
+  const [firstLoginReqState, setFirstLoginReqState] = useState('idle'); // idle | sending | sent | pending
+
+  useEffect(() => {
+    if (!mustChangePassword || !isGeneratorPassword || !loggedUserId) return;
+    let cancelled = false;
+    fetch(`${API_URL}/api/password-change-requests?user_id=${loggedUserId}&pending_only=true`, { headers: authHeaders() })
+      .then(async (r) => {
+        const data = await r.json().catch(() => []);
+        if (!cancelled && Array.isArray(data) && data.length > 0) {
+          setPwRequestPending(true);
+          setFirstLoginReqState('pending');
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [mustChangePassword, isGeneratorPassword, loggedUserId]);
+
+  const handleFirstLoginPwRequest = async () => {
+    if (pwRequestPending) return;
+    setFirstLoginReqState('sending');
+    try {
+      const res = await fetch(`${API_URL}/api/password-change-request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ user_id: loggedUserId, user_name: loggedUser, reason: 'first_login_temp' }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to send request.');
+      setPwRequestPending(true);
+      setFirstLoginReqState('sent');
+    } catch (err) {
+      setForcePwMsg('❌ ' + (err.message === 'Already pending' ? 'Your request is already pending CHO approval.' : err.message));
+      setPwRequestPending(true);
+      setFirstLoginReqState('pending');
+    }
+  };
+
+  const dismissFirstLoginPrompt = () => {
+    setMustChangePassword(false);
+    setFirstLoginReqState('idle');
+    const raw = localStorage.getItem('cdms_session');
+    if (raw) {
+      const s = JSON.parse(raw);
+      localStorage.setItem('cdms_session', JSON.stringify({ ...s, mustChangePassword: false }));
+    }
+  };
 
   const t = (key) => translations[language]?.[key] || key;
 
@@ -648,6 +748,72 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
   return (
     <div className="dashboard-layout">
       <Sidebar role={loginRole} activeTab={activeTab} setActiveTab={setActiveTab} language={language} choUnit={sidebarChoUnit} />
+
+      {mustChangePassword && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+          onClick={(e) => { if (e.target === e.currentTarget) return; }}>
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '32px', width: '100%', maxWidth: '440px', boxShadow: '0 24px 60px rgba(0,0,0,0.4)' }}>
+            {isGeneratorPassword ? (
+              <>
+                <h3 style={{ margin: '0 0 6px', color: 'var(--text-h)', fontSize: '19px' }}>🔑 Temporary Password Detected</h3>
+                <p style={{ margin: '0 0 22px', color: 'var(--text-muted)', fontSize: '15px', lineHeight: 1.5 }}>
+                  The password that you used is a generated temporary password. Would you like to change it immediately by requesting a password change from CHO?
+                </p>
+                {firstLoginReqState === 'pending' || pwRequestPending ? (
+                  <div style={{ fontSize: '15px', color: '#129968', fontWeight: '500', textAlign: 'center', padding: '12px', background: 'rgba(18,153,104,0.1)', borderRadius: '8px', marginBottom: '16px' }}>
+                    ✓ Your password change request is pending CHO approval. You can set a new password once it is approved (Settings → Account Security).
+                  </div>
+                ) : firstLoginReqState === 'sent' ? (
+                  <div style={{ fontSize: '15px', color: '#129968', fontWeight: '500', textAlign: 'center', padding: '12px', background: 'rgba(18,153,104,0.1)', borderRadius: '8px', marginBottom: '16px' }}>
+                    ✓ Request sent to the CHO. You'll be able to set a new password once it is approved (Settings → Account Security).
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <button type="button" disabled={firstLoginReqState === 'sending'} onClick={handleFirstLoginPwRequest}
+                      style={{ padding: '12px', borderRadius: '6px', border: 'none', background: 'var(--accent, #129968)', color: '#fff', fontSize: '16px', fontWeight: '700', cursor: firstLoginReqState === 'sending' ? 'not-allowed' : 'pointer', opacity: firstLoginReqState === 'sending' ? 0.6 : 1 }}>
+                      {firstLoginReqState === 'sending' ? 'Sending Request...' : 'Yes, Request Password Change'}
+                    </button>
+                    <button type="button" onClick={dismissFirstLoginPrompt}
+                      style={{ padding: '12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-muted)', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>
+                      Not now
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <h3 style={{ margin: '0 0 6px', color: 'var(--text-h)', fontSize: '19px' }}>🔒 Change Password Required</h3>
+                <p style={{ margin: '0 0 22px', color: 'var(--text-muted)', fontSize: '15px', lineHeight: 1.5 }}>
+                  For your security, please set a new password before continuing. Your password must be at least 8 characters long and include uppercase, lowercase, a number, and a special character.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Current Password</label>
+                    <input type="password" value={forcePw.current} onChange={(e) => setForcePw({ ...forcePw, current: e.target.value })}
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>New Password</label>
+                    <input type="password" value={forcePw.next} onChange={(e) => setForcePw({ ...forcePw, next: e.target.value })}
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Confirm New Password</label>
+                    <input type="password" value={forcePw.confirm} onChange={(e) => setForcePw({ ...forcePw, confirm: e.target.value })}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleForcedPasswordChange(); }}
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px' }} />
+                  </div>
+                  {forcePwMsg && <div style={{ fontSize: '15px', color: forcePwMsg.startsWith('❌') ? '#ef4444' : '#129968', fontWeight: '500' }}>{forcePwMsg}</div>}
+                  <button type="button" disabled={forcePwLoading} onClick={handleForcedPasswordChange}
+                    style={{ padding: '12px', borderRadius: '6px', border: 'none', background: 'var(--accent, #129968)', color: '#fff', fontSize: '16px', fontWeight: '700', cursor: forcePwLoading ? 'not-allowed' : 'pointer', opacity: forcePwLoading ? 0.6 : 1 }}>
+                    {forcePwLoading ? 'Saving...' : 'Save New Password'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="main-content">
         <div className="top-nav">

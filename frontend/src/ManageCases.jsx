@@ -11,7 +11,7 @@ import { getPointInBarangay } from './data/coordinates';
 import { notify } from './components/Toast';
 import { DISEASES as DEFAULT_DISEASES } from './resident/PreventionTips';
 import { emitDiseasesChanged } from './diseaseSignal';
-import { FeverIcon, InfluenzaAIcon, LeptospirosisIcon, TuberculosisIcon, TyphoidIcon, RabiesIcon } from './components/DiseaseIcons';
+import { FeverIcon, InfluenzaAIcon, LeptospirosisIcon, TuberculosisIcon, TyphoidIcon, RabiesIcon, FecesIcon, SoreEyesIcon, AvianIcon, ContactBloodborneIcon } from './components/DiseaseIcons';
 
 const AllDiseasesIcon = ({ color = '#121358', size = 28 }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
@@ -50,16 +50,29 @@ const SVG_ICON_DEFS = [
   { token: 'svg:vectorborne', name: 'Vector-borne', render: () => <VectorborneIcon color="#D97706" /> },
   { token: 'svg:vaccine', name: 'Vaccine-Preventable', render: () => <VaccineIcon color="#129968" /> },
   { token: 'svg:rabies', name: 'Rabies', render: () => <RabiesIcon color="#DC2626" /> },
+  { token: 'svg:feces', name: 'Diarrhea', render: () => <FecesIcon color="#D97706" /> },
+  { token: 'svg:avian', name: 'Avian Influenza / Chickenpox', render: () => <AvianIcon color="#F97316" /> },
+  { token: 'svg:soreeyes', name: 'Sore Eyes', render: () => <SoreEyesIcon color="#EAB308" /> },
+  { token: 'svg:contact-bloodborne', name: 'Contact & Bloodborne', render: () => <ContactBloodborneIcon color="#7C3AED" /> },
+  { token: 'svg:hepatitis', name: 'Hepatitis', render: () => <ContactBloodborneIcon color="#B45309" /> },
 ];
 
 // Maps each built-in SVG disease to its token
 const SVG_ENTRY_TOKEN = {
   'Dengue Fever': 'svg:fever',
   'Influenza A': 'svg:flu-a',
+  'Influenza': 'svg:flu-a',
   'Leptospirosis': 'svg:leptospirosis',
   'Tuberculosis': 'svg:tuberculosis',
   'Typhoid Fever': 'svg:typhoid',
   'Rabies': 'svg:rabies',
+  'Diarrhea': 'svg:feces',
+  'Avian Influenza': 'svg:avian',
+  'Chickenpox': 'svg:avian',
+  'Sore Eyes': 'svg:soreeyes',
+  'Hepatitis A': 'svg:hepatitis',
+  'Hepatitis B': 'svg:hepatitis',
+  'Hepatitis C': 'svg:hepatitis',
 };
 
 // Convert any icon (emoji string or SVG JSX element) to its serializable token
@@ -131,20 +144,20 @@ const CHO_UNIT_BARANGAYS = {
 // ── All 28 disease entries with name, dbName (prefix match), icon, color, desc ──
 const ALL_DISEASE_ENTRIES = [
   { id: 1,  name: 'Acute Respiratory Infection',   dbName: 'Acute Respiratory Infection', icon: '🫁', color: '#60A5FA', desc: 'Highly contagious respiratory infection affecting the upper and lower respiratory tract.' },
-  { id: 2,  name: 'Avian Influenza',               dbName: 'Avian Influenza', icon: '🐔', color: '#F97316', desc: 'A viral influenza subtype transmitted from birds to humans, causing severe respiratory illness.' },
-  { id: 3,  name: 'Chickenpox',                    dbName: 'Chickenpox', icon: '🟠', color: '#FB923C', desc: 'A highly contagious viral infection causing an itchy, blister-like rash and fever.' },
+  { id: 2,  name: 'Avian Influenza',               dbName: 'Avian Influenza', icon: <AvianIcon color="#F97316" />, color: '#F97316', desc: 'A viral influenza subtype transmitted from birds to humans, causing severe respiratory illness.' },
+  { id: 3,  name: 'Chickenpox',                    dbName: 'Chickenpox', icon: <AvianIcon color="#FB923C" />, color: '#FB923C', desc: 'A highly contagious viral infection causing an itchy, blister-like rash and fever.' },
   { id: 4,  name: 'Cholera',                       dbName: 'Cholera', icon: '🌊', color: '#0EA5E9', desc: 'An acute diarrheal infection caused by ingestion of food or water contaminated with Vibrio cholerae.' },
   { id: 5,  name: 'Covid-19',                      dbName: 'Covid-19', icon: '🛡️', color: '#3B82F6', desc: 'An infectious respiratory disease caused by the SARS-CoV-2 virus, requiring close contact tracing.' },
   { id: 6,  name: 'Dengue Fever',                  dbName: 'Dengue', icon: <FeverIcon color="#ef4444" />, color: '#ef4444', desc: 'A viral infection transmitted by Aedes mosquitoes, causing high fever and severe body aches.' },
-  { id: 7,  name: 'Diarrhea',                      dbName: 'Diarrhea', icon: '💩', color: '#D97706', desc: 'A gastrointestinal infection causing loose, watery stools, often leading to dehydration.' },
+  { id: 7,  name: 'Diarrhea',                      dbName: 'Diarrhea', icon: <FecesIcon color="#D97706" />, color: '#D97706', desc: 'A gastrointestinal infection causing loose, watery stools, often leading to dehydration.' },
   { id: 8,  name: 'Diphtheria',                    dbName: 'Diphtheria', icon: '🫁', color: '#A78BFA', desc: 'A serious bacterial infection affecting the mucous membranes of the nose and throat.' },
   { id: 9,  name: 'Ebola',                         dbName: 'Ebola', icon: '🦠', color: '#DC2626', desc: 'A severe, often fatal viral hemorrhagic fever with high transmission risk.' },
   { id: 10, name: 'Hand Foot and Mouth Disease',   dbName: 'Hand Foot and Mouth Disease', icon: '🖐️', color: '#F472B6', desc: 'A mild viral illness common in children, causing sores in the mouth and rash on hands and feet.' },
-  { id: 11, name: 'Hepatitis A',                   dbName: 'Hepatitis A', icon: '🫀', color: '#CA8A04', desc: 'A viral liver infection spread through contaminated food and water or close contact.' },
-  { id: 12, name: 'Hepatitis B',                   dbName: 'Hepatitis B', icon: '🩸', color: '#B45309', desc: 'A serious liver infection caused by the hepatitis B virus, transmitted through blood and bodily fluids.' },
-  { id: 13, name: 'Hepatitis C',                   dbName: 'Hepatitis C', icon: '🩸', color: '#92400E', desc: 'A viral liver infection transmitted through blood contact, often becoming chronic.' },
+  { id: 11, name: 'Hepatitis A',                   dbName: 'Hepatitis A', icon: <ContactBloodborneIcon color="#CA8A04" />, color: '#CA8A04', desc: 'A viral liver infection spread through contaminated food and water or close contact.' },
+  { id: 12, name: 'Hepatitis B',                   dbName: 'Hepatitis B', icon: <ContactBloodborneIcon color="#B45309" />, color: '#B45309', desc: 'A serious liver infection caused by the hepatitis B virus, transmitted through blood and bodily fluids.' },
+  { id: 13, name: 'Hepatitis C',                   dbName: 'Hepatitis C', icon: <ContactBloodborneIcon color="#92400E" />, color: '#92400E', desc: 'A viral liver infection transmitted through blood contact, often becoming chronic.' },
   { id: 14, name: 'HIV/AIDS',                      dbName: 'HIV/AIDS', icon: '🔴', color: '#DC2626', desc: 'A chronic viral infection attacking the immune system, requiring lifelong management.' },
-  { id: 15, name: 'Influenza',                     dbName: 'Influenza', icon: '🤧', color: '#F59E0B', desc: 'A common contagious respiratory viral infection causing fever, cough, and body aches.' },
+  { id: 15, name: 'Influenza',                     dbName: 'Influenza', icon: <InfluenzaAIcon color="#F59E0B" />, color: '#F59E0B', desc: 'A common contagious respiratory viral infection causing fever, cough, and body aches.' },
   { id: 16, name: 'Influenza A',                   dbName: 'Influenza A', icon: <InfluenzaAIcon color="#D97706" />, color: '#D97706', desc: 'A highly contagious respiratory illness caused by influenza viruses, leading to seasonal outbreaks.' },
   { id: 17, name: 'Leprosy',                       dbName: 'Leprosy', icon: '🧬', color: '#A1A1AA', desc: 'A chronic infectious disease affecting the skin and nerves, curable with multidrug therapy.' },
   { id: 18, name: 'Leptospirosis',                 dbName: 'Leptospirosis', icon: <LeptospirosisIcon color="#129968" />, color: '#129968', desc: 'A bacterial disease spread through contaminated water, posing a high risk during flood seasons.' },
@@ -155,7 +168,7 @@ const ALL_DISEASE_ENTRIES = [
   { id: 23, name: 'Poliomyelitis',                 dbName: 'Poliomyelitis', icon: '🦽', color: '#FCA5A5', desc: 'A viral disease that can cause permanent paralysis, preventable through vaccination.' },
   { id: 24, name: 'Rabies',                        dbName: 'Rabies', icon: <RabiesIcon color="#DC2626" />, color: '#DC2626', desc: 'A fatal viral disease transmitted through the bite of an infected animal, requiring immediate treatment.' },
   { id: 25, name: 'SARS',                          dbName: 'SARS', icon: '😷', color: '#6366F1', desc: 'A severe respiratory illness caused by a coronavirus, with high fever and respiratory distress.' },
-  { id: 26, name: 'Sore Eyes',                     dbName: 'Sore Eyes', icon: '👁️', color: '#FCD34D', desc: 'A contagious eye infection causing redness, itching, and discharge, common in children.' },
+  { id: 26, name: 'Sore Eyes',                     dbName: 'Sore Eyes', icon: <SoreEyesIcon color="#EAB308" />, color: '#EAB308', desc: 'A contagious eye infection causing redness, itching, and discharge, common in children.' },
   { id: 27, name: 'Tuberculosis',                  dbName: 'Tuberculosis', icon: <TuberculosisIcon color="#F97316" />, color: '#F97316', desc: 'An infectious bacterial disease that primarily affects the lungs, requiring long-term treatment.' },
   { id: 28, name: 'Typhoid Fever',                 dbName: 'Typhoid Fever', icon: <TyphoidIcon color="#8B5CF6" />, color: '#8B5CF6', desc: 'A systemic infection caused by Salmonella Typhi, spread through contaminated food and water.' },
 ];
@@ -239,7 +252,7 @@ const DISEASE_CATEGORIES = [
     diseases: ALL_DISEASE_ENTRIES.filter(d => ['Chickenpox', 'Diphtheria', 'Measles', 'Pertussis'].includes(d.name)),
   },
   {
-    id: 'contact', name: 'Contact & Bloodborne', icon: '🩸', color: '#7C3AED',
+    id: 'contact', name: 'Contact & Bloodborne', icon: resolveIcon('svg:contact-bloodborne'), color: '#7C3AED',
     desc: 'Diseases transmitted through direct contact, bodily fluids, or blood exposure',
     diseases: ALL_DISEASE_ENTRIES.filter(d => ['Ebola', 'Hepatitis C', 'Hand Foot and Mouth Disease', 'Meningococcemia', 'Sore Eyes'].includes(d.name)),
   },
@@ -624,6 +637,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const [filterBarangay, setFilterBarangay] = useState('All Barangays');
   const [filterStatus, setFilterStatus] = useState('All Status');
   const [filterPurok, setFilterPurok] = useState('All Puroks');
+  const [showArchived, setShowArchived] = useState(false);
+  const showArchivedRef = useRef(false);
   const [tablePage, setTablePage] = useState(1);
   const [tableEllipsisOpen, setTableEllipsisOpen] = useState(false);
   const [tableEllipsisInput, setTableEllipsisInput] = useState('');
@@ -703,6 +718,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const [showLookupDropdown, setShowLookupDropdown] = useState(false);
   const [lookupLoading, setLookupLoading] = useState(false);
   const lookupTimerRef = useRef(null);
+  const patientNameRef = useRef('');
   const lookupDropdownRef = useRef(null);
   const [formErrors, setFormErrors] = useState({});
 
@@ -766,7 +782,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   }, [editRequestSuccess]);
 
   // Fetch all cases
-  const fetchCases = () => {
+  const fetchCases = (includeArchived) => {
+    const wantArchived = includeArchived ?? showArchivedRef.current;
     setLoadingCases(true);
     if (!appOnlineRef.current) {
       getCachedCases().then(cached => {
@@ -776,7 +793,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       });
       return;
     }
-    axios.get(API_URL + '/api/disease_cases?user_id=' + (loggedUserId || ''))
+    axios.get(API_URL + '/api/disease_cases?user_id=' + (loggedUserId || '') + (wantArchived ? '&include_archived=1' : ''))
       .then(res => { setAllCases(res.data); setLoadingCases(false); setLastUpdated(Date.now()); cacheCases(res.data).catch(() => {}); })
       .catch(async () => {
         const cached = await getCachedCases();
@@ -789,7 +806,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     fetchCases();
     const interval = setInterval(() => {
       if (!appOnlineRef.current) return;
-      if (view !== 'add' && view !== 'edit') fetchCases();
+      if (view !== 'add' && view !== 'edit') fetchCases(showArchivedRef.current);
     }, 30000);
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1529,6 +1546,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     }
 
     const name = (formData.patientName || '').trim();
+    patientNameRef.current = (formData.patientName || '').trim();
     if (name.length < 2) {
       return;
     }
@@ -1537,6 +1555,10 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       setLookupLoading(true);
       axios.get(`${API_URL}/api/patients/lookup`, { params: { name } })
         .then(res => {
+          if (name !== patientNameRef.current.trim()) {
+            setLookupLoading(false);
+            return;
+          }
           const results = res.data || [];
           setPatientLookupResults(results);
           if (results.length === 1) {
@@ -1550,6 +1572,10 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           setLookupLoading(false);
         })
         .catch(async () => {
+          if (name !== patientNameRef.current.trim()) {
+            setLookupLoading(false);
+            return;
+          }
           try {
             const cached = await getCachedCases();
             const nameLower = name.toLowerCase();
@@ -1570,7 +1596,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           }
           setLookupLoading(false);
         });
-    }, 300);
+    }, 1000);
 
     return () => {
       if (lookupTimerRef.current) clearTimeout(lookupTimerRef.current);
@@ -1598,9 +1624,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
   // ── Filter cases for list ──
   const getFilteredCases = () => {
-    let result = selectedDisease
-      ? baseCases.filter(c => matchesCard(c, selectedDisease))
-      : baseCases;
+    let result = showArchived
+      ? baseCases.filter(c => c.is_archived === 1)
+      : baseCases.filter(c => c.is_archived !== 1);
+    if (selectedDisease) {
+      result = result.filter(c => matchesCard(c, selectedDisease));
+    }
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -1760,9 +1789,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       await axios.delete(`${API_URL}/api/cases/${deleteTarget.case_id}`);
       fetchCases();
       setDeleteTarget(null);
-      notify('Case deleted successfully!', 'success');
+      notify('Case archived successfully!', 'success');
     } catch (err) {
-      notify('Delete failed: ' + (err.response?.data?.error || err.message), 'error');
+      notify('Archive failed: ' + (err.response?.data?.error || err.message), 'error');
     } finally {
       setDeleteLoading(false);
     }
@@ -1847,10 +1876,17 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
   // ── OPEN ADD ──
   const openAdd = () => {
-    setFormData({
-      ...EMPTY_FORM,
-      diseaseType: selectedDisease?.name || '',
-    });
+    const base = { ...EMPTY_FORM, diseaseType: selectedDisease?.name || '' };
+    // BHW: pre-fill barangay from their assignment so offline adds never block on barangay detection
+    if (loginRole === 'BHW' && loginBarangay) {
+      const matched = barangayList.find(b => b.name === loginBarangay);
+      if (matched) {
+        base.barangayId = String(matched.id);
+        const coords = BARANGAY_COORDS[loginBarangay];
+        if (coords) { base.lat = String(coords[0]); base.lng = String(coords[1]); }
+      }
+    }
+    setFormData(base);
     setEditingCase(null);
     setFormErrors({});
     setView('add');
@@ -3439,28 +3475,29 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               </div>
               <h3 style={{ margin: '0 0 8px 0', fontSize: '22px', fontWeight: '700', color: 'var(--text-main)' }}>Are you sure?</h3>
               <p style={{ margin: '0 0 20px 0', color: 'var(--text-muted)', fontSize: '15px', lineHeight: '1.6' }}>
-                This action cannot be undone.<br />This will permanently delete the case record of:
-              </p>
-              <div style={{ background: 'var(--input-bg)', border: 'none', borderLeft: '4px solid #ef4444', borderRadius: '6px', padding: '14px 18px', marginBottom: '20px', textAlign: 'left' }}>
-                <div style={{ fontWeight: '700', color: 'var(--text-main)', fontSize: '15px', marginBottom: '4px' }}>
-                  Case ID: D-{String(deleteTarget.case_id).padStart(4, '0')}
+                  This will archive (soft-delete) the case record of:
+                </p>
+                <div style={{ background: 'var(--input-bg)', border: 'none', borderLeft: '4px solid #129968', borderRadius: '6px', padding: '14px 18px', marginBottom: '20px', textAlign: 'left' }}>
+                  <div style={{ fontWeight: '700', color: 'var(--text-main)', fontSize: '15px', marginBottom: '4px' }}>
+                    Case ID: D-{String(deleteTarget.case_id).padStart(4, '0')}
+                  </div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '15px' }}>
+                    {deleteTarget.patient_name || 'Unknown'} – {deleteTarget.barangay_name || 'Unknown Barangay'}.
+                  </div>
                 </div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '15px' }}>
-                  {deleteTarget.patient_name || 'Unknown'} – {deleteTarget.barangay_name || 'Unknown Barangay'}.
-                </div>
-              </div>
-              <p style={{ color: 'var(--text-muted)', fontSize: '15px', margin: '0 0 28px 0' }}>
-                All associated case records will remain but show as "System" for audit purposes.
-              </p>
-              <div style={{ display: 'flex', borderTop: '1px solid var(--border-color)', paddingTop: '20px', gap: '0' }}>
-                <button onClick={() => setDeleteTarget(null)} disabled={deleteLoading}
-                  style={{ flex: 1, padding: '14px', background: 'var(--input-bg)', border: 'none', borderRight: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '16px', fontWeight: '500', color: 'var(--text-main)', borderRadius: '0 0 0 16px' }}>
-                  Cancel
-                </button>
-                <button onClick={executeDelete} disabled={deleteLoading}
-                  style={{ flex: 1, padding: '14px', background: '#ef4444', border: 'none', cursor: deleteLoading ? 'not-allowed' : 'pointer', fontSize: '16px', fontWeight: '600', color: '#fff', borderRadius: '0 0 16px 0' }}>
-                  {deleteLoading ? 'Deleting...' : 'Delete'}
-                </button>
+                <p style={{ color: 'var(--text-muted)', fontSize: '15px', margin: '0 0 28px 0' }}>
+                  The record is kept on file, hidden from the active list, and can be restored anytime.
+                  It will no longer appear in charts unless explicitly restored.
+                </p>
+                <div style={{ display: 'flex', borderTop: '1px solid var(--border-color)', paddingTop: '20px', gap: '0' }}>
+                  <button onClick={() => setDeleteTarget(null)} disabled={deleteLoading}
+                    style={{ flex: 1, padding: '14px', background: 'var(--input-bg)', border: 'none', borderRight: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '16px', fontWeight: '500', color: 'var(--text-main)', borderRadius: '0 0 0 16px' }}>
+                    Cancel
+                  </button>
+                  <button onClick={executeDelete} disabled={deleteLoading}
+                    style={{ flex: 1, padding: '14px', background: '#129968', border: 'none', cursor: deleteLoading ? 'not-allowed' : 'pointer', fontSize: '16px', fontWeight: '600', color: '#fff', borderRadius: '0 0 16px 0' }}>
+                    {deleteLoading ? 'Archiving...' : 'Archive'}
+                  </button>
               </div>
             </div>
           </div>
@@ -3540,6 +3577,20 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         {/* Table card */}
         <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' }}>
           <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+            {/* Active | Archived toggle - CHO only */}
+            {loginRole !== 'BHW' && (
+              <div style={{ display: 'flex', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
+                <button onClick={() => { setShowArchived(false); showArchivedRef.current = false; fetchCases(false); setTablePage(1); }}
+                  style={{ padding: '8px 14px', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: '600', background: !showArchived ? '#121358' : 'transparent', color: !showArchived ? '#fff' : 'var(--text-muted)' }}>
+                  Active
+                </button>
+                <button onClick={() => { setShowArchived(true); showArchivedRef.current = true; fetchCases(true); setTablePage(1); }}
+                  style={{ padding: '8px 14px', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: '600', background: showArchived ? '#121358' : 'transparent', color: showArchived ? '#fff' : 'var(--text-muted)' }}>
+                  Archived
+                </button>
+              </div>
+            )}
+
             {/* Search */}
             <input type="text" placeholder="Search Cases..."
               value={searchQuery} onChange={e => { setSearchQuery(e.target.value); setTablePage(1); }}
@@ -3691,6 +3742,19 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       </td>
                       <td style={{ padding: compactMode ? '7px 8px' : '12px', textAlign: 'center' }}>
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                        {c.is_archived === 1 ? (
+                          loginRole !== 'BHW' ? (
+                            <button onClick={() => {
+                              axios.post(`${API_URL}/api/cases/${c.case_id}/restore`)
+                                .then(() => { notify(`Case #${c.case_id} restored.`, 'success'); fetchCases(true); })
+                                .catch(err => notify('Restore failed: ' + (err.response?.data?.error || err.message), 'error'));
+                            }} title="Restore case"
+                            style={{ padding: '5px 10px', background: 'transparent', border: '1px solid #129968', borderRadius: '4px', cursor: 'pointer', fontSize: '15px', color: '#129968' }}>
+                            ↩ Restore
+                          </button>
+                          ) : null
+                        ) : (
+                        <>
                           <button onClick={() => openEdit(c)} title="Edit case"
                             style={{ padding: '5px 10px', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer', color: 'var(--text-main)', fontSize: '15px' }}>
                             ✏️
@@ -3707,11 +3771,13 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                                   .then(() => fetchCases())
                                   .catch(err => notify('Delete failed: ' + (err.response?.data?.error || err.message), 'error'));
                               }
-                            }} title="Delete case"
+                            }} title="Archive case"
                             style={{ padding: '5px 10px', background: 'transparent', border: '1px solid #ef4444', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>
                             🗑️
                           </button>
-                        </div>
+                        </>
+                        )}
+                      </div>
                       </td>
                     </tr>
                   ))
@@ -3883,6 +3949,45 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           </span>
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {patientLookupResults.length > 0 && (
+                    <div style={{
+                      marginTop: '8px',
+                      background: 'var(--bg-surface)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                    }}>
+                      <div style={{
+                        padding: '8px 12px', fontSize: '14px', fontWeight: 600, color: 'var(--text-main)',
+                        borderBottom: '1px solid var(--border-color)', background: 'var(--input-bg)',
+                      }}>
+                        🕘 Previous Cases for this Patient ({patientLookupResults.length})
+                      </div>
+                      <div style={{ maxHeight: '180px', overflowY: 'auto' }}>
+                        {patientLookupResults.map((p, i) => (
+                          <div key={i} style={{
+                            padding: '8px 12px',
+                            borderBottom: i < patientLookupResults.length - 1 ? '1px solid var(--border-color)' : 'none',
+                            display: 'flex', alignItems: 'center', gap: '10px',
+                            fontSize: '14px', color: 'var(--text-main)',
+                          }}>
+                            <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
+                              {p.case_id ? `#${String(p.case_id).padStart(4, '0')}` : '--'}
+                            </span>
+                            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {p.disease_name || 'Unknown'}
+                            </span>
+                            <span style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{formatDateStr(p.date_reported, dateFormat)}</span>
+                            <span style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap', maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.barangay_name || 'N/A'}</span>
+                            <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap', ...getStatusStyle(p.status) }}>
+                              {p.status || '--'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -4137,8 +4242,15 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     }} />
                 </div>
                 {loginRole === 'BHW' ? (
-                  <div>
-                    <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Assigned Purok / Blk / Phase / Lot</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Assigned Barangay</label>
+                      <div style={{ padding: '8px 12px', background: 'var(--input-bg, #f1f5f9)', borderRadius: '6px', fontSize: '15px', color: 'var(--text-main)', fontWeight: '500' }}>
+                        {loginBarangay || scopedBarangayList.find(b => String(b.id) === String(formData.barangayId))?.name || 'Not set'}
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Assigned Purok / Blk / Phase / Lot</label>
                     {isBhwReadOnly ? (
                       <div style={{ padding: '8px 12px', background: 'var(--input-bg, #f1f5f9)', borderRadius: '6px', fontSize: '15px', color: 'var(--text-main)' }}>
                         {formData.purok || 'Not set'}
@@ -4203,6 +4315,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       )}
                     </div>
                     )}
+                  </div>
                   </div>
                 ) : (
                   <div>

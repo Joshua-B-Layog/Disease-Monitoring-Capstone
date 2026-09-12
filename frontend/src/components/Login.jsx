@@ -549,12 +549,12 @@ const handleLoginOtpSubmit = async (e) => {
 };
 
     const getPasswordStrength = (pw) => {
-      if (!pw || pw.length < 7) return 'low';
+      if (!pw || pw.length < 8) return 'low';
       const hasUpper = /[A-Z]/.test(pw);
+      const hasLower = /[a-z]/.test(pw);
       const hasNumber = /[0-9]/.test(pw);
       const hasSpecial = /[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\\/;'`~]/.test(pw);
-      if (hasUpper && hasNumber && hasSpecial) return 'strong';
-      if (!hasUpper && !hasSpecial) return 'low';
+      if (hasUpper && hasLower && hasNumber && hasSpecial) return 'strong';
       return 'medium';
     };
 
@@ -569,7 +569,7 @@ const handleLoginOtpSubmit = async (e) => {
         return;
     }
     if (getPasswordStrength(signupPassword) === 'low') {
-        setSignupError('Password is too weak. Use at least 7 characters with uppercase, number, and special character.');
+        setSignupError('Password is too weak. Use at least 8 characters with uppercase, lowercase, number, and special character.');
         return;
     }
     if (signupMobile && signupMobile.length < 10) {

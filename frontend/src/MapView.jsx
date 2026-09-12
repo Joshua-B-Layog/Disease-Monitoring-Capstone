@@ -504,7 +504,7 @@ function CaseDotMarkers({ cases, zoom }) {
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
 
-    if (zoom < 16) return;
+    if (zoom < 15) return;
 
     const isFullView = zoom === 19;
     const casesWithCoords = cases.filter(c => c.latitude && c.longitude && !isNaN(parseFloat(c.latitude)) && !isNaN(parseFloat(c.longitude)));
@@ -516,12 +516,12 @@ function CaseDotMarkers({ cases, zoom }) {
       const severityColor = c.severity === 'Severe' ? '#DC2626' : c.severity === 'Moderate' ? '#D97706' : '#3b82f6';
 
       const marker = L.circleMarker([lat, lng], {
-        radius: isFullView ? 7 : 4,
+        radius: isFullView ? 12 : 7,
         fillColor: color,
-        color: isFullView ? '#fff' : 'rgba(255,255,255,0.6)',
-        weight: isFullView ? 2 : 1.5,
-        opacity: isFullView ? 1 : 0.7,
-        fillOpacity: isFullView ? 0.85 : 0.45,
+        color: isFullView ? '#fff' : 'rgba(255,255,255,0.75)',
+        weight: isFullView ? 3 : 2.5,
+        opacity: isFullView ? 1 : 0.85,
+        fillOpacity: isFullView ? 0.85 : 0.65,
         interactive: isFullView,
         pane: 'topPane',
       }).addTo(map);
@@ -574,7 +574,7 @@ function PulseMarkers({ barangayData, onHover, onLeave, onClick }) {
           <svg width="${w}" height="${h}" viewBox="0 0 34 44" style="position:absolute;top:0;left:0;display:block;filter:drop-shadow(0 3px 4px rgba(0,0,0,0.5));">
             <path d="M17 0C7.6 0 0 7.6 0 17c0 12 17 27 17 27s17-15 17-27C34 7.6 26.4 0 17 0z" fill="${color}"/>
             <circle cx="17" cy="17" r="11" fill="#ffffff"/>
-            <text x="17" y="21" text-anchor="middle" font-size="12" font-weight="800" fill="${color}" font-family="Tw Cen MT Condensed,system-ui,sans-serif">${b.totalCases}</text>
+            <text x="17" y="22" text-anchor="middle" font-size="14" font-weight="800" fill="${color}" font-family="Tw Cen MT Condensed,system-ui,sans-serif">${b.totalCases}</text>
           </svg>
           <div style="position:absolute;left:50%;top:${h + 1}px;transform:translateX(-50%);background:rgba(15,23,42,0.85);border:1px solid rgba(255,255,255,0.18);color:#fff;font-size:9.5px;font-weight:600;padding:2px 7px;border-radius:8px;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis;line-height:1.2;text-shadow:0 1px 2px rgba(0,0,0,0.3);">${label}</div>
         </div>`,
@@ -588,7 +588,7 @@ function PulseMarkers({ barangayData, onHover, onLeave, onClick }) {
     markersRef.current = [];
 
     barangayData.forEach(b => {
-      const size = Math.max(24, Math.min(54, 20 + b.totalCases * 1.5));
+      const size = Math.max(34, Math.min(72, 24 + b.totalCases * 1.8));
       const icon = createPinIcon(b, size);
 
       const m = L.marker(b.coords, { icon, zIndexOffset: 1000 }).addTo(map);
@@ -1349,7 +1349,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           <ZoomToBarangay key="zoom-barangay" barangay={filterBarangay} loginRole={loginRole} loginBarangay={loginBarangay} sessionContext={sessionContext} cases={allCases} />
           <ZoomListener key="zoom-listener" onZoom={setMapZoom} filterBarangay={filterBarangay} autoDetectedBrgy={autoDetectedBrgy} setAutoDetectedBrgy={setAutoDetectedBrgy} loginRole={loginRole} />
           <CaseDotMarkers key="case-dot-markers" cases={allCases} zoom={mapZoom} />
-          {loginRole !== 'BHW' && (filterBarangay === 'All Barangays' && !showAutoPurok) ? (
+          {loginRole !== 'BHW' && (filterBarangay === 'All Barangays' && !showAutoPurok) && (
             <GeoJSON
               key="brgy-geojson"
               ref={geoJsonLayerRef}
@@ -1393,14 +1393,15 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                 });
               }}
             />
-          ) : mapZoom < 19 ? (
+          )}
+          {mapZoom < 19 && (
             <PulseMarkers
               barangayData={purokData.length > 0 ? purokData : barangayData}
               onHover={setTooltip}
               onLeave={() => setTooltip(null)}
               onClick={setPopup}
             />
-          ) : null}
+          )}
         </MapContainer>
 
         {/* SD / HD BASE LAYER TOGGLE */}

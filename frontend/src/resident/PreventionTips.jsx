@@ -1,17 +1,25 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import BackButton from '../components/BackButton';
 import { onDiseasesChanged } from '../diseaseSignal';
-import { FeverIcon, InfluenzaAIcon, LeptospirosisIcon, TuberculosisIcon, TyphoidIcon, RabiesIcon } from '../components/DiseaseIcons';
+import { FeverIcon, InfluenzaAIcon, LeptospirosisIcon, TuberculosisIcon, TyphoidIcon, RabiesIcon, FecesIcon, SoreEyesIcon, AvianIcon, ContactBloodborneIcon } from '../components/DiseaseIcons';
 
 const parseLines = (str) => (str ? String(str).split('\n').map(s => s.trim()).filter(Boolean) : []);
 
 const SVG_DISEASE_ICONS = {
   Dengue: FeverIcon,
   'Influenza A': InfluenzaAIcon,
+  Influenza: InfluenzaAIcon,
   Leptospirosis: LeptospirosisIcon,
   Tuberculosis: TuberculosisIcon,
   'Typhoid Fever': TyphoidIcon,
   Rabies: RabiesIcon,
+  Diarrhea: FecesIcon,
+  'Avian Influenza': AvianIcon,
+  Chickenpox: AvianIcon,
+  'Sore Eyes': SoreEyesIcon,
+  'Hepatitis A': ContactBloodborneIcon,
+  'Hepatitis B': ContactBloodborneIcon,
+  'Hepatitis C': ContactBloodborneIcon,
 };
 
 const renderDiseaseIcon = (disease, size = 26) => {
@@ -50,7 +58,7 @@ export const DISEASES = [
     ],
   },
   {
-    name: 'Diarrhea', icon: '💧', color: '#0ea5e9', videoId: 'OGIUigzPuew',
+    name: 'Diarrhea', icon: '💧', color: '#D97706', videoId: 'OGIUigzPuew',
     tips: [
       'Wash hands thoroughly with soap and water before eating and after using the toilet.',
       'Drink only boiled or properly treated water.',
@@ -269,7 +277,7 @@ export const DISEASES = [
     ],
   },
   {
-    name: 'Avian Influenza', icon: '🐔', color: '#D97706', videoId: 'iAusO1XxhnQ',
+    name: 'Avian Influenza', icon: '🐔', color: '#F97316', videoId: 'iAusO1XxhnQ',
     tips: [
       'Avoid contact with sick or dead birds.',
       'Cook poultry and eggs thoroughly before eating.',
@@ -289,7 +297,7 @@ export const DISEASES = [
     ],
   },
   {
-    name: 'Chickenpox', icon: '🟠', color: '#f97316', videoId: 'jvNHpVB1JpY',
+    name: 'Chickenpox', icon: '🟠', color: '#FB923C', videoId: 'jvNHpVB1JpY',
     tips: [
       'Get vaccinated with the varicella vaccine.',
       'Isolate infected individuals until all blisters have crusted over.',
@@ -402,7 +410,7 @@ export const DISEASES = [
     ],
   },
   {
-    name: 'Influenza', icon: '🤒', color: '#D97706', videoId: 'wMUk5zSlzqY',
+    name: 'Influenza', icon: '🤒', color: '#F59E0B', videoId: 'wMUk5zSlzqY',
     tips: [
       'Get the annual flu vaccine.',
       'Wash hands frequently with soap and water.',
@@ -554,7 +562,7 @@ export const DISEASES = [
     ],
   },
   {
-    name: 'Sore Eyes', icon: '👁️', color: '#0ea5e9', videoId: 'jMJLweTwPZk',
+    name: 'Sore Eyes', icon: '👁️', color: '#EAB308', videoId: 'jMJLweTwPZk',
     tips: [
       'Wash hands frequently, especially before touching your eyes.',
       'Avoid sharing towels, pillows, or eye makeup.',

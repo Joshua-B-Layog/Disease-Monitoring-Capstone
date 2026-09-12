@@ -137,6 +137,54 @@ function validateCasePayload(payload = {}) {
   return errors;
 }
 
+// Password policy: minimum complexity for all staff accounts
+// Optional denyTokens: substrings the password must NOT contain (e.g. first name, last name, role label).
+function validatePasswordStrength(password, denyTokens = []) {
+  const pw = String(password || '');
+  const errors = [];
+  if (pw.length < 8) errors.push('Password must be at least 8 characters.');
+  if (!/[A-Z]/.test(pw)) errors.push('Password must include an uppercase letter.');
+  if (!/[a-z]/.test(pw)) errors.push('Password must include a lowercase letter.');
+  if (!/[0-9]/.test(pw)) errors.push('Password must include a number.');
+  if (!/[^A-Za-z0-9]/.test(pw)) errors.push('Password must include a special character (e.g. !@#$%).');
+  const lowerPw = pw.toLowerCase();
+  const hit = denyTokens
+    .filter(t => String(t || '').trim().length >= 2)
+    .some(t => lowerPw.includes(String(t).toLowerCase().trim()));
+  if (hit) errors.push('Password must not contain your name or role designation.');
+  return errors;
+}
+
+// Strong temporary password generator: meets the same policy as user-set passwords.
+function generateStrongTempPassword(len = 12) {
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower = 'abcdefghjkmnpqrstuvwxyz';
+  const numbers = '23456789';
+  const special = '!@#$%';
+  const all = upper + lower + numbers + special;
+  const random = (max) => crypto.randomInt(0, max);
+  const parts = [upper[random(upper.length)], lower[random(lower.length)], numbers[random(numbers.length)], special[random(special.length)]];
+  for (let i = 4; i < len; i++) parts.push(all[random(all.length)]);
+  for (let i = parts.length - 1; i > 0; i--) {
+    const j = random(i + 1);
+    [parts[i], parts[j]] = [parts[j], parts[i]];
+  }
+  return parts.join('');
+}
+
+// Minimal in-memory rate limiter (per key, sliding window)
+const rateLimitBuckets = {};
+function simpleRateLimit(key, max, windowMs) {
+  const now = Date.now();
+  const bucket = rateLimitBuckets[key];
+  if (!bucket || bucket.resetAt < now) {
+    rateLimitBuckets[key] = { count: 1, resetAt: now + windowMs };
+    return { allowed: true, remaining: max - 1, retryAfterMs: 0 };
+  }
+  bucket.count += 1;
+  return { allowed: bucket.count <= max, remaining: Math.max(0, max - bucket.count), retryAfterMs: bucket.resetAt - now };
+}
+
 const app = express();
 
 const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
@@ -239,6 +287,36 @@ db.query("SHOW COLUMNS FROM diseases LIKE 'active'", (err, rows) => {
     }
 });
 
+// Migration: is_archived flag on disease_cases (soft delete / archive instead of permanent delete)
+db.query("SHOW COLUMNS FROM disease_cases LIKE 'is_archived'", (err, rows) => {
+    if (!err && rows.length === 0) {
+        db.query("ALTER TABLE disease_cases ADD COLUMN is_archived TINYINT(1) NOT NULL DEFAULT 0 AFTER created_by", (alterErr) => {
+            if (alterErr) console.error('Migration error adding is_archived:', alterErr.message);
+            else console.log('Migration: added is_archived column to disease_cases table');
+        });
+    }
+});
+
+// Migration: must_change_password flag on users (force password change on first login)
+db.query("SHOW COLUMNS FROM users LIKE 'must_change_password'", (err, rows) => {
+    if (!err && rows.length === 0) {
+        db.query("ALTER TABLE users ADD COLUMN must_change_password TINYINT(1) NOT NULL DEFAULT 0", (alterErr) => {
+            if (alterErr) console.error('Migration error adding must_change_password:', alterErr.message);
+            else console.log('Migration: added must_change_password column to users table');
+        });
+    }
+});
+
+// Migration: is_archived flag on users (soft delete / archive instead of permanent delete)
+db.query("SHOW COLUMNS FROM users LIKE 'is_archived'", (err, rows) => {
+    if (!err && rows.length === 0) {
+        db.query("ALTER TABLE users ADD COLUMN is_archived TINYINT(1) NOT NULL DEFAULT 0", (alterErr) => {
+            if (alterErr) console.error('Migration error adding users is_archived:', alterErr.message);
+            else console.log('Migration: added is_archived column to users table');
+        });
+    }
+});
+
 // Custom disease categories (persisted user-created categories for the disease carousel)
 db.query(`CREATE TABLE IF NOT EXISTS disease_categories (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -323,7 +401,7 @@ db.query(`CREATE TABLE IF NOT EXISTS audit_logs (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )`, (err) => {
   if (err) console.error('Error creating audit_logs table:', err.message);
-  else console.log('Audit logs table created/verified');
+  else { console.log('Audit logs table created/verified'); backfillLegacyAuditDetails(); }
 });
 
 
@@ -639,6 +717,51 @@ function createAuditLog(userId, userName, userRole, choUnit, barangay, action, e
   );
 }
 
+function phTimestamp(date) {
+  return (date ? new Date(date) : new Date()).toLocaleString('en-PH', {
+    timeZone: 'Asia/Manila',
+    month: 'short', day: 'numeric', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
+  });
+}
+
+// One-time (idempotent) reformat of legacy login/logout audit details so old rows
+// match the new readable PH-time format. Runs at startup; skips already-formatted rows.
+function backfillLegacyAuditDetails() {
+  db.query(
+    "SELECT id, action, details, created_at FROM audit_logs WHERE action IN ('Logged In', 'Logged In (2FA)', 'Logged Out')",
+    (err, rows) => {
+      if (err) { console.error('Audit backfill select error:', err.message); return; }
+      const formattedSuffix = /[A-Z][a-z]{2} \d{1,2}, \d{4}, \d{1,2}:\d{2}:\d{2} [AP]M$/;
+      const updates = [];
+      rows.forEach((r) => {
+        const d = r.details || '';
+        let newDetails = null;
+        if (r.action === 'Logged Out') {
+          if (/^Logout at \d{4}-\d{2}-\d{2}T/.test(d)) {
+            newDetails = `Logout at ${phTimestamp(d.replace(/^Logout at /, ''))}`;
+          } else if (!formattedSuffix.test(d)) {
+            newDetails = `Logout at ${phTimestamp(r.created_at)}`;
+          }
+        } else if (r.action === 'Logged In' || r.action === 'Logged In (2FA)') {
+          if (!formattedSuffix.test(d)) {
+            newDetails = `${d} on ${phTimestamp(r.created_at)}`;
+          }
+        }
+        if (newDetails && newDetails !== d) updates.push([newDetails, r.id]);
+      });
+      if (updates.length === 0) return;
+      let done = 0;
+      updates.forEach(([details, id]) => {
+        db.query('UPDATE audit_logs SET details = ? WHERE id = ?', [details, id], (uErr) => {
+          if (uErr) console.error('Audit backfill update error:', uErr.message);
+          if (++done === updates.length) console.log(`Audit backfill complete: reformatted ${updates.length} login/logout row(s).`);
+        });
+      });
+    }
+  );
+}
+
 function signToken(user) {
   return jwt.sign(
     {
@@ -734,6 +857,8 @@ app.get('/api/ping', (req, res) => res.sendStatus(200));
 // ROUTE: Get all disease cases (with disease_name join)
 app.get('/api/disease_cases', (req, res) => {
     const requesterId = req.query.user_id ? Number(req.query.user_id) : null;
+    const includeArchived = req.query.include_archived === '1';
+    const archiveFilter = includeArchived ? '' : ' AND dc.is_archived = 0';
     const sql = `
         SELECT 
             dc.case_id, 
@@ -751,13 +876,14 @@ app.get('/api/disease_cases', (req, res) => {
             dc.severity,
             dc.status, 
             dc.date_reported,
+            dc.is_archived,
             d.name AS disease_name, 
             b.name AS barangay_name,
             dc.barangay_id
         FROM disease_cases dc
         LEFT JOIN diseases d ON dc.disease_id = d.id
         LEFT JOIN barangays b ON dc.barangay_id = b.id
-        WHERE (dc.status != 'Draft' OR dc.created_by = ?)
+        WHERE (dc.status != 'Draft' OR dc.created_by = ?)${archiveFilter}
         ORDER BY dc.case_id DESC
     `;
     db.query(sql, [requesterId], (err, results) => {
@@ -777,12 +903,13 @@ app.get('/api/patients/lookup', authenticate, (req, res) => {
   }
   const searchTerm = `%${name.trim()}%`;
   const sql = `
-    SELECT dc1.patient_name, dc1.age, dc1.gender, dc1.contact,
+    SELECT dc1.case_id, dc1.patient_name, dc1.age, dc1.gender, dc1.contact,
            dc1.address, dc1.barangay_id, b.name AS barangay_name,
            dc1.symptoms, dc1.physician, dc1.latitude, dc1.longitude,
-           dc1.date_reported
+           dc1.date_reported, dc1.status, d.name AS disease_name
     FROM disease_cases dc1
     LEFT JOIN barangays b ON dc1.barangay_id = b.id
+    LEFT JOIN diseases d ON dc1.disease_id = d.id
     INNER JOIN (
       SELECT patient_name, MAX(date_reported) AS max_date
       FROM disease_cases
@@ -917,12 +1044,15 @@ app.get('/api/barangays', (req, res) => {
 
 // ROUTE: Get all users (no passwords)
 app.get('/api/users', authenticate, (req, res) => {
+    const includeArchived = req.query.include_archived === 'true';
     const query = `
         SELECT u.user_id, u.username, u.full_name, u.email, u.mobile_number,
                u.role, u.is_active, u.last_login, u.assigned_barangay_id,
+               u.is_archived, u.status,
                b.name AS barangay_name
         FROM users u
         LEFT JOIN barangays b ON u.assigned_barangay_id = b.id
+        ${includeArchived ? '' : 'WHERE u.is_archived = 0'}
         ORDER BY u.user_id ASC
     `;
     db.query(query, (err, results) => {
@@ -940,7 +1070,7 @@ app.get('/api/users/:id/profile', authenticate, (req, res) => {
     const { id } = req.params;
     const query = `
         SELECT u.user_id, u.username, u.full_name, u.email, u.mobile_number,
-               u.role, u.assigned_barangay_id, u.is_active,
+               u.role, u.assigned_barangay_id, u.is_active, u.is_archived,
                u.last_login, u.last_login_location, u.last_login_device,
                u.previous_login, u.previous_login_location, u.previous_login_device,
                u.two_fa_enabled,
@@ -1087,17 +1217,9 @@ app.post('/api/cases', authenticate, (req, res) => {
       routeOrProceed(null);
     }
     function proceedAfterCrossCheck() {
-      if (contact && contact.trim()) {
-        db.query('SELECT case_id FROM disease_cases WHERE contact = ? AND contact IS NOT NULL AND contact != ? AND patient_name != ? LIMIT 1', [contact.trim(), '', patient_name], (cErr, cRes) => {
-          if (cErr) return res.status(500).json({ error: cErr.message });
-          if (cRes && cRes.length > 0) {
-            return res.status(409).json({ error: 'That contact number is already in use by another patient. Please use a different contact number.' });
-          }
-          proceedToCheck();
-        });
-      } else {
-        proceedToCheck();
-      }
+      // Contact numbers may be shared between relatives/household members.
+      // Duplicate-patient detection (same name + active status) still applies below.
+      proceedToCheck();
     }
 
     function proceedToCheck() {
@@ -1809,33 +1931,19 @@ app.put('/api/case-add-requests/:id/approve', authenticate, (req, res) => {
       );
     };
 
-    const checkContact = (cb) => {
-      if (final.contact && String(final.contact).trim()) {
-        db.query('SELECT case_id FROM disease_cases WHERE contact = ? AND contact IS NOT NULL AND contact != ? AND patient_name != ? LIMIT 1',
-          [String(final.contact).trim(), '', final.patient_name], (cErr, cRes) => {
-            if (cErr) return res.status(500).json({ error: cErr.message });
-            if (cRes && cRes.length > 0) {
-              return res.status(409).json({ error: 'That contact number is already in use by another patient. Please use a different contact number.' });
-            }
-            cb();
-          });
-      } else cb();
-    };
-
     checkDuplicate(() => {
-      checkContact(() => {
-        const findDiseaseQuery = 'SELECT id FROM diseases WHERE LOWER(name) = LOWER(?)';
-        db.query(findDiseaseQuery, [final.disease_name], (dErr, dRes) => {
-          const dId = (dRes && dRes.length > 0) ? dRes[0].id : null;
-          const doInsert = (finalId) => {
-            db.query(
-              `INSERT INTO disease_cases
+      const findDiseaseQuery = 'SELECT id FROM diseases WHERE LOWER(name) = LOWER(?)';
+      db.query(findDiseaseQuery, [final.disease_name], (dErr, dRes) => {
+        const dId = (dRes && dRes.length > 0) ? dRes[0].id : null;
+        const doInsert = (finalId) => {
+          db.query(
+            `INSERT INTO disease_cases
                 (patient_name, disease_id, age, severity, gender, status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude, created_by)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-              [final.patient_name, finalId, final.age || 0, final.severity, final.gender, final.case_status,
-                final.contact || null, final.onset_date || null, final.address || null, final.barangay_id,
-                final.symptoms || null, final.physician || null, final.latitude || null, final.longitude || null, reqRow.requested_by || null],
-              (insErr, insResult) => {
+            [final.patient_name, finalId, final.age || 0, final.severity, final.gender, final.case_status,
+              final.contact || null, final.onset_date || null, final.address || null, final.barangay_id,
+              final.symptoms || null, final.physician || null, final.latitude || null, final.longitude || null, reqRow.requested_by || null],
+            (insErr, insResult) => {
                 if (insErr) return res.status(500).json({ error: insErr.message });
                 const newCaseId = insResult.insertId;
                 const resolverId = body.actor_id || null;
@@ -1886,7 +1994,6 @@ app.put('/api/case-add-requests/:id/approve', authenticate, (req, res) => {
             });
           } else doInsert(dId);
         });
-      });
     });
   });
 });
@@ -1953,7 +2060,7 @@ app.put('/api/case-add-requests/:id/read', authenticate, (req, res) => {
 
 // POST /api/password-change-request — BHW requests password change
 app.post('/api/password-change-request', authenticate, (req, res) => {
-  const { user_id, user_name } = req.body;
+  const { user_id, user_name, reason } = req.body;
   if (!user_id) return res.status(400).json({ error: 'user_id is required.' });
 
   // Check for existing pending request
@@ -1978,7 +2085,9 @@ app.post('/api/password-change-request', authenticate, (req, res) => {
             [],
             (nErr, users) => {
               if (!nErr && users && users.length > 0) {
-                const msg = `${user_name || 'A BHW'} is requesting a password change. Please review and approve or reject this request.`;
+                const msg = reason === 'first_login_temp'
+                  ? `${user_name || 'A BHW'} is a new user who logged in with a generated temporary password and would like to change it immediately. Please review and approve or reject this request.`
+                  : `${user_name || 'A BHW'} is requesting a password change. Please review and approve or reject this request.`;
                 users.forEach(u => {
                   db.query(
                     'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
@@ -2080,26 +2189,34 @@ app.put('/api/password-change-requests/:id/read', authenticate, (req, res) => {
 app.put('/api/users/:id/set-password', authenticate, (req, res) => {
   const { id } = req.params;
   const { newPassword } = req.body;
-  if (!newPassword || newPassword.length < 6) {
-    return res.status(400).json({ error: 'New password must be at least 6 characters.' });
-  }
 
-  // Gate: verify an accepted request exists before allowing password change
-  db.query('SELECT id FROM password_change_requests WHERE user_id = ? AND status = \'accepted\' LIMIT 1', [id], (err, rows) => {
-    if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
-    if (!rows || rows.length === 0) {
-      return res.status(403).json({ error: 'No approved password change request found. Please wait for CHO approval.' });
+  db.query('SELECT full_name, role FROM users WHERE user_id = ?', [id], (fErr, fRows) => {
+    if (fErr) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+    const who = (fRows && fRows[0]) || {};
+    const [sFirst, ...sRest] = (who.full_name || '').split(' ');
+    const denied = [sFirst || '', sRest.join(' ') || '', (who.role || 'BHW') === 'CHO' ? 'CHO' : 'BHW'];
+    const pwErrors = validatePasswordStrength(newPassword, denied);
+    if (pwErrors.length > 0) {
+      return res.status(400).json({ error: pwErrors.join(' ') });
     }
 
-    const hashed = bcrypt.hashSync(newPassword, 10);
-    db.query('UPDATE users SET password = ? WHERE user_id = ?', [hashed, id], (err2, result) => {
-      if (err2) return res.status(500).json({ error: err2.message });
-      if (result.affectedRows === 0) return res.status(404).json({ error: 'User not found.' });
+    // Gate: verify an accepted request exists before allowing password change
+    db.query('SELECT id FROM password_change_requests WHERE user_id = ? AND status = \'accepted\' LIMIT 1', [id], (err, rows) => {
+      if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+      if (!rows || rows.length === 0) {
+        return res.status(403).json({ error: 'No approved password change request found. Please wait for CHO approval.' });
+      }
 
-      // Mark the accepted request as fully resolved
-      db.query("UPDATE password_change_requests SET status = 'resolved', resolved_at = NOW() WHERE user_id = ? AND status = 'accepted'", [id]);
+      const hashed = bcrypt.hashSync(newPassword, 10);
+      db.query('UPDATE users SET password = ?, must_change_password = 0, initial_password = NULL WHERE user_id = ?', [hashed, id], (err2, result) => {
+        if (err2) return res.status(500).json({ error: err2.message });
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'User not found.' });
 
-      res.json({ message: 'Password updated successfully.' });
+        // Mark the accepted request as fully resolved
+        db.query("UPDATE password_change_requests SET status = 'resolved', resolved_at = NOW() WHERE user_id = ? AND status = 'accepted'", [id]);
+
+        res.json({ message: 'Password updated successfully.' });
+      });
     });
   });
 });
@@ -2140,7 +2257,16 @@ app.put('/api/cases/:id', authenticate, (req, res) => {
                 status: 'Status', contact: 'Contact', onset_date: 'Date of Onset', address: 'Address',
                 symptoms: 'Symptoms', physician: 'Physician', latitude: 'Latitude', longitude: 'Longitude',
               };
-              const normalize = (v) => (v === null || v === undefined || v === '') ? '' : String(v);
+              const normalize = (v) => (v === null || v === undefined || v === '') ? '' : String(v).trim();
+              const fmtDateVal = (v) => {
+                if (v instanceof Date && !isNaN(v)) {
+                  const p = (n) => String(n).padStart(2, '0');
+                  return `${v.getFullYear()}-${p(v.getMonth() + 1)}-${p(v.getDate())}`;
+                }
+                if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10);
+                return normalize(v);
+              };
+              const canonicalVal = (payloadKey, v) => (payloadKey === 'onset_date' ? fmtDateVal(v) : normalize(v));
               const buildChangeSummary = () => {
                 if (!oldRow) return '';
                 const FIELD_MAP = { patient_name: 'patient_name', age: 'age', severity: 'severity', gender: 'gender', status: 'status', contact: 'contact', onset_date: 'onset_date', address: 'address', symptoms: 'symptoms', physician: 'physician', latitude: 'latitude', longitude: 'longitude' };
@@ -2158,13 +2284,15 @@ app.put('/api/cases/:id', authenticate, (req, res) => {
                   else if (payloadKey === 'longitude') newVal = longitude || null;
                   else newVal = req.body[payloadKey];
                   const oldVal = oldRow[payloadKey];
-                  // Compare normalized values; skip empty→empty
-                  if (normalize(oldVal) !== normalize(newVal)) {
-                    const ov = normalize(oldVal) || '(empty)';
-                    const nv = normalize(newVal) || '(empty)';
+                  const ov = canonicalVal(payloadKey, oldVal);
+                  const nv = canonicalVal(payloadKey, newVal);
+                  // Compare canonical values; skip empty→empty
+                  if (ov !== nv) {
+                    const dispOv = ov || '(empty)';
+                    const dispNv = nv || '(empty)';
                     // Truncate long values (symptoms/address)
-                    const fmtOv = ov.length > 40 ? ov.slice(0, 37) + '...' : ov;
-                    const fmtNv = nv.length > 40 ? nv.slice(0, 37) + '...' : nv;
+                    const fmtOv = dispOv.length > 60 ? dispOv.slice(0, 57) + '...' : dispOv;
+                    const fmtNv = dispNv.length > 60 ? dispNv.slice(0, 57) + '...' : dispNv;
                     changes.push(`${label}: ${fmtOv} → ${fmtNv}`);
                   }
                 }
@@ -2301,17 +2429,8 @@ app.put('/api/cases/:id', authenticate, (req, res) => {
             }); // end fetch old status
         };
 
-        if (contact && contact.trim()) {
-          db.query('SELECT case_id FROM disease_cases WHERE contact = ? AND contact IS NOT NULL AND contact != ? AND case_id != ? AND patient_name != ? LIMIT 1', [contact.trim(), '', id, patient_name], (cErr, cRes) => {
-            if (cErr) return res.status(500).json({ error: cErr.message });
-            if (cRes && cRes.length > 0) {
-              return res.status(409).json({ error: 'That contact number is already in use by another patient. Please use a different contact number.' });
-            }
-            proceedToUpdate();
-          });
-        } else {
-          proceedToUpdate();
-        }
+        // Contact numbers may be shared between relatives/household members.
+        proceedToUpdate();
 
         function proceedToUpdate() {
         if (!diseaseId && disease_name) {
@@ -2398,6 +2517,12 @@ app.put('/api/users/:id', authenticate, requireRole('CHO'), async (req, res) => 
         // If newPassword provided, update it, email the user, and send in-app notification
         const afterUpdate = () => {
           if (newPassword && newPassword.trim()) {
+            const [pFirst, ...pRest] = (fullName || '').split(' ');
+            const denied = [pFirst || '', pRest.join(' ') || '', (role || 'BHW') === 'CHO' ? 'CHO' : 'BHW'];
+            const pwChk = validatePasswordStrength(newPassword.trim(), denied);
+            if (pwChk.length > 0) {
+              return res.status(400).json({ error: pwChk.join(' ') });
+            }
             const hashedPw = bcrypt.hashSync(newPassword.trim(), 10);
             db.query('UPDATE users SET password = ? WHERE user_id = ?', [hashedPw, id], (pwErr) => {
               if (pwErr) {
@@ -2468,17 +2593,29 @@ app.put('/api/users/:id/change-password', authenticate, (req, res) => {
     const { id } = req.params;
     const { currentPassword, newPassword } = req.body;
 
-    db.query('SELECT password FROM users WHERE user_id = ?', [id], (err, results) => {
+    db.query('SELECT password, full_name, role FROM users WHERE user_id = ?', [id], (err, results) => {
         if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
         if (results.length === 0) return res.status(404).json({ error: 'User not found.' });
+
+        const [cFirst, ...cRest] = (results[0].full_name || '').split(' ');
+        const denied = [cFirst || '', cRest.join(' ') || '', (results[0].role || 'BHW') === 'CHO' ? 'CHO' : 'BHW'];
+        const pwErrors = validatePasswordStrength(newPassword, denied);
+        if (pwErrors.length > 0) {
+          return res.status(400).json({ error: pwErrors.join(' ') });
+        }
 
         const pwValid = bcrypt.compareSync(currentPassword, results[0].password) || results[0].password === currentPassword;
         if (!pwValid) {
             return res.status(401).json({ error: 'Current password is incorrect.' });
         }
 
+        // Prevent reusing the current password
+        if (bcrypt.compareSync(newPassword, results[0].password)) {
+            return res.status(400).json({ error: 'New password must be different from your current password.' });
+        }
+
         const hashedNew = bcrypt.hashSync(newPassword, 10);
-        db.query('UPDATE users SET password = ? WHERE user_id = ?', [hashedNew, id], (updateErr) => {
+        db.query('UPDATE users SET password = ?, must_change_password = 0, initial_password = NULL, two_fa_token = NULL, two_fa_token_expiry = NULL WHERE user_id = ?', [hashedNew, id], (updateErr) => {
             if (updateErr) return res.status(500).json({ error: updateErr.message });
             return res.status(200).json({ message: 'Password updated successfully.' });
         });
@@ -2491,7 +2628,7 @@ app.put('/api/users/:id/change-password', authenticate, (req, res) => {
 // ROUTE: Delete disease case
 app.delete('/api/cases/:id', authenticate, (req, res) => {
     const { id } = req.params;
-    console.log("--- Delete Case ---", { id });
+    console.log("--- Archive Case ---", { id });
 
     const fetchCaseQuery = `
         SELECT dc.patient_name, d.name AS disease_name, b.name AS barangay_name, dc.barangay_id
@@ -2503,7 +2640,7 @@ app.delete('/api/cases/:id', authenticate, (req, res) => {
     
     db.query(fetchCaseQuery, [id], (err, caseResults) => {
         if (err) {
-            console.error("Fetch case error before delete:", err.message);
+            console.error("Fetch case error before archive:", err.message);
             return res.status(500).json({ error: 'Something went wrong. Please try again.' });
         }
         
@@ -2514,18 +2651,23 @@ app.delete('/api/cases/:id', authenticate, (req, res) => {
         const caseInfo = caseResults[0];
         const { patient_name, disease_name, barangay_name, barangay_id } = caseInfo;
 
-        const deleteQuery = 'DELETE FROM disease_cases WHERE case_id = ?';
+        // Soft archive instead of permanent delete — the record stays in the DB
+        // so the patient can be found again if they resurface in the future.
+        const archiveQuery = 'UPDATE disease_cases SET is_archived = 1 WHERE case_id = ?';
         
-        db.query(deleteQuery, [id], (delErr, delResult) => {
+        db.query(archiveQuery, [id], (delErr, delResult) => {
             if (delErr) {
-                console.error("Delete case error:", delErr.message);
+                console.error("Archive case error:", delErr.message);
                 return res.status(500).json({ error: delErr.message });
+            }
+            if ((!delResult || delResult.affectedRows === 0) && (delResult && delResult.changedRows === 0)) {
+                return res.status(404).json({ error: 'Case not found.' });
             }
             
             // Write audit log entry
             const isOfflineDelete = !!(req.body && req.body._offlineTimestamp);
             const auditUserId = (req.body && (req.body.user_id || req.body._offlineUserId)) || null;
-            const auditAction = isOfflineDelete ? 'Synced Delete (Offline)' : 'Deleted';
+            const auditAction = isOfflineDelete ? 'Synced Archive (Offline)' : 'Archived';
             const auditDisease = disease_name || 'Unknown Disease';
             const auditPatient = patient_name || 'Unknown Patient';
             if (auditUserId) {
@@ -2536,36 +2678,95 @@ app.delete('/api/cases/:id', authenticate, (req, res) => {
                     const brgy = (!bErr && bRes.length > 0) ? bRes[0].name : null;
                     const choUnit = u.role === 'CHO' ? getChoUnitForBarangay(brgy) : null;
                     createAuditLog(auditUserId, u.full_name, u.role, choUnit, brgy, auditAction, 'Case Record',
-                     `Deleted case for ${auditPatient} (${auditDisease}) in Barangay ${barangay_name || 'N/A'} (Case ID: ${id})`);
+                     `Archived case for ${auditPatient} (${auditDisease}) in Barangay ${barangay_name || 'N/A'} (Case ID: ${id})`);
                   });
                 }
               });
             }
 
-            const title = 'Case Deleted';
-            const message = `Case for ${patient_name} (${disease_name}) in Barangay ${barangay_name || 'N/A'} has been deleted.`;
+            const title = 'Case Archived';
+            const message = `Case for ${patient_name} (${disease_name}) in Barangay ${barangay_name || 'N/A'} has been archived.`;
             createNotificationForUsers(title, message, 'delete', 'ManageCases', barangay_id, 'delete');
 
-            console.log(`Case ${id} deleted from database.`);
-            return res.status(200).json({ message: 'Case deleted successfully.' });
+            console.log(`Case ${id} archived (soft delete).`);
+            return res.status(200).json({ message: 'Case archived successfully.' });
         });
     });
+});
+
+// ROUTE: Restore an archived case
+app.post('/api/cases/:id/restore', authenticate, requireRole('CHO'), (req, res) => {
+    const { id } = req.params;
+    console.log("--- Restore Case ---", { id });
+
+    db.query(
+        'SELECT patient_name, is_archived, barangay_id FROM disease_cases WHERE case_id = ?',
+        [id],
+        (err, results) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (!results || results.length === 0) return res.status(404).json({ error: 'Case not found.' });
+            if (results[0].is_archived !== 1) return res.status(400).json({ error: 'Case is not archived.' });
+
+            db.query('UPDATE disease_cases SET is_archived = 0 WHERE case_id = ?', [id], (uErr, uResult) => {
+                if (uErr) return res.status(500).json({ error: uErr.message });
+                const rid = req.user ? req.user.user_id : (req.body.user_id || null);
+                const rname = req.user ? req.user.name : (req.body.user_name || 'CHO');
+                const brgy = req.user ? req.user.barangay : (req.body.barangay || null);
+                createAuditLog(rid, rname, req.user ? req.user.role : 'CHO', null, brgy, 'Restored', 'Case Record',
+                    `Restored archived case #${id} for ${results[0].patient_name}`);
+                return res.status(200).json({ message: 'Case restored successfully.' });
+            });
+        }
+    );
 });
 
 // ROUTE: Delete a user account
 app.delete('/api/users/:id', authenticate, requireRole('CHO'), (req, res) => {
     const { id } = req.params;
-    db.query('DELETE FROM users WHERE user_id = ?', [id], (err, result) => {
+    const callerId = req.user ? req.user.user_id : null;
+    if (callerId && Number(id) === Number(callerId)) {
+        return res.status(400).json({ error: 'You cannot archive your own account.' });
+    }
+    // Soft archive instead of permanent delete — the account stays in the DB
+    db.query('UPDATE users SET is_archived = 1 WHERE user_id = ?', [id], (err, result) => {
         if (err) {
-            console.error("Delete user error:", err.message);
+            console.error("Archive user error:", err.message);
             return res.status(500).json({ error: 'Something went wrong. Please try again.' });
         }
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: 'User not found.' });
         }
-        console.log(`User ${id} deleted.`);
-        createAuditLog(id, 'CHO Admin', 'CHO', null, null, 'Deleted', 'User Account', `Deleted user account ID ${id}`);
-        res.status(200).json({ message: 'User deleted successfully.' });
+        const writeAudit = (admin) => {
+            const adminName = admin ? admin.full_name : 'CHO Admin';
+            const adminRole = admin ? admin.role : 'CHO';
+            const choUnit = admin ? (admin.role === 'CHO' ? 'CHO Unit I' : null) : null;
+            const barangay = admin ? admin.barangay : null;
+            const fullName = admin ? admin.archivedName : `User ID ${id}`;
+            createAuditLog(callerId, adminName, adminRole, choUnit, barangay, 'Archived', 'User Account', `Archived account for ${fullName} (User ID: ${id})`);
+        };
+        db.query(
+            'SELECT u.full_name AS archivedName, a.full_name, a.role, b.name AS barangay FROM users u LEFT JOIN users a ON a.user_id = ? LEFT JOIN barangays b ON a.assigned_barangay_id = b.id WHERE u.user_id = ?',
+            [callerId, id], (aErr, aRes) => {
+                writeAudit((aRes && aRes[0]) ? aRes[0] : null);
+            });
+        console.log(`User ${id} archived.`);
+        res.status(200).json({ message: 'User account archived successfully.' });
+    });
+});
+
+// ROUTE: Restore an archived user account
+app.put('/api/users/:id/restore', authenticate, requireRole('CHO'), (req, res) => {
+    const { id } = req.params;
+    db.query('UPDATE users SET is_archived = 0 WHERE user_id = ?', [id], (err, result) => {
+        if (err) {
+            console.error("Restore user error:", err.message);
+            return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+        }
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+        createAuditLog(id, 'CHO Admin', 'CHO', null, null, 'Restored', 'User Account', `Restored user account ID ${id}`);
+        res.status(200).json({ message: 'User account restored successfully.' });
     });
 });
 
@@ -2684,6 +2885,7 @@ app.post('/api/login', (req, res) => {
         WHERE (u.username = ? OR u.email = ?)
         AND u.role = ?
         AND u.is_active = 1
+        AND u.is_archived = 0
     `;
 
     db.query(query, [email, email, role], (err, results) => {
@@ -2792,11 +2994,15 @@ app.post('/api/login', (req, res) => {
             user.user_id
         ]);
 
-        createAuditLog(user.user_id, user.full_name, user.role, null, user.assigned_barangay_name, 'Logged In', 'System', `Login from ${device || 'Unknown Device'} at ${location || 'Unknown Location'}`);
+        if (!user.two_fa_enabled) {
+            createAuditLog(user.user_id, user.full_name, user.role, user.cho_unit || null, user.assigned_barangay_name, 'Logged In', 'System', `Login from ${device || 'Unknown Device'} at ${location || 'Unknown Location'} on ${phTimestamp()}`);
+        }
 
         return res.status(200).json({
             message: 'Success',
             requires2FA: !!user.two_fa_enabled,
+            mustChangePassword: !!user.must_change_password,
+            isGeneratorPassword: !!(user.initial_password),
             token: user.two_fa_enabled ? null : signToken(user),
             user: {
                 id: user.user_id,
@@ -2808,10 +3014,22 @@ app.post('/api/login', (req, res) => {
     });
 });
 
-// ROUTE: Log out (audit trail)
-app.post('/api/logout', (req, res) => {
-    const { userId, userName, userRole, barangay } = req.body;
-    createAuditLog(userId || null, userName || 'Unknown', userRole || 'System', null, barangay || null, 'Logged Out', 'System', `Logout at ${new Date().toISOString()}`);
+// ROUTE: Log out (audit trail) — identity derived from the JWT, not client-supplied body
+app.post('/api/logout', authenticate, (req, res) => {
+    const userId = req.user ? req.user.user_id : null;
+    const userName = req.user ? req.user.name : 'Unknown';
+    const userRole = req.user ? req.user.role : 'System';
+    const barangay = req.user ? req.user.barangay : null;
+    const writeLogoutAudit = (choUnit) => {
+        createAuditLog(userId, userName, userRole, choUnit, barangay, 'Logged Out', 'System', `Logout at ${phTimestamp()}`);
+    };
+    if (userId) {
+        db.query('SELECT cho_unit FROM users WHERE user_id = ?', [userId], (err, rows) => {
+            writeLogoutAudit((!err && rows && rows[0]) ? rows[0].cho_unit : null);
+        });
+    } else {
+        writeLogoutAudit(null);
+    }
     res.json({ ok: true });
 });
 
@@ -2819,6 +3037,11 @@ app.post('/api/logout', (req, res) => {
 app.post('/api/register', (req, res) => {
     const { name, username: bodyUsername, email, mobile, password, role, context } = req.body;
     const enforcedRole = 'BHW'; // Public self-registration is BHW-only. CHO accounts must be created via User Management by an existing CHO admin.
+
+    const pwErrors = validatePasswordStrength(password);
+    if (pwErrors.length > 0) {
+      return res.status(400).json({ message: pwErrors.join(' ') });
+    }
 
     console.log("--- Registration Request ---", { name, email, role: enforcedRole, context });
 
@@ -2944,6 +3167,22 @@ app.post('/api/sync', authenticate, (req, res) => {
                         if (p._offlineUserId) {
                             createAuditLog(p._offlineUserId, p._offlineUserName || 'Offline User', null, null, null, 'Synced Case (Offline)', 'Disease Case', `Offline case synced: ${p.patient_name} — ${p.disease_name}`);
                         }
+                        // Mirror the online POST /api/cases notifications for synced offline creates
+                        db.query(`
+                            SELECT dc.patient_name, d.name AS disease_name, b.name AS barangay_name, dc.barangay_id, dc.severity, dc.status
+                            FROM disease_cases dc
+                            LEFT JOIN diseases d ON dc.disease_id = d.id
+                            LEFT JOIN barangays b ON dc.barangay_id = b.id
+                            WHERE dc.case_id = ?
+                        `, [result.insertId], (nErr, nRows) => {
+                            if (!nErr && nRows && nRows.length > 0) {
+                                const info = nRows[0];
+                                const title = 'New Case Reported';
+                                const message = `A new case of ${info.disease_name} (${info.severity}) has been reported for ${info.patient_name} in Barangay ${info.barangay_name || 'N/A'}.`;
+                                createNotificationForUsers(title, message, 'info', 'ManageCases', info.barangay_id, 'new_case_reported', null, result.insertId);
+                                checkAndAlertHighRisk(info.barangay_id, info.barangay_name);
+                            }
+                        });
                     }
                     processNext(index + 1);
                 });
@@ -2984,6 +3223,22 @@ app.post('/api/sync', authenticate, (req, res) => {
                         if (p._offlineUserId) {
                             createAuditLog(p._offlineUserId, p._offlineUserName || 'Offline User', null, null, null, 'Synced Edit (Offline)', 'Disease Case', `Offline edit synced for case #${caseId}`);
                         }
+                        // Mirror the online PUT /api/cases/:id notifications for synced offline edits
+                        db.query(`
+                            SELECT dc.patient_name, d.name AS disease_name, b.name AS barangay_name, dc.barangay_id, dc.status
+                            FROM disease_cases dc
+                            LEFT JOIN diseases d ON dc.disease_id = d.id
+                            LEFT JOIN barangays b ON dc.barangay_id = b.id
+                            WHERE dc.case_id = ?
+                        `, [caseId], (nErr, nRows) => {
+                            if (!nErr && nRows && nRows.length > 0) {
+                                const info = nRows[0];
+                                const title = 'Case Status Updated';
+                                const message = `The case status for ${info.patient_name} (${info.disease_name}) in Barangay ${info.barangay_name || 'N/A'} has been changed to ${info.status}.`;
+                                createNotificationForUsers(title, message, 'info', 'ManageCases', info.barangay_id, 'case_status_updated', null, caseId);
+                                checkAndAlertHighRisk(info.barangay_id, info.barangay_name);
+                            }
+                        });
                     }
                     processNext(index + 1);
                 });
@@ -3018,17 +3273,31 @@ app.post('/api/sync', authenticate, (req, res) => {
             );
         } else if (type === 'delete' && endpoint && endpoint.startsWith('/api/cases/')) {
             const caseId = endpoint.split('/').pop();
-            db.query('DELETE FROM disease_cases WHERE case_id = ?', [caseId], (err) => {
-                if (err) {
-                    results.push({ type, error: err.message });
-                } else {
-                    processed++;
-                    results.push({ type, caseId });
-                    if (payload && payload._offlineUserId) {
-                        createAuditLog(payload._offlineUserId, payload._offlineUserName || 'Offline User', null, null, null, 'Synced Delete (Offline)', 'Disease Case', `Offline delete synced for case #${caseId}`);
+            // Soft archive instead of permanent delete — the record stays in the DB
+            // so the patient can be found again if they resurface in the future.
+            db.query(`SELECT dc.patient_name, d.name AS disease_name, b.name AS barangay_name, dc.barangay_id
+                      FROM disease_cases dc
+                      LEFT JOIN diseases d ON dc.disease_id = d.id
+                      LEFT JOIN barangays b ON dc.barangay_id = b.id
+                      WHERE dc.case_id = ?`, [caseId], (cErr, cRows) => {
+                const cInfo = (!cErr && cRows && cRows.length > 0) ? cRows[0] : null;
+                db.query('UPDATE disease_cases SET is_archived = 1 WHERE case_id = ?', [caseId], (err) => {
+                    if (err) {
+                        results.push({ type, error: err.message });
+                    } else {
+                        processed++;
+                        results.push({ type, caseId });
+                        if (payload && payload._offlineUserId) {
+                            createAuditLog(payload._offlineUserId, payload._offlineUserName || 'Offline User', null, null, null, 'Synced Archive (Offline)', 'Disease Case', `Offline archive synced for case #${caseId}`);
+                        }
+                        if (cInfo) {
+                            const title = 'Case Archived';
+                            const message = `Case for ${cInfo.patient_name} (${cInfo.disease_name}) in Barangay ${cInfo.barangay_name || 'N/A'} has been archived.`;
+                            createNotificationForUsers(title, message, 'delete', 'ManageCases', cInfo.barangay_id, 'delete');
+                        }
                     }
-                }
-                processNext(index + 1);
+                    processNext(index + 1);
+                });
             });
         } else if (type === 'message' && endpoint === '/api/contact-messages') {
             const p = payload || {};
@@ -3379,8 +3648,14 @@ app.post('/api/users', authenticate, requireRole('CHO'), async (req, res) => {
     let tempPasswordGenerated = null;
 
     if (generateTempPassword || !password) {
-        tempPasswordGenerated = crypto.randomBytes(6).toString('hex');
+        tempPasswordGenerated = generateStrongTempPassword();
         finalPassword = tempPasswordGenerated;
+    } else {
+        const denyTokens = [firstName, lastName, role === 'CHO' ? 'CHO' : 'BHW'];
+        const pwErrors = validatePasswordStrength(password, denyTokens);
+        if (pwErrors.length > 0) {
+            return res.status(400).json({ error: pwErrors.join(' ') });
+        }
     }
 
     // Check for duplicates before inserting
@@ -3410,8 +3685,8 @@ app.post('/api/users', authenticate, requireRole('CHO'), async (req, res) => {
     }
 
     const insertQuery = `
-        INSERT INTO users (username, full_name, email, mobile_number, password, initial_password, role, assigned_barangay_id, is_active)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO users (username, full_name, email, mobile_number, password, initial_password, role, assigned_barangay_id, is_active, must_change_password)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
     `;
 
     const hashedFinal = bcrypt.hashSync(finalPassword, 10);
@@ -3442,9 +3717,10 @@ app.post('/api/users', authenticate, requireRole('CHO'), async (req, res) => {
     });
 });
 
-// ROUTE: Send 2FA verification email — generates a real token now
-app.post('/api/send-2fa-email', (req, res) => {
-    const { userId } = req.body;
+// ROUTE: Send 2FA verification email — generates a real token now. Self-service only (uses JWT identity).
+app.post('/api/send-2fa-email', authenticate, (req, res) => {
+    const userId = req.user ? req.user.user_id : null;
+    if (!userId) return res.status(401).json({ error: 'Not authenticated.' });
     db.query('SELECT email, full_name FROM users WHERE user_id = ?', [userId], (err, results) => {
         if (err || results.length === 0) return res.status(404).json({ error: 'User not found.' });
         const user = results[0];
@@ -3507,9 +3783,10 @@ app.post('/api/verify-2fa-token', (req, res) => {
     });
 });
 
-// ROUTE: Disable 2FA
+// ROUTE: Disable 2FA — operates on the authenticated user's own account (IDOR-safe)
 app.post('/api/disable-2fa', authenticate, (req, res) => {
-    const { userId } = req.body;
+    const userId = req.user ? req.user.user_id : null;
+    if (!userId) return res.status(401).json({ error: 'Not authenticated.' });
     db.query('UPDATE users SET two_fa_enabled = 0, two_fa_token = NULL, two_fa_token_expiry = NULL WHERE user_id = ?',
         [userId], (err) => {
         if (err) return res.status(500).json({ error: 'Failed to disable 2FA.' });
@@ -3520,6 +3797,14 @@ app.post('/api/disable-2fa', authenticate, (req, res) => {
 // ROUTE: Send login OTP (called after password is verified, only if 2FA is enabled)
 app.post('/api/send-login-otp', (req, res) => {
     const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'User id required.' });
+
+    const ip = req.headers['x-forwarded-for'] ? String(req.headers['x-forwarded-for']).split(',')[0].trim() : (req.socket && req.socket.remoteAddress) || 'unknown';
+    const throttle = simpleRateLimit(`otp:${userId}:${ip}`, 5, 60000);
+    if (!throttle.allowed) {
+        return res.status(429).json({ error: 'Too many code requests. Please wait before trying again.' });
+    }
+
     db.query('SELECT email, full_name FROM users WHERE user_id = ?', [userId], (err, results) => {
         if (err || results.length === 0) return res.status(404).json({ error: 'User not found.' });
         const user = results[0];
@@ -3527,7 +3812,8 @@ app.post('/api/send-login-otp', (req, res) => {
         const otp = crypto.randomInt(100000, 1000000).toString();
         const expiry = new Date(Date.now() + 600000); // 10 minutes
 
-        db.query('UPDATE users SET login_otp = ?, login_otp_expiry = ?, login_otp_attempts = 0 WHERE user_id = ?',
+        // Do NOT reset login_otp_attempts here — the attempt guard must persist across resends
+        db.query('UPDATE users SET login_otp = ?, login_otp_expiry = ? WHERE user_id = ?',
             [otp, expiry, userId], async (updateErr) => {
             if (updateErr) return res.status(500).json({ error: 'Failed to generate code.' });
 
@@ -3558,8 +3844,10 @@ app.post('/api/verify-login-otp', (req, res) => {
     const { userId, otp } = req.body;
 
     const query = `
-        SELECT * FROM users
-        WHERE user_id = ? AND login_otp = ? AND login_otp_expiry > NOW()
+        SELECT u.*, b.name AS assigned_barangay_name
+        FROM users u
+        LEFT JOIN barangays b ON u.assigned_barangay_id = b.id
+        WHERE u.user_id = ? AND u.login_otp = ? AND u.login_otp_expiry > NOW() AND u.is_active = 1 AND u.is_archived = 0
     `;
     db.query(query, [userId, otp], (err, results) => {
         if (err) return res.status(500).json({ error: 'Database error.' });
@@ -3582,13 +3870,20 @@ app.post('/api/verify-login-otp', (req, res) => {
         db.query('UPDATE users SET login_otp = NULL, login_otp_expiry = NULL, login_otp_attempts = 0 WHERE user_id = ?', [userId]);
 
         const user = results[0];
+
+        db.query('UPDATE users SET login_otp = NULL, login_otp_expiry = NULL, login_otp_attempts = 0 WHERE user_id = ?', [userId]);
+        createAuditLog(user.user_id, user.full_name, user.role, user.cho_unit || null, user.assigned_barangay_name || null, 'Logged In (2FA)', 'System', `Login completed via two-factor authentication on ${phTimestamp()}`);
+
         return res.status(200).json({
             message: 'Login verified.',
             token: signToken(user),
+            mustChangePassword: !!user.must_change_password,
+            isGeneratorPassword: !!(user.initial_password),
             user: {
                 id: user.user_id,
                 name: user.full_name,
                 role: user.role,
+                barangay: user.assigned_barangay_name || null
             }
         });
     });

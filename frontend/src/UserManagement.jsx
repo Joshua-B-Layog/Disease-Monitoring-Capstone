@@ -40,13 +40,28 @@ const getChoUnit = (barangayName) => {
 
 const USERS_PER_PAGE = 10;
 
+const getUserPasswordErrors = (pw, firstName, lastName, role) => {
+  const errors = [];
+  const value = String(pw || '');
+  if (value.length < 8) errors.push('Password must be at least 8 characters.');
+  if (!/[A-Z]/.test(value)) errors.push('Password must include an uppercase letter.');
+  if (!/[a-z]/.test(value)) errors.push('Password must include a lowercase letter.');
+  if (!/[0-9]/.test(value)) errors.push('Password must include a number.');
+  if (!/[^A-Za-z0-9]/.test(value)) errors.push('Password must include a special character (e.g. !@#$%).');
+  const deny = [firstName, lastName, role === 'CHO' ? 'CHO' : 'BHW']
+    .filter(t => String(t || '').trim().length >= 2);
+  const hit = deny.some(t => value.toLowerCase().includes(String(t).toLowerCase().trim()));
+  if (hit) errors.push('Password must not contain your name or role designation.');
+  return errors;
+};
+
 const EMPTY_FORM = {
   firstName: '', lastName: '', username: '', email: '', mobile: '',
   barangayId: '', isActive: true, password: '', generateTempPassword: true,
   role: 'BHW',
 };
 
-export default function UserManagement({ confirmDelete, fontScale, compactMode, dateFormat, loggedUserId, loginRole, setActiveTab }) {
+export default function UserManagement({ confirmDelete, fontScale, compactMode, dateFormat, loggedUserId, loginRole, sessionContext, setActiveTab }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [barangayList, setBarangayList] = useState([]);
@@ -56,6 +71,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
   const [filterBarangay, setFilterBarangay] = useState('All Barangays');
   const [filterStatus, setFilterStatus] = useState('All Status');
   const [filterRole, setFilterRole] = useState('All Roles');
+  const [showArchived, setShowArchived] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [ellipsisOpen, setEllipsisOpen] = useState(false);
   const [ellipsisPageInput, setEllipsisPageInput] = useState('');
@@ -104,9 +120,10 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
     return `${m}/${day}/${yy} ${h12}:${min} ${ampm}`;
   };
 
-  const fetchUsers = () => {
+  const fetchUsers = (includeArchived = false) => {
     setLoading(true);
-    axios.get(API_URL + '/api/users')
+    const url = API_URL + '/api/users' + (includeArchived ? '?include_archived=true' : '');
+    axios.get(url)
       .then(res => { setUsers(res.data); setLoading(false); setOfflineMode(false); cacheUsers(res.data).catch(() => {}); })
       .catch(async () => {
         const cached = await getCachedUsers();
@@ -161,6 +178,8 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
   }, [showModal, deleteTarget]);
 
   const filteredUsers = users.filter(u => {
+    const isArchived = u.is_archived === 1;
+    if (showArchived !== isArchived) return false;
     const q = searchQuery.toLowerCase();
     const matchesSearch = !q ||
       (u.full_name || '').toLowerCase().includes(q) ||
@@ -304,6 +323,19 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
     }
     setFormErrors({});
 
+    // Client-side password policy (same rules as BHW sign-up + name/role exclusion)
+    const hasCustomPw = editingUser
+      ? Boolean(formData.password.trim())
+      : !formData.generateTempPassword && Boolean(formData.password.trim());
+    if (hasCustomPw) {
+      const pwErrors = getUserPasswordErrors(formData.password, formData.firstName, formData.lastName, formData.role);
+      if (pwErrors.length > 0) {
+        setSubmitMsg('Error: ' + pwErrors.join(' '));
+        setSubmitLoading(false);
+        return;
+      }
+    }
+
     const payload = {
       firstName: formData.firstName,
       lastName: formData.lastName,
@@ -370,7 +402,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
         setDeleteTarget(null);
       }
     } catch (err) {
-      setSubmitMsg('Delete failed: ' + (err.response?.data?.error || err.message));
+      setSubmitMsg('Archive failed: ' + (err.response?.data?.error || err.message));
       setTimeout(() => setSubmitMsg(''), 3000);
     } finally {
       setDeleteLoading(false);
@@ -380,7 +412,26 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
   const unitIBarangays = useMemo(() => barangayList.filter(b => getChoUnit(b.name) === 'CHO Unit I'), [barangayList]);
   const unitIIBarangays = useMemo(() => barangayList.filter(b => getChoUnit(b.name) === 'CHO Unit II'), [barangayList]);
   const allBarangayAssignOptions = useMemo(() => [...unitIBarangays, ...unitIIBarangays], [unitIBarangays, unitIIBarangays]);
-  const visibleBarangayAssignOptions = showAllBarangayAssign ? allBarangayAssignOptions : allBarangayAssignOptions.slice(0, 5);
+
+  const choUnitKey = useMemo(() => {
+    if (!sessionContext) return null;
+    const n = normalize(sessionContext);
+    for (const unit of Object.keys(CHO_BARANGAYS)) {
+      if (normalize(unit) === n) return unit;
+    }
+    return null;
+  }, [sessionContext]);
+
+  const scopedAssignOptions = useMemo(() => {
+    if (choUnitKey && formData.role === 'BHW') {
+      return allBarangayAssignOptions.filter(b =>
+        CHO_BARANGAYS[choUnitKey].some(ab => normalize(ab) === normalize(b.name))
+      );
+    }
+    return allBarangayAssignOptions;
+  }, [choUnitKey, formData.role, allBarangayAssignOptions]);
+
+  const visibleBarangayAssignOptions = showAllBarangayAssign ? scopedAssignOptions : scopedAssignOptions.slice(0, 5);
 
   const inputStyle = {
     width: '100%', padding: '10px 12px', borderRadius: '8px',
@@ -511,9 +562,21 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
               </div>
             )}
           </div>
+          <button type="button"
+            onClick={() => {
+              const next = !showArchived;
+              setShowArchived(next);
+              setCurrentPage(1);
+              setSelectedIds([]);
+              fetchUsers(next);
+            }}
+            disabled={offlineMode}
+            style={{ padding: '8px 14px', background: showArchived ? 'rgba(18,19,88,0.15)' : 'transparent', border: `1px solid ${showArchived ? '#121358' : 'var(--border-color)'}`, color: showArchived ? '#121358' : 'var(--text-muted)', borderRadius: '6px', cursor: offlineMode ? 'not-allowed' : 'pointer', fontWeight: '600', fontSize: '15px', opacity: offlineMode ? 0.4 : 1, whiteSpace: 'nowrap' }}>
+            {showArchived ? '← Back to Active Accounts' : '🗄️ Show Archived Accounts'}
+          </button>
           {selectedIds.length > 0 && (
             <>
-              {selectedIds.length < paginatedUsers.length && (
+              {selectedIds.length < paginatedUsers.length && !showArchived && (
               <button onClick={() => {
                 setEditQueueIndex(0);
                 openEdit(users.find(u => u.user_id === selectedIds[0]));
@@ -525,6 +588,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                 Edit Selected ({selectedIds.length})
               </button>
               )}
+              {!showArchived && (
               <button onClick={() => {
                 setBulkDeleteMode(true);
                 setDeleteTarget({ user_id: null, full_name: `${selectedIds.length} accounts`, barangay_name: '' });
@@ -533,8 +597,9 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                 onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                 onMouseLeave={e => e.currentTarget.style.opacity = '1'}
                 style={{ padding: '8px 16px', background: 'transparent', border: '1px solid #ef4444', color: '#ef4444', borderRadius: '6px', cursor: offlineMode ? 'not-allowed' : 'pointer', fontWeight: '500', fontSize: '15px', opacity: offlineMode ? 0.4 : 1 }}>
-                Delete Selected ({selectedIds.length})
+                Archive Selected ({selectedIds.length})
               </button>
+              )}
             </>
           )}
           <button onClick={openAdd}
@@ -580,13 +645,22 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                     <td style={{ padding: compactMode ? '8px 6px' : '15px 10px' }}>{user.barangay_name || '—'}</td>
                     <td style={{ padding: compactMode ? '8px 6px' : '15px 10px' }}>{user.role}</td>
                     <td style={{ padding: compactMode ? '8px 6px' : '15px 10px' }}>
-                      <span style={{
-                        padding: '4px 12px', borderRadius: '20px', fontSize: '15px', fontWeight: '500',
-                        background: user.is_active ? '#121358' : 'var(--input-bg)',
-                        color: user.is_active ? '#93c5fd' : 'var(--text-muted)'
-                      }}>
-                        {user.is_active ? 'Active' : 'Inactive'}
-                      </span>
+                      {user.is_archived === 1 ? (
+                        <span style={{
+                          padding: '4px 12px', borderRadius: '20px', fontSize: '15px', fontWeight: '500',
+                          background: '#fef3c7', color: '#d97706'
+                        }}>
+                          Archived
+                        </span>
+                      ) : (
+                        <span style={{
+                          padding: '4px 12px', borderRadius: '20px', fontSize: '15px', fontWeight: '500',
+                          background: user.is_active ? '#121358' : 'var(--input-bg)',
+                          color: user.is_active ? '#93c5fd' : 'var(--text-muted)'
+                        }}>
+                          {user.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      )}
                     </td>
                     <td style={{ padding: compactMode ? '8px 6px' : '15px 10px', color: 'var(--text-muted)', fontSize: '15px' }}>
                       {formatDate(user.last_login)}
@@ -600,21 +674,35 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                           style={{ padding: '6px 10px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', borderRadius: '6px', cursor: offlineMode ? 'not-allowed' : 'pointer', opacity: offlineMode ? 0.4 : 1 }}>
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                         </button>
-                        <button onClick={() => {
-                              if (confirmDelete) {
-                                setDeleteTarget(user);
-                              } else {
-                                axios.delete(`${API_URL}/api/users/${user.user_id}`)
-                                  .then(() => fetchUsers())
-                                  .catch(err => { setSubmitMsg('Delete failed: ' + (err.response?.data?.error || err.message)); setTimeout(() => setSubmitMsg(''), 3000); });
-                              }
-                            }} title="Delete"
-                          disabled={offlineMode}
-                          onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
-                          onMouseLeave={e => e.currentTarget.style.opacity = '1'}
-                          style={{ padding: '6px 10px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', borderRadius: '6px', cursor: offlineMode ? 'not-allowed' : 'pointer', opacity: offlineMode ? 0.4 : 1 }}>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
-                        </button>
+                        {user.is_archived === 1 ? (
+                          <button onClick={() => {
+                            axios.put(`${API_URL}/api/users/${user.user_id}/restore`)
+                              .then(() => { setSubmitMsg('User account restored successfully!'); setTimeout(() => setSubmitMsg(''), 3000); fetchUsers(true); })
+                              .catch(err => { setSubmitMsg('Restore failed: ' + (err.response?.data?.error || err.message)); setTimeout(() => setSubmitMsg(''), 3000); });
+                          }} title="Restore"
+                            disabled={offlineMode}
+                            onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+                            onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                            style={{ padding: '6px 10px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', borderRadius: '6px', cursor: offlineMode ? 'not-allowed' : 'pointer', opacity: offlineMode ? 0.4 : 1 }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#129968" strokeWidth="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                          </button>
+                        ) : (
+                          <button onClick={() => {
+                                if (confirmDelete) {
+                                  setDeleteTarget(user);
+                                } else {
+                                  axios.delete(`${API_URL}/api/users/${user.user_id}`)
+                                    .then(() => fetchUsers())
+                                    .catch(err => { setSubmitMsg('Archive failed: ' + (err.response?.data?.error || err.message)); setTimeout(() => setSubmitMsg(''), 3000); });
+                                }
+                              }} title="Archive"
+                            disabled={offlineMode}
+                            onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+                            onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                            style={{ padding: '6px 10px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', borderRadius: '6px', cursor: offlineMode ? 'not-allowed' : 'pointer', opacity: offlineMode ? 0.4 : 1 }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -770,10 +858,10 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                               {b.name}
                             </div>
                           ))}
-                          {!showAllBarangayAssign && allBarangayAssignOptions.length > 5 && (
+                           {!showAllBarangayAssign && scopedAssignOptions.length > 5 && (
                             <div onClick={() => setShowAllBarangayAssign(true)}
                               style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '15px', color: '#3B82F6', fontWeight: '600', borderTop: '1px solid var(--border-color)', textAlign: 'center' }}>
-                              Show all {allBarangayAssignOptions.length} barangays
+                              Show all {scopedAssignOptions.length} barangays
                             </div>
                           )}
                         </div>
@@ -866,11 +954,11 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                 <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
               </svg>
             </div>
-            <h3 style={{ margin: '0 0 8px 0', fontSize: '22px', fontWeight: '700', color: 'var(--text-h)' }}>Are you sure?</h3>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: '22px', fontWeight: '700', color: 'var(--text-h)' }}>Archive this account?</h3>
             <p style={{ margin: '0 0 20px 0', color: 'var(--text-muted)', fontSize: '15px', lineHeight: '1.6' }}>
-              This action cannot be undone.<br />{bulkDeleteMode
-                ? `This will permanently delete ${selectedIds.length} accounts. Are you sure?`
-                : 'This will permanently delete the account of:'}
+              This cannot be undone. The account will be hidden and will no longer be able to log in.<br />{bulkDeleteMode
+                ? `This will archive ${selectedIds.length} accounts. Are you sure?`
+                : 'This will archive the account of:'}
             </p>
             {!bulkDeleteMode && (
             <div style={{ background: 'var(--input-bg)', borderLeft: '4px solid #ef4444', borderRadius: '6px', padding: '14px 18px', marginBottom: '20px', textAlign: 'left' }}>
@@ -883,7 +971,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
             </div>
             )}
             <p style={{ color: 'var(--text-muted)', fontSize: '15px', margin: '0 0 28px 0' }}>
-              All associated case records will remain but show as "System" for audit purposes.
+              You can restore this account from the Archived Accounts view at any time.
             </p>
             <div style={{ display: 'flex', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
               <button onClick={() => { setDeleteTarget(null); setBulkDeleteMode(false); }} disabled={deleteLoading}
@@ -892,7 +980,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
               </button>
               <button onClick={executeDelete} disabled={deleteLoading}
                 style={{ flex: 1, padding: '14px', background: '#ef4444', border: 'none', cursor: deleteLoading ? 'not-allowed' : 'pointer', fontSize: '16px', fontWeight: '600', color: '#fff' }}>
-                {deleteLoading ? 'Deleting...' : 'Delete'}
+                {deleteLoading ? 'Archiving...' : 'Archive'}
               </button>
             </div>
           </div>
