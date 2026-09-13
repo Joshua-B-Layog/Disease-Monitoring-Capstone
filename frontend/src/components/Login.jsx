@@ -461,7 +461,9 @@ function AnimatedMapView({ setFade, active, onSequenceComplete }) {
                 username: email,
                 name: data.user.name,
                 barangay: data.user.barangay,
-                token: data.token || null
+                token: data.token || null,
+                device: device,
+                location: location
             };
 
             // Cache user credentials for offline login
@@ -532,7 +534,7 @@ const handleLoginOtpSubmit = async (e) => {
         const response = await fetch(API_URL + '/api/verify-login-otp', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: pendingUser.id, otp: loginOtp })
+            body: JSON.stringify({ userId: pendingUser.id, otp: loginOtp, device: pendingUser.device, location: pendingUser.location })
         });
         const data = await response.json();
         if (response.ok) {

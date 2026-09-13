@@ -3,6 +3,8 @@ import axios from 'axios';
 import * as XLSX from 'xlsx';
 import { API_URL } from './config';
 import { cacheCases, getCachedCases, cacheAuditLogs, getCachedAuditLogs, cacheGeneratedReports, getCachedGeneratedReports } from './offlineSync';
+import { formatDate, formatDateTime } from './formatDate';
+import DatePicker from './components/DatePicker';
 
 // ── CHO Unit → Barangay mapping ──
 const CHO_BARANGAYS = {
@@ -120,7 +122,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
         const mapped = res.data.map(r => ({
           id: r.id,
           title: r.title,
-          timestamp: `Generated ${new Date(r.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`,
+          timestamp: `Generated ${formatDateTime(r.created_at, dateFormat)}`,
           period: r.period,
           entity: r.entity,
           details: r.details,
@@ -246,7 +248,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
   const handleDownloadCSV = (report) => {
     const headers = 'Timestamp,User ID,Name,Action,Entity,Details\n';
     const logRows = (report.snapshotLogs || []).map(l =>
-      `"${l.created_at ? new Date(l.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}","${l.user_id || ''}","${l.user_name || ''}","${l.action}","${l.entity}","${l.details}"`
+      `"${l.created_at ? formatDateTime(l.created_at, dateFormat) : ''}","${l.user_id || ''}","${l.user_name || ''}","${l.action}","${l.entity}","${l.details}"`
     ).join('\n');
     const blob = new Blob([headers + logRows], { type: 'text/csv;charset=utf-8;' });
     const url  = URL.createObjectURL(blob);
@@ -257,7 +259,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
 
   const handleDownloadWord = (report) => {
     const rows = (report.snapshotLogs || []).map(l =>
-      `<tr><td>${l.created_at ? new Date(l.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</td><td>${l.user_id || ''}</td><td>${l.user_name || ''}</td><td>${l.action}</td><td>${l.entity}</td><td>${l.details}</td></tr>`
+      `<tr><td>${l.created_at ? formatDateTime(l.created_at, dateFormat) : ''}</td><td>${l.user_id || ''}</td><td>${l.user_name || ''}</td><td>${l.action}</td><td>${l.entity}</td><td>${l.details}</td></tr>`
     ).join('');
     const letterhead = buildReportLetterhead(report.title, `${report.period} | ${report.entity} | ${report.timestamp}`);
     const footer = buildReportFooter();
@@ -285,7 +287,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
 
   const handleDownloadPDF = (report) => {
     const rows = (report.snapshotLogs || []).map(l =>
-      `<tr><td>${l.created_at ? new Date(l.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</td><td>${l.user_id || ''}</td><td>${l.user_name || ''}</td><td>${l.action}</td><td>${l.entity}</td><td>${l.details}</td></tr>`
+      `<tr><td>${l.created_at ? formatDateTime(l.created_at, dateFormat) : ''}</td><td>${l.user_id || ''}</td><td>${l.user_name || ''}</td><td>${l.action}</td><td>${l.entity}</td><td>${l.details}</td></tr>`
     ).join('');
     const letterhead = buildReportLetterhead(report.title, `${report.period} | ${report.entity} | ${report.timestamp}`);
     const footer = buildReportFooter();
@@ -328,7 +330,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
     const metaSheet = XLSX.utils.aoa_to_sheet(metaRows);
     XLSX.utils.book_append_sheet(wb, metaSheet, 'Summary');
     const logData = (report.snapshotLogs || []).map(l => ({
-      'Timestamp': l.created_at ? new Date(l.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '',
+      'Timestamp': l.created_at ? formatDateTime(l.created_at, dateFormat) : '',
       'User ID': l.user_id || '',
       'Name': l.user_name || '',
       'Action': l.action,
@@ -344,7 +346,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
   // ── Audit log export (PDF / Excel / CSV) ──
   const handleAuditExport = (format) => {
     const rows = filteredAuditLogs.map(l => ({
-      'Timestamp': l.created_at ? new Date(l.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '',
+      'Timestamp': l.created_at ? formatDateTime(l.created_at, dateFormat) : '',
       'User ID': l.user_id || '',
       'Name': l.user_name || '',
       'Role': l.user_role === 'CHO' ? 'CHO Admin' : 'BHW',
@@ -367,7 +369,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
     } else {
       const headRow = `<tr>${Object.keys(rows[0] || {}).map(k => `<th>${k}</th>`).join('')}</tr>`;
       const bodyRows = rows.map(r => `<tr>${Object.values(r).map(v => `<td>${String(v ?? '')}</td>`).join('')}</tr>`).join('');
-      const letterhead = buildReportLetterhead('Cabuyao CDMS - Audit Log Export', `${rows.length} entries | Generated ${new Date().toLocaleString('en-PH')}`);
+      const letterhead = buildReportLetterhead('Cabuyao CDMS - Audit Log Export', `${rows.length} entries | Generated ${formatDateTime(new Date(), dateFormat)}`);
       const footer = buildReportFooter();
       const htmlStr = `<html><head><meta charset="utf-8"><title>Audit Logs</title>
       <style>body{font-family:Arial,sans-serif;padding:32px;font-size:12px;color:#111;}table{width:100%;border-collapse:collapse;}th{background:#1e3a8a;color:white;padding:8px;text-align:left;font-size:11px;}td{padding:7px;border-bottom:1px solid #e5e7eb;font-size:11px;}tr:nth-child(even) td{background:#f9fafb;}</style></head><body>
@@ -601,18 +603,6 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
   const DAY_NAMES    = ['Su','Mo','Tu','We','Th','Fr','Sa'];
   const getDaysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
   const getFirstDay    = (y, m) => new Date(y, m, 1).getDay();
-  const formatDate = (d) => {
-    if (!d) return '';
-    const dt = new Date(d);
-    if (isNaN(dt)) return '';
-    const m = String(dt.getMonth() + 1).padStart(2, '0');
-    const day = String(dt.getDate()).padStart(2, '0');
-    const y = String(dt.getFullYear());
-    const yy = y.slice(2);
-    if (dateFormat === 'DD/MM/YY') return `${day}/${m}/${yy}`;
-    if (dateFormat === 'YYYY-MM-DD') return `${y}-${m}-${day}`;
-    return `${m}/${day}/${yy}`;
-  };
 
   const handleCalendarDay = (day) => {
     const clicked = new Date(calYear, calMonth, day);
@@ -780,7 +770,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                 <tbody>
                   {(viewReport.snapshotLogs || []).slice(...(modalShowAll ? [(modalPage - 1) * ITEMS_PER_PAGE, modalPage * ITEMS_PER_PAGE] : [0, 10])).map(l => (
                     <tr key={l.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                        <td style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{l.created_at ? new Date(l.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</td>
+                        <td style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{l.created_at ? formatDateTime(l.created_at, dateFormat) : ''}</td>
                         <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                           <div style={{ fontWeight: '600', color: 'var(--text-main)', fontSize: '15px' }}>{l.user_id}</div>
                           <div style={{ color: 'var(--text-muted)', fontSize: '15px' }}>{l.user_name}</div>
@@ -998,10 +988,10 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
             </div>
           )}
         </div>
-        <input type="date" value={reportDateStart} onChange={e => setReportDateStart(e.target.value)}
-          style={{ ...s.input, width: '150px', flex: '0 0 auto' }} />
-        <input type="date" value={reportDateEnd} onChange={e => setReportDateEnd(e.target.value)}
-          style={{ ...s.input, width: '150px', flex: '0 0 auto' }} />
+        <DatePicker value={reportDateStart} dateFormat={dateFormat} placeholder="Start date"
+          onChange={v => setReportDateStart(v)} style={{ width: '165px', flex: '0 0 auto' }} />
+        <DatePicker value={reportDateEnd} dateFormat={dateFormat} placeholder="End date"
+          onChange={v => setReportDateEnd(v)} style={{ width: '165px', flex: '0 0 auto' }} />
         <div style={{ position: 'relative', flex: 1, minWidth: '160px' }} ref={typeRef}>
           <button onClick={() => { setTypeOpen(!typeOpen); setPeriodOpen(false); }}
             style={{ ...s.dropBtn(reportType !== ''), width: '100%', boxSizing: 'border-box', justifyContent: 'space-between' }}>
@@ -1346,7 +1336,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
             <button onClick={() => { setShowDatePicker(!showDatePicker); setShowActionDrop(false); setShowUserDrop(false); setShowSubDrop(false); }}
               style={s.dropBtn(!!dateRange.start)}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              {dateRange.start ? `${formatDate(dateRange.start)}${dateRange.end ? ' - ' + formatDate(dateRange.end) : ''}` : 'Date Range'}
+              {dateRange.start ? `${formatDate(dateRange.start, dateFormat)}${dateRange.end ? ' - ' + formatDate(dateRange.end, dateFormat) : ''}` : 'Date Range'}
             </button>
             {showDatePicker && (
               <div style={{ position: 'absolute', top: '110%', left: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', boxShadow: '0 8px 32px rgba(0,0,0,0.14)', zIndex: 300, padding: '16px', width: '280px' }}>
@@ -1354,13 +1344,13 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                   <div style={{ flex: 1, textAlign: 'center' }}>
                     <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '3px', fontWeight: '600' }}>Start Date</div>
                     <div style={{ padding: '6px', background: selectingStart ? 'rgba(13,148,136,0.15)' : 'var(--input-bg)', border: `1px solid ${selectingStart ? '#0d9488' : 'var(--border-color)'}`, borderRadius: '6px', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer' }} onClick={() => setSelectingStart(true)}>
-                      {dateRange.start ? formatDate(dateRange.start) : '—'}
+                      {dateRange.start ? formatDate(dateRange.start, dateFormat) : '—'}
                     </div>
                   </div>
                   <div style={{ flex: 1, textAlign: 'center' }}>
                     <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '3px', fontWeight: '600' }}>End Date</div>
                     <div style={{ padding: '6px', background: !selectingStart ? 'rgba(13,148,136,0.15)' : 'var(--input-bg)', border: `1px solid ${!selectingStart ? '#0d9488' : 'var(--border-color)'}`, borderRadius: '6px', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer' }} onClick={() => setSelectingStart(false)}>
-                      {dateRange.end ? formatDate(dateRange.end) : '—'}
+                      {dateRange.end ? formatDate(dateRange.end, dateFormat) : '—'}
                     </div>
                   </div>
                 </div>
@@ -1471,7 +1461,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                   <tr key={log.id} style={{ borderBottom: '1px solid var(--border-color)' }}
                     onMouseEnter={e => e.currentTarget.style.background = 'var(--input-bg)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                    <td style={{ padding: compactMode ? '7px 8px' : '13px 14px', fontSize: '15px', color: 'var(--text-muted)', whiteSpace: 'nowrap', textAlign: 'center' }}>{log.created_at ? new Date(log.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</td>
+                    <td style={{ padding: compactMode ? '7px 8px' : '13px 14px', fontSize: '15px', color: 'var(--text-muted)', whiteSpace: 'nowrap', textAlign: 'center' }}>{log.created_at ? formatDateTime(log.created_at, dateFormat) : ''}</td>
                     <td style={{ padding: compactMode ? '7px 8px' : '13px 14px', textAlign: 'center' }}>
                       <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)' }}>U-{String(log.user_id).padStart(3, '0')}</div>
                       <div style={{ fontSize: '15px', color: 'var(--text-muted)' }}>{log.user_name}</div>

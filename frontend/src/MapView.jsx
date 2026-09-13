@@ -10,6 +10,7 @@ import { GeoJSON } from 'react-leaflet';
 import cabuyaoBoundaries from './data/cabuyao_barangays.geojson.json';
 import cabuyaoGeoJSON from './data/cabuyao_barangays.geojson';
 import { getPointInBarangay, pointInFeature } from './data/coordinates';
+import DatePicker from './components/DatePicker';
 
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -431,9 +432,9 @@ if (!document.getElementById('cdms-pulse')) {
   const s = document.createElement('style');
   s.id = 'cdms-pulse';
   s.textContent = `@keyframes cdmsPulse {
-    0%   { transform: scale(0.85); opacity: 0.9; }
-    70%  { transform: scale(2.4);  opacity: 0;   }
-    100% { transform: scale(0.85); opacity: 0;   }
+    0%   { transform: scale(1);   opacity: 0.95; }
+    60%  { transform: scale(3.2); opacity: 0;    }
+    100% { transform: scale(1);   opacity: 0;    }
   }`;
   document.head.appendChild(s);
 }
@@ -504,7 +505,7 @@ function CaseDotMarkers({ cases, zoom }) {
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
 
-    if (zoom < 15) return;
+    if (zoom < 18) return;
 
     const isFullView = zoom === 19;
     const casesWithCoords = cases.filter(c => c.latitude && c.longitude && !isNaN(parseFloat(c.latitude)) && !isNaN(parseFloat(c.longitude)));
@@ -558,25 +559,25 @@ function PulseMarkers({ barangayData, onHover, onLeave, onClick }) {
   const markersRef = useRef([]);
 
   const createPinIcon = (b, size) => {
-    const { color, ring } = getRisk(b.totalCases);
+    const { color } = getRisk(b.totalCases);
     const w = size;
     const h = Math.round(size * 44 / 34);
-    const labelRaw = b.purok && b.purok !== 'Unspecified' ? b.purok : (b.barangayName || b.barangay || '');
+    const hasUnitLabel = !!(b.purok && b.purok !== 'Unspecified');
+    const labelRaw = hasUnitLabel ? b.purok : '';
     const label = labelRaw.length > 22 ? labelRaw.slice(0, 21) + '…' : labelRaw;
-    const labelH = 20;
+    const labelH = hasUnitLabel ? 20 : 0;
     const totalH = h + labelH;
 
     return L.divIcon({
       className: '',
       html: `
         <div style="position:relative;width:${w}px;height:${totalH}px;cursor:pointer;">
-          <div style="position:absolute;left:50%;top:${h - 5}px;width:16px;height:16px;transform:translate(-50%,-50%);border-radius:50%;background:${ring};animation:cdmsPulse 2s ease-out infinite;"></div>
           <svg width="${w}" height="${h}" viewBox="0 0 34 44" style="position:absolute;top:0;left:0;display:block;filter:drop-shadow(0 3px 4px rgba(0,0,0,0.5));">
             <path d="M17 0C7.6 0 0 7.6 0 17c0 12 17 27 17 27s17-15 17-27C34 7.6 26.4 0 17 0z" fill="${color}"/>
             <circle cx="17" cy="17" r="11" fill="#ffffff"/>
             <text x="17" y="22" text-anchor="middle" font-size="14" font-weight="800" fill="${color}" font-family="Tw Cen MT Condensed,system-ui,sans-serif">${b.totalCases}</text>
           </svg>
-          <div style="position:absolute;left:50%;top:${h + 1}px;transform:translateX(-50%);background:rgba(15,23,42,0.85);border:1px solid rgba(255,255,255,0.18);color:#fff;font-size:9.5px;font-weight:600;padding:2px 7px;border-radius:8px;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis;line-height:1.2;text-shadow:0 1px 2px rgba(0,0,0,0.3);">${label}</div>
+          ${hasUnitLabel ? `<div style="position:absolute;left:50%;top:${h + 1}px;transform:translateX(-50%);background:rgba(15,23,42,0.85);border:1px solid rgba(255,255,255,0.18);color:#fff;font-size:9.5px;font-weight:600;padding:2px 7px;border-radius:8px;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis;line-height:1.2;text-shadow:0 1px 2px rgba(0,0,0,0.3);">${label}</div>` : ''}
         </div>`,
       iconSize: [w, totalH],
       iconAnchor: [w / 2, h],
@@ -588,7 +589,8 @@ function PulseMarkers({ barangayData, onHover, onLeave, onClick }) {
     markersRef.current = [];
 
     barangayData.forEach(b => {
-      const size = Math.max(34, Math.min(72, 24 + b.totalCases * 1.8));
+      if (!b.purok || b.purok === 'Unspecified') return;
+      const size = Math.max(40, Math.min(76, 28 + b.totalCases * 1.8));
       const icon = createPinIcon(b, size);
 
       const m = L.marker(b.coords, { icon, zIndexOffset: 1000 }).addTo(map);
@@ -765,7 +767,7 @@ function ChoroplethLayer({ barangayData, onHover, onLeave, onClick }) {
   );
 }
 
-export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginBarangay, sessionContext, compactMode }) {
+export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginBarangay, sessionContext, compactMode, dateFormat = 'MM/DD/YY' }) {
   const [allCases, setAllCases]         = useState([]);
   const [barangayData, setBarangayData] = useState([]);
   const [purokData, setPurokData]       = useState([]);
@@ -1213,7 +1215,9 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         {/* Date */}
         <div>
           <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Date</label>
-          <input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} style={SEL} />
+          <DatePicker value={filterDate} dateFormat={dateFormat} placeholder="All dates" clearable={true}
+            onChange={v => setFilterDate(v)}
+            style={{ width: '100%' }} />
         </div>
 
         {/* Severity — includes Asymptomatic */}
@@ -1394,7 +1398,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               }}
             />
           )}
-          {mapZoom < 19 && (
+          {mapZoom < 18 && (
             <PulseMarkers
               barangayData={purokData.length > 0 ? purokData : barangayData}
               onHover={setTooltip}
@@ -1464,7 +1468,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         </div>
 
         {/* ZOOM LEVEL INDICATOR */}
-        {mapZoom >= 16 && mapZoom < 19 && (
+        {mapZoom === 18 && (
           <div style={{
             position: 'absolute', bottom: '16px', left: '50%', transform: 'translateX(-50%)',
             zIndex: 1000, padding: '6px 12px', borderRadius: '8px',

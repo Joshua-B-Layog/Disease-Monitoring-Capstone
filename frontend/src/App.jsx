@@ -16,6 +16,7 @@ import { API_URL } from './config';
 import { getPendingCount, processSyncQueue } from './syncEngine';
 import { cacheNotifications, getCachedNotifications } from './offlineSync';
 import { setAuthToken, getAuthToken, authHeaders } from './auth';
+import { formatDateTime } from './formatDate';
 import './App.css';
 
 const getSavedFontScale = () => {
@@ -52,7 +53,7 @@ const extractDiseaseFromMessage = (message) => {
 
 const translations = {
   en: { 'Dashboard':'Dashboard','Manage Cases':'Manage Cases','Audit Reports':'Audit Reports','Map View':'Map View','User Accounts':'User Accounts','Settings':'Settings','Logout':'Logout','CHO Profile':'CHO Profile','Specialist':'Specialist','Profile Settings':'Profile Settings','Account Security':'Account Security','Notifications':'Notifications','System Preferences':'System Preferences','Data Management':'Data Management','Save Preferences':'Save Preferences','Save Changes':'Save Changes','Cancel':'Cancel','Edit Profile':'Edit Profile' },
-  fil: { 'Dashboard':'Dashboard','Manage Cases':'Pamahalaan ang mga Kaso','Audit Reports':'Mga Ulat ng Pag-audit','Map View':'Pananaw ng Mapa','User Accounts':'Mga Account ng User','Settings':'Mga Setting','Logout':'Mag-logout','CHO Profile':'Profile ng CHO','Specialist':'Specialista','Profile Settings':'Mga Setting ng Profile','Account Security':'Seguridad ng Account','Notifications':'Mga Abiso','System Preferences':'Mga Kagustuhan ng System','Data Management':'Pamamahala ng Data','Save Preferences':'I-save ang Mga Kagustuhan','Save Changes':'I-save ang Mga Pagbabago','Cancel':'Kanselahin','Edit Profile':'I-edit ang Profile' },
+  fil: { 'Dashboard':'Dashboard','Pamahalaan ang Mga Kaso':'Pamahalaan ang mga Kaso','Audit Reports':'Mga Ulat ng Pag-audit','Map View':'Pananaw ng Mapa','User Accounts':'Mga Account ng User','Settings':'Mga Setting','Logout':'Mag-logout','CHO Profile':'Profile ng CHO','Specialist':'Specialista','Profile Settings':'Mga Setting ng Profile','Account Security':'Seguridad ng Account','Notifications':'Mga Abiso','System Preferences':'Mga Kagustuhan ng System','Data Management':'Pamamahala ng Data','Save Preferences':'I-save ang Mga Kagustuhan','Save Changes':'I-save ang Mga Pagbabago','Cancel':'Kanselahin','Edit Profile':'I-edit ang Profile' },
   id: { 'Dashboard':'Dasbor','Manage Cases':'Kelola Kasus','Audit Reports':'Laporan Audit','Map View':'Tampilan Peta','User Accounts':'Akun Pengguna','Settings':'Pengaturan','Logout':'Keluar','CHO Profile':'Profil CHO','Specialist':'Spesialis','Profile Settings':'Pengaturan Profil','Account Security':'Keamanan Akun','Notifications':'Notifikasi','System Preferences':'Preferensi Sistem','Data Management':'Manajemen Data','Save Preferences':'Simpan Preferensi','Save Changes':'Simpan Perubahan','Cancel':'Batal','Edit Profile':'Edit Profil' },
   vi: { 'Dashboard':'Bảng điều khiển','Manage Cases':'Quản lý ca bệnh','Audit Reports':'Báo cáo kiểm toán','Map View':'Xem bản đồ','User Accounts':'Tài khoản người dùng','Settings':'Cài đặt','Logout':'Đăng xuất','CHO Profile':'Hồ sơ CHO','Specialist':'Chuyên viên','Profile Settings':'Cài đặt hồ sơ','Account Security':'Bảo mật tài khoản','Notifications':'Thông báo','System Preferences':'Tùy chọn hệ thống','Data Management':'Quản lý dữ liệu','Save Preferences':'Lưu tùy chọn','Save Changes':'Lưu thay đổi','Cancel':'Hủy','Edit Profile':'Chỉnh sửa hồ sơ' },
   th: { 'Dashboard':'แดชบอร์ด','Manage Cases':'จัดการเคส','Audit Reports':'รายงานการตรวจสอบ','Map View':'มุมมองแผนที่','User Accounts':'บัญชีผู้ใช้','Settings':'การตั้งค่า','Logout':'ออกจากระบบ','CHO Profile':'โปรไฟล์ CHO','Specialist':'ผู้เชี่ยวชาญ','Profile Settings':'การตั้งค่าโปรไฟล์','Account Security':'ความปลอดภัยของบัญชี','Notifications':'การแจ้งเตือน','System Preferences':'การตั้งค่าระบบ','Data Management':'การจัดการข้อมูล','Save Preferences':'บันทึกการตั้งค่า','Save Changes':'บันทึกการเปลี่ยนแปลง','Cancel':'ยกเลิก','Edit Profile':'แก้ไขโปรไฟล์' },
@@ -115,11 +116,12 @@ function App() {
   const [language, setLanguage]           = useState('en');
   const [timeZone, setTimeZone]           = useState('Asia/Manila');
   const [dateFormat, setDateFormat]       = useState(() => localStorage.getItem('cdms_date_format') || 'MM/DD/YY');
-  const [autoSave, setAutoSave]           = useState(false);
+  const [autoSave, setAutoSave]           = useState(() => localStorage.getItem('cdms_autoSave') !== 'false');
   const [confirmDelete, setConfirmDelete] = useState(() => localStorage.getItem('cdms_confirm_delete') !== 'false');
   const [keyboardShortcuts, setKeyboardShortcuts] = useState(false);
   const [fontScale, setFontScale] = useState(getSavedFontScale);
   const [pendingInboxView, setPendingInboxView] = useState(null);
+  const [pendingOpenCaseId, setPendingOpenCaseId] = useState(null);
   const [compactMode, setCompactMode] = useState(getSavedCompact);
   const [openProfileView, setOpenProfileView] = useState(false);
   const [openSecurityView, setOpenSecurityView] = useState(false);
@@ -284,11 +286,24 @@ function App() {
     document.documentElement.setAttribute('data-compact', compact ? 'true' : 'false');
   }, []);
 
-  // ── Load saved profile photo from localStorage on mount ──
+  // ── Load saved profile photo (per-user) from localStorage on mount ──
   useEffect(() => {
-    const saved = localStorage.getItem('cdms_profile_photo');
-    if (saved) setProfilePhoto(saved);
-  }, []);
+    if (!loggedUserId) {
+      setProfilePhoto(null);
+      return;
+    }
+    const key = `cdms_profile_photo_${loggedUserId}`;
+    let saved = localStorage.getItem(key);
+    if (!saved) {
+      const legacy = localStorage.getItem('cdms_profile_photo');
+      if (legacy) {
+        localStorage.setItem(key, legacy);
+        localStorage.removeItem('cdms_profile_photo');
+        saved = legacy;
+      }
+    }
+    setProfilePhoto(saved || null);
+  }, [loggedUserId]);
 
   // ── Load saved prefs from localStorage ──
   useEffect(() => {
@@ -314,8 +329,15 @@ useEffect(() => {
 
   const fetchNotifications = () => {
     fetch(`${API_URL}/api/notifications?userId=${loggedUserId}`, { headers: authHeaders() })
-      .then(res => res.json())
+      .then(res => {
+        if (res.status === 401 && loggedUserId) {
+          handleLogout();
+          return;
+        }
+        return res.json();
+      })
       .then(data => {
+        if (!data) return;
         const arr = Array.isArray(data) ? data : [];
         setNotifications(arr);
         cacheNotifications(arr).catch(() => {});
@@ -386,10 +408,12 @@ useEffect(() => {
 
   const handleProfilePhotoChange = (dataUrl) => {
     setProfilePhoto(dataUrl);
+    if (!loggedUserId) return;
+    const key = `cdms_profile_photo_${loggedUserId}`;
     if (dataUrl) {
-      localStorage.setItem('cdms_profile_photo', dataUrl);
+      localStorage.setItem(key, dataUrl);
     } else {
-      localStorage.removeItem('cdms_profile_photo');
+      localStorage.removeItem(key);
     }
   };
 
@@ -464,9 +488,9 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
           />
         );
       case 'Manage Cases':
-        return <ManageCases caseFilter={caseFilter} setCaseFilter={setCaseFilter} dateFormat={dateFormat} autoSave={autoSave} confirmDelete={confirmDelete} keyboardShortcuts={keyboardShortcuts} fontScale={fontScale} compactMode={compactMode} loggedUserId={loggedUserId} loggedUser={loggedUser} loginRole={loginRole} loginBarangay={loggedUserBarangay} sessionContext={sessionContext} initialView={pendingInboxView} onInitialViewConsumed={() => setPendingInboxView(null)} />;
+        return <ManageCases caseFilter={caseFilter} setCaseFilter={setCaseFilter} dateFormat={dateFormat} autoSave={autoSave} confirmDelete={confirmDelete} keyboardShortcuts={keyboardShortcuts} fontScale={fontScale} compactMode={compactMode} loggedUserId={loggedUserId} loggedUser={loggedUser} loginRole={loginRole} loginBarangay={loggedUserBarangay} sessionContext={sessionContext} initialView={pendingInboxView} onInitialViewConsumed={() => setPendingInboxView(null)} pendingOpenCaseId={pendingOpenCaseId} onPendingCaseConsumed={() => setPendingOpenCaseId(null)} />;
       case 'Map View':
-        return <MapView setActiveTab={setActiveTab} setCaseFilter={setCaseFilter} fontScale={fontScale} compactMode={compactMode} loginRole={loginRole} loginBarangay={loggedUserBarangay} sessionContext={sessionContext} />;
+        return <MapView setActiveTab={setActiveTab} setCaseFilter={setCaseFilter} fontScale={fontScale} compactMode={compactMode} loginRole={loginRole} loginBarangay={loggedUserBarangay} sessionContext={sessionContext} dateFormat={dateFormat} />;
       case 'User Accounts': 
         if (loginRole !== 'CHO') {
           return (
@@ -521,7 +545,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
       case 'Roles & Permissions':
         return <RolesPermissions compactMode={compactMode} loginRole={loginRole} onBack={() => setActiveTab('User Accounts')} />;
       case 'Weekly Summary':
-        return <WeeklySummary userId={loggedUserId} loginRole={loginRole} compactMode={compactMode} fontScale={fontScale} onBack={() => setActiveTab('Dashboard')} />;
+        return <WeeklySummary userId={loggedUserId} loginRole={loginRole} compactMode={compactMode} fontScale={fontScale} onBack={() => setActiveTab('Dashboard')} dateFormat={dateFormat} />;
       default:
         return <div style={{ padding: '20px' }}>Content coming soon...</div>;
     }
@@ -939,10 +963,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                             </div>
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                               <span style={{ fontSize: '15px', color: 'var(--text-muted)' }}>
-                                {new Date(n.created_at).toLocaleString('en-PH', {
-                                  month: 'short', day: 'numeric',
-                                  hour: '2-digit', minute: '2-digit'
-                                })}
+                                {formatDateTime(n.created_at, dateFormat)}
                               </span>
                               {n.is_read === 0 && (
                                 <button onClick={() => handleMarkRead(n.id)} style={{
@@ -972,8 +993,18 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                                      setPendingInboxView('outbox');
                                      setActiveTab('Manage Cases');
                                    } else if (target === 'ManageCases') {
-                                     const diseaseName = extractDiseaseFromMessage(n.message);
-                                     setCaseFilter({ disease: diseaseName, barangay: '', purok: '' });
+                                     const caseRefId = n.reference_id;
+                                     const isCaseNotification = caseRefId && (
+                                       n.title === 'New Case Reported' ||
+                                       n.title === 'Case Status Updated' ||
+                                       n.title === 'Updated Case Reported'
+                                     );
+                                     if (isCaseNotification) {
+                                       setPendingOpenCaseId(caseRefId);
+                                     } else {
+                                       const diseaseName = extractDiseaseFromMessage(n.message);
+                                       setCaseFilter({ disease: diseaseName, barangay: '', purok: '' });
+                                     }
                                      setActiveTab('Manage Cases');
                                    } else if (target === 'Registrations') {
                                      setPendingInboxView('inbox:registrations');
@@ -1031,7 +1062,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
               </div>
 
               <div className="avatar" style={{
-                background: profilePhoto ? 'transparent' : '#3B82F6',
+                background: profilePhoto ? 'transparent' : '#129968',
                 overflow: 'hidden', padding: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}>

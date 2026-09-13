@@ -194,6 +194,15 @@ if (!process.env.JWT_SECRET) {
   console.warn('⚠ WARNING: JWT_SECRET is not set. Using an insecure development secret. Set JWT_SECRET in your environment.');
 }
 
+// Warn at boot if BREVO_API_KEY doesn't look like a valid Brevo API key (xkeysib-<64 hex>-<suffix>)
+if (process.env.BREVO_API_KEY) {
+  const brevoKey = process.env.BREVO_API_KEY.trim();
+  const brevoKeyOk = /^xkeysib-[0-9a-fA-F]{64}-[A-Za-z0-9]{8,}$/.test(brevoKey);
+  if (!brevoKeyOk) {
+    console.warn('⚠ WARNING: BREVO_API_KEY does not look like a valid Brevo API key (expected xkeysib-<64 hex>-<suffix>). Email delivery via Brevo will fail until it is fixed.');
+  }
+}
+
 // ==========================================
 // 2. MIDDLEWARE
 // ==========================================
@@ -709,6 +718,23 @@ db.query(`CREATE TABLE IF NOT EXISTS case_status_history (
   else console.log('Case status history table created/verified');
 });
 
+// User login sessions table (server-tracked for Facebook-style session management)
+db.query(`CREATE TABLE IF NOT EXISTS user_sessions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  token_id VARCHAR(64) NOT NULL,
+  device VARCHAR(255),
+  location VARCHAR(255),
+  ip VARCHAR(64),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  revoked_at DATETIME NULL,
+  INDEX idx_sessions_user (user_id),
+  INDEX idx_sessions_token (token_id)
+)`, (err) => {
+  if (err) console.error('Error creating user_sessions table:', err.message);
+  else console.log('User sessions table created/verified');
+});
+
 function createAuditLog(userId, userName, userRole, choUnit, barangay, action, entity, details) {
   db.query(
     'INSERT INTO audit_logs (user_id, user_name, user_role, cho_unit, barangay, action, entity, details) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -762,16 +788,34 @@ function backfillLegacyAuditDetails() {
   );
 }
 
-function signToken(user) {
+function signToken(user, jti) {
   return jwt.sign(
     {
       user_id: user.user_id,
       role: user.role,
       name: user.full_name,
       barangay: user.assigned_barangay_name || null,
+      jti: jti || null,
     },
     JWT_SECRET,
     { expiresIn: '24h' }
+  );
+}
+
+// Create a user_sessions row and return the signed token bound to that session (jti).
+// Used by login + verify-login-otp so every active session is server-tracked.
+function createSessionAndSignToken(user, device, location, ip, cb) {
+  const tokenId = crypto.randomBytes(24).toString('hex');
+  db.query(
+    'INSERT INTO user_sessions (user_id, token_id, device, location, ip) VALUES (?, ?, ?, ?, ?)',
+    [user.user_id, tokenId, device || 'Unknown Device', location || 'Unknown Location', ip || null],
+    (err) => {
+      if (err) {
+        console.error('[SESSION] createSessionAndSignToken insert error:', err.message);
+        return cb(err, null);
+      }
+      cb(null, signToken(user, tokenId));
+    }
   );
 }
 
@@ -788,7 +832,32 @@ function authenticate(req, res, next) {
       role: payload.role,
       name: payload.name,
       barangay: payload.barangay,
+      token_id: payload.jti || null,
     };
+    // Server-side session check: if the token carries a jti, its user_sessions row
+    // must exist and not be revoked. Legacy tokens without a jti pass through.
+    if (payload.jti) {
+      db.query(
+        'SELECT id FROM user_sessions WHERE token_id = ? AND revoked_at IS NULL',
+        [payload.jti],
+        (sErr, sRows) => {
+          if (sErr || !sRows || sRows.length === 0) {
+            createAuditLog(
+              (req.user && req.user.user_id) || null,
+              req.user && req.user.name ? req.user.name : 'Unknown',
+              (req.user && req.user.role) || 'Unknown',
+              null, null,
+              'Auth Failed',
+              req.originalUrl,
+              `Revoked or missing session for ${req.method} ${req.originalUrl}`
+            );
+            return res.status(401).json({ error: 'Not authenticated. Please log in again.' });
+          }
+          next();
+        }
+      );
+      return;
+    }
     next();
   } catch (err) {
     createAuditLog(
@@ -1115,6 +1184,88 @@ app.put('/api/users/:id/profile', authenticate, (req, res) => {
         console.log(`Profile updated for user ${id}: ${fullName}`);
         res.status(200).json({ message: 'Profile updated successfully.', fullName });
     });
+});
+
+// ROUTE: List active login sessions for the authenticated user (Facebook-style)
+app.get('/api/users/:id/sessions', authenticate, (req, res) => {
+    if (Number(req.params.id) !== Number(req.user.user_id)) {
+        return res.status(403).json({ error: 'You can only view your own sessions.' });
+    }
+    const query = `
+        SELECT id, token_id, device, location, created_at
+        FROM user_sessions
+        WHERE user_id = ? AND revoked_at IS NULL
+        ORDER BY created_at DESC, id DESC
+    `;
+    db.query(query, [req.user.user_id], (err, rows) => {
+        if (err) {
+            console.error('[SESSION] list error:', err.message);
+            return res.status(500).json({ error: 'Failed to load sessions.' });
+        }
+        const currentTokenId = req.user.token_id || null;
+        const sessions = (rows || []).map((r) => ({
+            id: r.id,
+            device: r.device || 'Unknown Device',
+            location: r.location || 'Unknown Location',
+            created_at: r.created_at,
+            isCurrent: !!currentTokenId && r.token_id === currentTokenId,
+        }));
+        res.json({ sessions, count: sessions.length });
+    });
+});
+
+// ROUTE: Revoke a single session (cannot revoke your current session)
+app.delete('/api/users/:id/sessions/:sessionId', authenticate, (req, res) => {
+    if (Number(req.params.id) !== Number(req.user.user_id)) {
+        return res.status(403).json({ error: 'You can only manage your own sessions.' });
+    }
+    const sessionId = Number(req.params.sessionId);
+    db.query(
+        'SELECT id, token_id, device FROM user_sessions WHERE id = ? AND user_id = ? AND revoked_at IS NULL',
+        [sessionId, req.user.user_id],
+        (err, rows) => {
+            if (err) {
+                console.error('[SESSION] revoke lookup error:', err.message);
+                return res.status(500).json({ error: 'Failed to revoke session.' });
+            }
+            if (!rows || rows.length === 0) {
+                return res.status(404).json({ error: 'Session not found or already revoked.' });
+            }
+            const session = rows[0];
+            if (req.user.token_id && session.token_id === req.user.token_id) {
+                return res.status(400).json({ error: 'You cannot revoke your current session.' });
+            }
+            db.query('UPDATE user_sessions SET revoked_at = NOW() WHERE id = ?', [sessionId], (uErr) => {
+                if (uErr) {
+                    console.error('[SESSION] revoke error:', uErr.message);
+                    return res.status(500).json({ error: 'Failed to revoke session.' });
+                }
+                createAuditLog(req.user.user_id, req.user.name, req.user.role, null, req.user.barangay, 'Session Revoked', 'System', `Revoked session on ${session.device || 'Unknown Device'}`);
+                res.json({ ok: true });
+            });
+        }
+    );
+});
+
+// ROUTE: Revoke all other sessions (keeps the current one active)
+app.delete('/api/users/:id/sessions', authenticate, (req, res) => {
+    if (Number(req.params.id) !== Number(req.user.user_id)) {
+        return res.status(403).json({ error: 'You can only manage your own sessions.' });
+    }
+    const currentTokenId = req.user.token_id || '';
+    db.query(
+        "UPDATE user_sessions SET revoked_at = NOW() WHERE user_id = ? AND revoked_at IS NULL AND token_id <> ?",
+        [req.user.user_id, currentTokenId],
+        (err, result) => {
+            if (err) {
+                console.error('[SESSION] revoke-all error:', err.message);
+                return res.status(500).json({ error: 'Failed to revoke sessions.' });
+            }
+            const revoked = result ? result.affectedRows : 0;
+            createAuditLog(req.user.user_id, req.user.name, req.user.role, null, req.user.barangay, 'All Other Sessions Revoked', 'System', `Revoked ${revoked} other session(s)`);
+            res.json({ ok: true, revoked });
+        }
+    );
 });
 
 // ==========================================
@@ -2399,8 +2550,8 @@ app.put('/api/cases/:id', authenticate, (req, res) => {
                                   const prefs = (!pErr && pRows.length > 0) ? pRows[0] : {};
                                   if (prefs.push_notifications && prefs.updated_case_reported) {
                                     db.query(
-                                      'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
-                                      [er.requested_by, erTitle, erMsg, 'info', 'ManageCases']
+                                      'INSERT INTO notifications (user_id, title, message, type, link_to, reference_id) VALUES (?, ?, ?, ?, ?, ?)',
+                                      [er.requested_by, erTitle, erMsg, 'info', 'ManageCases', id]
                                     );
                                   }
                                 }
@@ -2998,20 +3149,56 @@ app.post('/api/login', (req, res) => {
             createAuditLog(user.user_id, user.full_name, user.role, user.cho_unit || null, user.assigned_barangay_name, 'Logged In', 'System', `Login from ${device || 'Unknown Device'} at ${location || 'Unknown Location'} on ${phTimestamp()}`);
         }
 
-        return res.status(200).json({
-            message: 'Success',
-            requires2FA: !!user.two_fa_enabled,
-            mustChangePassword: !!user.must_change_password,
-            isGeneratorPassword: !!(user.initial_password),
-            token: user.two_fa_enabled ? null : signToken(user),
-            user: {
-                id: user.user_id,
-                name: user.full_name,
-                role: user.role,
-                barangay: user.assigned_barangay_name || null
-            }
+        const respondLogin = (token) => {
+            return res.status(200).json({
+                message: 'Success',
+                requires2FA: !!user.two_fa_enabled,
+                mustChangePassword: !!user.must_change_password,
+                isGeneratorPassword: !!(user.initial_password),
+                token: token || null,
+                user: {
+                    id: user.user_id,
+                    name: user.full_name,
+                    role: user.role,
+                    barangay: user.assigned_barangay_name || null
+                }
+            });
+        };
+
+        if (user.two_fa_enabled) {
+            return respondLogin(null);
+        }
+
+        createSessionAndSignToken(user, device, location, req.headers['x-forwarded-for'] ? String(req.headers['x-forwarded-for']).split(',')[0].trim() : (req.socket && req.socket.remoteAddress) || '', (err, token) => {
+            if (err) return res.status(500).json({ error: 'Failed to create login session.' });
+            respondLogin(token);
         });
     });
+});
+
+// ROUTE: Log out (audit trail) — identity derived from the JWT, not client-supplied body
+app.post('/api/logout', authenticate, (req, res) => {
+    const userId = req.user ? req.user.user_id : null;
+    const userName = req.user ? req.user.name : 'Unknown';
+    const userRole = req.user ? req.user.role : 'System';
+    const barangay = req.user ? req.user.barangay : null;
+    // Revoke this session so its JWT dies immediately
+    if (req.user && req.user.token_id) {
+        db.query('UPDATE user_sessions SET revoked_at = NOW() WHERE token_id = ? AND revoked_at IS NULL', [req.user.token_id], (rErr) => {
+            if (rErr) console.error('[SESSION] logout revoke error:', rErr.message);
+        });
+    }
+    const writeLogoutAudit = (choUnit) => {
+        createAuditLog(userId, userName, userRole, choUnit, barangay, 'Logged Out', 'System', `Logout at ${phTimestamp()}`);
+    };
+    if (userId) {
+        db.query('SELECT cho_unit FROM users WHERE user_id = ?', [userId], (err, rows) => {
+            writeLogoutAudit((!err && rows && rows[0]) ? rows[0].cho_unit : null);
+        });
+    } else {
+        writeLogoutAudit(null);
+    }
+    res.json({ ok: true });
 });
 
 // ROUTE: Log out (audit trail) — identity derived from the JWT, not client-supplied body
@@ -3721,12 +3908,18 @@ app.post('/api/users', authenticate, requireRole('CHO'), async (req, res) => {
 app.post('/api/send-2fa-email', authenticate, (req, res) => {
     const userId = req.user ? req.user.user_id : null;
     if (!userId) return res.status(401).json({ error: 'Not authenticated.' });
-    db.query('SELECT email, full_name FROM users WHERE user_id = ?', [userId], (err, results) => {
+    db.query('SELECT email, full_name, two_fa_token, two_fa_token_expiry FROM users WHERE user_id = ?', [userId], (err, results) => {
         if (err || results.length === 0) return res.status(404).json({ error: 'User not found.' });
         const user = results[0];
 
-        const token = crypto.randomBytes(32).toString('hex');
-        const expiry = new Date(Date.now() + 3600000); // 1 hour
+        if (!user.email) {
+            return res.status(400).json({ error: 'No email on file. Add an email in Profile Settings before enabling 2FA.' });
+        }
+
+        // Reuse a still-valid token so re-requesting the link does not invalidate the earlier email.
+        const existingValid = user.two_fa_token && user.two_fa_token_expiry && new Date(user.two_fa_token_expiry).getTime() > Date.now();
+        const token = existingValid ? user.two_fa_token : crypto.randomBytes(32).toString('hex');
+        const expiry = existingValid ? user.two_fa_token_expiry : new Date(Date.now() + 3600000); // 1 hour
 
         db.query('UPDATE users SET two_fa_token = ?, two_fa_token_expiry = ? WHERE user_id = ?',
             [token, expiry, userId], async (updateErr) => {
@@ -3751,7 +3944,19 @@ app.post('/api/send-2fa-email', authenticate, (req, res) => {
                 </div>
                 `);
             } catch (err) {
-                return res.status(500).json({ error: 'Failed to send email.' });
+                const brevoMsg = (err.response && err.response.data && err.response.data.message)
+                    ? String(err.response.data.message)
+                    : (err.message || 'Unknown Brevo error');
+                const brevoCode = (err.response && err.response.data && err.response.data.code)
+                    ? String(err.response.data.code)
+                    : '';
+                console.log(`\n🔑 FALLBACK 2FA VERIFY LINK for ${user.email}: [ ${verifyLink} ]\n`);
+                return res.status(200).json({
+                    message: `Email blocked by the mail service (Brevo${brevoCode ? ' ' + brevoCode : ''}: ${brevoMsg}). Use the fallback link below to activate 2FA.`,
+                    fallback: true,
+                    verifyLink,
+                    brevoError: brevoMsg,
+                });
             }
             return res.status(200).json({ message: '2FA verification email sent.' });
         });
@@ -3818,13 +4023,13 @@ app.post('/api/send-login-otp', (req, res) => {
             if (updateErr) return res.status(500).json({ error: 'Failed to generate code.' });
 
             try {
-                await sendBrevoEmail(user.email, 'Cabuyao Health - Your Login Verification Code', `
+                await sendBrevoEmail(user.email, 'Cabuyao Health - Your Login/2FA Verification Code', `
                 <div style="max-width:600px;margin:0 auto;font-family:system-ui,sans-serif;background:#16171d;border:1px solid #2e303a;border-radius:8px;overflow:hidden;">
                     <div style="background:#0d9488;padding:24px;text-align:center;">
                         <h1 style="color:#fff;margin:0;font-size:28px;">CABUYAO HEALTH</h1>
                     </div>
                     <div style="background:#1f2028;padding:40px 32px;text-align:center;">
-                        <p style="color:#f3f4f6;font-size:16px;">Hi ${user.full_name}, here is your login code:</p>
+                        <p style="color:#f3f4f6;font-size:16px;">Hi ${user.full_name}, here is your login/2FA code:</p>
                         <div style="font-size:36px;font-weight:bold;color:#10b981;letter-spacing:8px;margin:24px 0;">${otp}</div>
                         <p style="color:#6b7280;font-size:14px;">This code expires in 10 minutes. If you did not attempt to log in, please secure your account.</p>
                     </div>
@@ -3841,7 +4046,7 @@ app.post('/api/send-login-otp', (req, res) => {
 
 // ROUTE: Verify login OTP — completes the 2FA login step
 app.post('/api/verify-login-otp', (req, res) => {
-    const { userId, otp } = req.body;
+    const { userId, otp, device, location } = req.body;
 
     const query = `
         SELECT u.*, b.name AS assigned_barangay_name
@@ -3874,46 +4079,28 @@ app.post('/api/verify-login-otp', (req, res) => {
         db.query('UPDATE users SET login_otp = NULL, login_otp_expiry = NULL, login_otp_attempts = 0 WHERE user_id = ?', [userId]);
         createAuditLog(user.user_id, user.full_name, user.role, user.cho_unit || null, user.assigned_barangay_name || null, 'Logged In (2FA)', 'System', `Login completed via two-factor authentication on ${phTimestamp()}`);
 
-        return res.status(200).json({
-            message: 'Login verified.',
-            token: signToken(user),
-            mustChangePassword: !!user.must_change_password,
-            isGeneratorPassword: !!(user.initial_password),
-            user: {
-                id: user.user_id,
-                name: user.full_name,
-                role: user.role,
-                barangay: user.assigned_barangay_name || null
-            }
+        const respondVerified = (token) => {
+            return res.status(200).json({
+                message: 'Login verified.',
+                token: token || null,
+                mustChangePassword: !!user.must_change_password,
+                isGeneratorPassword: !!(user.initial_password),
+                user: {
+                    id: user.user_id,
+                    name: user.full_name,
+                    role: user.role,
+                    barangay: user.assigned_barangay_name || null
+                }
+            });
+        };
+
+        createSessionAndSignToken(user, device, location, req.headers['x-forwarded-for'] ? String(req.headers['x-forwarded-for']).split(',')[0].trim() : (req.socket && req.socket.remoteAddress) || '', (err, token) => {
+            if (err) return res.status(500).json({ error: 'Failed to create login session.' });
+            respondVerified(token);
         });
     });
 });
 
-
-// ==========================================
-// Brevo SMS Gateway
-async function sendSMS(to, message) {
-    const apiKey = process.env.BREVO_API_KEY;
-    if (!apiKey) {
-        console.log(`\n[Brevo SMS not configured] Would send SMS to ${to}: ${message}\n`);
-        return;
-    }
-    await axios.post('https://api.brevo.com/v3/transactionalSMS/sms', {
-        sender: 'Cabuyao',
-        recipient: to,
-        content: message,
-        type: 'transactional'
-    }, {
-        headers: { 'api-key': apiKey, 'Content-Type': 'application/json' }
-    });
-}
-
-function formatPhone(phone) {
-    let p = phone.toString().trim();
-    if (p.startsWith('0')) p = '63' + p.slice(1);
-    if (!p.startsWith('+')) p = '+' + p;
-    return p;
-}
 
 // NOTIFICATIONS SYSTEM ROUTES & HELPERS
 // ==========================================
@@ -3924,7 +4111,7 @@ function createNotificationForUsers(title, message, type, link_to, barangayId = 
     // Pre-fetch the CHO unit for the case barangay (for unit-level CHO matching)
     const proceed = (caseBarangayUnit) => {
         db.query(
-            `SELECT u.user_id, u.role, u.assigned_barangay_id, u.email, u.mobile_number, b.name AS barangay_name
+            `SELECT u.user_id, u.role, u.assigned_barangay_id, u.email, b.name AS barangay_name
              FROM users u
              LEFT JOIN barangays b ON u.assigned_barangay_id = b.id
              WHERE u.is_active = 1`,
@@ -3977,7 +4164,8 @@ function createNotificationForUsers(title, message, type, link_to, barangayId = 
                     }
 
                     // Determine if this event is allowed by user preferences
-                    const eventAllowed = !eventType || eventType === 'delete' || prefs[eventType] == true;
+                    // 'high_risk_alert' is always delivered (automatic) within the user's assigned scope
+                    const eventAllowed = !eventType || eventType === 'delete' || eventType === 'high_risk_alert' || prefs[eventType] == true;
 
                     // 1. In-app notification (Push) — only if push_notifications is ON
                     if (prefs.push_notifications && eventAllowed) {
@@ -4011,14 +4199,6 @@ function createNotificationForUsers(title, message, type, link_to, barangayId = 
                                 <p style="color:#94a3b8;font-size:12px">Cabuyao City Disease Monitoring System</p>
                             </div>`
                         ).catch(err => console.error(`Email notification failed for user ${user.user_id}:`, err.message));
-                    }
-
-                    // 3. SMS notification
-                    if (prefs.sms_notifications && eventAllowed && user.mobile_number) {
-                        const smsText = `${title}: ${message}`;
-                        sendSMS(formatPhone(user.mobile_number), smsText).catch(err => {
-                            console.error(`SMS notification failed for user ${user.user_id}:`, err.message);
-                        });
                     }
                 });
             });
@@ -4280,13 +4460,17 @@ app.get('/api/export-all', authenticate, (req, res) => {
 
 // GET /api/backup — full data export as JSON download
 app.get('/api/backup', authenticate, (req, res) => {
+  if (req.user.role !== 'CHO') {
+    return res.status(403).json({ error: 'Only CHO accounts may export system backups.' });
+  }
+
   const results = {};
 
   db.query('SELECT * FROM disease_cases', (err, cases) => {
     if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     results.disease_cases = cases;
 
-    db.query('SELECT user_id, username, full_name, role, assigned_barangay_id, is_active, email, mobile_number, last_login FROM users',
+    db.query('SELECT user_id, username, full_name, role, assigned_barangay_id, is_active, email, mobile_number, last_login, password FROM users',
       (err, users) => {
       if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
       results.users = users;
@@ -4311,6 +4495,8 @@ app.get('/api/backup', authenticate, (req, res) => {
               results.system = 'Cabuyao CDMS';
               results.version = '1.1';
 
+              createAuditLog(req.user.user_id, req.user.name, req.user.role, null, req.user.barangay || null, 'Backup', 'System Data', 'CHO exported a full system backup');
+
               res.setHeader('Content-Type', 'application/json');
               res.setHeader('Content-Disposition',
                 `attachment; filename=CDMS_Backup_${new Date().toISOString().split('T')[0]}.json`);
@@ -4318,89 +4504,6 @@ app.get('/api/backup', authenticate, (req, res) => {
             });
           });
         });
-      });
-    });
-  });
-});
-
-// DELETE /api/users/:id/my-data — clear current user's personal data & reset account
-app.delete('/api/users/:id/my-data', authenticate, (req, res) => {
-  const { id } = req.params;
-
-  db.query('SELECT user_id, username, full_name, email, role, assigned_barangay_id, password, initial_password FROM users WHERE user_id = ?',
-    [id], (err, userResults) => {
-    if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
-    if (userResults.length === 0)
-      return res.status(404).json({ error: 'User not found.' });
-
-    const user = userResults[0];
-    let resetPassword = user.initial_password || user.password;
-    const looksHashed = typeof resetPassword === 'string' && /^\$2[abxy]\$/.test(resetPassword);
-    if (looksHashed) resetPassword = crypto.randomBytes(6).toString('hex');
-
-    // 1. Final audit log before clearing
-    createAuditLog(id, user.full_name || 'User', user.role, null, null, 'Cleared', 'Account Data', 'User cleared all personal account data and was logged out');
-
-    // 2. Delete user-scoped records
-    const queries = [
-      'DELETE FROM notifications WHERE user_id = ?',
-      'DELETE FROM notification_preferences WHERE user_id = ?',
-      'DELETE FROM audit_logs WHERE user_id = ?',
-      'DELETE FROM generated_reports WHERE created_by = ?',
-      'DELETE FROM case_inbox WHERE from_user_id = ?',
-    ];
-
-    let completed = 0;
-    queries.forEach((sql, index) => {
-      db.query(sql, [id], (delErr) => {
-        if (delErr) console.error(`Clear data query ${index} error:`, delErr.message);
-        completed++;
-        if (completed === queries.length) {
-          // 3. Reset password to initial_password
-          const hashedReset = bcrypt.hashSync(resetPassword, 10);
-          db.query('UPDATE users SET password = ? WHERE user_id = ?', [hashedReset, id], (updateErr) => {
-            if (updateErr) {
-              console.error('Password reset error:', updateErr.message);
-              return res.status(500).json({ error: 'Failed to reset password.' });
-            }
-
-            // 4. Send email notification with reset password
-            if (user.email) {
-              const htmlContent = `
-                <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:12px">
-                  <h2 style="color:#1e3a8a;margin:0 0 12px 0">Account Data Cleared</h2>
-                  <p style="color:#475569;font-size:15px;line-height:1.5">
-                    Your Cabuyao Health System account data has been cleared successfully.
-                  </p>
-                  <p style="color:#475569;font-size:15px;line-height:1.5">
-                    Your account has been reset to its original credentials:
-                  </p>
-                  <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin:16px 0">
-                    <p style="margin:0 0 8px 0;font-size:14px;color:#334155">
-                      <strong>Username:</strong> ${user.username}
-                    </p>
-                    <p style="margin:0;font-size:14px;color:#334155">
-                      <strong>Password:</strong> ${resetPassword}
-                    </p>
-                  </div>
-                  <p style="color:#94a3b8;font-size:12px">
-                    You have been logged out. Please sign in again with the credentials above.
-                  </p>
-                  <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0" />
-                  <p style="color:#94a3b8;font-size:11px">Cabuyao City Disease Monitoring System</p>
-                </div>
-              `;
-              sendBrevoEmail(user.email, 'Account Data Cleared - Cabuyao CDMS', htmlContent)
-                .catch(err => console.error('Clear-data email failed:', err.message));
-            }
-
-            console.log(`Cleared personal data for user ${id} (${user.username}) - password reset to original`);
-            res.status(200).json({
-              message: 'Your personal data has been cleared successfully. You have been logged out.',
-              logged_out: true,
-            });
-          });
-        }
       });
     });
   });
@@ -4773,6 +4876,7 @@ app.get('/api/weekly-summary', authenticate, (req, res) => {
 
 // ── Shared weekly summary helpers (used by cron + trigger endpoint) ──
 function buildWeeklyHtmlAndPlain(summary, barangays, diseases, severities, scopeLabel) {
+    summary = summary || {}; // zero-case scopes still render a "no data" summary instead of crashing
     const total = summary.total_cases || 0;
     const newWeek = summary.new_this_week || 0;
     const active = summary.active_cases || 0;
@@ -4848,9 +4952,9 @@ function buildWeeklyHtmlAndPlain(summary, barangays, diseases, severities, scope
     return { html, plain };
 }
 
-// Weekly Summary — every Monday at 8:00 AM (scoped per user / CHO unit / BHW barangay)
-cron.schedule('0 17 * * 5', () => {
-    console.log('⏰ Running weekly summary cron job (Friday 5PM)...');
+// Weekly Summary — Friday 5PM cron (scoped per user / CHO unit / BHW barangay)
+function runWeeklySummary() {
+    console.log('⏰ Running weekly summary delivery...');
 
     // Helper: run scoped queries for a given set of barangay names, returns [summary, barangays, diseases, severities]
     function runScopedQueries(barangayNames) {
@@ -4915,19 +5019,12 @@ cron.schedule('0 17 * * 5', () => {
                 sendBrevoEmail(user.email, '📊 Weekly Summary - Cabuyao CDMS', html)
                     .catch(err => console.error(`Weekly summary email failed for ${user.user_id}:`, err.message));
             }
-            // SMS delivery for users with sms_notifications enabled + mobile number on file
-            if (user.sms_notifications === 1 && user.mobile_number) {
-                const smsBody = plain.length > 400 ? plain.slice(0, 397) + '...' : plain;
-                sendSMS(formatPhone(user.mobile_number), smsBody)
-                    .catch(err => console.error(`Weekly summary SMS failed for ${user.user_id}:`, err.message));
-            }
         });
     }
 
     // 1. Fetch all eligible users with scope info
     db.query(
-        `SELECT u.user_id, u.role, u.assigned_barangay_id, b.name AS barangay_name, u.email, u.full_name, u.mobile_number,
-                np.sms_notifications
+        `SELECT u.user_id, u.role, u.assigned_barangay_id, b.name AS barangay_name, u.email, u.full_name
          FROM users u
          LEFT JOIN barangays b ON u.assigned_barangay_id = b.id
          INNER JOIN notification_preferences np ON u.user_id = np.user_id
@@ -4973,6 +5070,31 @@ cron.schedule('0 17 * * 5', () => {
             });
         }
     );
+}
+
+// Every Friday at 5PM
+cron.schedule('0 17 * * 5', () => {
+    console.log('⏰ Running weekly summary cron job (Friday 5PM)...');
+    runWeeklySummary();
+});
+
+// Manual run for testing/on-demand (CHO only)
+app.post('/api/weekly-summary/run', authenticate, (req, res) => {
+    if (req.user.role !== 'CHO') {
+        return res.status(403).json({ error: 'Only CHO can trigger a weekly summary run.' });
+    }
+    createAuditLog(
+        req.user.user_id,
+        req.user.name,
+        req.user.role,
+        null,
+        req.user.barangay || null,
+        'Weekly Summary',
+        'System',
+        'Weekly summary run triggered manually'
+    );
+    runWeeklySummary();
+    return res.json({ message: 'Weekly summary run started. Notifications and emails will be sent to subscribed users.' });
 });
 
 // ==========================================
@@ -5024,6 +5146,10 @@ app.post('/api/notifications/system-maintenance', authenticate, (req, res) => {
 
 // POST /api/restore — restore from a backup JSON
 app.post('/api/restore', authenticate, (req, res) => {
+    if (req.user.role !== 'CHO') {
+        return res.status(403).json({ error: 'Only CHO accounts may restore system backups.' });
+    }
+
     const backup = req.body;
 
     if (!backup || !backup.system || !backup.backup_date) {
@@ -5048,9 +5174,9 @@ app.post('/api/restore', authenticate, (req, res) => {
         let done = 0;
         backup.users.forEach(u => {
             db.query(
-                `INSERT IGNORE INTO users (user_id, username, full_name, role, assigned_barangay_id, is_active, email, mobile_number, last_login)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [u.user_id, u.username, u.full_name, u.role, u.assigned_barangay_id, u.is_active, u.email, u.mobile_number, u.last_login],
+                `INSERT IGNORE INTO users (user_id, username, full_name, role, assigned_barangay_id, is_active, email, mobile_number, last_login, password)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [u.user_id, u.username, u.full_name, u.role, u.assigned_barangay_id, u.is_active, u.email, u.mobile_number, u.last_login, u.password || null],
                 (err) => { if (err) console.error('Restore user error:', err.message); done++; if (done >= backup.users.length) callback(); }
             );
         });
@@ -5109,6 +5235,7 @@ app.post('/api/restore', authenticate, (req, res) => {
             restoreUsers(() => {
                 restoreDiseaseCases(() => {
                     restoreCategories(() => {
+                        createAuditLog(req.user.user_id, req.user.name, req.user.role, null, req.user.barangay || null, 'Restore', 'System Data', `System restored from backup dated ${backup.backup_date}`);
                         console.log(' Restore completed from backup dated ' + backup.backup_date);
                         res.json({ message: 'Restore completed successfully.' });
                     });
@@ -5118,8 +5245,12 @@ app.post('/api/restore', authenticate, (req, res) => {
     });
 });
 
-// POST /api/restore/confirm — preview what will be restored before committing
+// POST /api/restore/preview — preview what will be restored before committing
 app.post('/api/restore/preview', authenticate, (req, res) => {
+    if (req.user.role !== 'CHO') {
+        return res.status(403).json({ error: 'Only CHO accounts may preview system restores.' });
+    }
+
     const backup = req.body;
     if (!backup || !backup.system || !backup.backup_date) {
         return res.status(400).json({ error: 'Invalid backup file.' });

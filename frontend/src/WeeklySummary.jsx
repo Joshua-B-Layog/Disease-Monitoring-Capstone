@@ -3,8 +3,10 @@ import { API_URL } from './config';
 import BackButton from './components/BackButton';
 import { cacheWeeklySummary, getCachedWeeklySummary } from './offlineSync';
 import { authHeaders } from './auth';
+import { formatDate, formatDateTime } from './formatDate';
+import DatePicker from './components/DatePicker';
 
-export default function WeeklySummary({ userId, loginRole, compactMode, fontScale, onBack }) {
+export default function WeeklySummary({ userId, loginRole, compactMode, fontScale, onBack, dateFormat = 'MM/DD/YY' }) {
   const defaultStart = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
   const defaultEnd = new Date().toISOString().slice(0, 10);
 
@@ -42,20 +44,9 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
 
   useEffect(() => { if (userId) fetchData(); }, [userId, startDate, endDate]);
 
-  const fmtDate = (d) => {
-    if (!d) return '';
-    return new Date(d).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' });
-  };
-
-  const fmtDateTime = (d) => {
-    if (!d) return '';
-    return new Date(d).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-  };
-
-  const fmtShortDate = (d) => {
-    if (!d) return '';
-    return new Date(d).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
+  const fmtDate = (d) => formatDate(d, dateFormat);
+  const fmtDateTime = (d) => formatDateTime(d, dateFormat);
+  const fmtShortDate = (d) => formatDate(d, dateFormat);
 
   const getRiskColor = (count) => {
     if (count >= 20) return '#DC2626';
@@ -288,11 +279,11 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
         )}
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {/* Date Range */}
-          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-            style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px' }} />
+          <DatePicker value={startDate} dateFormat={dateFormat} placeholder="Start date"
+            onChange={v => setStartDate(v)} style={{ width: '150px' }} />
           <span style={{ color: 'var(--text-muted)', alignSelf: 'center', fontSize: '15px' }}>to</span>
-          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
-            style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px' }} />
+          <DatePicker value={endDate} dateFormat={dateFormat} placeholder="End date"
+            onChange={v => setEndDate(v)} style={{ width: '150px' }} />
           <button onClick={fetchData} style={{ padding: '6px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '15px', fontWeight: '600' }}>
             Generate
           </button>
@@ -313,7 +304,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{ fontSize: '28px', fontWeight: '700', color: '#DC2626' }}>{summary.new_this_week}</div>
             {comparison && (
-              <span title={`Previous period (${data.previousPeriod?.start} to ${data.previousPeriod?.end}): ${comparison.newCases.previous}`} style={{
+              <span title={`Previous period (${fmtDate(data.previousPeriod?.start)} to ${fmtDate(data.previousPeriod?.end)}): ${comparison.newCases.previous}`} style={{
                 fontSize: '13px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px',
                 background: comparison.newCases.up ? 'rgba(220,38,38,0.15)' : 'rgba(18,153,104,0.15)',
                 color: comparison.newCases.up ? '#ef4444' : '#16b877',

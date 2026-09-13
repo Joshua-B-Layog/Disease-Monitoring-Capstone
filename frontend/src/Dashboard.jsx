@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { API_URL } from './config';
 import { cacheCases, getCachedCases, isOnline } from './offlineSync';
+import { formatDate as formatDateStr } from './formatDate';
+import DatePicker from './components/DatePicker';
 
 // Counts up (or down) to `value` whenever it changes
 const AnimatedNumber = ({ value, style }) => {
@@ -49,19 +51,6 @@ const findBestDisease = (diseaseName) => {
 };
 
 const CASES_PER_PAGE = 10;
-
-const formatDateStr = (dateStr, fmt) => {
-  if (!dateStr) return '--';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return '--';
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const shortY = String(y).slice(-2);
-  if (fmt === 'DD/MM/YY') return `${day}/${m}/${shortY}`;
-  if (fmt === 'YYYY-MM-DD') return `${y}-${m}-${day}`;
-  return `${m}/${day}/${shortY}`;
-};
 
 const getWorkWeek = () => {
   const now = new Date();
@@ -388,28 +377,18 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
           {(allPeriod === 'weekly' || allPeriod === 'monthly' || allPeriod === 'custom') && (
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-              <input
-                type="date"
-                key={`all-start-${allDateRange.start}`}
-                defaultValue={allDateRange.start}
-                onBlur={(e) => { const v = e.target.value; if (/^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(new Date(v))) { setAllDateRange({ ...allDateRange, start: v }); setAllPeriod('custom'); } }}
-                onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
-                style={{ padding: '6px 8px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '15px' }}
-              />
+              <DatePicker value={allDateRange.start} dateFormat={dateFormat} clearable={false}
+                placeholder="Start date"
+                onChange={(v) => { if (v) { setAllDateRange({ ...allDateRange, start: v }); setAllPeriod('custom'); } }} />
               <span style={{ color: 'var(--text-muted)', fontSize: '15px' }}>to</span>
-              <input
-                type="date"
-                key={`all-end-${allDateRange.end}`}
-                defaultValue={allDateRange.end}
-                onBlur={(e) => { const v = e.target.value; if (/^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(new Date(v))) { setAllDateRange({ ...allDateRange, end: v }); setAllPeriod('custom'); } }}
-                onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
-                style={{ padding: '6px 8px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '15px' }}
-              />
+              <DatePicker value={allDateRange.end} dateFormat={dateFormat} clearable={false}
+                placeholder="End date"
+                onChange={(v) => { if (v) { setAllDateRange({ ...allDateRange, end: v }); setAllPeriod('custom'); } }} />
             </div>
           )}
 
           <span style={{ marginLeft: 'auto', fontSize: '15px', color: 'var(--text-muted)' }}>
-            {allDateRange.start} to {allDateRange.end}
+            {formatDateStr(allDateRange.start, dateFormat)} to {formatDateStr(allDateRange.end, dateFormat)}
           </span>
         </div>
 
@@ -417,7 +396,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' }}>
           <h4 style={{ color: 'var(--text-main)', margin: '0 0 16px 0', fontSize: '15px', fontWeight: '600' }}>
             Disease Cases by Count
-            <span style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: '400', marginLeft: '8px' }}>({allTotalCases} total cases · {allDateRange.start} to {allDateRange.end})</span>
+            <span style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: '400', marginLeft: '8px' }}>({allTotalCases} total cases · {formatDateStr(allDateRange.start, dateFormat)} to {formatDateStr(allDateRange.end, dateFormat)})</span>
           </h4>
           {!hasCases ? (
             <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: '15px' }}>
@@ -799,13 +778,13 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   const exportBars = periodChart ? monthBars : (isBhw ? diseaseBars : sortedBars);
   const exportTitle = periodChart
     ? (dashPeriod === 'weekly'
-        ? `Weekly Cases - ${selectedDisease} (${dateRange.start || ''} to ${dateRange.end || ''})`
+        ? `Weekly Cases - ${selectedDisease} (${formatDateStr(dateRange.start, dateFormat)} to ${formatDateStr(dateRange.end, dateFormat)})`
         : dashPeriod === 'monthly'
           ? `Monthly Cases (${MONTH_FULL[new Date(dateRange.start || Date.now()).getMonth()]} ${dashYear})`
           : dashPeriod === 'quarterly'
             ? `Quarterly Cases (Q${dashQuarter} ${dashYear})`
             : dashPeriod === 'custom'
-              ? `Custom Range (${dateRange.start || ''} to ${dateRange.end || ''})`
+              ? `Custom Range (${formatDateStr(dateRange.start, dateFormat)} to ${formatDateStr(dateRange.end, dateFormat)})`
               : `Yearly Cases (${dashYear})`)
     : (isBhw ? 'All Diseases - Case Counts' : `${selectedDisease} Cases by Barangay`);
   const exportHighest = periodChart ? monthMax : (isBhw ? (diseaseBars.length > 0 ? diseaseBars[0].count : 1) : highestCount);
@@ -896,7 +875,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         .bar-section { margin: 8px 0 24px 0; }
       </style></head><body>
       <h2>Cabuyao Disease Monitoring System - Dashboard Export</h2>
-      <p>Generated: ${new Date().toLocaleDateString()} &nbsp;|&nbsp; Date Range: ${dateRange.start} to ${dateRange.end}</p>
+      <p>Generated: ${formatDateStr(new Date(), dateFormat)} &nbsp;|&nbsp; Date Range: ${formatDateStr(dateRange.start, dateFormat)} to ${formatDateStr(dateRange.end, dateFormat)}</p>
 
       <h3>${eTitle}</h3>
       <div class="bar-section">${buildBarChartHTML(eBars, eTitle, eHighest)}</div>
@@ -918,7 +897,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   const handleExportExcel = () => {
     const headers = 'Case ID\tPatient Name\tAge\tBarangay\tDisease\tSeverity\tStatus\tDate Reported\n';
     const rows = displayCases.map(c =>
-      `${c.case_id}\t${c.patient_name || ''}\t${c.age || ''}\t${c.barangay_name || ''}\t${c.disease_name || ''}\t${c.severity || ''}\t${c.status || ''}\t${c.date_reported || ''}`
+      `${c.case_id}\t${c.patient_name || ''}\t${c.age || ''}\t${c.barangay_name || ''}\t${c.disease_name || ''}\t${c.severity || ''}\t${c.status || ''}\t${formatDateStr(c.date_reported, dateFormat)}`
     ).join('\n');
     const blob = new Blob([headers + rows], { type: 'application/vnd.ms-excel' });
     const url = URL.createObjectURL(blob);
@@ -931,7 +910,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   const handleExportCSV = () => {
     const headers = 'Case ID,Patient Name,Age,Barangay,Disease,Severity,Status,Date Reported\n';
     const rows = displayCases.map(c =>
-      `"${c.case_id}","${c.patient_name || ''}","${c.age || ''}","${c.barangay_name || ''}","${c.disease_name || ''}","${c.severity || ''}","${c.status || ''}","${c.date_reported || ''}"`
+      `"${c.case_id}","${c.patient_name || ''}","${c.age || ''}","${c.barangay_name || ''}","${c.disease_name || ''}","${c.severity || ''}","${c.status || ''}","${formatDateStr(c.date_reported, dateFormat)}"`
     ).join('\n');
     const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -965,7 +944,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         footer { color: #4b5563; font-size: 12px; margin-top: 40px; border-top: 1px solid #1e293b; padding-top: 12px; }
       </style></head><body>
       <h1>Cabuyao Disease Monitoring System</h1>
-      <p>Dashboard Export &nbsp;|&nbsp; Generated: ${new Date().toLocaleDateString()} &nbsp;|&nbsp; ${dateRange.start} to ${dateRange.end}</p>
+      <p>Dashboard Export &nbsp;|&nbsp; Generated: ${formatDateStr(new Date(), dateFormat)} &nbsp;|&nbsp; ${formatDateStr(dateRange.start, dateFormat)} to ${formatDateStr(dateRange.end, dateFormat)}</p>
 
       <div class="stats">
         <div class="stat"><div class="num">${totalCases}</div><div class="lbl">Total Cases</div></div>
@@ -1031,7 +1010,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         @media print { button { display: none; } }
       </style></head><body>
       <h2>Cabuyao Disease Monitoring System</h2>
-      <p>Report generated: ${new Date().toLocaleString()} &nbsp;|&nbsp; Date Range: ${dateRange.start} to ${dateRange.end}</p>
+      <p>Report generated: ${formatDateStr(new Date(), dateFormat)} &nbsp;|&nbsp; Date Range: ${formatDateStr(dateRange.start, dateFormat)} to ${formatDateStr(dateRange.end, dateFormat)}</p>
 
       <h3>${eTitle}</h3>
       <div class="bar-section">${buildBarChartHTML(eBars, eTitle, eHighest)}</div>
@@ -1081,7 +1060,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         <div style={{ color: 'var(--text-muted)', fontSize: '15px', marginTop: '4px' }}>
           {loginRole === 'CHO' ? `City Health Officer - ${sessionContext || ''}` : `Barangay Health Worker - ${loginBarangay || ''}`}
           <span style={{ margin: '0 8px' }}>•</span>
-          {new Date().toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          {new Date().toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })} · {formatDateStr(new Date(), dateFormat)}
         </div>  
       </div>
 
@@ -1461,22 +1440,12 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
             {(dashPeriod === 'weekly' || dashPeriod === 'monthly' || dashPeriod === 'custom') && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '8px' }}>
-                <input
-                  type="date"
-                  key={`start-${dateRange.start}`}
-                  defaultValue={dateRange.start}
-                  onBlur={(e) => { const v = e.target.value; if (/^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(new Date(v))) { setDateRange({ ...dateRange, start: v }); setDashPeriod('custom'); } }}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.target.blur(); } }}
-                  style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '15px', boxSizing: 'border-box' }}
-                />
-                <input
-                  type="date"
-                  key={`end-${dateRange.end}`}
-                  defaultValue={dateRange.end}
-                  onBlur={(e) => { const v = e.target.value; if (/^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(new Date(v))) { setDateRange({ ...dateRange, end: v }); setDashPeriod('custom'); } }}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.target.blur(); } }}
-                  style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '15px', boxSizing: 'border-box' }}
-                />
+                <DatePicker value={dateRange.start} dateFormat={dateFormat} clearable={false}
+                  placeholder="Start date"
+                  onChange={(v) => { if (v) { setDateRange({ ...dateRange, start: v }); setDashPeriod('custom'); } }} />
+                <DatePicker value={dateRange.end} dateFormat={dateFormat} clearable={false}
+                  placeholder="End date"
+                  onChange={(v) => { if (v) { setDateRange({ ...dateRange, end: v }); setDashPeriod('custom'); } }} />
               </div>
             )}
           </div>
@@ -1566,7 +1535,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
               <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' }}>
                 <h4 style={{ color: 'var(--text-main)', margin: '0 0 16px 0', fontSize: '15px', fontWeight: '600' }}>
                   Top Barangays
-                  <span style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: '400', marginLeft: '8px' }}>({dateRange.start} to {dateRange.end})</span>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: '400', marginLeft: '8px' }}>({formatDateStr(dateRange.start, dateFormat)} to {formatDateStr(dateRange.end, dateFormat)})</span>
                 </h4>
                 {topBarangayList.length === 0 ? (
                   <div style={{ color: 'var(--text-muted)', fontSize: '15px', padding: '20px 0', textAlign: 'center' }}>No cases in this period</div>
@@ -1593,7 +1562,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <h4 style={{ color: 'var(--text-main)', margin: 0, fontSize: '15px', fontWeight: '600' }}>
                   Top Diseases
-                  <span style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: '400', marginLeft: '8px' }}>({dateRange.start} to {dateRange.end})</span>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: '400', marginLeft: '8px' }}>({formatDateStr(dateRange.start, dateFormat)} to {formatDateStr(dateRange.end, dateFormat)})</span>
                 </h4>
                 <button
                   onClick={() => setShowAllDiseases(true)}

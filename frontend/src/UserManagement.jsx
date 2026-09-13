@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
 import { API_URL } from './config';
 import { cacheUsers, getCachedUsers, getCachedBarangays, isOnline } from './offlineSync';
+import { formatDateTime } from './formatDate';
 
 const CHO_BARANGAYS = {
   'CHO Unit I': [
@@ -102,23 +103,6 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
   const filterRoleRef = useRef(null);
   const [roleOpen, setRoleOpen] = useState(false);
   const roleRef = useRef(null);
-
-  const formatDate = (d) => {
-    if (!d) return '\u2014';
-    const dt = new Date(d);
-    if (isNaN(dt)) return '\u2014';
-    const m = String(dt.getMonth() + 1).padStart(2, '0');
-    const day = String(dt.getDate()).padStart(2, '0');
-    const y = String(dt.getFullYear());
-    const yy = y.slice(2);
-    const h = dt.getHours();
-    const min = String(dt.getMinutes()).padStart(2, '0');
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    const h12 = h % 12 || 12;
-    if (dateFormat === 'DD/MM/YY') return `${day}/${m}/${yy} ${h12}:${min} ${ampm}`;
-    if (dateFormat === 'YYYY-MM-DD') return `${y}-${m}-${day} ${h12}:${min} ${ampm}`;
-    return `${m}/${day}/${yy} ${h12}:${min} ${ampm}`;
-  };
 
   const fetchUsers = (includeArchived = false) => {
     setLoading(true);
@@ -571,7 +555,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
               fetchUsers(next);
             }}
             disabled={offlineMode}
-            style={{ padding: '8px 14px', background: showArchived ? 'rgba(18,19,88,0.15)' : 'transparent', border: `1px solid ${showArchived ? '#121358' : 'var(--border-color)'}`, color: showArchived ? '#121358' : 'var(--text-muted)', borderRadius: '6px', cursor: offlineMode ? 'not-allowed' : 'pointer', fontWeight: '600', fontSize: '15px', opacity: offlineMode ? 0.4 : 1, whiteSpace: 'nowrap' }}>
+            style={{ padding: '8px 14px', background: showArchived ? '#121358' : 'transparent', border: `1px solid ${showArchived ? '#121358' : 'var(--border-color)'}`, color: showArchived ? '#fff' : 'var(--text-muted)', borderRadius: '6px', cursor: offlineMode ? 'not-allowed' : 'pointer', fontWeight: '600', fontSize: '15px', opacity: offlineMode ? 0.4 : 1, whiteSpace: 'nowrap' }}>
             {showArchived ? '← Back to Active Accounts' : '🗄️ Show Archived Accounts'}
           </button>
           {selectedIds.length > 0 && (
@@ -663,7 +647,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                       )}
                     </td>
                     <td style={{ padding: compactMode ? '8px 6px' : '15px 10px', color: 'var(--text-muted)', fontSize: '15px' }}>
-                      {formatDate(user.last_login)}
+                      {formatDateTime(user.last_login, dateFormat)}
                     </td>
                     <td style={{ padding: compactMode ? '8px 6px' : '15px 10px' }}>
                       <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>

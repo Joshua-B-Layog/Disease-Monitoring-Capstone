@@ -12,6 +12,8 @@ import { notify } from './components/Toast';
 import { DISEASES as DEFAULT_DISEASES } from './resident/PreventionTips';
 import { emitDiseasesChanged } from './diseaseSignal';
 import { FeverIcon, InfluenzaAIcon, LeptospirosisIcon, TuberculosisIcon, TyphoidIcon, RabiesIcon, FecesIcon, SoreEyesIcon, AvianIcon, ContactBloodborneIcon } from './components/DiseaseIcons';
+import { formatDate as formatDateStr, formatDateTime } from './formatDate';
+import DatePicker from './components/DatePicker';
 
 const AllDiseasesIcon = ({ color = '#121358', size = 28 }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
@@ -410,20 +412,7 @@ const EMPTY_FORM = {
 const CATEGORIES_PER_PAGE = 8;
 const DISEASES_PER_PAGE = 12;
 
-const formatDateStr = (dateStr, fmt) => {
-  if (!dateStr) return '--';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return '--';
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const shortY = String(y).slice(-2);
-  if (fmt === 'DD/MM/YY') return `${day}/${m}/${shortY}`;
-  if (fmt === 'YYYY-MM-DD') return `${y}-${m}-${day}`;
-  return `${m}/${day}/${shortY}`;
-};
-
-export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, autoSave, confirmDelete, keyboardShortcuts, fontScale, compactMode, loggedUserId, loggedUser, loginRole, loginBarangay, sessionContext, initialView, onInitialViewConsumed }) {
+export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, autoSave, confirmDelete, keyboardShortcuts, fontScale, compactMode, loggedUserId, loggedUser, loginRole, loginBarangay, sessionContext, initialView, onInitialViewConsumed, pendingOpenCaseId, onPendingCaseConsumed }) {
   const [view, setView] = useState('categories');
   const [inboxItems, setInboxItems] = useState([]);
   const [outboxItems, setOutboxItems] = useState([]);
@@ -768,6 +757,22 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       if (onInitialViewConsumed) onInitialViewConsumed();
     }
   }, [initialView]);
+
+  // ── Auto-open a specific case when arriving from a notification ("View →") ──
+  useEffect(() => {
+    if (!pendingOpenCaseId) return;
+    let applied = false;
+    const target = allCases.find(c => String(c.case_id) === String(pendingOpenCaseId));
+    if (target && barangayList.length > 0) {
+      openEdit(target);
+      applied = true;
+    }
+    const timer = setTimeout(() => {
+      if (onPendingCaseConsumed) onPendingCaseConsumed();
+    }, applied ? 0 : 8000);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingOpenCaseId, allCases, barangayList]);
 
   useEffect(() => {
     if (editRequestSuccess) {
@@ -3093,7 +3098,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       )}
                     </div>
                     <div style={{ fontSize: '15px', color: 'var(--text-muted)', flexShrink: 0 }}>
-                      {new Date(req.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+                      {formatDateStr(req.created_at, dateFormat)}
                     </div>
                     <button onClick={() => {
                       if (req._kind === 'edit') axios.put(`${API_URL}/api/case-edit-requests/${req.id}/read`);
@@ -3149,7 +3154,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     </div>
                   </div>
                   <div style={{ fontSize: '15px', color: 'var(--text-muted)', flexShrink: 0 }}>
-                    {new Date(item.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+                    {formatDateStr(item.created_at, dateFormat)}
                   </div>
                   <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
                     <button onClick={() => handleAcceptInboxItem(item)} title="Accept"
@@ -3215,7 +3220,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       </div>
                     </div>
                     <div style={{ fontSize: '15px', color: 'var(--text-muted)', flexShrink: 0 }}>
-                      {new Date(req.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+                      {formatDateStr(req.created_at, dateFormat)}
                     </div>
                     <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
                       <button onClick={() => req._type === 'password-change' ? handleAcceptPasswordRequest(req) : handleAcceptEditRequest(req)} title="Accept"
@@ -3259,7 +3264,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           {req.address || 'No address'} · {req.barangay_name || ''}
                         </div>
                         <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          Submitted by {req.requested_by_name || 'BHW'} · {new Date(req.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+                          Submitted by {req.requested_by_name || 'BHW'} · {formatDateStr(req.created_at, dateFormat)}
                         </div>
                       </div>
                     </div>
@@ -3306,7 +3311,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     )}
                   </div>
                   <div style={{ fontSize: '15px', color: 'var(--text-muted)', flexShrink: 0 }}>
-                    {new Date(reg.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+                    {formatDateStr(reg.created_at, dateFormat)}
                   </div>
                   <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
                     <button onClick={() => handleApproveRegistration(reg)} title="Approve"
@@ -3353,7 +3358,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     </div>
                   </div>
                   <div style={{ fontSize: '15px', color: 'var(--text-muted)', flexShrink: 0 }}>
-                    {new Date(msg.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+                    {formatDateStr(msg.created_at, dateFormat)}
                   </div>
                   {msg.status === 'new' ? (
                     <>
@@ -3447,7 +3452,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   </div>
                 </div>
                 <div style={{ fontSize: '15px', color: 'var(--text-muted)', flexShrink: 0 }}>
-                  {new Date(item.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+                  {formatDateStr(item.created_at, dateFormat)}
                 </div>
               </div>
             ))
@@ -4536,7 +4541,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                             </div>
                             <div style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
                               {entry.changed_by_name && <span>by {entry.changed_by_name}</span>}
-                              {entry.changed_at && <span>{entry.changed_by_name ? ' · ' : ''}{new Date(entry.changed_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>}
+                              {entry.changed_at && <span>{entry.changed_by_name ? ' · ' : ''}{formatDateTime(entry.changed_at, dateFormat)}</span>}
                             </div>
                             {entry.notes && <div style={{ color: 'var(--text-muted)', fontSize: '14px', fontStyle: 'italic', marginTop: '2px' }}>{entry.notes}</div>}
                           </div>
@@ -4548,32 +4553,14 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
                 <div>
                   <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Date of Onset</label>
-                  <div style={{ position: 'relative' }}>
-                    <input id="onset-date-input" type="date" style={{ ...inputStyle, paddingRight: '36px', border: formErrors.onsetDate ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.onsetDate ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }} value={formData.onsetDate}
-                      onChange={e => { setFormData({ ...formData, onsetDate: e.target.value }); setFormErrors(prev => ({ ...prev, onsetDate: false })); }}
-                      readOnly={isBhwReadOnly} />
-                    <span title="Open date picker" onClick={() => {
+                  <DatePicker value={formData.onsetDate} dateFormat={dateFormat} clearable={false}
+                    placeholder="Select date" disabled={isBhwReadOnly} error={!!formErrors.onsetDate}
+                    style={{ width: '100%' }}
+                    onChange={v => {
                       if (isBhwReadOnly) return;
-                      const el = document.getElementById('onset-date-input');
-                      if (el) {
-                        if (typeof el.showPicker === 'function') {
-                          el.showPicker();
-                        } else {
-                          el.focus();
-                        }
-                      }
-                    }}
-                      style={{
-                        position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
-                        cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: '4px', borderRadius: '4px',
-                      }}>
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                        <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
-                        <line x1="3" y1="10" x2="21" y2="10"/>
-                      </svg>
-                    </span>
-                  </div>
+                      setFormData({ ...formData, onsetDate: v });
+                      setFormErrors(prev => ({ ...prev, onsetDate: false }));
+                    }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Attending Physician</label>

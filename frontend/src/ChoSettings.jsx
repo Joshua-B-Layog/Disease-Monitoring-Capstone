@@ -6,6 +6,8 @@ import BackButton from './components/BackButton';
 import { getAllQueueItems, clearCompleted, getSyncHistory, clearSyncHistory } from './syncEngine';
 import { cacheUserProfile, getCachedUserProfile, getCachedBarangays, isOnline, getCachedAtMap } from './offlineSync';
 import { authHeaders } from './auth';
+import { emitTwoFaChanged, onTwoFaChanged } from './twoFaSignal';
+import { formatDate, formatDateTime } from './formatDate';
 import './ChoSettings.css';
 
 const CACHE_STORES = [
@@ -19,7 +21,7 @@ const CACHE_STORES = [
   { key: 'contactMessages_cached_at', label: 'Contact Messages' },
 ];
 
-function OfflineSyncPanel() {
+function OfflineSyncPanel({ dateFormat = 'MM/DD/YY' }) {
   const [items, setItems] = useState([]);
   const [history, setHistory] = useState([]);
   const [cachedAt, setCachedAt] = useState({});
@@ -50,8 +52,18 @@ function OfflineSyncPanel() {
     if (t === 'create') return '+ New Case';
     if (t === 'edit') return '✎ Edit Case';
     if (t === 'delete') return '✕ Delete Case';
-    if (t === 'message') return '✉ Message';
+    if (t === 'message') return '✉ Inbox Message';
+    if (t === 'add_request') return 'Submit New Case for Approval';
+    if (t === 'edit-request' || t === 'edit_request') return 'Request Case Edit to CHO';
     return t;
+  };
+
+  const statusLabel = (s) => {
+    if (s === 'pending') return 'Waiting';
+    if (s === 'syncing') return 'Syncing Now';
+    if (s === 'done') return 'Completed';
+    if (s === 'error') return 'Failed';
+    return s;
   };
 
   if (loading) return <div style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '17px' }}>Loading sync queue...</div>;
@@ -62,11 +74,11 @@ function OfflineSyncPanel() {
       <div style={{ flex: 1, minWidth: 0 }}>
         <span style={{ fontWeight: '600', color: 'var(--text-main)' }}>{typeLabel(item.type)}</span>
         <span style={{ color: 'var(--text-muted)', marginLeft: '8px' }}>
-          {new Date(item.timestamp).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+          {formatDateTime(item.timestamp, dateFormat)}
         </span>
       </div>
-      <span style={{ fontSize: '17px', padding: '2px 8px', borderRadius: '10px', background: statusColor(item.status) + '22', color: statusColor(item.status), fontWeight: '600', textTransform: 'capitalize' }}>
-        {item.status}
+      <span style={{ fontSize: '17px', padding: '2px 8px', borderRadius: '10px', background: statusColor(item.status) + '22', color: statusColor(item.status), fontWeight: '600' }}>
+        {statusLabel(item.status)}
       </span>
       {item.error && <span style={{ fontSize: '17px', color: '#EF4444', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.error}>{item.error}</span>}
     </div>
@@ -86,7 +98,7 @@ function OfflineSyncPanel() {
             const t = cachedAt[s.key];
             return (
               <span key={s.key} style={{ padding: '4px 10px', borderRadius: '10px', fontSize: '15px', fontWeight: '600', background: t ? 'rgba(18,153,104,0.12)' : 'rgba(239,68,68,0.1)', color: t ? '#129968' : '#EF4444', border: `1px solid ${t ? 'rgba(18,153,104,0.35)' : 'rgba(239,68,68,0.35)'}` }}>
-                {s.label}: {t ? new Date(t).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'not cached yet'}
+                {s.label}: {t ? formatDateTime(t, dateFormat) : 'not cached yet'}
               </span>
             );
           })}
@@ -151,6 +163,21 @@ const translations = {
 };
 const langCodeMap = { 'English':'en','Filipino':'fil','Bahasa Indonesia':'id','Tiếng Việt':'vi','ไทย':'th' };
 
+const CHO_UNIT_BARANGAYS = {
+  'CHO Unit I (Sala)': ['Barangay Uno (Poblacion)', 'Barangay Dos (Poblacion)', 'Barangay Tres (Poblacion)', 'Sala', 'Bigaa', 'Butong', 'Marinig', 'Gulod', 'Niugan', 'Baclaran'],
+  'CHO Unit II (Pulo)': ['Pulo', 'Banay-Banay', 'Banlic', 'Mamatid', 'San Isidro', 'Diezmo', 'Pittland', 'Casile'],
+};
+
+const normBarangay = (name) => (name || '').replace(/\(.*?\)/g, '').replace(/^Barangay\s*/i, '').replace(/^Brgy\.?\s*/i, '').trim().toLowerCase();
+
+const getChoUnitForBarangay = (barangay) => {
+  const n = normBarangay(barangay);
+  for (const [unit, list] of Object.entries(CHO_UNIT_BARANGAYS)) {
+    if (list.some(b => normBarangay(b) === n)) return unit;
+  }
+  return null;
+};
+
 export default function CHOSettings({
   activeUser,
   userId,
@@ -200,10 +227,6 @@ export default function CHOSettings({
   const [storageLoading, setStorageLoading] = useState(false);
   const [lastBackupDate, setLastBackupDate] = useState(() => localStorage.getItem('cdms_last_backup') || null);
   const [backupLoading, setBackupLoading] = useState(false);
-  const [showClearModal, setShowClearModal] = useState(false);
-  const [clearCountdown, setClearCountdown] = useState(3);
-  const [clearLoading, setClearLoading] = useState(false);
-  const [clearSuccess, setClearSuccess] = useState('');
   const [autoBackupEnabled, setAutoBackupEnabled] = useState(() => localStorage.getItem('cdms_auto_backup') !== 'false');
   const [toastMsg, setToastMsg] = useState('');
   const [toastType, setToastType] = useState('success');
@@ -238,21 +261,37 @@ export default function CHOSettings({
   const [saveMsg, setSaveMsg] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // ── Session data from DB ──
-  const [sessionData, setSessionData] = useState({
-    last_login: null,
-    last_login_location: null,
-    last_login_device: null,
-    previous_login: null,
-    previous_login_location: null,
-    previous_login_device: null,
-  });
-  const [otherSessionsCleared, setOtherSessionsCleared] = useState(false);
+  // ── Unit Office Assignment custom dropdown ──
+  const [assignOpen, setAssignOpen] = useState(false);
+  const assignRef = useRef(null);
+  useEffect(() => {
+    const handler = (e) => {
+      if (assignRef.current && !assignRef.current.contains(e.target)) setAssignOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const coveredNames = (() => {
+    const role = activeUser?.role;
+    const context = activeUser?.context || '';
+    if (role === 'BHW') {
+      const unit = getChoUnitForBarangay(context);
+      return unit ? CHO_UNIT_BARANGAYS[unit] : (context ? [context] : []);
+    }
+    return CHO_UNIT_BARANGAYS[context] || Object.values(CHO_UNIT_BARANGAYS).flat();
+  })();
+
+  // ── Login sessions (server-tracked) ──
+  const [loginSessions, setLoginSessions] = useState([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sessionsMsg, setSessionsMsg] = useState('');
   const [showSessionsModal, setShowSessionsModal] = useState(false);
-  const [revokedSessionIds, setRevokedSessionIds] = useState([]);
 
   // ── Barangay list ──
   const [barangayList, setBarangayList] = useState([]);
+
+  const coveredOptions = barangayList.filter(b => coveredNames.some(cn => normBarangay(cn) === normBarangay(b.name)));
 
   // ── Security ──
   const [security, setSecurity] = useState({
@@ -271,19 +310,21 @@ export default function CHOSettings({
   const [twoFaStep, setTwoFaStep] = useState('idle'); // 'idle' | 'email_sent' | 'verified'
   const [twoFaLoading, setTwoFaLoading] = useState(false);
   const [twoFaMsg, setTwoFaMsg] = useState('');
+  const [twoFaFallbackLink, setTwoFaFallbackLink] = useState('');
   const [disableOtp, setDisableOtp] = useState('');
   const [disableOtpError, setDisableOtpError] = useState('');
   const [disableOtpLoading, setDisableOtpLoading] = useState(false);
 
   // ── Notifications ──
   const [notifications, setNotifications] = useState({
-    emailNotifications: false, pushNotifications: false, smsNotifications: false,
-    newCaseReported: false, caseStatusUpdated: false, highRiskAlert: false,
+    emailNotifications: false, pushNotifications: false,
+    newCaseReported: false, caseStatusUpdated: false,
     updatedCaseReported: false,
     weeklySummary: false, systemMaintenance: false,
   });
   const [notifLoading, setNotifLoading] = useState(false);
   const [notifSaveMsg, setNotifSaveMsg] = useState('');
+  const [runningWeekly, setRunningWeekly] = useState(false);
   const [systemPrefsSaveMsg, setSystemPrefsSaveMsg] = useState('');
 
   useEffect(() => {
@@ -297,10 +338,8 @@ export default function CHOSettings({
         setNotifications({
           emailNotifications: !!data.email_notifications,
           pushNotifications: !!data.push_notifications,
-          smsNotifications: !!data.sms_notifications,
           newCaseReported: !!data.new_case_reported,
           caseStatusUpdated: !!data.case_status_updated,
-          highRiskAlert: !!data.high_risk_alert,
           updatedCaseReported: !!data.updated_case_reported,
           weeklySummary: !!data.weekly_summary,
           systemMaintenance: !!data.system_maintenance,
@@ -349,7 +388,7 @@ export default function CHOSettings({
       : 'English',
     timeZone: localStorage.getItem('cdms_timeZone')?.split(' (')[0] || 'Asia/Manila',
     dateFormat: savedDateFormat || 'MM/DD/YY',
-    autoSave: localStorage.getItem('cdms_autoSave') === 'true',
+    autoSave: localStorage.getItem('cdms_autoSave') !== 'false',
     confirmDelete: localStorage.getItem('cdms_confirm_delete') !== 'false',
     keyboardShortcuts: localStorage.getItem('cdms_keyboardShortcuts') === 'true',
   });
@@ -448,14 +487,6 @@ export default function CHOSettings({
     if (daysSince >= 7) handleCreateBackup(true);
   }, []);
 
-  // ── Countdown timer for clear modal ──
-  useEffect(() => {
-    if (!showClearModal) { setClearCountdown(3); return; }
-    if (clearCountdown <= 0) return;
-    const timer = setTimeout(() => setClearCountdown(prev => prev - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [showClearModal, clearCountdown]);
-
   const handleCreateBackup = (silent = false) => {
     setBackupLoading(true);
     fetch(API_URL + '/api/backup', { headers: authHeaders() })
@@ -476,29 +507,6 @@ export default function CHOSettings({
         setBackupLoading(false);
         if (!silent) { setToastMsg('Backup failed. Please try again.'); setToastType('error'); setTimeout(() => setToastMsg(''), 3000); }
       });
-  };
-
-  const handleClearMyData = async () => {
-    if (!userId) return;
-    setClearLoading(true);
-    try {
-      const res = await axios.delete(`${API_URL}/api/users/${userId}/my-data`);
-      setClearSuccess('Your personal data has been cleared successfully. System data and other users are not affected.');
-      setTimeout(() => {
-        setShowClearModal(false);
-        setClearSuccess('');
-        setClearLoading(false);
-        if (res.data?.logged_out) {
-          localStorage.clear();
-          window.location.href = '/';
-        }
-      }, 2500);
-    } catch (err) {
-      setToastMsg('Clear failed: ' + (err.response?.data?.error || err.message));
-      setToastType('error');
-      setTimeout(() => setToastMsg(''), 3000);
-      setClearLoading(false);
-    }
   };
 
   const [showCurrent, setShowCurrent] = useState(false);
@@ -531,14 +539,6 @@ export default function CHOSettings({
           phone: d.mobile_number || '',
           assignment: d.assigned_barangay_name || activeUser?.context || '',
           assignedBarangayId: d.assigned_barangay_id || null,
-        });
-        setSessionData({
-          last_login: d.last_login,
-          last_login_location: d.last_login_location,
-          last_login_device: d.last_login_device,
-          previous_login: d.previous_login,
-          previous_login_location: d.previous_login_location,
-          previous_login_device: d.previous_login_device,
         });
         setIsTwoFactorEnabled(!!d.two_fa_enabled);
         setProfileLoading(false);
@@ -725,12 +725,27 @@ if (security.newPassword !== security.confirmPassword) {
     // Turning ON - send verification email
     setTwoFaLoading(true);
     setTwoFaMsg('');
+    setTwoFaFallbackLink('');
     try {
-      await axios.post(API_URL + '/api/send-2fa-email', { userId });
-      setTwoFaStep('email_sent');
-      setTwoFaMsg(`✅ Verification email sent to ${maskEmail(profile.email)}. Click the link in your email to activate 2FA.`);
+      const res = await axios.post(API_URL + '/api/send-2fa-email', { userId });
+      const data = res && res.data ? res.data : {};
+      if (data.fallback && data.verifyLink) {
+        setTwoFaFallbackLink(data.verifyLink);
+        setTwoFaStep('email_sent');
+        setTwoFaMsg(data.message || `Email blocked by the mail service. Use the fallback link below to activate 2FA.`);
+      } else {
+        setTwoFaStep('email_sent');
+        setTwoFaMsg(`✅ Verification email sent to ${maskEmail(profile.email)}. Click the link in your email to activate 2FA. Check spam/junk if it doesn't arrive soon.`);
+      }
     } catch (err) {
-      setTwoFaMsg('❌ Failed to send verification email. Please try again.');
+      const fallbackLink = err.response?.data?.verifyLink;
+      if (err.response?.data?.fallback && fallbackLink) {
+        setTwoFaFallbackLink(fallbackLink);
+        setTwoFaStep('email_sent');
+        setTwoFaMsg(err.response.data.message || `Email blocked by the mail service. Use the fallback link below to activate 2FA.`);
+      } else {
+        setTwoFaMsg(`❌ ${err.response?.data?.error || 'Failed to send verification email. Please try again.'}`);
+      }
     } finally {
       setTwoFaLoading(false);
     }
@@ -754,6 +769,7 @@ if (security.newPassword !== security.confirmPassword) {
         setTwoFaStep('idle');
         setTwoFaMsg('✅ Two-Factor Authentication has been disabled.');
         setDisableOtp('');
+        emitTwoFaChanged(userId, false);
       }
     } catch (err) {
       setDisableOtpError(err.response?.data?.error || 'Invalid or expired code.');
@@ -769,6 +785,83 @@ if (security.newPassword !== security.confirmPassword) {
     setDisableOtp('');
     setDisableOtpError('');
   };
+
+  // ── Login sessions (server-tracked) ──
+  const loadSessions = () => {
+    if (!userId) return;
+    setSessionsLoading(true);
+    axios.get(`${API_URL}/api/users/${userId}/sessions`)
+      .then(res => setLoginSessions(Array.isArray(res.data?.sessions) ? res.data.sessions : []))
+      .catch(() => setLoginSessions([]))
+      .finally(() => setSessionsLoading(false));
+  };
+
+  useEffect(() => {
+    loadSessions();
+  }, [userId]);
+
+  useEffect(() => {
+    if (showSessionsModal) {
+      setSessionsMsg('');
+      loadSessions();
+    }
+  }, [showSessionsModal]);
+
+  const handleRevokeSession = async (sessionId) => {
+    setSessionsMsg('');
+    try {
+      await axios.delete(`${API_URL}/api/users/${userId}/sessions/${sessionId}`);
+      setLoginSessions(prev => prev.filter(s => s.id !== sessionId));
+      setSessionsMsg('✅ That session has been logged out.');
+    } catch (err) {
+      setSessionsMsg(`❌ ${err.response?.data?.error || 'Failed to revoke session.'}`);
+    }
+  };
+
+  const handleRevokeAllSessions = async () => {
+    setSessionsMsg('');
+    try {
+      await axios.delete(`${API_URL}/api/users/${userId}/sessions`);
+      setLoginSessions(prev => prev.filter(s => s.isCurrent));
+      setSessionsMsg('✅ All other sessions have been logged out.');
+      loadSessions();
+    } catch (err) {
+      setSessionsMsg(`❌ ${err.response?.data?.error || 'Failed to revoke sessions.'}`);
+    }
+  };
+
+  // ── Real-time 2FA status sync (cross-tab) ──
+  const refreshTwoFa = () => {
+    if (!userId) return;
+    axios.get(`${API_URL}/api/users/${userId}/profile`)
+      .then(res => setIsTwoFactorEnabled(!!(res.data && res.data.two_fa_enabled)))
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    if (!userId) return;
+    const unsubscribe = onTwoFaChanged(userId, (enabled) => {
+      refreshTwoFa();
+      if (enabled) {
+        setTwoFaStep('idle');
+        setTwoFaMsg('');
+        setTwoFaFallbackLink('');
+        setDisableOtp('');
+        setDisableOtpError('');
+      }
+    });
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refreshTwoFa();
+    };
+    const onFocus = () => refreshTwoFa();
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      unsubscribe();
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [userId]);
 
   // ── Format helpers ──
   const maskEmail = (email) => {
@@ -791,7 +884,7 @@ if (security.newPassword !== security.confirmPassword) {
     if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
     if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
     if (diffDays === 1) return 'Yesterday';
-    return date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    return formatDateTime(date, systemPrefs.dateFormat);
   };
 
   const getDeviceIcon = (device) => {
@@ -810,10 +903,8 @@ if (security.newPassword !== security.confirmPassword) {
       ...prev,
       pushNotifications: false,
       emailNotifications: false,
-      smsNotifications: false,
       newCaseReported: false,
       caseStatusUpdated: false,
-      highRiskAlert: false,
       updatedCaseReported: false,
       weeklySummary: false,
       systemMaintenance: false,
@@ -825,6 +916,28 @@ if (security.newPassword !== security.confirmPassword) {
     setNotifications(prev => ({ ...prev, [key]: value }));
   }
 };
+
+  const handleRunWeeklyNow = async () => {
+    setRunningWeekly(true);
+    try {
+      const res = await fetch(`${API_URL}/api/weekly-summary/run`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setToastMsg(data.message || 'Weekly summary sent to subscribed users!');
+        setToastType('success');
+      } else {
+        setToastMsg(data.error || 'Weekly summary run failed.');
+        setToastType('error');
+      }
+    } catch {
+      setToastMsg('Network error. Is the server running?');
+      setToastType('error');
+    }
+    setRunningWeekly(false);
+    setTimeout(() => setToastMsg(''), 4000);
+  };
 
   // Derive display name
   const displayName = `${profile.firstName} ${profile.lastName}`.trim() || loggedUser || 'CHO Admin';
@@ -877,7 +990,7 @@ if (security.newPassword !== security.confirmPassword) {
               <NavigationCard title={t('Account Security')} icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="#2563EB"><path d="M19.944,2.642,12,.009,4.056,2.643A3,3,0,0,0,2,5.49V12c0,7.524,9.2,11.679,9.594,11.852l.354.157.368-.122C12.711,23.755,22,20.577,22,12V5.49A3,3,0,0,0,19.944,2.642Z"/></svg>} view="security" />
               <NavigationCard title={t('Notifications')} icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="#D97706"><path d="M20,8c-2.21,0-4-1.79-4-4S17.79,0,20,0s4,1.79,4,4-1.79,4-4,4Zm-8,7.42c.77,0,1.54-.29,2.12-.88l4.67-4.67c-2.73-.56-4.79-2.98-4.79-5.88,0-.34,.04-.67,.09-1H5c-1.81,0-3.38,.97-4.26,2.41L9.88,14.55c.58,.58,1.35,.88,2.12,.88Zm9.76-5.69l-6.23,6.23c-.97,.97-2.26,1.46-3.54,1.46s-2.56-.49-3.54-1.46L.05,7.54c-.01,.15-.05,.3-.05,.46v11c0,2.76,2.24,5,5,5h14c2.76,0,5-2.24,5-5l-.02-10.53c-.64,.57-1.39,1-2.22,1.26Z"/></svg>} view="notifications" />
               <NavigationCard title={t('System Preferences')} icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="#475569"><path d="M21,12a9.143,9.143,0,0,0-.15-1.645L23.893,8.6l-3-5.2L17.849,5.159A9,9,0,0,0,15,3.513V0H9V3.513A9,9,0,0,0,6.151,5.159L3.107,3.4l-3,5.2L3.15,10.355a9.1,9.1,0,0,0,0,3.29L.107,15.4l3,5.2,3.044-1.758A9,9,0,0,0,9,20.487V24h6V20.487a9,9,0,0,0,2.849-1.646L20.893,20.6l3-5.2L20.85,13.645A9.143,9.143,0,0,0,21,12Zm-6,0a3,3,0,1,1-3-3A3,3,0,0,1,15,12Z"/></svg>} view="system" />
-              <NavigationCard title={t('Data Management')} icon={<svg width="22" height="22" viewBox="12.3 12 11.4 12" fill="#0891B2"><path d="m22.5 18c0-.46-.089-.895-.218-1.312l1.417-.816-.999-1.732-1.41.813c-.605-.652-1.393-1.126-2.289-1.331v-1.621h-2v1.621c-.896.205-1.685.678-2.289 1.331l-1.41-.813-.999 1.732 1.417.816c-.129.418-.218.853-.218 1.312s.089.895.218 1.312l-1.417.816.999 1.732 1.41-.813c.605.652 1.393 1.126 2.289 1.331v1.621h2v-1.621c.896-.205 1.685-.678 2.289-1.331l1.41.813.999-1.732-1.417-.816c.129-.418.218-.853.218-1.312zm-4.5 1.5c-.827 0-1.5-.673-1.5-1.5s.673-1.5 1.5-1.5 1.5.673 1.5 1.5-.673 1.5-1.5 1.5z"/></svg>} view="data" isFullWidth />
+              <NavigationCard title={t('Data Management')} icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="#0891B2"><path d="M2 20h20v-4H2v4zm2-3h2v2H4v-2zm-2-3h20v-4H2v4zm2-3h2V9H4v2zm-2-3h20V4H2v4zm2-3h2V5H4v2z"/></svg>} view="data" isFullWidth />
             </div>
           </div>
         )}
@@ -965,18 +1078,47 @@ if (security.newPassword !== security.confirmPassword) {
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <label style={{ fontSize: '17px', fontWeight: '500', color: 'var(--text-muted)' }}>Unit Office Assignment</label>
-                    <div style={{ position: 'relative' }}>
-                      <select value={profile.assignedBarangayId || ''}
-                        onChange={e => {
-                          const selected = barangayList.find(b => b.id === parseInt(e.target.value));
-                          setProfile({ ...profile, assignedBarangayId: e.target.value ? parseInt(e.target.value) : null, assignment: selected ? selected.name : '' });
-                        }}
-                        style={{ ...fieldStyle, cursor: 'pointer', appearance: 'none', paddingRight: '36px' }}>
-                        <option value="">- Select Assignment -</option>
-                        {barangayList.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                      </select>
-                      <span style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', fontSize: '15px', pointerEvents: 'none', opacity: 0.6 }}>▼</span>
+                    <div style={{ position: 'relative' }} ref={assignRef}>
+                      <button type="button"
+                        onClick={() => setAssignOpen(!assignOpen)}
+                        style={{ ...fieldStyle, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', textAlign: 'left', background: 'var(--input-bg)', color: 'var(--text-main)' }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {profile.assignment || '- Select Assignment -'}
+                        </span>
+                        <span style={{ fontSize: '15px', transform: assignOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', opacity: 0.6, pointerEvents: 'none' }}>▼</span>
+                      </button>
+                      {assignOpen && (
+                        <div style={{
+                          position: 'absolute', top: 'calc(100% + 6px)', left: '0', right: '0', zIndex: 30,
+                          background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
+                          borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,0.25)',
+                          maxHeight: '220px', overflowY: 'auto', padding: '4px',
+                        }}>
+                          <button type="button"
+                            onClick={() => { setProfile({ ...profile, assignedBarangayId: null, assignment: '' }); setAssignOpen(false); }}
+                            style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '9px 12px', border: 'none', borderRadius: '8px', cursor: 'pointer', background: !profile.assignedBarangayId ? 'rgba(96,165,250,0.18)' : 'transparent', color: 'var(--text-main)', fontSize: '15px', fontWeight: !profile.assignedBarangayId ? '600' : '400', textAlign: 'left' }}>
+                            <span style={{ flex: 1 }}>- Select Assignment -</span>
+                            {!profile.assignedBarangayId && <span style={{ color: '#60a5fa', fontSize: '15px' }}>✓</span>}
+                          </button>
+                          {coveredOptions.map(b => {
+                            const isSel = profile.assignedBarangayId === b.id;
+                            return (
+                              <button key={b.id} type="button"
+                                onClick={() => { setProfile({ ...profile, assignedBarangayId: b.id, assignment: b.name }); setAssignOpen(false); }}
+                                style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '9px 12px', border: 'none', borderRadius: '8px', cursor: 'pointer', background: isSel ? 'rgba(96,165,250,0.18)' : 'transparent', color: 'var(--text-main)', fontSize: '15px', fontWeight: isSel ? '600' : '400', textAlign: 'left' }}>
+                                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name}</span>
+                                {isSel && <span style={{ color: '#60a5fa', fontSize: '15px' }}>✓</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
+                    <span style={{ fontSize: '15px', color: 'var(--text-muted)' }}>
+                      {activeUser?.role === 'BHW'
+                        ? `Showing barangays covered by your CHO unit${coveredNames.length > 1 ? ` (${coveredNames.length})` : ''}.`
+                        : `Showing barangays covered by ${((activeUser?.context || '').split('(')[0] || 'your unit').trim()} (${coveredNames.length}).`}
+                    </span>
                   </div>
                 </div>
 
@@ -1190,6 +1332,18 @@ if (security.newPassword !== security.confirmPassword) {
                 </div>
               )}
 
+              {twoFaFallbackLink && (
+                <div style={{ marginTop: '14px', padding: '14px 16px', background: 'rgba(16,185,129,0.08)', border: '1px solid #129968', borderRadius: '8px', fontSize: '17px', color: 'var(--text-main)' }}>
+                  <div style={{ fontWeight: '600', marginBottom: '8px', color: '#129968' }}>🔑 Fallback link (email blocked)</div>
+                  <a href={twoFaFallbackLink} style={{ color: '#129968', textDecoration: 'underline', wordBreak: 'break-all' }}>
+                    {twoFaFallbackLink}
+                  </a>
+                  <div style={{ marginTop: '8px', fontSize: '17px', color: 'var(--text-muted)' }}>
+                    Open this link to verify and activate 2FA. It also appears in the server console.
+                  </div>
+                </div>
+              )}
+
               {twoFaStep === 'disable_otp_sent' && (
                 <div style={{ marginTop: '14px', padding: '16px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
                   <label style={{ display: 'block', fontSize: '17px', fontWeight: '600', color: '#991b1b', marginBottom: '8px' }}>
@@ -1246,7 +1400,7 @@ if (security.newPassword !== security.confirmPassword) {
                   <div className="security-header-text">
                     <h3>Login Sessions</h3>
                     <span className="security-timestamp">
-                      {otherSessionsCleared ? '1 active session' : sessionData.previous_login ? '2 active sessions' : '1 active session'}
+                      {sessionsLoading ? 'Loading sessions...' : `${loginSessions.length} active session${loginSessions.length === 1 ? '' : 's'}`}
                     </span>
                   </div>
                 </div>
@@ -1258,33 +1412,45 @@ if (security.newPassword !== security.confirmPassword) {
               </div>
 
               {/* Current Session preview (always visible) */}
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: '16px',
-                padding: '16px', background: 'var(--input-bg)', border: '1px solid var(--border-color)',
-                borderRadius: '10px',
-              }}>
-                <div style={{ fontSize: '28px', flexShrink: 0 }}>
-                  {getDeviceIcon(sessionData.last_login_device)}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-h)' }}>
-                      {sessionData.last_login_device || 'Current Device'}
-                    </span>
-                    <span style={{ fontSize: '17px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px', background: '#129968', color: 'white' }}>
-                      THIS DEVICE
-                    </span>
+              {(() => {
+                const current = loginSessions.find(s => s.isCurrent) || loginSessions[0];
+                if (!current) {
+                  return (
+                    <div style={{ fontSize: '17px', color: 'var(--text-muted)', textAlign: 'center', padding: '8px 0' }}>
+                      No active sessions found.
+                    </div>
+                  );
+                }
+                return (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: '16px',
+                    padding: '16px', background: 'var(--input-bg)', border: '1px solid var(--border-color)',
+                    borderRadius: '10px',
+                  }}>
+                    <div style={{ fontSize: '28px', flexShrink: 0 }}>
+                      {getDeviceIcon(current.device)}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-h)' }}>
+                          {current.device || 'Current Device'}
+                        </span>
+                        <span style={{ fontSize: '17px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px', background: '#129968', color: 'white' }}>
+                          THIS DEVICE
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '17px', color: 'var(--text-muted)' }}>
+                        {current.location || 'Cabuyao, Calabarzon, Philippines'}
+                      </div>
+                      <div style={{ fontSize: '17px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        {formatLoginTime(current.created_at)}
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ fontSize: '17px', color: 'var(--text-muted)' }}>
-                    {sessionData.last_login_location || 'Cabuyao, Calabarzon, Philippines'}
-                  </div>
-                  <div style={{ fontSize: '17px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                    {formatLoginTime(sessionData.last_login)}
-                  </div>
-                </div>
-              </div>
+                );
+              })()}
 
-              {!sessionData.previous_login && (
+              {loginSessions.filter(s => !s.isCurrent).length === 0 && !sessionsLoading && (
                 <p style={{ margin: '10px 0 0 0', fontSize: '17px', color: 'var(--text-muted)', textAlign: 'center' }}>
                   No other active sessions found.
                 </p>
@@ -1323,85 +1489,77 @@ if (security.newPassword !== security.confirmPassword) {
                     Devices currently signed in to your account.
                   </p>
 
-                  {/* Current Session - cannot be revoked */}
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: '14px',
-                    padding: '14px 16px', background: 'var(--input-bg)', border: '1px solid var(--border-color)',
-                    borderRadius: '10px', marginBottom: '12px',
-                  }}>
-                    <div style={{ fontSize: '26px', flexShrink: 0 }}>
-                      {getDeviceIcon(sessionData.last_login_device)}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-h)' }}>
-                          {sessionData.last_login_device || 'Current Device'}
-                        </span>
-                        <span style={{ fontSize: '15px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px', background: '#129968', color: 'white' }}>
-                          TRUSTED
-                        </span>
-                        <span style={{ fontSize: '15px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px', background: '#dcf7eb', color: '#129968' }}>
-                          THIS DEVICE
-                        </span>
-                      </div>
-                        <div style={{ fontSize: '17px', color: 'var(--text-muted)' }}>
-                        {sessionData.last_login_location || 'Cabuyao, Calabarzon, Philippines'}
-                      </div>
-                        <div style={{ fontSize: '17px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                        {formatLoginTime(sessionData.last_login)}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Previous / Other Sessions - individually revokable */}
-                  {sessionData.previous_login && !otherSessionsCleared && !revokedSessionIds.includes('previous') && (
+                  {sessionsMsg && (
                     <div style={{
-                      display: 'flex', alignItems: 'center', gap: '14px',
-                      padding: '14px 16px', background: 'var(--input-bg)', border: '1px solid var(--border-color)',
-                      borderRadius: '10px', marginBottom: '12px',
+                      padding: '12px 16px', borderRadius: '8px', fontSize: '17px', fontWeight: '500', marginBottom: '12px',
+                      background: 'var(--input-bg)',
+                      color: sessionsMsg.startsWith('✅') ? '#0a5e42' : '#991b1b',
                     }}>
-                      <div style={{ fontSize: '26px', flexShrink: 0 }}>
-                        {getDeviceIcon(sessionData.previous_login_device)}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-h)', marginBottom: '3px' }}>
-                          {sessionData.previous_login_device || 'Unknown Device'}
-                        </div>
-                      <div style={{ fontSize: '17px', color: 'var(--text-muted)' }}>
-                          {sessionData.previous_login_location || 'Unknown Location'}
-                        </div>
-                      <div style={{ fontSize: '17px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                          {formatLoginTime(sessionData.previous_login)}
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => setRevokedSessionIds(prev => [...prev, 'previous'])}
-                        style={{ padding: '7px 14px', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '17px', fontWeight: '600', color: '#dc2626', cursor: 'pointer', flexShrink: 0 }}>
-                        Revoke
-                      </button>
+                      {sessionsMsg}
                     </div>
                   )}
 
-                  {(otherSessionsCleared || revokedSessionIds.includes('previous')) && sessionData.previous_login && (
-                    <div style={{ padding: '12px 16px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '17px', color: '#129968', fontWeight: '500', marginBottom: '12px' }}>
-                      ✅ This session has been logged out.
+                  {sessionsLoading ? (
+                    <div style={{ fontSize: '17px', color: 'var(--text-muted)', textAlign: 'center', padding: '20px 0' }}>
+                      Loading sessions...
                     </div>
-                  )}
-
-                  {!sessionData.previous_login && (
+                  ) : loginSessions.length === 0 ? (
                     <div style={{ padding: '14px 16px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '17px', color: 'var(--text-muted)', textAlign: 'center', marginBottom: '12px' }}>
-                      No other active sessions found.
+                      No active sessions found.
                     </div>
+                  ) : (
+                    loginSessions.map(session => (
+                      <div key={session.id} style={{
+                        display: 'flex', alignItems: 'center', gap: '14px',
+                        padding: '14px 16px', background: 'var(--input-bg)', border: '1px solid var(--border-color)',
+                        borderRadius: '10px', marginBottom: '12px',
+                      }}>
+                        <div style={{ fontSize: '26px', flexShrink: 0 }}>
+                          {getDeviceIcon(session.device)}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-h)' }}>
+                              {session.device || 'Unknown Device'}
+                            </span>
+                            {session.isCurrent && (
+                              <>
+                                <span style={{ fontSize: '15px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px', background: '#129968', color: 'white' }}>
+                                  TRUSTED
+                                </span>
+                                <span style={{ fontSize: '15px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px', background: '#dcf7eb', color: '#129968' }}>
+                                  THIS DEVICE
+                                </span>
+                              </>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '17px', color: 'var(--text-muted)' }}>
+                            {session.location || 'Unknown Location'}
+                          </div>
+                          <div style={{ fontSize: '17px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            {formatLoginTime(session.created_at)}
+                          </div>
+                        </div>
+                        {!session.isCurrent && (
+                          <button
+                            onClick={() => handleRevokeSession(session.id)}
+                            style={{ padding: '7px 14px', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '17px', fontWeight: '600', color: '#dc2626', cursor: 'pointer', flexShrink: 0 }}>
+                            Revoke
+                          </button>
+                        )}
+                      </div>
+                    ))
                   )}
 
                   {/* Log Out of All Other Sessions */}
-                  {sessionData.previous_login && !otherSessionsCleared && !revokedSessionIds.includes('previous') && (
+                  {loginSessions.filter(s => !s.isCurrent).length > 0 && (
                     <button
-                      onClick={() => setOtherSessionsCleared(true)}
+                      onClick={handleRevokeAllSessions}
+                      disabled={sessionsLoading}
                       style={{
                         width: '100%', marginTop: '8px', padding: '12px',
                         background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px',
-                        fontSize: '17px', fontWeight: '600', color: '#dc2626', cursor: 'pointer',
+                        fontSize: '17px', fontWeight: '600', color: '#dc2626', cursor: sessionsLoading ? 'not-allowed' : 'pointer',
                       }}>
                       Log Out of All Other Sessions
                     </button>
@@ -1432,7 +1590,6 @@ if (security.newPassword !== security.confirmPassword) {
                 rows: [
                   { key: 'pushNotifications', label: 'Push Notifications', sub: 'Receive push notifications in browser' },
                   { key: 'emailNotifications', label: 'Email Notifications', sub: 'Receive notifications via email' },
-                  { key: 'smsNotifications', label: 'SMS Notifications', sub: 'Receive notifications via text message' },
                 ],
               },
               {
@@ -1442,7 +1599,6 @@ if (security.newPassword !== security.confirmPassword) {
                   { key: 'newCaseReported', label: 'New Case Reported', sub: 'When a new case is reported in your barangay' },
                   { key: 'updatedCaseReported', label: 'Updated Case Reported', sub: 'When a BHW requests an edit or a CHO updates a case' },
                   { key: 'caseStatusUpdated', label: 'Case Status Updated', sub: 'When a case status changes' },
-                  { key: 'highRiskAlert', label: 'High Risk Alert', sub: 'When a high-risk area is identified' },
                 ],
               },
               {
@@ -1464,23 +1620,43 @@ if (security.newPassword !== security.confirmPassword) {
                 </div>
                 <div className="security-sessions-container">
                   {section.rows.map(row => (
-                    <div key={row.key} className="session-list-row"
-                        style={{ 
-                          opacity: row.key !== 'pushNotifications' && !notifications.pushNotifications ? 0.4 : 1,
-                          pointerEvents: row.key !== 'pushNotifications' && !notifications.pushNotifications ? 'none' : 'auto'
+                    <React.Fragment key={row.key}>
+                      <div className="session-list-row"
+                          style={{ 
+                            opacity: row.key !== 'pushNotifications' && !notifications.pushNotifications ? 0.4 : 1,
+                            pointerEvents: row.key !== 'pushNotifications' && !notifications.pushNotifications ? 'none' : 'auto'
+                          }}>
+                        <div className="session-info-meta"><h4>{row.label}</h4><p>{row.sub}</p></div>
+                        <label className="figma-toggle-switch" style={{
+                        opacity: row.key !== 'pushNotifications' && !notifications.pushNotifications ? 0.4 : 1,
+                        cursor: row.key !== 'pushNotifications' && !notifications.pushNotifications ? 'not-allowed' : 'pointer'
                         }}>
-                      <div className="session-info-meta"><h4>{row.label}</h4><p>{row.sub}</p></div>
-                      <label className="figma-toggle-switch" style={{
-                      opacity: row.key !== 'pushNotifications' && !notifications.pushNotifications ? 0.4 : 1,
-                      cursor: row.key !== 'pushNotifications' && !notifications.pushNotifications ? 'not-allowed' : 'pointer'
-                      }}>
-                      <input type="checkbox"
-                        checked={notifications[row.key]}
-                        disabled={row.key !== 'pushNotifications' && !notifications.pushNotifications}
-                        onChange={e => handleNotificationToggle(row.key, e.target.checked)} />
-                      <span className="figma-slider" />
-                    </label>
-                    </div>
+                        <input type="checkbox"
+                          checked={notifications[row.key]}
+                          disabled={row.key !== 'pushNotifications' && !notifications.pushNotifications}
+                          onChange={e => handleNotificationToggle(row.key, e.target.checked)} />
+                        <span className="figma-slider" />
+                      </label>
+                      </div>
+                      {row.key === 'weeklySummary' && activeUser?.role === 'CHO' && notifications.weeklySummary && (
+                        <div style={{ padding: '2px 0 14px 0', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <button onClick={handleRunWeeklyNow} disabled={runningWeekly}
+                            style={{
+                              alignSelf: 'flex-start', padding: '8px 16px', borderRadius: '8px',
+                              border: '1px solid var(--border-color)',
+                              background: runningWeekly ? 'var(--input-bg)' : 'var(--bg-surface)',
+                              color: 'var(--text-main)', cursor: runningWeekly ? 'wait' : 'pointer',
+                              fontSize: '15px', fontWeight: '700',
+                              display: 'flex', alignItems: 'center', gap: '6px',
+                            }}>
+                            ⚡ {runningWeekly ? 'Sending...' : 'Run Weekly Summary Now'}
+                          </button>
+                          <span style={{ fontSize: '15px', color: 'var(--text-muted)' }}>
+                            Runs now instead of waiting for the Friday 5PM auto-send.
+                          </span>
+                        </div>
+                      )}
+                    </React.Fragment>
                   ))}
                 </div>
               </div>
@@ -1498,10 +1674,8 @@ if (security.newPassword !== security.confirmPassword) {
                     body: JSON.stringify({
                       push_notifications: notifications.pushNotifications,
                       email_notifications: notifications.emailNotifications,
-                      sms_notifications: notifications.smsNotifications,
                       new_case_reported: notifications.newCaseReported,
                       case_status_updated: notifications.caseStatusUpdated,
-                      high_risk_alert: notifications.highRiskAlert,
                       updated_case_reported: notifications.updatedCaseReported,
                       weekly_summary: notifications.weeklySummary,
                       system_maintenance: notifications.systemMaintenance,
@@ -1676,11 +1850,11 @@ if (security.newPassword !== security.confirmPassword) {
                   <div style={{ position: 'relative' }}>
                       <select value={systemPrefs.timeZone} onChange={e => setSystemPrefs({ ...systemPrefs, timeZone: e.target.value })}
                         style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '17px', cursor: 'pointer', appearance: 'none', color: 'var(--text-main)', minWidth: '120px' }}>
-                        <option value="Asia/Manila">Asia/Manila (GMT+8)</option>
-                        <option value="Asia/Jakarta">Asia/Jakarta (GMT+7)</option>
-                        <option value="Asia/Ho_Chi_Minh">Asia/Ho_Chi_Minh (GMT+7)</option>
-                        <option value="Asia/Bangkok">Asia/Bangkok (GMT+7)</option>
-                        <option value="Asia/Kolkata">Asia/Kolkata (GMT+5:30)</option>
+                        <option value="Asia/Manila">Manila, Philippines (GMT+8)</option>
+                        <option value="Asia/Jakarta">Jakarta, Indonesia (GMT+7)</option>
+                        <option value="Asia/Ho_Chi_Minh">Ho Chi Minh, Vietnam (GMT+7)</option>
+                        <option value="Asia/Bangkok">Bangkok, Thailand (GMT+7)</option>
+                        <option value="Asia/Kolkata">Kolkata, India (GMT+5:30)</option>
                       </select>
                     <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-muted)', fontSize: '17px' }}>▼</span>
                   </div>
@@ -1825,7 +1999,7 @@ if (security.newPassword !== security.confirmPassword) {
                         const users = userRes.data;
                         const logs = (auditRes.data || []).map((l, idx) => ({
                           id: l.id ?? idx + 1,
-                          timestamp: new Date(l.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                          timestamp: formatDateTime(l.created_at, systemPrefs.dateFormat),
                           userName: l.user_name || '',
                           userRole: l.user_role || '',
                           action: l.action || '',
@@ -1835,7 +2009,7 @@ if (security.newPassword !== security.confirmPassword) {
 
                         if (row.label === 'Export as PDF') {
                           const caseRows = cases.map(c =>
-                            `<tr><td>${c.case_id}</td><td>${c.patient_name||''}</td><td>${c.age||''}</td><td>${c.gender||''}</td><td>${c.barangay_name||''}</td><td>${c.disease_name||''}</td><td>${c.severity||''}</td><td>${c.status||''}</td><td>${c.date_reported||''}</td></tr>`
+                            `<tr><td>${c.case_id}</td><td>${c.patient_name||''}</td><td>${c.age||''}</td><td>${c.gender||''}</td><td>${c.barangay_name||''}</td><td>${c.disease_name||''}</td><td>${c.severity||''}</td><td>${c.status||''}</td><td>${formatDate(c.date_reported, systemPrefs.dateFormat)}</td></tr>`
                           ).join('');
                           const userRows = users.map(u =>
                             `<tr><td>U-${String(u.user_id).padStart(3,'0')}</td><td>${u.full_name||''}</td><td>${u.username||''}</td><td>${u.role||''}</td><td>${u.barangay_name||''}</td><td>${u.is_active?'Active':'Inactive'}</td><td>${u.email||''}</td></tr>`
@@ -1856,7 +2030,7 @@ if (security.newPassword !== security.confirmPassword) {
                           </style></head><body>
                           <button class="print-btn" onclick="window.print();">🖨️ Print / Save as PDF</button>
                           <h2>Cabuyao CDMS - Full Data Export</h2>
-                          <p class="meta">Generated: ${new Date().toLocaleString()} &nbsp;|&nbsp; ${cases.length} Cases, ${users.length} Users</p>
+                          <p class="meta">Generated: ${formatDateTime(new Date(), systemPrefs.dateFormat)} &nbsp;|&nbsp; ${cases.length} Cases, ${users.length} Users</p>
                           <h3>Case Records (${cases.length})</h3>
                           <table><thead><tr><th>ID</th><th>Patient Name</th><th>Age</th><th>Gender</th><th>Barangay</th><th>Disease</th><th>Severity</th><th>Status</th><th>Date Reported</th></tr></thead><tbody>${caseRows}</tbody></table>
                           <h3>User Accounts (${users.length})</h3>
@@ -1935,7 +2109,7 @@ if (security.newPassword !== security.confirmPassword) {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderTop: '1px solid var(--border-color)' }}>
                     <div style={{ textAlign: 'left' }}>
                       <div style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-main)' }}>Last Backup</div>
-                      <div style={{ fontSize: '17px', color: 'var(--text-muted)' }}>{lastBackupDate ? new Date(lastBackupDate).toLocaleString('en-PH', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'No backup yet'}</div>
+                      <div style={{ fontSize: '17px', color: 'var(--text-muted)' }}>{lastBackupDate ? formatDateTime(lastBackupDate, systemPrefs.dateFormat) : 'No backup yet'}</div>
                     </div>
                     {lastBackupDate
                       ? <span style={{ fontSize: '17px', fontWeight: '600', padding: '4px 12px', borderRadius: '16px', background: 'var(--input-bg)', color: '#027a48' }}>Successful</span>
@@ -1963,7 +2137,7 @@ if (security.newPassword !== security.confirmPassword) {
                           if (!previewRes.ok) throw new Error('Invalid backup file');
                           const preview = await previewRes.json();
                           const confirmed = window.confirm(
-                            `Restore backup from ${new Date(preview.backup_date).toLocaleDateString('en-PH')}?\n\n` +
+                            `Restore backup from ${formatDate(preview.backup_date, systemPrefs.dateFormat)}?\n\n` +
                             `Will restore:\n` +
                             `• ${preview.counts.disease_cases} disease cases\n` +
                             `• ${preview.counts.users} users\n` +
@@ -2027,123 +2201,8 @@ if (security.newPassword !== security.confirmPassword) {
                   </div>
                 </div>
 
-                <OfflineSyncPanel />
+                <OfflineSyncPanel dateFormat={systemPrefs.dateFormat} />
               </div>
-
-              {/* Danger Zone */}
-              <div className="security-section-card" style={{ borderColor: 'var(--border-color)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="#DC2626"><path d="M20.5,8.48V3.5h-4.98L12-.02l-3.52,3.52H3.5v4.98L-.02,12l3.52,3.52v4.98h4.98l3.52,3.52,3.52-3.52h4.98v-4.98l3.52-3.52-3.52-3.52Zm-7.5,9.52h-2v-2h2v2Zm0-4h-2V6h2V14Z"/></svg>
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#dc2626' }}>Danger Zone</h3>
-                    <span style={{ fontSize: '17px', color: 'var(--text-muted)' }}>Irreversible actions</span>
-                  </div>
-                </div>
-
-                <div style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '16px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
-                  <div style={{ textAlign: 'left' }}>
-                    <div style={{ fontSize: '17px', fontWeight: '700', color: '#b91c1c', marginBottom: '4px' }}>Clear All Data</div>
-                    <div style={{ fontSize: '17px', color: '#991b1b' }}>This will permanently delete all your data. This action cannot be undone.</div>
-                  </div>
-                  <button onClick={() => setShowClearModal(true)} disabled={offlineMode} style={{ ...offlineBtnStyle, padding: '10px 20px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '17px', fontWeight: '600', color: '#dc2626', cursor: offlineMode ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }} title={offlineMode ? 'Unavailable offline' : ''}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-                    Clear Data
-                  </button>
-                </div>
-              </div>
-              </div>
-            )}
-
-            {showClearModal && (
-              <div style={{
-                position:'fixed', inset:0,
-                background:'rgba(0,0,0,0.6)',
-                display:'flex', alignItems:'center',
-                justifyContent:'center', zIndex:9999
-              }}>
-                <div style={{
-                  background:'var(--bg-surface)', borderRadius:'16px',
-                  padding:'40px 32px', width:'440px',
-                  maxWidth:'95vw', textAlign:'center',
-                  boxShadow:'0 24px 60px rgba(0,0,0,0.3)'
-                }}>
-                  <div style={{
-                    width:'64px', height:'64px', borderRadius:'50%',
-                    background:'var(--input-bg)', display:'flex',
-                    alignItems:'center', justifyContent:'center',
-                    margin:'0 auto 20px auto', fontSize:'28px'
-                  }}>⚠️</div>
-
-                  <h3 style={{margin:'0 0 8px 0', fontSize:'22px',
-                    fontWeight:'700', color:'var(--text-main)'}}>
-                    Clear Your Personal Data?
-                  </h3>
-
-                  <p style={{margin:'0 0 16px 0', color:'var(--text-muted)',
-                    fontSize:'15px', lineHeight:'1.6'}}>
-                    This will permanently clear YOUR personal data
-                    (notifications and activity history) from this account.
-                  </p>
-
-                  <div style={{
-                    background:'var(--input-bg)', border:'1px solid #fbbf24',
-                    borderRadius:'8px', padding:'12px 16px',
-                    marginBottom:'20px', textAlign:'left'
-                  }}>
-                    <p style={{margin:0, fontSize:'13px', color:'#92400e',
-                      fontWeight:'500'}}>
-                      ✅ Other CHO admins and BHW data will NOT be affected<br/>
-                      ✅ Case records remain in the system<br/>
-                      ❌ Your notification history will be permanently deleted
-                    </p>
-                  </div>
-
-                  {clearSuccess && (
-                    <div className="cdms-msg-in" style={{
-                      background:'var(--input-bg)', color:'var(--success-text)',
-                      padding:'10px', borderRadius:'8px',
-                      marginBottom:'16px', fontSize:'13px',
-                      fontWeight:'500'
-                    }}>
-                      ✅ {clearSuccess}
-                    </div>
-                  )}
-
-                  <div style={{
-                    display:'flex', gap:'12px',
-                    borderTop:'1px solid var(--border-color)',
-                    paddingTop:'20px', marginTop:'8px'
-                  }}>
-                    <button
-                      onClick={() => setShowClearModal(false)}
-                      disabled={clearLoading}
-                      style={{
-                        flex:1, padding:'14px', background:'transparent',
-                        border:'1px solid var(--border-color)', borderRadius:'8px',
-                        cursor:'pointer', fontSize:'15px',
-                        fontWeight:'500', color:'var(--text-main)'
-                      }}>
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleClearMyData}
-                      disabled={clearCountdown > 0 || clearLoading}
-                      style={{
-                        flex:1, padding:'14px',
-                        background: clearCountdown > 0 ? '#9ca3af' : '#ef4444',
-                        border:'none', borderRadius:'8px',
-                        cursor: clearCountdown > 0 ? 'not-allowed' : 'pointer',
-                        fontSize:'15px', fontWeight:'600', color:'#fff',
-                        transition:'background 0.3s'
-                      }}>
-                      {clearLoading
-                        ? 'Clearing...'
-                        : clearCountdown > 0
-                          ? `Wait ${clearCountdown}s...`
-                          : 'Yes, Clear My Data'}
-                    </button>
-                  </div>
-                </div>
               </div>
             )}
           </div>

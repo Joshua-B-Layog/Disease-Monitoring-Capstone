@@ -419,9 +419,9 @@ if (!document.getElementById('cdms-pulse')) {
   const s = document.createElement('style');
   s.id = 'cdms-pulse';
   s.textContent = `@keyframes cdmsPulse {
-    0%   { transform: scale(0.85); opacity: 0.9; }
-    70%  { transform: scale(2.4);  opacity: 0;   }
-    100% { transform: scale(0.85); opacity: 0;   }
+    0%   { transform: scale(1);   opacity: 0.95; }
+    60%  { transform: scale(3.2); opacity: 0;    }
+    100% { transform: scale(1);   opacity: 0;    }
   }`;
   document.head.appendChild(s);
 }
@@ -440,7 +440,8 @@ function PulseMarkers({ barangayData, onHover, onLeave, onClick }) {
       className: '',
       html: `
         <div style="position:relative;width:${w}px;height:${totalH}px;cursor:pointer;">
-          <div style="position:absolute;left:50%;top:${h - 5}px;width:16px;height:16px;transform:translate(-50%,-50%);border-radius:50%;background:${ring};animation:cdmsPulse 2s ease-out infinite;"></div>
+          <div style="position:absolute;left:50%;top:${h - 5}px;width:30px;height:30px;transform:translate(-50%,-50%);border-radius:50%;background:${ring};animation:cdmsPulse 1.8s ease-out 0.9s infinite;"></div>
+          <div style="position:absolute;left:50%;top:${h - 5}px;width:22px;height:22px;transform:translate(-50%,-50%);border-radius:50%;background:${ring};animation:cdmsPulse 1.8s ease-out infinite;"></div>
           <svg width="${w}" height="${h}" viewBox="0 0 34 44" style="position:absolute;top:0;left:0;display:block;filter:drop-shadow(0 3px 4px rgba(0,0,0,0.5));">
             <path d="M17 0C7.6 0 0 7.6 0 17c0 12 17 27 17 27s17-15 17-27C34 7.6 26.4 0 17 0z" fill="${color}"/>
             <circle cx="17" cy="17" r="11" fill="#ffffff"/>
@@ -457,7 +458,7 @@ function PulseMarkers({ barangayData, onHover, onLeave, onClick }) {
     markersRef.current = [];
 
     barangayData.forEach(b => {
-      const size = Math.max(24, Math.min(54, 20 + b.totalCases * 1.5));
+      const size = Math.max(32, Math.min(60, 22 + b.totalCases * 1.6));
       const icon = createPinIcon(b, size);
 
       const m = L.marker(b.coords, { icon, zIndexOffset: 1000 }).addTo(map);

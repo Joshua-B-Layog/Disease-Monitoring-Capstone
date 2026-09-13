@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { API_URL } from '../config';
+import { emitTwoFaChanged } from '../twoFaSignal';
 
 export default function Verify2FALanding() {
   const [status, setStatus] = useState('verifying'); // 'verifying' | 'success' | 'error'
@@ -24,6 +25,7 @@ export default function Verify2FALanding() {
       .then(async (res) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Verification failed.');
+        emitTwoFaChanged(userId, true);
         setStatus('success');
         setMessage(data.message || '2FA has been activated for your account.');
       })
@@ -91,8 +93,12 @@ export default function Verify2FALanding() {
             <h2 style={{ color: '#ffffff', fontSize: '22px', fontWeight: '700', margin: '0 0 12px 0' }}>
               Verification Failed
             </h2>
-            <p style={{ color: '#ef4444', fontSize: '15px', margin: '0 0 24px 0' }}>
+            <p style={{ color: '#ef4444', fontSize: '15px', margin: '0 0 12px 0' }}>
               {message}
+            </p>
+            <p style={{ color: '#9CA3AF', fontSize: '14px', margin: '0 0 24px 0', lineHeight: '1.5' }}>
+              This link may have expired or already been used. Toggle 2FA off and on again in
+              Settings → Security → Two-Factor Authentication to request a fresh link.
             </p>
             <button
               onClick={() => { window.location.href = '/'; }}
