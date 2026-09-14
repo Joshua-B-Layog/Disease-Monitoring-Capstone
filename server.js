@@ -189,6 +189,21 @@ const app = express();
 
 const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
 
+// Resolve the frontend base URL for links placed in emails (2FA verify, password reset).
+// Prefers the FRONTEND_URL env var; otherwise derives it from the request's Origin/Referer so
+// emails always point to the live frontend (e.g. Vercel) instead of falling back to localhost.
+function resolveFrontendUrl(req) {
+  if (process.env.FRONTEND_URL) return FRONTEND_URL;
+  const origin = (req.headers && (req.headers.origin || req.headers.referer)) || '';
+  try {
+    const parsed = new URL(origin);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return parsed.origin.replace(/\/$/, '');
+    }
+  } catch (e) { /* not a valid URL — fall through */ }
+  return 'http://localhost:3000';
+}
+
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-only-insecure-secret-change-me';
 if (!process.env.JWT_SECRET) {
   console.warn('⚠ WARNING: JWT_SECRET is not set. Using an insecure development secret. Set JWT_SECRET in your environment.');
@@ -3749,7 +3764,7 @@ app.post('/api/forgot-password', (req, res) => {
                 return res.status(500).json({ error: 'Failed to save reset token: ' + updateErr.message });
             }
 
-            const resetLink = `${FRONTEND_URL}/reset-password?token=${token}&email=${encodeURIComponent(userFound.email)}`;
+            const resetLink = `${resolveFrontendUrl(req)}/reset-password?token=${token}&email=${encodeURIComponent(userFound.email)}`;
 
             const mailOptions = {
                 from: `"Cabuyao Health System" <${process.env.BREVO_FROM}>`,
@@ -3925,7 +3940,7 @@ app.post('/api/send-2fa-email', authenticate, (req, res) => {
             [token, expiry, userId], async (updateErr) => {
             if (updateErr) return res.status(500).json({ error: 'Failed to save verification token.' });
 
-            const verifyLink = `${FRONTEND_URL}/verify-2fa?token=${token}&userId=${userId}`;
+            const verifyLink = `${resolveFrontendUrl(req)}/verify-2fa?token=${token}&userId=${userId}`;
 
             try {
                 await sendBrevoEmail(user.email, 'Cabuyao Health - Verify Your Email for 2FA', `
