@@ -186,7 +186,7 @@ function InfoCard({ label, value }) {
       <div style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
         {label}
       </div>
-      <div style={{ fontSize: '17px', fontWeight: '500', color: 'var(--text-main)' }}>
+      <div style={{ fontSize: '17px', fontWeight: '500', color: 'var(--text-main)', wordBreak: 'break-word' }}>
         {value}
       </div>
     </div>

@@ -1149,76 +1149,76 @@ export default function ResidentMap() {
             </div>
           );
         })()}
+        </div>
 
-        {/* CLICK POPUP */}
-        {popup && (
+      {/* CLICK POPUP — full-screen overlay (escapes .resident-map-area clipping so the ✕ is always reachable) */}
+      {popup && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 5000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(0,0,0,0.55)',
+        }} onClick={() => setPopup(null)}>
           <div style={{
-            position: 'absolute', inset: 0, zIndex: 2000,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(0,0,0,0.55)',
-          }} onClick={() => setPopup(null)}>
-            <div style={{
-              background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '14px',
-              padding: '28px', width: '440px', maxWidth: '95vw', maxHeight: '80vh',
-              display: 'flex', flexDirection: 'column', boxShadow: '0 24px 60px rgba(0,0,0,0.3)',
-            }} onClick={e => e.stopPropagation()}>
+            background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '14px',
+            padding: '28px', width: '440px', maxWidth: '95vw', maxHeight: '80vh',
+            display: 'flex', flexDirection: 'column', boxShadow: '0 24px 60px rgba(0,0,0,0.3)',
+          }} onClick={e => e.stopPropagation()}>
 
-              {/* Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px', flexShrink: 0 }}>
-                <div>
-                  <h3 style={{ margin: '0 0 5px 0', fontSize: '22px', fontWeight: '700', color: 'var(--text-main)' }}>{popup.barangayName}</h3>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                    <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: getRisk(popup.totalCases).color, display: 'inline-block' }} />
-                    <span style={{ fontSize: '17px', color: 'var(--text-muted)' }}>
-                      {getRisk(popup.totalCases).label} · {popup.totalCases} total case{popup.totalCases !== 1 ? 's' : ''}
-                    </span>
-                  </div>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px', flexShrink: 0 }}>
+              <div>
+                <h3 style={{ margin: '0 0 5px 0', fontSize: '22px', fontWeight: '700', color: 'var(--text-main)' }}>{popup.barangayName}</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                  <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: getRisk(popup.totalCases).color, display: 'inline-block' }} />
+                  <span style={{ fontSize: '17px', color: 'var(--text-muted)' }}>
+                    {getRisk(popup.totalCases).label} · {popup.totalCases} total case{popup.totalCases !== 1 ? 's' : ''}
+                  </span>
                 </div>
-                <button onClick={() => setPopup(null)}
-                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '26px', lineHeight: 1, padding: 0 }}>
-                  ×
-                </button>
               </div>
+              <button onClick={() => setPopup(null)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '26px', lineHeight: 1, padding: 0 }}>
+                ×
+              </button>
+            </div>
 
-              <div style={{ borderTop: '1px solid var(--border-color)', marginBottom: '14px', flexShrink: 0 }} />
+            <div style={{ borderTop: '1px solid var(--border-color)', marginBottom: '14px', flexShrink: 0 }} />
 
-              <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-              <p style={{ margin: '0 0 10px 0', fontSize: '17px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                All Diseases in this Barangay
-              </p>
+            <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+            <p style={{ margin: '0 0 10px 0', fontSize: '17px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              All Diseases in this Barangay
+            </p>
 
-              {Object.entries(popup.diseases)
-                .sort((a, b) => b[1] - a[1])
-                .map(([disease, count], i) => {
-                  const isTop = i < 5;
-                  return (
-                    <div key={disease} style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '10px 12px', marginBottom: '7px', borderRadius: '8px',
-                      background: isTop ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.06)',
-                      border: `1px solid ${isTop ? 'rgba(96,165,250,0.3)' : 'var(--border-color)'}`,
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '9px', flex: 1, minWidth: 0 }}>
-                        {isTop && (
-                          <span style={{ fontSize: '17px', background: '#121358', color: 'white', padding: '2px 6px', borderRadius: '10px', fontWeight: '700', flexShrink: 0 }}>
-                            TOP {i + 1}
-                          </span>
-                        )}
-                        <span style={{ fontSize: '17px', color: 'var(--text-main)', fontWeight: isTop ? '600' : '400', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {disease}
+            {Object.entries(popup.diseases)
+              .sort((a, b) => b[1] - a[1])
+              .map(([disease, count], i) => {
+                const isTop = i < 5;
+                return (
+                  <div key={disease} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '10px 12px', marginBottom: '7px', borderRadius: '8px',
+                    background: isTop ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.06)',
+                    border: `1px solid ${isTop ? 'rgba(96,165,250,0.3)' : 'var(--border-color)'}`,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '9px', flex: 1, minWidth: 0 }}>
+                      {isTop && (
+                        <span style={{ fontSize: '17px', background: '#121358', color: 'white', padding: '2px 6px', borderRadius: '10px', fontWeight: '700', flexShrink: 0 }}>
+                          TOP {i + 1}
                         </span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, marginLeft: '10px' }}>
-                        <span style={{ fontSize: '17px', fontWeight: '700', color: '#10b981' }}>{count}</span>
-                      </div>
+                      )}
+                      <span style={{ fontSize: '17px', color: 'var(--text-main)', fontWeight: isTop ? '600' : '400', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {disease}
+                      </span>
                     </div>
-                  );
-                })}
-              </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, marginLeft: '10px' }}>
+                      <span style={{ fontSize: '17px', fontWeight: '700', color: '#10b981' }}>{count}</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Legend */}
       <div style={{ marginTop: '16px', display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '24px', padding: '0 16px', alignItems: 'start' }}>

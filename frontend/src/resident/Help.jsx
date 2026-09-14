@@ -38,9 +38,10 @@ export default function Help() {
           </div>
           <div style={{ marginTop: '14px', textAlign: 'center' }}>
             <span style={{
-              padding: '8px 20px', background: 'var(--input-bg)', borderRadius: '6px',
-              fontSize: '17px', color: 'var(--text-muted)', cursor: 'pointer', display: 'inline-block',
-            }}>
+                padding: '8px 20px', background: 'var(--input-bg)', borderRadius: '6px',
+                fontSize: '17px', color: 'var(--text-muted)', cursor: 'pointer', display: 'inline-block',
+                wordBreak: 'break-word',
+              }}>
               Contact Support: chosupport@cabuyao.gov.ph
             </span>
           </div>

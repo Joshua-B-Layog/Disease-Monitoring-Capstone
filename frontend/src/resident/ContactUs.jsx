@@ -364,7 +364,7 @@ export default function ContactUs() {
             </a>
           </div>
 
-          <div style={{ fontSize: '17px', color: 'var(--text-muted)', lineHeight: '1.7' }}>
+          <div style={{ fontSize: '17px', color: 'var(--text-muted)', lineHeight: '1.7', wordBreak: 'break-word' }}>
             <div><strong style={{ color: 'var(--text-main)' }}>Address:</strong> {currentLoc.address}</div>
             <div><strong style={{ color: 'var(--text-main)' }}>Phone:</strong> {currentLoc.phone}</div>
             <div><strong style={{ color: 'var(--text-main)' }}>Email:</strong> {currentLoc.email}</div>
