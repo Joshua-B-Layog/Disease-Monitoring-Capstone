@@ -8,6 +8,7 @@ import { cacheUserProfile, getCachedUserProfile, getCachedBarangays, isOnline, g
 import { authHeaders } from './auth';
 import { emitTwoFaChanged, onTwoFaChanged } from './twoFaSignal';
 import { formatDate, formatDateTime } from './formatDate';
+import { useI18n } from './i18n';
 import './ChoSettings.css';
 
 const CACHE_STORES = [
@@ -27,6 +28,7 @@ function OfflineSyncPanel({ dateFormat = 'MM/DD/YY' }) {
   const [cachedAt, setCachedAt] = useState({});
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('queue');
+  const { t } = useI18n();
 
   const refresh = async () => {
     setLoading(true);
@@ -48,25 +50,25 @@ function OfflineSyncPanel({ dateFormat = 'MM/DD/YY' }) {
     return '#EF4444';
   };
 
-  const typeLabel = (t) => {
-    if (t === 'create') return '+ New Case';
-    if (t === 'edit') return '✎ Edit Case';
-    if (t === 'delete') return '✕ Delete Case';
-    if (t === 'message') return '✉ Inbox Message';
-    if (t === 'add_request') return 'Submit New Case for Approval';
-    if (t === 'edit-request' || t === 'edit_request') return 'Request Case Edit to CHO';
-    return t;
+  const typeLabel = (ty) => {
+    if (ty === 'create') return t('+ New Case');
+    if (ty === 'edit') return t('✎ Edit Case');
+    if (ty === 'delete') return t('✕ Delete Case');
+    if (ty === 'message') return t('✉ Inbox Message');
+    if (ty === 'add_request') return t('Submit New Case for Approval');
+    if (ty === 'edit-request' || ty === 'edit_request') return t('Request Case Edit to CHO');
+    return ty;
   };
 
   const statusLabel = (s) => {
-    if (s === 'pending') return 'Waiting';
-    if (s === 'syncing') return 'Syncing Now';
-    if (s === 'done') return 'Completed';
-    if (s === 'error') return 'Failed';
+    if (s === 'pending') return t('Waiting');
+    if (s === 'syncing') return t('Syncing Now');
+    if (s === 'done') return t('Completed');
+    if (s === 'error') return t('Failed');
     return s;
   };
 
-  if (loading) return <div style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '17px' }}>Loading sync queue...</div>;
+  if (loading) return <div style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '17px' }}>{t('Loading sync queue...')}</div>;
 
   const renderRow = (item, idx) => (
     <div key={item.id || idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderBottom: '1px solid var(--border-color)', fontSize: '17px' }}>
@@ -88,32 +90,32 @@ function OfflineSyncPanel({ dateFormat = 'MM/DD/YY' }) {
     <div>
       <div style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '12px 14px', marginBottom: '12px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-          <span style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-main)' }}>Last Sync &amp; Local Cache</span>
+          <span style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-main)' }}>{t('Last Sync & Local Cache')}</span>
           <span style={{ fontSize: '17px', fontWeight: '600', color: isOnline() ? '#129968' : '#EF4444' }}>
-            {isOnline() ? '● Online' : '● Offline'}
+            {isOnline() ? t('● Online') : t('● Offline')}
           </span>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
           {CACHE_STORES.map(s => {
-            const t = cachedAt[s.key];
+            const at = cachedAt[s.key];
             return (
-              <span key={s.key} style={{ padding: '4px 10px', borderRadius: '10px', fontSize: '15px', fontWeight: '600', background: t ? 'rgba(18,153,104,0.12)' : 'rgba(239,68,68,0.1)', color: t ? '#129968' : '#EF4444', border: `1px solid ${t ? 'rgba(18,153,104,0.35)' : 'rgba(239,68,68,0.35)'}` }}>
-                {s.label}: {t ? formatDateTime(t, dateFormat) : 'not cached yet'}
+              <span key={s.key} style={{ padding: '4px 10px', borderRadius: '10px', fontSize: '15px', fontWeight: '600', background: at ? 'rgba(18,153,104,0.12)' : 'rgba(239,68,68,0.1)', color: at ? '#129968' : '#EF4444', border: `1px solid ${at ? 'rgba(18,153,104,0.35)' : 'rgba(239,68,68,0.35)'}` }}>
+                {t(s.label)}: {at ? formatDateTime(at, dateFormat) : t('not cached yet')}
               </span>
             );
           })}
         </div>
         <p style={{ margin: '8px 0 0 0', fontSize: '15px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
-          Point-in-time copies of each dataset are saved locally so the app keeps working offline and syncs changes automatically once back online.
+          {t('Point-in-time copies of each dataset are saved locally so the app keeps working offline and syncs changes automatically once back online.')}
         </p>
       </div>
 
       <div style={{ display: 'flex', gap: '4px', marginBottom: '12px', background: 'var(--input-bg)', borderRadius: '8px', padding: '3px' }}>
         <button onClick={() => setTab('queue')} style={{ flex: 1, padding: '6px 12px', borderRadius: '6px', border: 'none', fontSize: '17px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s', background: tab === 'queue' ? 'var(--bg-surface)' : 'transparent', color: tab === 'queue' ? 'var(--text-main)' : 'var(--text-muted)', boxShadow: tab === 'queue' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
-          Queue ({items.filter(i => i.status === 'pending').length})
+          {t('Queue (')}{items.filter(i => i.status === 'pending').length})
         </button>
         <button onClick={() => setTab('history')} style={{ flex: 1, padding: '6px 12px', borderRadius: '6px', border: 'none', fontSize: '17px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s', background: tab === 'history' ? 'var(--bg-surface)' : 'transparent', color: tab === 'history' ? 'var(--text-main)' : 'var(--text-muted)', boxShadow: tab === 'history' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
-          History ({history.length})
+          {t('History (')}{history.length})
         </button>
       </div>
 
@@ -121,11 +123,11 @@ function OfflineSyncPanel({ dateFormat = 'MM/DD/YY' }) {
         <div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
             <button onClick={async () => { await clearCompleted(); refresh(); }} style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '17px', fontWeight: '500' }}>
-              Archive & Clear Completed
+              {t('Archive & Clear Completed')}
             </button>
           </div>
           {items.length === 0 ? (
-            <div style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '17px' }}>No offline operations in queue.</div>
+            <div style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '17px' }}>{t('No offline operations in queue.')}</div>
           ) : (
             <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
               {items.slice(0, 20).map((item, idx) => renderRow(item, idx))}
@@ -138,11 +140,11 @@ function OfflineSyncPanel({ dateFormat = 'MM/DD/YY' }) {
         <div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
             <button onClick={async () => { await clearSyncHistory(); refresh(); }} style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '17px', fontWeight: '500' }}>
-              Clear History
+              {t('Clear History')}
             </button>
           </div>
           {history.length === 0 ? (
-            <div style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '17px' }}>No sync history yet. Completed syncs will appear here.</div>
+            <div style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '17px' }}>{t('No sync history yet. Completed syncs will appear here.')}</div>
           ) : (
             <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
               {history.slice(0, 50).map((item, idx) => renderRow(item, idx))}
@@ -154,14 +156,7 @@ function OfflineSyncPanel({ dateFormat = 'MM/DD/YY' }) {
   );
 }
 
-const translations = {
-  en: { 'Profile Settings':'Profile Settings','Account Security':'Account Security','Notifications':'Notifications','System Preferences':'System Preferences','Data Management':'Data Management','Save Preferences':'Save Preferences','Save Changes':'Save Changes','Cancel':'Cancel' },
-  fil: { 'Profile Settings':'Mga Setting ng Profile','Account Security':'Seguridad ng Account','Notifications':'Mga Abiso','System Preferences':'Mga Kagustuhan ng System','Data Management':'Pamamahala ng Data','Save Preferences':'I-save ang Mga Kagustuhan','Save Changes':'I-save ang Mga Pagbabago','Cancel':'Kanselahin' },
-  id: { 'Profile Settings':'Pengaturan Profil','Account Security':'Keamanan Akun','Notifications':'Notifikasi','System Preferences':'Preferensi Sistem','Data Management':'Manajemen Data','Save Preferences':'Simpan Preferensi','Save Changes':'Simpan Perubahan','Cancel':'Batal' },
-  vi: { 'Profile Settings':'Cài đặt hồ sơ','Account Security':'Bảo mật tài khoản','Notifications':'Thông báo','System Preferences':'Tùy chọn hệ thống','Data Management':'Quản lý dữ liệu','Save Preferences':'Lưu tùy chọn','Save Changes':'Lưu thay đổi','Cancel':'Hủy' },
-  th: { 'Profile Settings':'การตั้งค่าโปรไฟล์','Account Security':'ความปลอดภัยของบัญชี','Notifications':'การแจ้งเตือน','System Preferences':'การตั้งค่าระบบ','Data Management':'การจัดการข้อมูล','Save Preferences':'บันทึกการตั้งค่า','Save Changes':'บันทึกการเปลี่ยนแปลง','Cancel':'ยกเลิก' },
-};
-const langCodeMap = { 'English':'en','Filipino':'fil','Bahasa Indonesia':'id','Tiếng Việt':'vi','ไทย':'th' };
+const langCodeMap = { 'English':'en', 'Filipino':'fil' };
 
 const CHO_UNIT_BARANGAYS = {
   'CHO Unit I (Sala)': ['Barangay Uno (Poblacion)', 'Barangay Dos (Poblacion)', 'Barangay Tres (Poblacion)', 'Sala', 'Bigaa', 'Butong', 'Marinig', 'Gulod', 'Niugan', 'Baclaran'],
@@ -205,6 +200,7 @@ export default function CHOSettings({
   onSecurityViewOpened,
 }) {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [currentView, setCurrentView] = useState('menu');
   useEffect(() => {
     if (openProfileView) {
@@ -382,9 +378,6 @@ export default function CHOSettings({
     fontSize: scaleToLabel(savedFontScale || '1'),
     compactView: savedCompactMode === true || savedCompactMode === 'true' ? true : false,
     displayLanguage: localStorage.getItem('cdms_language') === 'fil' ? 'Filipino'
-      : localStorage.getItem('cdms_language') === 'id' ? 'Bahasa Indonesia'
-      : localStorage.getItem('cdms_language') === 'vi' ? 'Tiếng Việt'
-      : localStorage.getItem('cdms_language') === 'th' ? 'ไทย'
       : 'English',
     timeZone: localStorage.getItem('cdms_timeZone')?.split(' (')[0] || 'Asia/Manila',
     dateFormat: savedDateFormat || 'MM/DD/YY',
@@ -393,11 +386,6 @@ export default function CHOSettings({
     keyboardShortcuts: localStorage.getItem('cdms_keyboardShortcuts') === 'true',
   });
   const [systemPrefsSnapshot, setSystemPrefsSnapshot] = useState(null);
-
-  const t = (key) => {
-    const code = langCodeMap[systemPrefs.displayLanguage] || 'en';
-    return translations[code]?.[key] || key;
-  };
 
   // ── Notify App.jsx of language/timezone/dateFormat changes ──
   useEffect(() => {
@@ -585,7 +573,7 @@ export default function CHOSettings({
   // ── Save profile changes to DB ──
   const handleSaveProfile = async () => {
     if (!profile.firstName.trim() || !profile.lastName.trim()) {
-      setSaveMsg('First name and last name are required.');
+      setSaveMsg(t('First name and last name are required.'));
       return;
     }
     setSaving(true);
@@ -599,10 +587,10 @@ export default function CHOSettings({
         assignedBarangayId: profile.assignedBarangayId,
       });
       if (setLoggedUser) setLoggedUser(res.data.fullName);
-      setSaveMsg('✅ Profile saved successfully!');
+      setSaveMsg(t('✅ Profile saved successfully!'));
       setTimeout(() => { setSaveMsg(''); setCurrentView('menu'); }, 1500);
     } catch (err) {
-      setSaveMsg('❌ ' + (err.response?.data?.error || 'Failed to save profile.'));
+      setSaveMsg(t('❌ ') + (err.response?.data?.error || t('Failed to save profile.')));
     } finally {
       setSaving(false);
     }
@@ -612,15 +600,15 @@ export default function CHOSettings({
   const handleChangePassword = async () => {
     setPasswordMsg('');
     if (!security.currentPassword || !security.newPassword || !security.confirmPassword) {
-      setPasswordMsg('❌ All password fields are required.');
+      setPasswordMsg(t('❌ All password fields are required.'));
       return;
     }
     if (security.newPassword !== security.confirmPassword) {
-      setPasswordMsg('❌ New passwords do not match.');
+      setPasswordMsg(t('❌ New passwords do not match.'));
       return;
     }
     if (security.newPassword.length < 8 || !/[A-Z]/.test(security.newPassword) || !/[a-z]/.test(security.newPassword) || !/[0-9]/.test(security.newPassword) || !/[^A-Za-z0-9]/.test(security.newPassword)) {
-      setPasswordMsg('❌ New password must be 8+ characters with uppercase, lowercase, a number, and a special character.');
+      setPasswordMsg(t('❌ New password must be 8+ characters with uppercase, lowercase, a number, and a special character.'));
       return;
     }
 
@@ -630,10 +618,10 @@ export default function CHOSettings({
         currentPassword: security.currentPassword,
         newPassword: security.newPassword,
       });
-      setPasswordMsg('✅ Password updated successfully!');
+      setPasswordMsg(t('✅ Password updated successfully!'));
       setSecurity({ currentPassword: '', newPassword: '', confirmPassword: '' });
     } catch (err) {
-      setPasswordMsg('❌ ' + (err.response?.data?.error || 'Failed to update password.'));
+      setPasswordMsg(t('❌ ') + (err.response?.data?.error || t('Failed to update password.')));
     } finally {
       setPasswordLoading(false);
     }
@@ -645,11 +633,11 @@ export default function CHOSettings({
     setPwRequestMsg('');
     try {
       const userName = loggedUser || activeUser?.context || 'BHW User';
-      const res = await axios.post(`${API_URL}/api/password-change-request`, { user_id: userId, user_name: userName });
-      setPwRequestMsg('✅ ' + (res.data?.message || 'Request sent to CHO.'));
+const res = await axios.post(`${API_URL}/api/password-change-request`, { user_id: userId, user_name: userName });
+      setPwRequestMsg(t('✅ ') + (res.data?.message || t('Request sent to CHO.')));
       setPwRequestStatus('pending');
     } catch (err) {
-      setPwRequestMsg('❌ ' + (err.response?.data?.error || 'Failed to send request.'));
+      setPwRequestMsg(t('❌ ') + (err.response?.data?.error || t('Failed to send request.')));
     } finally {
       setPwRequestLoading(false);
     }
@@ -664,10 +652,10 @@ export default function CHOSettings({
       if (pending) {
         await axios.put(`${API_URL}/api/password-change-requests/${pending.id}/reject`);
         setPwRequestStatus('none');
-        setPwRequestMsg('✅ Request cancelled.');
+        setPwRequestMsg(t('✅ Request cancelled.'));
       }
     } catch (err) {
-      setPwRequestMsg('❌ ' + (err.response?.data?.error || 'Failed to cancel request.'));
+      setPwRequestMsg(t('❌ ') + (err.response?.data?.error || t('Failed to cancel request.')));
     } finally {
       setPwRequestLoading(false);
     }
@@ -676,27 +664,27 @@ export default function CHOSettings({
   const handleSetNewPassword = async () => {
     setPasswordMsg('');
     if (!security.newPassword || !security.confirmPassword) {
-      setPasswordMsg('❌ Both password fields are required.');
+      setPasswordMsg(t('❌ Both password fields are required.'));
       return;
     }
 if (security.newPassword !== security.confirmPassword) {
-      setPasswordMsg('❌ Passwords do not match.');
+      setPasswordMsg(t('❌ Passwords do not match.'));
       return;
     }
     if (security.newPassword.length < 8 || !/[A-Z]/.test(security.newPassword) || !/[a-z]/.test(security.newPassword) || !/[0-9]/.test(security.newPassword) || !/[^A-Za-z0-9]/.test(security.newPassword)) {
-      setPasswordMsg('❌ New password must be 8+ characters with uppercase, lowercase, a number, and a special character.');
+      setPasswordMsg(t('❌ New password must be 8+ characters with uppercase, lowercase, a number, and a special character.'));
       return;
     }
 
     setPasswordLoading(true);
     try {
       await axios.put(`${API_URL}/api/users/${userId}/set-password`, { newPassword: security.newPassword });
-      setPasswordMsg('✅ Password updated successfully!');
+      setPasswordMsg(t('✅ Password updated successfully!'));
       setSecurity({ currentPassword: '', newPassword: '', confirmPassword: '' });
       setPwRequestStatus('none');
       setPwRequestMsg('');
     } catch (err) {
-      setPasswordMsg('❌ ' + (err.response?.data?.error || 'Failed to update password.'));
+      setPasswordMsg(t('❌ ') + (err.response?.data?.error || t('Failed to update password.')));
     } finally {
       setPasswordLoading(false);
     }
@@ -713,9 +701,9 @@ if (security.newPassword !== security.confirmPassword) {
       try {
         await axios.post(API_URL + '/api/send-login-otp', { userId });
         setTwoFaStep('disable_otp_sent');
-        setTwoFaMsg(`📧 A 6-digit code was sent to ${maskEmail(profile.email)}. Enter it below to disable 2FA.`);
+        setTwoFaMsg(t('📧 A 6-digit code was sent to ') + maskEmail(profile.email) + t('. Enter it below to disable 2FA.'));
       } catch (err) {
-        setTwoFaMsg('❌ Failed to send verification code. Please try again.');
+        setTwoFaMsg(t('❌ Failed to send verification code. Please try again.'));
       } finally {
         setTwoFaLoading(false);
       }
@@ -732,19 +720,19 @@ if (security.newPassword !== security.confirmPassword) {
       if (data.fallback && data.verifyLink) {
         setTwoFaFallbackLink(data.verifyLink);
         setTwoFaStep('email_sent');
-        setTwoFaMsg(data.message || `Email blocked by the mail service. Use the fallback link below to activate 2FA.`);
+        setTwoFaMsg(data.message || t('Email blocked by the mail service. Use the fallback link below to activate 2FA.'));
       } else {
         setTwoFaStep('email_sent');
-        setTwoFaMsg(`✅ Verification email sent to ${maskEmail(profile.email)}. Click the link in your email to activate 2FA. Check spam/junk if it doesn't arrive soon.`);
+        setTwoFaMsg(t('✅ Verification email sent to ') + maskEmail(profile.email) + t('. Click the link in your email to activate 2FA. Check spam/junk if it doesn\'t arrive soon.'));
       }
     } catch (err) {
       const fallbackLink = err.response?.data?.verifyLink;
       if (err.response?.data?.fallback && fallbackLink) {
         setTwoFaFallbackLink(fallbackLink);
         setTwoFaStep('email_sent');
-        setTwoFaMsg(err.response.data.message || `Email blocked by the mail service. Use the fallback link below to activate 2FA.`);
+        setTwoFaMsg(err.response.data.message || t('Email blocked by the mail service. Use the fallback link below to activate 2FA.'));
       } else {
-        setTwoFaMsg(`❌ ${err.response?.data?.error || 'Failed to send verification email. Please try again.'}`);
+        setTwoFaMsg(t('❌ ') + (err.response?.data?.error || t('Failed to send verification email. Please try again.')));
       }
     } finally {
       setTwoFaLoading(false);
@@ -755,7 +743,7 @@ if (security.newPassword !== security.confirmPassword) {
   const handleConfirmDisable2FA = async () => {
     setDisableOtpError('');
     if (disableOtp.length !== 6) {
-      setDisableOtpError('Please enter the 6-digit code sent to your email.');
+      setDisableOtpError(t('Please enter the 6-digit code sent to your email.'));
       return;
     }
     setDisableOtpLoading(true);
@@ -767,12 +755,12 @@ if (security.newPassword !== security.confirmPassword) {
         await axios.post(API_URL + '/api/disable-2fa', { userId });
         setIsTwoFactorEnabled(false);
         setTwoFaStep('idle');
-        setTwoFaMsg('✅ Two-Factor Authentication has been disabled.');
+        setTwoFaMsg(t('✅ Two-Factor Authentication has been disabled.'));
         setDisableOtp('');
         emitTwoFaChanged(userId, false);
       }
     } catch (err) {
-      setDisableOtpError(err.response?.data?.error || 'Invalid or expired code.');
+      setDisableOtpError(err.response?.data?.error || t('Invalid or expired code.'));
     } finally {
       setDisableOtpLoading(false);
     }
@@ -812,9 +800,9 @@ if (security.newPassword !== security.confirmPassword) {
     try {
       await axios.delete(`${API_URL}/api/users/${userId}/sessions/${sessionId}`);
       setLoginSessions(prev => prev.filter(s => s.id !== sessionId));
-      setSessionsMsg('✅ That session has been logged out.');
+      setSessionsMsg(t('✅ That session has been logged out.'));
     } catch (err) {
-      setSessionsMsg(`❌ ${err.response?.data?.error || 'Failed to revoke session.'}`);
+      setSessionsMsg(t('❌ ') + (err.response?.data?.error || t('Failed to revoke session.')));
     }
   };
 
@@ -823,10 +811,10 @@ if (security.newPassword !== security.confirmPassword) {
     try {
       await axios.delete(`${API_URL}/api/users/${userId}/sessions`);
       setLoginSessions(prev => prev.filter(s => s.isCurrent));
-      setSessionsMsg('✅ All other sessions have been logged out.');
+      setSessionsMsg(t('✅ All other sessions have been logged out.'));
       loadSessions();
     } catch (err) {
-      setSessionsMsg(`❌ ${err.response?.data?.error || 'Failed to revoke sessions.'}`);
+      setSessionsMsg(t('❌ ') + (err.response?.data?.error || t('Failed to revoke sessions.')));
     }
   };
 
@@ -880,10 +868,10 @@ if (security.newPassword !== security.confirmPassword) {
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return 'Just Now';
-    if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
-    if (diffDays === 1) return 'Yesterday';
+    if (diffMins < 1) return t('Just Now');
+    if (diffMins < 60) return `${diffMins}${diffMins !== 1 ? t(' minutes ago') : t(' minute ago')}`;
+    if (diffHours < 24) return `${diffHours}${diffHours !== 1 ? t(' hours ago') : t(' hour ago')}`;
+    if (diffDays === 1) return t('Yesterday');
     return formatDateTime(date, systemPrefs.dateFormat);
   };
 
@@ -925,14 +913,14 @@ if (security.newPassword !== security.confirmPassword) {
       });
       const data = await res.json();
       if (res.ok) {
-        setToastMsg(data.message || 'Weekly summary sent to subscribed users!');
+        setToastMsg(data.message || t('Weekly summary sent to subscribed users!'));
         setToastType('success');
       } else {
-        setToastMsg(data.error || 'Weekly summary run failed.');
+        setToastMsg(data.error || t('Weekly summary run failed.'));
         setToastType('error');
       }
     } catch {
-      setToastMsg('Network error. Is the server running?');
+      setToastMsg(t('Network error. Is the server running?'));
       setToastType('error');
     }
     setRunningWeekly(false);
@@ -940,7 +928,7 @@ if (security.newPassword !== security.confirmPassword) {
   };
 
   // Derive display name
-  const displayName = `${profile.firstName} ${profile.lastName}`.trim() || loggedUser || 'CHO Admin';
+  const displayName = `${profile.firstName} ${profile.lastName}`.trim() || loggedUser || t('CHO Admin');
   const initials = (() => {
     const parts = displayName.trim().split(' ').filter(Boolean);
     if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
@@ -975,15 +963,15 @@ if (security.newPassword !== security.confirmPassword) {
         {/* ── MENU VIEW ── */}
         {currentView === 'menu' && (
           <div>
-            <h1 className="settings-title">Settings</h1>
+            <h1 className="settings-title">{t('Settings')}</h1>
             {offlineMode && (
               <div style={{ padding: '10px 14px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '17px', color: '#D97706', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '16px' }}>⚠</span>
-                Offline - settings changes require an internet connection.
+                {t('Offline - settings changes require an internet connection.')}
               </div>
             )}
             <p className="settings-subtitle">
-              Manage your account credentials, notifications, and core configuration behaviors.
+              {t('Manage your account credentials, notifications, and core configuration behaviors.')}
             </p>
             <div className="menu-grid">
               <NavigationCard title={t('Profile Settings')} icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="#121358"><path d="m23.58 8.536-3.362-5.4-4.945 3.08v-6.216h-6.546v6.216l-4.945-3.08-3.362 5.4 5.563 3.464-5.563 3.464 3.362 5.4 4.945-3.08v6.216h6.546v-6.216l4.945 3.08 3.362-5.4-5.563-3.464z"/></svg>} view="profile" />
@@ -998,10 +986,10 @@ if (security.newPassword !== security.confirmPassword) {
         {/* ── PROFILE SETTINGS VIEW ── */}
         {currentView === 'profile' && (
           <div className="detail-view-container">
-            <BackButton onClick={() => { setCurrentView('menu'); setSaveMsg(''); }} style={{ marginBottom: '24px' }}>Back to Settings</BackButton>
+            <BackButton onClick={() => { setCurrentView('menu'); setSaveMsg(''); }} style={{ marginBottom: '24px' }}>{t('Back to Settings')}</BackButton>
 
             {profileLoading ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading profile...</div>
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('Loading profile...')}</div>
             ) : (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '24px', marginBottom: '24px' }}>
@@ -1013,7 +1001,7 @@ if (security.newPassword !== security.confirmPassword) {
                       overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
                     }}>
                       {profilePhoto ? (
-                        <img src={profilePhoto} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <img src={profilePhoto} alt={t('Profile')} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       ) : (
                         <span style={{ color: '#ffffff', fontSize: '32px', fontWeight: '600' }}>{initials}</span>
                       )}
@@ -1035,17 +1023,17 @@ if (security.newPassword !== security.confirmPassword) {
                     <p style={{ fontSize: '17px', color: 'var(--text-muted)', margin: 0 }}>
                       {activeUser?.role === 'BHW'
                         ? `BHW - ${profile.assignment || activeUser?.context || ''}`
-                        : `${activeUser?.role || 'CHO'} Specialist - ${profile.assignment || activeUser?.context || ''}`
+                        : `${activeUser?.role || 'CHO'} ${t('Specialist')} - ${profile.assignment || activeUser?.context || ''}`
                       }
                     </p>
                     <button onClick={() => fileInputRef.current.click()}
                       style={{ background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '8px 18px', fontSize: '17px', fontWeight: '500', cursor: 'pointer', marginTop: '6px', width: 'fit-content' }}>
-                      Change Photo
+                      {t('Change Photo')}
                     </button>
                     {profilePhoto && (
                       <button onClick={() => onProfilePhotoChange(null)}
                         style={{ background: 'transparent', color: '#ef4444', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '6px 14px', fontSize: '17px', cursor: 'pointer', width: 'fit-content' }}>
-                        Remove Photo
+                        {t('Remove Photo')}
                       </button>
                     )}
                   </div>
@@ -1069,7 +1057,7 @@ if (security.newPassword !== security.confirmPassword) {
                     { label: 'Contact Number', key: 'phone', type: 'text' },
                   ].map(field => (
                     <div key={field.key} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '17px', fontWeight: '500', color: 'var(--text-muted)' }}>{field.label}</label>
+                      <label style={{ fontSize: '17px', fontWeight: '500', color: 'var(--text-muted)' }}>{t(field.label)}</label>
                       <input type={field.type} value={profile[field.key]} readOnly={field.readOnly}
                         onChange={e => !field.readOnly && setProfile({ ...profile, [field.key]: e.target.value })}
                         style={{ ...fieldStyle, background: 'var(--input-bg)', color: field.readOnly ? 'var(--text-muted)' : 'var(--text-main)', cursor: field.readOnly ? 'not-allowed' : 'text' }} />
@@ -1077,13 +1065,13 @@ if (security.newPassword !== security.confirmPassword) {
                   ))}
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '17px', fontWeight: '500', color: 'var(--text-muted)' }}>Unit Office Assignment</label>
+                    <label style={{ fontSize: '17px', fontWeight: '500', color: 'var(--text-muted)' }}>{t('Unit Office Assignment')}</label>
                     <div style={{ position: 'relative' }} ref={assignRef}>
                       <button type="button"
                         onClick={() => setAssignOpen(!assignOpen)}
                         style={{ ...fieldStyle, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', textAlign: 'left', background: 'var(--input-bg)', color: 'var(--text-main)' }}>
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {profile.assignment || '- Select Assignment -'}
+                          {profile.assignment || t('- Select Assignment -')}
                         </span>
                         <span style={{ fontSize: '15px', transform: assignOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', opacity: 0.6, pointerEvents: 'none' }}>▼</span>
                       </button>
@@ -1097,7 +1085,7 @@ if (security.newPassword !== security.confirmPassword) {
                           <button type="button"
                             onClick={() => { setProfile({ ...profile, assignedBarangayId: null, assignment: '' }); setAssignOpen(false); }}
                             style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '9px 12px', border: 'none', borderRadius: '8px', cursor: 'pointer', background: !profile.assignedBarangayId ? 'rgba(96,165,250,0.18)' : 'transparent', color: 'var(--text-main)', fontSize: '15px', fontWeight: !profile.assignedBarangayId ? '600' : '400', textAlign: 'left' }}>
-                            <span style={{ flex: 1 }}>- Select Assignment -</span>
+                            <span style={{ flex: 1 }}>{t('- Select Assignment -')}</span>
                             {!profile.assignedBarangayId && <span style={{ color: '#60a5fa', fontSize: '15px' }}>✓</span>}
                           </button>
                           {coveredOptions.map(b => {
@@ -1116,8 +1104,8 @@ if (security.newPassword !== security.confirmPassword) {
                     </div>
                     <span style={{ fontSize: '15px', color: 'var(--text-muted)' }}>
                       {activeUser?.role === 'BHW'
-                        ? `Showing barangays covered by your CHO unit${coveredNames.length > 1 ? ` (${coveredNames.length})` : ''}.`
-                        : `Showing barangays covered by ${((activeUser?.context || '').split('(')[0] || 'your unit').trim()} (${coveredNames.length}).`}
+                        ? `${t('Showing barangays covered by your CHO unit')}${coveredNames.length > 1 ? ` (${coveredNames.length})` : ''}.`
+                        : `${t('Showing barangays covered by ')}${((activeUser?.context || '').split('(')[0] || t('your unit')).trim()} (${coveredNames.length}).`}
                     </span>
                   </div>
                 </div>
@@ -1129,7 +1117,7 @@ if (security.newPassword !== security.confirmPassword) {
                   </button>
                   <button onClick={handleSaveProfile} disabled={saving}
                     style={{ background: saving ? '#6fd4a2' : '#129968', border: 'none', color: '#ffffff', borderRadius: '12px', padding: '12px', fontSize: '17px', fontWeight: '500', cursor: saving ? 'not-allowed' : 'pointer', flexGrow: 1 }}>
-                    {saving ? 'Saving...' : t('Save Changes')}
+                    {saving ? t('Saving...') : t('Save Changes')}
                   </button>
                 </div>
               </>
@@ -1140,7 +1128,7 @@ if (security.newPassword !== security.confirmPassword) {
         {/* ── ACCOUNT SECURITY VIEW ── */}
         {currentView === 'security' && (
           <div className="detail-view-container security-view-view">
-            <BackButton onClick={() => { setCurrentView('menu'); setPasswordMsg(''); setTwoFaMsg(''); }}>Back to Settings</BackButton>
+            <BackButton onClick={() => { setCurrentView('menu'); setPasswordMsg(''); setTwoFaMsg(''); }}>{t('Back to Settings')}</BackButton>
 
             {/* ── 1. CHANGE PASSWORD ── */}
             <div className="security-section-card">
@@ -1149,8 +1137,8 @@ if (security.newPassword !== security.confirmPassword) {
                   <svg width="22" height="22" viewBox="0 0 512 512" fill="#D97706"><path d="M405.333,179.712v-30.379C405.333,66.859,338.475,0,256,0S106.667,66.859,106.667,149.333v30.379   c-38.826,16.945-63.944,55.259-64,97.621v128C42.737,464.214,90.452,511.93,149.333,512h213.333   c58.881-0.07,106.596-47.786,106.667-106.667v-128C469.278,234.971,444.159,196.657,405.333,179.712z M277.333,362.667   c0,11.782-9.551,21.333-21.333,21.333c-11.782,0-21.333-9.551-21.333-21.333V320c0-11.782,9.551-21.333,21.333-21.333   c11.782,0,21.333,9.551,21.333,21.333V362.667z M362.667,170.667H149.333v-21.333c0-58.91,47.756-106.667,106.667-106.667   s106.667,47.756,106.667,106.667V170.667z"/></svg>
                 </div>
                 <div className="security-header-text">
-                  <h3>Change Password</h3>
-                  <span className="security-timestamp">Update your account password</span>
+                  <h3>{t('Change Password')}</h3>
+                  <span className="security-timestamp">{t('Update your account password')}</span>
                 </div>
               </div>
 
@@ -1181,14 +1169,14 @@ if (security.newPassword !== security.confirmPassword) {
                     {pwRequestStatus === 'pending' && (
                       <div style={{ textAlign: 'center', padding: '20px 0' }}>
                         <div style={{ fontSize: '17px', color: 'var(--text-main)', fontWeight: '600', marginBottom: '8px' }}>
-                          Request Pending
+                          {t('Request Pending')}
                         </div>
                         <p style={{ fontSize: '17px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-                          Your password change request is awaiting CHO approval.
+                          {t('Your password change request is awaiting CHO approval.')}
                         </p>
                         <button onClick={handleCancelPasswordRequest} disabled={pwRequestLoading || offlineMode}
                           style={{ padding: '10px 24px', borderRadius: '8px', border: '1px solid #ef4444', background: 'transparent', color: '#ef4444', fontSize: '17px', fontWeight: '600', cursor: pwRequestLoading ? 'not-allowed' : 'pointer', opacity: offlineMode ? 0.5 : 1 }}>
-                          {pwRequestLoading ? 'Cancelling...' : 'Cancel Request'}
+                          {pwRequestLoading ? t('Cancelling...') : t('Cancel Request')}
                         </button>
                       </div>
                     )}
@@ -1196,26 +1184,26 @@ if (security.newPassword !== security.confirmPassword) {
                     {pwRequestStatus === 'accepted' && (
                       <>
                         <p style={{ fontSize: '17px', color: 'var(--success-text)', marginBottom: '16px', padding: '8px 12px', background: 'var(--success-bg)', borderRadius: '8px' }}>
-                          Your request was approved. Set your new password below.
+                          {t('Your request was approved. Set your new password below.')}
                         </p>
                         {[
                           { field: 'newPassword', label: 'New Password', show: showNew, setShow: setShowNew },
                           { field: 'confirmPassword', label: 'Confirm New Password', show: showConfirm, setShow: setShowConfirm },
                         ].map(({ field, label, show, setShow }) => (
                           <div key={field} className="security-input-row">
-                            <label>{label}</label>
+                            <label>{t(label)}</label>
                             <div className="security-password-wrapper">
                               <input type={show ? 'text' : 'password'} value={security[field]}
                                 onChange={e => setSecurity({ ...security, [field]: e.target.value })}
-                                placeholder={`Enter ${label}`} />
+                                placeholder={t(`Enter ${label}`)} />
                               <button type="button" className="security-eye-btn" onClick={() => setShow(!show)}>
                                 {show ? (
-                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
+                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2">
                                     <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
                                     <line x1="1" y1="1" x2="23" y2="23"/>
                                   </svg>
                                 ) : (
-                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
+                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2">
                                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                                     <circle cx="12" cy="12" r="3" />
                                   </svg>
@@ -1224,14 +1212,14 @@ if (security.newPassword !== security.confirmPassword) {
                             </div>
                             {field === 'confirmPassword' && security.confirmPassword && (
                               <p style={{ fontSize: '17px', marginTop: '5px', color: security.newPassword === security.confirmPassword ? '#129968' : '#ef4444' }}>
-                                {security.newPassword === security.confirmPassword ? '✓ Passwords match' : '✗ Passwords do not match'}
+                                {security.newPassword === security.confirmPassword ? t('✓ Passwords match') : t('✗ Passwords do not match')}
                               </p>
                             )}
                           </div>
                         ))}
                         <button onClick={handleSetNewPassword} disabled={passwordLoading || offlineMode} className="security-action-blue-btn"
                           style={{ ...offlineBtnStyle, opacity: passwordLoading ? 0.7 : offlineBtnStyle.opacity || 1, cursor: passwordLoading ? 'not-allowed' : offlineBtnStyle.cursor || 'pointer' }}>
-                          {passwordLoading ? 'Updating...' : 'Set New Password'}
+                          {passwordLoading ? t('Updating...') : t('Set New Password')}
                         </button>
                       </>
                     )}
@@ -1239,11 +1227,11 @@ if (security.newPassword !== security.confirmPassword) {
                     {pwRequestStatus === 'none' && (
                       <div style={{ textAlign: 'center', padding: '20px 0' }}>
                         <p style={{ fontSize: '17px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-                          To change your password, send a request to the City Health Office for approval.
+                          {t('To change your password, send a request to the City Health Office for approval.')}
                         </p>
                         <button onClick={handleRequestPasswordChange} disabled={pwRequestLoading || offlineMode}
                           style={{ padding: '10px 28px', borderRadius: '8px', border: 'none', background: '#129968', color: '#fff', fontSize: '17px', fontWeight: '600', cursor: pwRequestLoading ? 'not-allowed' : 'pointer', opacity: offlineMode ? 0.5 : 1 }}>
-                          {pwRequestLoading ? 'Sending...' : 'Request Password Change'}
+                          {pwRequestLoading ? t('Sending...') : t('Request Password Change')}
                         </button>
                       </div>
                     )}
@@ -1257,19 +1245,19 @@ if (security.newPassword !== security.confirmPassword) {
                       { field: 'confirmPassword', label: 'Confirm New Password', show: showConfirm, setShow: setShowConfirm },
                     ].map(({ field, label, show, setShow }) => (
                       <div key={field} className="security-input-row">
-                        <label>{label}</label>
+                        <label>{t(label)}</label>
                         <div className="security-password-wrapper">
                           <input type={show ? 'text' : 'password'} value={security[field]}
                             onChange={e => setSecurity({ ...security, [field]: e.target.value })}
-                            placeholder={`Enter ${label}`} />
+                            placeholder={t(`Enter ${label}`)} />
                           <button type="button" className="security-eye-btn" onClick={() => setShow(!show)}>
                             {show ? (
-                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
+                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2">
                                 <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
                                 <line x1="1" y1="1" x2="23" y2="23"/>
                               </svg>
                             ) : (
-                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
+                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2">
                                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                                 <circle cx="12" cy="12" r="3" />
                               </svg>
@@ -1278,15 +1266,15 @@ if (security.newPassword !== security.confirmPassword) {
                         </div>
                         {field === 'confirmPassword' && security.confirmPassword && (
                           <p style={{ fontSize: '17px', marginTop: '5px', color: security.newPassword === security.confirmPassword ? '#129968' : '#ef4444' }}>
-                            {security.newPassword === security.confirmPassword ? '✓ Passwords match' : '✗ Passwords do not match'}
+                            {security.newPassword === security.confirmPassword ? t('✓ Passwords match') : t('✗ Passwords do not match')}
                           </p>
                         )}
                       </div>
                     ))}
                     <button onClick={handleChangePassword} disabled={passwordLoading || offlineMode} className="security-action-blue-btn"
                       style={{ ...offlineBtnStyle, opacity: passwordLoading ? 0.7 : offlineBtnStyle.opacity || 1, cursor: passwordLoading ? 'not-allowed' : offlineBtnStyle.cursor || 'pointer' }}
-                      title={offlineMode ? 'Unavailable offline' : ''}>
-                      {passwordLoading ? 'Updating...' : 'Update Password'}
+                      title={offlineMode ? t('Unavailable offline') : ''}>
+                      {passwordLoading ? t('Updating...') : t('Update Password')}
                     </button>
                   </>
                 )}
@@ -1301,17 +1289,17 @@ if (security.newPassword !== security.confirmPassword) {
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="#2563EB"><path d="M19.944,2.642,12,.009,4.056,2.643A3,3,0,0,0,2,5.49V12c0,7.524,9.2,11.679,9.594,11.852l.354.157.368-.122C12.711,23.755,22,20.577,22,12V5.49A3,3,0,0,0,19.944,2.642Z"/></svg>
                   </div>
                   <div className="security-header-text">
-                    <h3>Two-Factor Authentication</h3>
+                    <h3>{t('Two-Factor Authentication')}</h3>
                     <span className="security-timestamp">
                       {isTwoFactorEnabled
-                        ? `✅ Active - verified via ${maskEmail(profile.email)}`
-                        : 'Currently disabled - adds an extra layer of security'}
+                        ? `${t('✅ Active - verified via ')}${maskEmail(profile.email)}`
+                        : t('Currently disabled - adds an extra layer of security')}
                     </span>
                   </div>
                 </div>
                 <label className="figma-toggle-switch" style={{ flexShrink: 0, marginLeft: '16px', marginTop: '4px', ...(offlineMode ? { opacity: 0.5, pointerEvents: 'none' } : {}) }}>
                   <input type="checkbox" checked={isTwoFactorEnabled}
-                    onChange={handle2FAToggle} disabled={twoFaLoading || twoFaStep === 'disable_otp_sent' || offlineMode} title={offlineMode ? 'Unavailable offline' : ''} />
+                    onChange={handle2FAToggle} disabled={twoFaLoading || twoFaStep === 'disable_otp_sent' || offlineMode} title={offlineMode ? t('Unavailable offline') : ''} />
                   <span className="figma-slider" />
                 </label>
               </div>
@@ -1328,7 +1316,7 @@ if (security.newPassword !== security.confirmPassword) {
 
               {twoFaStep === 'email_sent' && !isTwoFactorEnabled && (
                 <div style={{ marginTop: '14px', padding: '14px 16px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '17px', color: '#1e40af' }}>
-                  📧 Check your email and click <strong>"Verify Email"</strong> to complete 2FA setup. Once verified, 2FA will be active on your next login.
+                  {t('📧 Check your email and click ')}<strong>{t('"Verify Email"')}</strong>{t(' to complete 2FA setup. Once verified, 2FA will be active on your next login.')}
                 </div>
               )}
 
@@ -1347,7 +1335,7 @@ if (security.newPassword !== security.confirmPassword) {
               {twoFaStep === 'disable_otp_sent' && (
                 <div style={{ marginTop: '14px', padding: '16px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
                   <label style={{ display: 'block', fontSize: '17px', fontWeight: '600', color: '#991b1b', marginBottom: '8px' }}>
-                    Enter the 6-digit code to confirm disabling 2FA
+                    {t('Enter the 6-digit code to confirm disabling 2FA')}
                   </label>
                   {disableOtpError && (
                     <div style={{ fontSize: '17px', color: '#dc2626', marginBottom: '8px' }}>{disableOtpError}</div>
@@ -1374,7 +1362,7 @@ if (security.newPassword !== security.confirmPassword) {
                         fontWeight: '600', cursor: disableOtpLoading ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap',
                       }}
                     >
-                      {disableOtpLoading ? 'Verifying...' : 'Confirm Disable'}
+                      {disableOtpLoading ? t('Verifying...') : t('Confirm Disable')}
                     </button>
                   </div>
                   <button
@@ -1384,7 +1372,7 @@ if (security.newPassword !== security.confirmPassword) {
                       fontSize: '17px', cursor: 'pointer', padding: 0, textDecoration: 'underline',
                     }}
                   >
-                    Cancel and keep 2FA enabled
+                    {t('Cancel and keep 2FA enabled')}
                   </button>
                 </div>
               )}
@@ -1398,16 +1386,16 @@ if (security.newPassword !== security.confirmPassword) {
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="#64748B"><path d="M24,13V4a3,3,0,0,0-3-3H3A3,3,0,0,0,0,4v9Z"/><polygon points="24 19 24 15 0 15 0 19 11 19 11 21 6 21 6 23 18 23 18 21 13 21 13 19 24 19"/></svg>
                   </div>
                   <div className="security-header-text">
-                    <h3>Login Sessions</h3>
+                    <h3>{t('Login Sessions')}</h3>
                     <span className="security-timestamp">
-                      {sessionsLoading ? 'Loading sessions...' : `${loginSessions.length} active session${loginSessions.length === 1 ? '' : 's'}`}
+                      {sessionsLoading ? t('Loading sessions...') : `${loginSessions.length}${loginSessions.length !== 1 ? t(' active sessions') : t(' active session')}`}
                     </span>
                   </div>
                 </div>
                 <button
                   onClick={() => setShowSessionsModal(true)}
                   className="security-manage-btn">
-                  Manage
+                  {t('Manage')}
                 </button>
               </div>
 
@@ -1417,7 +1405,7 @@ if (security.newPassword !== security.confirmPassword) {
                 if (!current) {
                   return (
                     <div style={{ fontSize: '17px', color: 'var(--text-muted)', textAlign: 'center', padding: '8px 0' }}>
-                      No active sessions found.
+                      {t('No active sessions found.')}
                     </div>
                   );
                 }
@@ -1433,14 +1421,14 @@ if (security.newPassword !== security.confirmPassword) {
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                         <span style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-h)' }}>
-                          {current.device || 'Current Device'}
+                          {current.device || t('Current Device')}
                         </span>
                         <span style={{ fontSize: '17px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px', background: '#129968', color: 'white' }}>
-                          THIS DEVICE
+                          {t('THIS DEVICE')}
                         </span>
                       </div>
                       <div style={{ fontSize: '17px', color: 'var(--text-muted)' }}>
-                        {current.location || 'Cabuyao, Calabarzon, Philippines'}
+                        {current.location || t('Cabuyao, Calabarzon, Philippines')}
                       </div>
                       <div style={{ fontSize: '17px', color: 'var(--text-muted)', marginTop: '2px' }}>
                         {formatLoginTime(current.created_at)}
@@ -1452,7 +1440,7 @@ if (security.newPassword !== security.confirmPassword) {
 
               {loginSessions.filter(s => !s.isCurrent).length === 0 && !sessionsLoading && (
                 <p style={{ margin: '10px 0 0 0', fontSize: '17px', color: 'var(--text-muted)', textAlign: 'center' }}>
-                  No other active sessions found.
+                  {t('No other active sessions found.')}
                 </p>
               )}
             </div>
@@ -1479,14 +1467,14 @@ if (security.newPassword !== security.confirmPassword) {
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: 'var(--text-h)' }}>Manage Sessions</h3>
+                    <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: 'var(--text-h)' }}>{t('Manage Sessions')}</h3>
                     <button onClick={() => setShowSessionsModal(false)}
                       style={{ background: 'none', border: 'none', fontSize: '22px', color: 'var(--text-muted)', cursor: 'pointer', lineHeight: 1, padding: 0 }}>
                       ×
                     </button>
                   </div>
                   <p style={{ margin: '0 0 20px 0', fontSize: '17px', color: 'var(--text-muted)' }}>
-                    Devices currently signed in to your account.
+                    {t('Devices currently signed in to your account.')}
                   </p>
 
                   {sessionsMsg && (
@@ -1501,11 +1489,11 @@ if (security.newPassword !== security.confirmPassword) {
 
                   {sessionsLoading ? (
                     <div style={{ fontSize: '17px', color: 'var(--text-muted)', textAlign: 'center', padding: '20px 0' }}>
-                      Loading sessions...
+                      {t('Loading sessions...')}
                     </div>
                   ) : loginSessions.length === 0 ? (
                     <div style={{ padding: '14px 16px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '17px', color: 'var(--text-muted)', textAlign: 'center', marginBottom: '12px' }}>
-                      No active sessions found.
+                      {t('No active sessions found.')}
                     </div>
                   ) : (
                     loginSessions.map(session => (
@@ -1520,21 +1508,21 @@ if (security.newPassword !== security.confirmPassword) {
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px', flexWrap: 'wrap' }}>
                             <span style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-h)' }}>
-                              {session.device || 'Unknown Device'}
+                              {session.device || t('Unknown Device')}
                             </span>
                             {session.isCurrent && (
                               <>
                                 <span style={{ fontSize: '15px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px', background: '#129968', color: 'white' }}>
-                                  TRUSTED
+                                  {t('TRUSTED')}
                                 </span>
                                 <span style={{ fontSize: '15px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px', background: '#dcf7eb', color: '#129968' }}>
-                                  THIS DEVICE
+                                  {t('THIS DEVICE')}
                                 </span>
                               </>
                             )}
                           </div>
                           <div style={{ fontSize: '17px', color: 'var(--text-muted)' }}>
-                            {session.location || 'Unknown Location'}
+                            {session.location || t('Unknown Location')}
                           </div>
                           <div style={{ fontSize: '17px', color: 'var(--text-muted)', marginTop: '2px' }}>
                             {formatLoginTime(session.created_at)}
@@ -1544,7 +1532,7 @@ if (security.newPassword !== security.confirmPassword) {
                           <button
                             onClick={() => handleRevokeSession(session.id)}
                             style={{ padding: '7px 14px', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '17px', fontWeight: '600', color: '#dc2626', cursor: 'pointer', flexShrink: 0 }}>
-                            Revoke
+                            {t('Revoke')}
                           </button>
                         )}
                       </div>
@@ -1561,7 +1549,7 @@ if (security.newPassword !== security.confirmPassword) {
                         background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px',
                         fontSize: '17px', fontWeight: '600', color: '#dc2626', cursor: sessionsLoading ? 'not-allowed' : 'pointer',
                       }}>
-                      Log Out of All Other Sessions
+                      {t('Log Out of All Other Sessions')}
                     </button>
                   )}
 
@@ -1569,7 +1557,7 @@ if (security.newPassword !== security.confirmPassword) {
                     <button
                       onClick={() => setShowSessionsModal(false)}
                       style={{ padding: '10px 24px', background: '#1e3a8a', border: 'none', borderRadius: '8px', fontSize: '17px', fontWeight: '600', color: '#fff', cursor: 'pointer' }}>
-                      Done
+                      {t('Done')}
                     </button>
                   </div>
                 </div>
@@ -1614,8 +1602,8 @@ if (security.newPassword !== security.confirmPassword) {
                 <div className="security-card-header">
                   <div className="security-icon-box">{section.icon}</div>
                   <div className="security-header-text">
-                    <h3>{section.title}</h3>
-                    <span className="security-timestamp">{section.subtitle}</span>
+                    <h3>{t(section.title)}</h3>
+                    <span className="security-timestamp">{t(section.subtitle)}</span>
                   </div>
                 </div>
                 <div className="security-sessions-container">
@@ -1626,7 +1614,7 @@ if (security.newPassword !== security.confirmPassword) {
                             opacity: row.key !== 'pushNotifications' && !notifications.pushNotifications ? 0.4 : 1,
                             pointerEvents: row.key !== 'pushNotifications' && !notifications.pushNotifications ? 'none' : 'auto'
                           }}>
-                        <div className="session-info-meta"><h4>{row.label}</h4><p>{row.sub}</p></div>
+                        <div className="session-info-meta"><h4>{t(row.label)}</h4><p>{t(row.sub)}</p></div>
                         <label className="figma-toggle-switch" style={{
                         opacity: row.key !== 'pushNotifications' && !notifications.pushNotifications ? 0.4 : 1,
                         cursor: row.key !== 'pushNotifications' && !notifications.pushNotifications ? 'not-allowed' : 'pointer'
@@ -1649,10 +1637,10 @@ if (security.newPassword !== security.confirmPassword) {
                               fontSize: '15px', fontWeight: '700',
                               display: 'flex', alignItems: 'center', gap: '6px',
                             }}>
-                            ⚡ {runningWeekly ? 'Sending...' : 'Run Weekly Summary Now'}
+                            ⚡ {runningWeekly ? t('Sending...') : t('Run Weekly Summary Now')}
                           </button>
                           <span style={{ fontSize: '15px', color: 'var(--text-muted)' }}>
-                            Runs now instead of waiting for the Friday 5PM auto-send.
+                            {t('Runs now instead of waiting for the Friday 5PM auto-send.')}
                           </span>
                         </div>
                       )}
@@ -1663,9 +1651,9 @@ if (security.newPassword !== security.confirmPassword) {
             ))}
 
             <div className="notifications-action-container">
-              {notifLoading && <span style={{ fontSize: '17px', color: 'var(--text-muted)', marginRight: '12px' }}>Loading...</span>}
+              {notifLoading && <span style={{ fontSize: '17px', color: 'var(--text-muted)', marginRight: '12px' }}>{t('Loading...')}</span>}
               {notifSaveMsg && <span style={{ fontSize: '17px', color: 'var(--text-muted)', marginRight: '12px' }}>{notifSaveMsg}</span>}
-              <button className="notifications-save-btn" disabled={offlineMode} style={offlineBtnStyle} title={offlineMode ? 'Unavailable offline' : ''} onClick={async () => {
+              <button className="notifications-save-btn" disabled={offlineMode} style={offlineBtnStyle} title={offlineMode ? t('Unavailable offline') : ''} onClick={async () => {
                 setNotifSaveMsg('');
                 try {
                   const res = await fetch(`${API_URL}/api/notification-preferences/${userId}`, {
@@ -1682,13 +1670,13 @@ if (security.newPassword !== security.confirmPassword) {
                     }),
                   });
                   if (res.ok) {
-                    setNotifSaveMsg('Preferences saved!');
+                    setNotifSaveMsg(t('Preferences saved!'));
                     setTimeout(() => setCurrentView('menu'), 800);
                   } else {
-                    setNotifSaveMsg('Failed to save.');
+                    setNotifSaveMsg(t('Failed to save.'));
                   }
                 } catch {
-                  setNotifSaveMsg('Save error. Try again.');
+                  setNotifSaveMsg(t('Save error. Try again.'));
                 }
               }}>{t('Save Preferences')}</button>
             </div>
@@ -1701,19 +1689,19 @@ if (security.newPassword !== security.confirmPassword) {
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="#DC2626"><path d="M20.5,8.48V3.5h-4.98L12-.02l-3.52,3.52H3.5v4.98L-.02,12l3.52,3.52v4.98h4.98l3.52,3.52,3.52-3.52h4.98v-4.98l3.52-3.52-3.52-3.52Zm-7.5,9.52h-2v-2h2v2Zm0-4h-2V6h2V14Z"/></svg>
                   </div>
                   <div className="security-header-text">
-                    <h3>Send Maintenance Notice</h3>
-                    <span className="security-timestamp">Broadcast a system maintenance alert to all users</span>
+                    <h3>{t('Send Maintenance Notice')}</h3>
+                    <span className="security-timestamp">{t('Broadcast a system maintenance alert to all users')}</span>
                   </div>
                 </div>
                 <div style={{ padding: '0 0 12px 0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <input type="text" placeholder="Subject (e.g. Scheduled Maintenance)" id="maint-title"
+                  <input type="text" placeholder={t('Subject (e.g. Scheduled Maintenance)')} id="maint-title"
                     style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '17px', background: 'var(--input-bg)', color: 'var(--text-main)', outline: 'none' }} />
-                  <textarea placeholder="Message describing the maintenance..." id="maint-message" rows={3}
+                  <textarea placeholder={t('Message describing the maintenance...')} id="maint-message" rows={3}
                     style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '17px', background: 'var(--input-bg)', color: 'var(--text-main)', outline: 'none', resize: 'vertical' }} />
                   <button onClick={async () => {
                     const title = document.getElementById('maint-title').value.trim();
                     const message = document.getElementById('maint-message').value.trim();
-                    if (!title || !message) { setToastMsg('Please enter both a subject and message.'); setToastType('error'); setTimeout(() => setToastMsg(''), 3000); return; }
+                    if (!title || !message) { setToastMsg(t('Please enter both a subject and message.')); setToastType('error'); setTimeout(() => setToastMsg(''), 3000); return; }
                     try {
                       const res = await fetch(`${API_URL}/api/notifications/system-maintenance`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ title, message }),
@@ -1726,17 +1714,17 @@ if (security.newPassword !== security.confirmPassword) {
                         document.getElementById('maint-title').value = '';
                         document.getElementById('maint-message').value = '';
                       } else {
-                        setToastMsg(data.error || 'Failed to send.');
+                        setToastMsg(data.error || t('Failed to send.'));
                         setToastType('error');
                         setTimeout(() => setToastMsg(''), 3000);
                       }
                     } catch {
-                      setToastMsg('Network error. Is the server running?');
+                      setToastMsg(t('Network error. Is the server running?'));
                       setToastType('error');
                       setTimeout(() => setToastMsg(''), 3000);
                     }
                   }} style={{ padding: '10px 20px', background: '#d97706', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '17px', fontWeight: '600', cursor: 'pointer', alignSelf: 'flex-start' }}>
-                    Send Notice
+                    {t('Send Notice')}
                   </button>
                 </div>
               </div>
@@ -1778,20 +1766,20 @@ if (security.newPassword !== security.confirmPassword) {
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="#9333EA"><path d="m15.988,11.726c.158,1.78-1.24,3.274-2.988,3.274h-3.978c-.691,0-1.181-.666-.975-1.325.502-1.609,1.936-4.165,4.24-4.608,1.755-.338,3.542.879,3.7,2.659Zm.034-3.662c.74.558,1.279,1.309,1.611,2.141l5.659-6.085c.943-.942.945-2.47.003-3.413-.941-.942-2.467-.943-3.409-.002-.032.032-5.573,6.513-5.573,6.513.609.175,1.191.456,1.708.846Zm.667,7.312c-.944,1.032-2.289,1.625-3.688,1.625h-3.978c-.958,0-1.868-.46-2.435-1.23s-.735-1.776-.45-2.69c.729-2.332,2.621-5.229,5.565-5.915l4.388-5.164H5C2.243,2,0,4.243,0,7v8c0,2.757,2.243,5,5,5h6v2h-3c-.552,0-1,.447-1,1s.448,1,1,1h8c.553,0,1-.447,1-1s-.447-1-1-1h-3v-2h6c2.757,0,5-2.243,5-5V6.285l-6.091,6.546c-.16.94-.568,1.83-1.22,2.543Z"/></svg>
                 </div>
                 <div className="security-header-text">
-                  <h3>Appearance</h3>
-                  <span className="security-timestamp">Customize how the system looks</span>
+                  <h3>{t('Appearance')}</h3>
+                  <span className="security-timestamp">{t('Customize how the system looks')}</span>
                 </div>
               </div>
               <div className="security-sessions-container">
                 <div className="session-list-row">
-                    <div className="session-info-meta"><h4>Dark Mode</h4><p>Switch between light and dark theme</p></div>
+                    <div className="session-info-meta"><h4>{t('Dark Mode')}</h4><p>{t('Switch between light and dark theme')}</p></div>
                     <label className="figma-toggle-switch">
                       <input type="checkbox" checked={theme === 'dark'} onChange={() => toggleTheme()} />
                       <span className="figma-slider" />
                     </label>
                 </div>
                 <div className="session-list-row">
-                  <div className="session-info-meta"><h4>Font Size</h4><p>Adjust text size for better readability</p></div>
+                  <div className="session-info-meta"><h4>{t('Font Size')}</h4><p>{t('Adjust text size for better readability')}</p></div>
                   <div style={{ position: 'relative' }}>
                     <select value={systemPrefs.fontSize} onChange={e => {
                       const label = e.target.value;
@@ -1800,13 +1788,13 @@ if (security.newPassword !== security.confirmPassword) {
                       if (onFontSizeChange) onFontSizeChange(scale);
                     }}
                       style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '17px', cursor: 'pointer', appearance: 'none', color: 'var(--text-main)', minWidth: '120px' }}>
-                      <option>Small</option><option>Medium</option><option>Large</option>
+                      <option value="Small">{t('Small')}</option><option value="Medium">{t('Medium')}</option><option value="Large">{t('Large')}</option>
                     </select>
                     <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-muted)', fontSize: '17px' }}>▼</span>
                   </div>
                 </div>
                 <div className="session-list-row">
-                  <div className="session-info-meta"><h4>Compact View</h4><p>Show more content with less spacing</p></div>
+                  <div className="session-info-meta"><h4>{t('Compact View')}</h4><p>{t('Show more content with less spacing')}</p></div>
                   <label className="figma-toggle-switch">
                     <input type="checkbox" checked={systemPrefs.compactView} onChange={e => {
                       const val = e.target.checked;
@@ -1826,27 +1814,24 @@ if (security.newPassword !== security.confirmPassword) {
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="#0D9488"><path d="M24,7v2c0,.552-.448,1-1,1s-1-.448-1-1v-2c0-1.103-.897-2-2-2h-2.029l1.25,1.307c.383,.398,.371,1.031-.028,1.414-.194,.187-.443,.279-.693,.279-.262,0-.524-.103-.721-.307l-2.212-2.301c-.761-.761-.761-2.023,.013-2.798L17.779,.307c.383-.398,1.017-.41,1.414-.028,.398,.383,.411,1.016,.028,1.414l-1.257,1.307h2.036c2.206,0,4,1.794,4,4ZM6.221,16.307c-.383-.398-1.016-.409-1.414-.027-.398,.383-.411,1.016-.028,1.414l1.25,1.307h-2.029c-1.103,0-2-.897-2-2v-2c0-.553-.448-1-1-1s-1,.447-1,1v2c0,2.206,1.794,4,4,4h2.035l-1.256,1.307c-.383,.398-.371,1.031,.028,1.414,.194,.187,.443,.279,.693,.279,.262,0,.524-.103,.721-.307l2.199-2.288c.773-.774,.773-2.036,.013-2.798l-2.212-2.301Zm5.779-8.307c0,2.209-1.791,4-4,4H4c-2.209,0-4-1.791-4-4V4C0,1.791,1.791,0,4,0h4c2.209,0,4,1.791,4,4v4Zm-2.5-4.384c0-.34-.276-.616-.616-.616h-2.257v-.384c0-.34-.276-.616-.616-.616h-.021c-.34,0-.616,.276-.616,.616v.384H3.116c-.34,0-.616,.276-.616,.616v.021c0,.34,.276,.616,.616,.616H7.308c-.111,.963-.484,2.151-1.303,3.071-.276-.31-.507-.648-.692-1-.106-.202-.318-.325-.545-.325-.464,0-.769,.492-.553,.903,.225,.43,.501,.843,.83,1.22-.539,.328-1.189,.559-1.977,.635-.32,.031-.568,.293-.568,.614v.021c0,.365,.316,.648,.679,.614,1.146-.107,2.079-.485,2.832-1.022,.749,.533,1.671,.913,2.808,1.022,.364,.035,.68-.248,.68-.613v-.021c0-.316-.24-.583-.555-.613-.792-.075-1.442-.31-1.984-.639,.99-1.135,1.485-2.591,1.607-3.866h.316c.34,0,.616-.276,.616-.616v-.021ZM24,16v4c0,2.209-1.791,4-4,4h-4c-2.209,0-4-1.791-4-4v-4c0-2.209,1.791-4,4-4h4c2.209,0,4,1.791,4,4Zm-3.196,5.144l-1.363-5.948c-.107-.464-.403-.886-.842-1.07-.919-.385-1.855,.155-2.056,1.021l-1.413,5.993c-.104,.439,.23,.86,.681,.86h0c.324,0,.606-.223,.681-.539l.274-1.161h2.409l.265,1.157c.073,.318,.356,.543,.682,.543h.002c.449,0,.782-.418,.682-.856Zm-2.818-5.744c-.038,0-.071,.026-.079,.063l-.811,3.437h1.757l-.787-3.437c-.009-.037-.041-.063-.079-.063Z"/></svg>
                 </div>
                 <div className="security-header-text">
-                  <h3>Language & Region</h3>
-                  <span className="security-timestamp">Set your preferred language</span>
+                  <h3>{t('Language & Region')}</h3>
+                  <span className="security-timestamp">{t('Set your preferred language')}</span>
                 </div>
               </div>
               <div className="security-sessions-container">
                 <div className="session-list-row">
-                  <div className="session-info-meta"><h4>Display Language</h4></div>
+                  <div className="session-info-meta"><h4>{t('Display Language')}</h4></div>
                   <div style={{ position: 'relative' }}>
                       <select value={systemPrefs.displayLanguage} onChange={e => setSystemPrefs({ ...systemPrefs, displayLanguage: e.target.value })}
                         style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '17px', cursor: 'pointer', appearance: 'none', color: 'var(--text-main)', minWidth: '120px' }}>
                         <option>English</option>
                         <option>Filipino</option>
-                        <option>Bahasa Indonesia</option>
-                        <option>Tiếng Việt</option>
-                        <option>ไทย</option>
                       </select>
                     <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-muted)', fontSize: '17px' }}>▼</span>
                   </div>
                 </div>
                 <div className="session-list-row">
-                  <div className="session-info-meta"><h4>Time Zone</h4></div>
+                  <div className="session-info-meta"><h4>{t('Time Zone')}</h4></div>
                   <div style={{ position: 'relative' }}>
                       <select value={systemPrefs.timeZone} onChange={e => setSystemPrefs({ ...systemPrefs, timeZone: e.target.value })}
                         style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '17px', cursor: 'pointer', appearance: 'none', color: 'var(--text-main)', minWidth: '120px' }}>
@@ -1860,7 +1845,7 @@ if (security.newPassword !== security.confirmPassword) {
                   </div>
                 </div>
                 <div className="session-list-row">
-                  <div className="session-info-meta"><h4>Date Format</h4></div>
+                  <div className="session-info-meta"><h4>{t('Date Format')}</h4></div>
                   <div style={{ position: 'relative' }}>
                       <select value={systemPrefs.dateFormat} onChange={e => setSystemPrefs({ ...systemPrefs, dateFormat: e.target.value })}
                         style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '17px', cursor: 'pointer', appearance: 'none', color: 'var(--text-main)', minWidth: '120px' }}>
@@ -1881,27 +1866,27 @@ if (security.newPassword !== security.confirmPassword) {
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="#8B5CF6"><path d="m23.265 8.379-.983-.567c.129-.418.218-.853.218-1.313s-.09-.895-.218-1.313l.983-.567c.479-.275.643-.887.367-1.366-.276-.478-.886-.643-1.366-.367l-.977.563c-.605-.652-1.393-1.126-2.289-1.33v-1.121c0-.552-.448-1-1-1s-1 .448-1 1v1.121c-.896.205-1.685.678-2.289 1.33l-.977-.563c-.48-.276-1.09-.112-1.366.367s-.112 1.09.367 1.366l.983.567c-.129.418-.218.853-.218 1.313s.09.895.218 1.313l-.983.567c-.479.275-.643.887-.367 1.366.277.482.895.64 1.366.367l.977-.563c.605.652 1.393 1.126 2.289 1.33v1.121c0 .552.448 1 1 1s1-.448 1-1v-1.121c.896-.205 1.685-.678 2.289-1.33l.977.563c.47.273 1.088.116 1.366-.367.276-.479.112-1.09-.367-1.366zm-5.265-.379c-.827 0-1.5-.673-1.5-1.5s.673-1.5 1.5-1.5 1.5.673 1.5 1.5-.673 1.5-1.5 1.5zm6 4.52v2.48c0 2.757-2.243 5-5 5h-6v2h4c.552 0 1 .448 1 1s-.448 1-1 1h-10c-.552 0-1-.448-1-1s.448-1 1-1h4v-2h-6c-2.757 0-5-2.243-5-5v-8c0-2.757 2.243-5 5-5h5.798c-.818 1.306-1.298 2.845-1.298 4.5 0 4.694 3.806 8.5 8.5 8.5 2.342 0 4.463-.948 6-2.48z"/></svg>
                 </div>
                 <div className="security-header-text">
-                  <h3>System Behavior</h3>
-                  <span className="security-timestamp">Configure how the system behaves</span>
+                  <h3>{t('System Behavior')}</h3>
+                  <span className="security-timestamp">{t('Configure how the system behaves')}</span>
                 </div>
               </div>
               <div className="security-sessions-container">
                 <div className="session-list-row">
-                  <div className="session-info-meta"><h4>Auto-Save</h4><p>Automatically save changes while editing</p></div>
+                  <div className="session-info-meta"><h4>{t('Auto-Save')}</h4><p>{t('Automatically save changes while editing')}</p></div>
                   <label className="figma-toggle-switch">
                     <input type="checkbox" checked={systemPrefs.autoSave} onChange={e => setSystemPrefs({ ...systemPrefs, autoSave: e.target.checked })} />
                     <span className="figma-slider" />
                   </label>
                 </div>
                 <div className="session-list-row">
-                  <div className="session-info-meta"><h4>Confirm Before Delete</h4><p>Show confirmation dialog before deleting items</p></div>
+                  <div className="session-info-meta"><h4>{t('Confirm Before Delete')}</h4><p>{t('Show confirmation dialog before deleting items')}</p></div>
                   <label className="figma-toggle-switch">
                     <input type="checkbox" checked={systemPrefs.confirmDelete} onChange={e => { const val = e.target.checked; setSystemPrefs(prev => ({ ...prev, confirmDelete: val })); if (onConfirmDeleteChange) onConfirmDeleteChange(val); }} />
                     <span className="figma-slider" />
                   </label>
                 </div>
                 <div className="session-list-row">
-                  <div className="session-info-meta"><h4>Keyboard Shortcuts</h4><p>Enable keyboard shortcuts for quick actions</p></div>
+                  <div className="session-info-meta"><h4>{t('Keyboard Shortcuts')}</h4><p>{t('Enable keyboard shortcuts for quick actions')}</p></div>
                   <label className="figma-toggle-switch">
                     <input type="checkbox" checked={systemPrefs.keyboardShortcuts} onChange={e => setSystemPrefs({ ...systemPrefs, keyboardShortcuts: e.target.checked })} />
                     <span className="figma-slider" />
@@ -1914,7 +1899,7 @@ if (security.newPassword !== security.confirmPassword) {
               {systemPrefsSaveMsg && <span style={{ fontSize: '17px', color: 'var(--text-muted)', marginRight: '12px' }}>{systemPrefsSaveMsg}</span>}
               <button className="notifications-save-btn" onClick={() => {
                 setSystemPrefsSnapshot(takeSystemSnapshot());
-                setSystemPrefsSaveMsg('Preferences saved!');
+                setSystemPrefsSaveMsg(t('Preferences saved!'));
                 setTimeout(() => setCurrentView('menu'), 1200);
               }}>{t('Save Preferences')}</button>
             </div>
@@ -1933,14 +1918,14 @@ if (security.newPassword !== security.confirmPassword) {
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="#0891B2"><path d="m22.5 18c0-.46-.089-.895-.218-1.312l1.417-.816-.999-1.732-1.41.813c-.605-.652-1.393-1.126-2.289-1.331v-1.621h-2v1.621c-.896.205-1.685.678-2.289 1.331l-1.41-.813-.999 1.732 1.417.816c-.129.418-.218.853-.218 1.312s.089.895.218 1.312l-1.417.816.999 1.732 1.41-.813c.605.652 1.393 1.126 2.289 1.331v1.621h2v-1.621c.896-.205 1.685-.678 2.289-1.331l1.41.813.999-1.732-1.417-.816c.129-.418.218-.853.218-1.312zm-4.5 1.5c-.827 0-1.5-.673-1.5-1.5s.673-1.5 1.5-1.5 1.5.673 1.5 1.5-.673 1.5-1.5 1.5zm-18-8.933v-2.167c1.876 1.596 4.92 2.6 8.5 2.6s6.624-1.004 8.5-2.6v1.669c-2.455.307-4.559 1.724-5.802 3.735-.841.124-1.745.196-2.698.196-4.865 0-8.5-1.812-8.5-3.433zm0-6.067c0-2.485 3.806-4.5 8.5-4.5s8.5 2.015 8.5 4.5-3.806 4.5-8.5 4.5-8.5-2.015-8.5-4.5zm0 11.066v-1.74c1.876 1.334 4.92 2.174 8.5 2.174.614 0 1.204-.033 1.783-.081-.179.665-.283 1.36-.283 2.081 0 .316.023.627.059.933-.504.041-1.022.067-1.559.067-4.865 0-8.5-1.812-8.5-3.434zm10.549 5.329c.395 1.016.987 1.932 1.736 2.697-1.183.27-2.485.408-3.784.408-4.224 0-8.5-1.447-8.5-4.214v-.96c1.876 1.334 4.92 2.174 8.5 2.174.708 0 1.387-.042 2.049-.105z"/></svg>
                 </div>
                 <div className="security-header-text">
-                  <h3>Storage Overview</h3>
-                  <span className="security-timestamp">Manage your data storage</span>
+                  <h3>{t('Storage Overview')}</h3>
+                  <span className="security-timestamp">{t('Manage your data storage')}</span>
                 </div>
               </div>
               <div style={{ padding: '0 16px 20px 16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '17px', marginBottom: '8px', color: 'var(--text-muted)', fontWeight: '500' }}>
-                  <span>Storage Used</span>
-                  <span style={{ color: 'var(--text-main)', fontWeight: '600' }}>{storageLoading ? 'Loading...' : storageStats ? `${storageStats.totalMB} MB of 10 GB` : '— of 10 GB'}</span>
+                  <span>{t('Storage Used')}</span>
+                  <span style={{ color: 'var(--text-main)', fontWeight: '600' }}>{storageLoading ? t('Loading...') : storageStats ? `${storageStats.totalMB} MB ${t('of ')}10 GB` : `${t('— of ')}10 GB`}</span>
                 </div>
                 <div style={{ width: '100%', height: '12px', background: 'var(--border-color)', borderRadius: '6px', overflow: 'hidden', marginBottom: '24px' }}>
                   <div style={{ width: `${storageStats ? storageStats.usedPercent : 0}%`, height: '100%', background: 'var(--text-main)', borderRadius: '6px' }} />
@@ -1953,8 +1938,8 @@ if (security.newPassword !== security.confirmPassword) {
                   ].map(item => (
                     <div key={item.lbl} style={{ background: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
                       <div style={{ fontSize: '22px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '4px' }}>{item.val}</div>
-                      <div style={{ fontSize: '17px', color: 'var(--text-muted)' }}>{item.lbl}</div>
-                      <div style={{ fontSize: '17px', color: 'var(--text-muted)', marginTop: '2px' }}>{item.sub}</div>
+                      <div style={{ fontSize: '17px', color: 'var(--text-muted)' }}>{t(item.lbl)}</div>
+                      <div style={{ fontSize: '17px', color: 'var(--text-muted)', marginTop: '2px' }}>{item.sub.includes('records') ? `${storageStats ? storageStats.cases : '—'}${t(' records')}` : item.sub.includes('accounts') ? `${storageStats ? storageStats.users : '—'}${t(' accounts')}` : `${storageStats ? storageStats.notifications : '—'}${t(' notifications')}`}</div>
                     </div>
                   ))}
                 </div>
@@ -1968,8 +1953,8 @@ if (security.newPassword !== security.confirmPassword) {
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="#129968"><path d="M23.13,18.09l-1.61,1.61c-.2,.2-.45,.29-.71,.29s-.51-.1-.71-.29c-.39-.39-.39-1.02,0-1.41l1.29-1.29h-7.4c-.55,0-1-.45-1-1s.45-1,1-1h7.4l-1.29-1.29c-.39-.39-.39-1.02,0-1.41s1.02-.39,1.41,0l1.61,1.61c1.15,1.15,1.15,3.03,0,4.19ZM13,8h6.54c-.35-.91-.88-1.75-1.59-2.46l-3.48-3.49c-.71-.71-1.55-1.24-2.46-1.59V7c0,.55,.45,1,1,1Zm4.81,11h-3.81c-1.65,0-3-1.35-3-3s1.35-3,3-3h3.81c0-.77,.29-1.54,.88-2.12,.37-.37,.82-.63,1.29-.76v-.12h-6.98c-1.65,0-3-1.35-3-3V.02c-.16-.01-.32-.02-.49-.02H5C2.24,0,0,2.24,0,5v14c0,2.76,2.24,5,5,5H15c1.81,0,3.4-.97,4.28-2.42-.21-.13-.41-.28-.59-.46-.58-.58-.88-1.35-.88-2.12Z"/></svg>
                 </div>
                 <div className="security-header-text">
-                  <h3>Export Data</h3>
-                  <span className="security-timestamp">Download your data in various formats</span>
+                  <h3>{t('Export Data')}</h3>
+                  <span className="security-timestamp">{t('Download your data in various formats')}</span>
                 </div>
               </div>
               <div className="security-sessions-container">
@@ -1984,8 +1969,8 @@ if (security.newPassword !== security.confirmPassword) {
                         <path d={row.icon} />
                       </svg>
                       <div>
-                        <h4>{row.label}</h4>
-                        <p>{row.sub}</p>
+                        <h4>{t(row.label)}</h4>
+                        <p>{t(row.sub)}</p>
                       </div>
                     </div>
                     <button onClick={async () => {
@@ -2009,7 +1994,7 @@ if (security.newPassword !== security.confirmPassword) {
 
                         if (row.label === 'Export as PDF') {
                           const caseRows = cases.map(c =>
-                            `<tr><td>${c.case_id}</td><td>${c.patient_name||''}</td><td>${c.age||''}</td><td>${c.gender||''}</td><td>${c.barangay_name||''}</td><td>${c.disease_name||''}</td><td>${c.severity||''}</td><td>${c.status||''}</td><td>${formatDate(c.date_reported, systemPrefs.dateFormat)}</td></tr>`
+                            `<tr><td>${c.case_id}</td><td>${c.patient_name||''}</td><td>${c.age||''}</td><td>${c.gender||''}</td><td>${c.barangay_name||''}</td><td>${c.disease_name||''}</td><td>${c.severity||''}</td><td>${translateStatus(c.status)||''}</td><td>${formatDate(c.date_reported, systemPrefs.dateFormat)}</td></tr>`
                           ).join('');
                           const userRows = users.map(u =>
                             `<tr><td>U-${String(u.user_id).padStart(3,'0')}</td><td>${u.full_name||''}</td><td>${u.username||''}</td><td>${u.role||''}</td><td>${u.barangay_name||''}</td><td>${u.is_active?'Active':'Inactive'}</td><td>${u.email||''}</td></tr>`
@@ -2047,7 +2032,7 @@ if (security.newPassword !== security.confirmPassword) {
                           let content = '';
                           content += '=== CASE RECORDS ===' + nl;
                           content += 'Case ID' + sep + 'Patient Name' + sep + 'Age' + sep + 'Barangay' + sep + 'Disease' + sep + 'Severity' + sep + 'Status' + sep + 'Date Reported' + nl;
-                          cases.forEach(c => { content += `${c.case_id}${sep}${c.patient_name||''}${sep}${c.age||''}${sep}${c.barangay_name||''}${sep}${c.disease_name||''}${sep}${c.severity||''}${sep}${c.status||''}${sep}${c.date_reported||''}${nl}`; });
+                          cases.forEach(c => { content += `${c.case_id}${sep}${c.patient_name||''}${sep}${c.age||''}${sep}${c.barangay_name||''}${sep}${c.disease_name||''}${sep}${c.severity||''}${sep}${translateStatus(c.status)||''}${sep}${c.date_reported||''}${nl}`; });
                           content += nl + '=== USER ACCOUNTS ===' + nl;
                           content += 'ID' + sep + 'Name' + sep + 'Username' + sep + 'Barangay' + sep + 'Role' + sep + 'Status' + nl;
                           users.forEach(u => { content += `U-${String(u.user_id).padStart(3,'0')}${sep}${u.full_name||''}${sep}${u.username||''}${sep}${u.barangay_name||''}${sep}${u.role||''}${sep}${u.is_active?'Active':'Inactive'}${nl}`; });
@@ -2081,12 +2066,12 @@ if (security.newPassword !== security.confirmPassword) {
                           a.click();
                         }
                       } catch (err) {
-                        setToastMsg('Export failed. Please try again.');
+                        setToastMsg(t('Export failed. Please try again.'));
                         setToastType('error');
                         setTimeout(() => setToastMsg(''), 3000);
                       }
-                    }} style={{ ...offlineBtnStyle, padding: '8px 18px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '17px', fontWeight: '600', color: 'var(--text-main)', cursor: 'pointer' }} disabled={offlineMode} title={offlineMode ? 'Unavailable offline' : ''}>
-                      Export
+                    }} style={{ ...offlineBtnStyle, padding: '8px 18px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '17px', fontWeight: '600', color: 'var(--text-main)', cursor: 'pointer' }} disabled={offlineMode} title={offlineMode ? t('Unavailable offline') : ''}>
+                      {t('Export')}
                     </button>
                   </div>
                 ))}
@@ -2100,26 +2085,26 @@ if (security.newPassword !== security.confirmPassword) {
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="#0D9488"><path d="m8.5,16c3.58,0,6.624-.839,8.5-2.173v1.74c0,1.621-3.635,3.434-8.5,3.434S0,17.188,0,15.566v-1.74c1.876,1.334,4.92,2.174,8.5,2.174ZM0,18.826v.96c0,2.767,4.276,4.214,8.5,4.214s8.5-1.447,8.5-4.214v-.96c-1.876,1.334-4.92,2.174-8.5,2.174s-6.624-.839-8.5-2.174ZM22,0v1.534c-1.078-.97-2.482-1.534-4-1.534-2.967,0-5.431,2.167-5.91,5h2.052c.447-1.72,1.999-3,3.858-3,1,0,1.928.367,2.644,1h-1.644v2h5V0h-2Zm-4,10c-.994,0-1.929-.368-2.646-1h1.646v-2h-5v5h2v-1.531c1.08.966,2.494,1.531,4,1.531,2.967,0,5.431-2.167,5.91-5h-2.052c-.447,1.72-1.999,3-3.858,3Zm-9.5-1c.513,0,1.012-.028,1.5-.074v-2.926c0-2.151.854-4.1,2.235-5.538-1.128-.293-2.393-.462-3.735-.462C3.806,0,0,2.015,0,4.5s3.806,4.5,8.5,4.5Zm0,5c.516,0,1.015-.024,1.5-.063v-3.003c-.489.04-.987.066-1.5.066-3.58,0-6.624-1.004-8.5-2.6v2.167c0,1.621,3.635,3.433,8.5,3.433Z"/></svg>
                   </div>
                   <div className="security-header-text">
-                    <h3>Backup & Restore</h3>
-                    <span className="security-timestamp">Manage data backups</span>
+                    <h3>{t('Backup & Restore')}</h3>
+                    <span className="security-timestamp">{t('Manage data backups')}</span>
                   </div>
                 </div>
 
                 <div style={{ padding: '0 0 16px 0' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderTop: '1px solid var(--border-color)' }}>
                     <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-main)' }}>Last Backup</div>
-                      <div style={{ fontSize: '17px', color: 'var(--text-muted)' }}>{lastBackupDate ? formatDateTime(lastBackupDate, systemPrefs.dateFormat) : 'No backup yet'}</div>
+                      <div style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-main)' }}>{t('Last Backup')}</div>
+                      <div style={{ fontSize: '17px', color: 'var(--text-muted)' }}>{lastBackupDate ? formatDateTime(lastBackupDate, systemPrefs.dateFormat) : t('No backup yet')}</div>
                     </div>
                     {lastBackupDate
-                      ? <span style={{ fontSize: '17px', fontWeight: '600', padding: '4px 12px', borderRadius: '16px', background: 'var(--input-bg)', color: '#027a48' }}>Successful</span>
-                      : <span style={{ fontSize: '17px', color: 'var(--text-muted)' }}>Never</span>
+                      ? <span style={{ fontSize: '17px', fontWeight: '600', padding: '4px 12px', borderRadius: '16px', background: 'var(--input-bg)', color: '#027a48' }}>{t('Successful')}</span>
+                      : <span style={{ fontSize: '17px', color: 'var(--text-muted)' }}>{t('Never')}</span>
                     }
                   </div>
 
                   <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
-                    <button onClick={() => handleCreateBackup(false)} disabled={backupLoading || offlineMode} style={{ ...offlineBtnStyle, flex: 1, padding: '12px', background: '#003cb4', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '17px', fontWeight: '600', cursor: backupLoading || offlineMode ? 'not-allowed' : 'pointer', opacity: backupLoading ? 0.7 : offlineBtnStyle.opacity || 1 }} title={offlineMode ? 'Unavailable offline' : ''}>
-                      {backupLoading ? 'Creating Backup...' : 'Create Backup'}
+                    <button onClick={() => handleCreateBackup(false)} disabled={backupLoading || offlineMode} style={{ ...offlineBtnStyle, flex: 1, padding: '12px', background: '#003cb4', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '17px', fontWeight: '600', cursor: backupLoading || offlineMode ? 'not-allowed' : 'pointer', opacity: backupLoading ? 0.7 : offlineBtnStyle.opacity || 1 }} title={offlineMode ? t('Unavailable offline') : ''}>
+                      {backupLoading ? t('Creating Backup...') : t('Create Backup')}
                     </button>
                     <input type="file" ref={restoreInputRef} accept=".json" style={{ display: 'none' }}
                       onChange={async (e) => {
@@ -2137,31 +2122,31 @@ if (security.newPassword !== security.confirmPassword) {
                           if (!previewRes.ok) throw new Error('Invalid backup file');
                           const preview = await previewRes.json();
                           const confirmed = window.confirm(
-                            `Restore backup from ${formatDate(preview.backup_date, systemPrefs.dateFormat)}?\n\n` +
-                            `Will restore:\n` +
-                            `• ${preview.counts.disease_cases} disease cases\n` +
-                            `• ${preview.counts.users} users\n` +
-                            `• ${preview.counts.barangays} barangays\n` +
-                            `• ${preview.counts.diseases} diseases\n\n` +
-                            `Existing records with the same ID will be skipped. Continue?`
+                            `${t('Restore backup from ')}${formatDate(preview.backup_date, systemPrefs.dateFormat)}?\n\n` +
+                            `${t('Will restore')}:\n` +
+                            `• ${preview.counts.disease_cases}${t(' disease cases')}\n` +
+                            `• ${preview.counts.users}${t(' users')}\n` +
+                            `• ${preview.counts.barangays}${t(' barangays')}\n` +
+                            `• ${preview.counts.diseases}${t(' diseases')}\n\n` +
+                            t('Existing records with the same ID will be skipped. Continue?')
                           );
                           if (!confirmed) { setRestoreLoading(false); return; }
                           const res = await fetch(`${API_URL}/api/restore`, {
                             method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(data),
                           });
-                          if (!res.ok) throw new Error((await res.json()).error || 'Restore failed');
-                          setRestoreMsg('✅ Restore completed successfully!');
+                          if (!res.ok) throw new Error((await res.json()).error || t('Restore failed'));
+                          setRestoreMsg(t('✅ Restore completed successfully!'));
                           setTimeout(() => setRestoreMsg(''), 3000);
                         } catch (err) {
-                          setRestoreError('❌ ' + (err.message || 'Restore failed. Check the file format.'));
+                          setRestoreError(t('❌ ') + (err.message || t('Restore failed. Check the file format.')));
                           setTimeout(() => setRestoreError(''), 4000);
                         } finally {
                           setRestoreLoading(false);
                           e.target.value = '';
                         }
                       }} />
-                    <button onClick={() => restoreInputRef.current?.click()} disabled={restoreLoading || offlineMode} style={{ ...offlineBtnStyle, flex: 1, padding: '12px', background: restoreLoading ? '#64748b' : 'var(--bg-surface)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '17px', fontWeight: '600', cursor: restoreLoading || offlineMode ? 'not-allowed' : 'pointer' }} title={offlineMode ? 'Unavailable offline' : ''}>
-                      {restoreLoading ? 'Restoring...' : 'Restore'}
+                    <button onClick={() => restoreInputRef.current?.click()} disabled={restoreLoading || offlineMode} style={{ ...offlineBtnStyle, flex: 1, padding: '12px', background: restoreLoading ? '#64748b' : 'var(--bg-surface)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '17px', fontWeight: '600', cursor: restoreLoading || offlineMode ? 'not-allowed' : 'pointer' }} title={offlineMode ? t('Unavailable offline') : ''}>
+                      {restoreLoading ? t('Restoring...') : t('Restore')}
                     </button>
                   </div>
 
@@ -2178,8 +2163,8 @@ if (security.newPassword !== security.confirmPassword) {
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0 0 0', marginTop: '12px', borderTop: '1px solid var(--border-color)' }}>
                     <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-main)' }}>Auto-Backup</div>
-                      <div style={{ fontSize: '17px', color: 'var(--text-muted)' }}>Automatically backup data weekly</div>
+                      <div style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-main)' }}>{t('Auto-Backup')}</div>
+                      <div style={{ fontSize: '17px', color: 'var(--text-muted)' }}>{t('Automatically backup data weekly')}</div>
                     </div>
                     <label className="figma-toggle-switch">
                       <input type="checkbox" checked={autoBackupEnabled} onChange={e => { setAutoBackupEnabled(e.target.checked); localStorage.setItem('cdms_auto_backup', String(e.target.checked)); }} />
@@ -2196,8 +2181,8 @@ if (security.newPassword !== security.confirmPassword) {
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="#2563EB"><path d="M0,7v-3c0-.552,.448-1,1-1s1,.448,1,1v1.412C4.21,2.067,7.966,0,12,0c6.253,0,11.391,4.69,11.951,10.91,.05,.55-.356,1.036-.906,1.086-.03,.002-.061,.004-.091,.004-.512,0-.948-.391-.995-.91-.467-5.182-4.748-9.09-9.959-9.09-3.559,0-6.878,1.916-8.662,5h1.662c.552,0,1,.448,1,1s-.448,1-1,1H2c-1.103,0-2-.897-2-2ZM22,15h-3c-.553,0-1,.447-1,1s.447,1,1,1h1.662c-1.785,3.084-5.104,5-8.662,5-5.21,0-9.492-3.908-9.959-9.09-.049-.549-.523-.944-1.086-.906C.405,12.054,0,12.54,.049,13.09c.561,6.22,5.699,10.91,11.951,10.91,4.033,0,7.79-2.068,10-5.413v1.413c0,.553,.447,1,1,1s1-.447,1-1v-3c0-1.103-.897-2-2-2ZM14,7c1.105,0,2,.895,2,2v6c0,1.105-.895,2-2,2h-4c-1.105,0-2-.895-2-2v-6c0-1.105,.895-2,2-2h4Zm-1,7c0-.552-.448-1-1-1h-1c-.552,0-1,.448-1,1s.448,1,1,1h1c.552,0,1-.448,1-1Zm1-4c0-.552-.448-1-1-1h-2c-.552,0-1,.448-1,1s.448,1,1,1h2c.552,0,1-.448,1-1Z"/></svg>
                   </div>
                   <div>
-                    <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: 'var(--text-main)' }}>Offline Sync</h3>
-                    <span style={{ fontSize: '17px', color: 'var(--text-muted)' }}>View offline operation queue and sync history</span>
+                    <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: 'var(--text-main)' }}>{t('Offline Sync')}</h3>
+                    <span style={{ fontSize: '17px', color: 'var(--text-muted)' }}>{t('View offline operation queue and sync history')}</span>
                   </div>
                 </div>
 

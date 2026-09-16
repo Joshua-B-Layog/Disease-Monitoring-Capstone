@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useI18n, getLangName } from './i18n';
 import ResidentMap from './resident/ResidentMap';
 import AboutCho from './resident/AboutCho';
 import ContactUs from './resident/ContactUs';
@@ -10,16 +11,11 @@ import { API_URL } from './config';
 import { getPendingCount, processSyncQueue } from './syncEngine';
 import './resident.css';
 
-const SECTIONS = [
-  { key: 'map', label: 'Map' },
-  { key: 'about', label: 'About' },
-  { key: 'contact', label: 'Contact' },
-  { key: 'help', label: 'Help' },
-  { key: 'tips', label: 'Tips' },
-];
+const SECTION_KEYS = ['map', 'about', 'contact', 'help', 'tips'];
 
 export default function ResidentApp() {
   const location = useLocation();
+  const { t, lang, setLang } = useI18n();
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('map');
 
@@ -193,23 +189,38 @@ export default function ResidentApp() {
 
           {/* Desktop nav */}
           <nav className="resident-nav-desktop" style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-            {SECTIONS.map(s => (
-              <button key={s.key} onClick={() => scrollToSection(s.key)}
+            {SECTION_KEYS.map(k => (
+              <button key={k} onClick={() => scrollToSection(k)}
                 style={{
                   padding: '8px 18px',
                   borderRadius: '8px',
                   border: 'none',
-                  borderBottom: isActive(s.key) ? '2px solid #3B82F6' : '2px solid transparent',
-                  background: isActive(s.key) ? 'rgba(59,130,246,0.15)' : 'transparent',
+                  borderBottom: isActive(k) ? '2px solid #3B82F6' : '2px solid transparent',
+                  background: isActive(k) ? 'rgba(59,130,246,0.15)' : 'transparent',
                   color: '#fff',
                   fontSize: '15px',
-                  fontWeight: isActive(s.key) ? '600' : '400',
+                  fontWeight: isActive(k) ? '600' : '400',
                   cursor: 'pointer',
                   transition: 'all 0.2s',
                 }}>
-                {s.label}
+                {t(k[0].toUpperCase() + k.slice(1))}
               </button>
             ))}
+            {/* Language switcher */}
+            <div style={{ position: 'relative', marginLeft: '8px' }}>
+              <button onClick={() => setLang(lang === 'en' ? 'fil' : 'en')}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(255,255,255,0.3)',
+                  background: 'rgba(255,255,255,0.1)',
+                  color: '#fff',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                }}>
+                {getLangName(lang === 'en' ? 'fil' : 'en')}
+              </button>
+            </div>
             {/* Theme toggle */}
             <button onClick={toggleTheme}
               style={{
@@ -242,21 +253,30 @@ export default function ResidentApp() {
             padding: '12px 0',
             borderTop: '1px solid rgba(255,255,255,0.15)',
           }}>
-            {SECTIONS.map(s => (
-              <button key={s.key} onClick={() => scrollToSection(s.key)}
+            {SECTION_KEYS.map(k => (
+              <button key={k} onClick={() => scrollToSection(k)}
                 style={{
                   display: 'block', width: '100%', textAlign: 'left',
                   padding: '10px 16px',
-                  background: isActive(s.key) ? 'rgba(59,130,246,0.15)' : 'transparent',
+                  background: isActive(k) ? 'rgba(59,130,246,0.15)' : 'transparent',
                   border: 'none',
-                  borderLeft: isActive(s.key) ? '3px solid #3B82F6' : '3px solid transparent',
-                  color: '#fff', fontSize: '15px', fontWeight: isActive(s.key) ? '600' : '400',
+                  borderLeft: isActive(k) ? '3px solid #3B82F6' : '3px solid transparent',
+                  color: '#fff', fontSize: '15px', fontWeight: isActive(k) ? '600' : '400',
                   cursor: 'pointer',
                   transition: 'all 0.2s',
                 }}>
-                {s.label}
+                {t(k[0].toUpperCase() + k.slice(1))}
               </button>
             ))}
+            <button onClick={() => setLang(lang === 'en' ? 'fil' : 'en')}
+              style={{
+                display: 'block', width: '100%', textAlign: 'left',
+                padding: '10px 16px',
+                background: 'transparent', border: 'none',
+                color: 'rgba(255,255,255,0.8)', fontSize: '15px', cursor: 'pointer',
+              }}>
+              🌐 {getLangName(lang === 'en' ? 'fil' : 'en')}
+            </button>
             <button onClick={toggleTheme}
               style={{
                 display: 'block', width: '100%', textAlign: 'left',
@@ -264,7 +284,7 @@ export default function ResidentApp() {
                 background: 'transparent', border: 'none',
                 color: 'rgba(255,255,255,0.8)', fontSize: '15px', cursor: 'pointer',
               }}>
-              {theme === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode'}
+              {theme === 'dark' ? `☀️ ${t('Light Mode')}` : `🌙 ${t('Dark Mode')}`}
             </button>
           </div>
         )}
@@ -287,8 +307,7 @@ export default function ResidentApp() {
           fontSize: '16px', maxWidth: '600px', margin: '0 auto',
           lineHeight: '1.6',
         }}>
-          Stay informed about disease outbreaks in your barangay. Track cases, learn prevention tips,
-          and know when to seek medical help.
+          {t('Stay informed about disease outbreaks in your barangay. Track cases, learn prevention tips, and know when to seek medical help.')}
         </p>
       </div>
 
@@ -323,7 +342,7 @@ export default function ResidentApp() {
             borderRadius: '12px', padding: '16px 24px', marginBottom: '24px',
           }}>
             <div style={{               color: '#fff', fontWeight: '700', fontSize: '15px', marginBottom: '4px' }}>
-              National Emergency Hotline
+              {t('National Emergency Hotline')}
             </div>
             <div style={{ fontSize: '26px', fontWeight: '800', color: '#fff', letterSpacing: '0.05em' }}>
               911
@@ -348,7 +367,7 @@ export default function ResidentApp() {
           display: 'flex', alignItems: 'center', gap: '8px',
         }}>
           <span style={{ color: '#D97706', fontWeight: '700' }}>↻</span>
-          {pendingSyncCount} {pendingSyncCount === 1 ? 'message' : 'messages'} pending — will send when back online
+          {pendingSyncCount} {pendingSyncCount === 1 ? t('message') : t('messages')} {t('pending — will send when back online')}
         </div>
       )}
     </div>

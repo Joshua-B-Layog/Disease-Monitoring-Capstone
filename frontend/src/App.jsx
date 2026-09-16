@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useI18n } from './i18n';
 import Sidebar from './Sidebar';
 import ManageCases from './ManageCases';  
 import Dashboard from './Dashboard'; 
@@ -51,15 +52,8 @@ const extractDiseaseFromMessage = (message) => {
   return '';
 };
 
-const translations = {
-  en: { 'Dashboard':'Dashboard','Manage Cases':'Manage Cases','Audit Reports':'Audit Reports','Map View':'Map View','User Accounts':'User Accounts','Settings':'Settings','Logout':'Logout','CHO Profile':'CHO Profile','Specialist':'Specialist','Profile Settings':'Profile Settings','Account Security':'Account Security','Notifications':'Notifications','System Preferences':'System Preferences','Data Management':'Data Management','Save Preferences':'Save Preferences','Save Changes':'Save Changes','Cancel':'Cancel','Edit Profile':'Edit Profile' },
-  fil: { 'Dashboard':'Dashboard','Pamahalaan ang Mga Kaso':'Pamahalaan ang mga Kaso','Audit Reports':'Mga Ulat ng Pag-audit','Map View':'Pananaw ng Mapa','User Accounts':'Mga Account ng User','Settings':'Mga Setting','Logout':'Mag-logout','CHO Profile':'Profile ng CHO','Specialist':'Specialista','Profile Settings':'Mga Setting ng Profile','Account Security':'Seguridad ng Account','Notifications':'Mga Abiso','System Preferences':'Mga Kagustuhan ng System','Data Management':'Pamamahala ng Data','Save Preferences':'I-save ang Mga Kagustuhan','Save Changes':'I-save ang Mga Pagbabago','Cancel':'Kanselahin','Edit Profile':'I-edit ang Profile' },
-  id: { 'Dashboard':'Dasbor','Manage Cases':'Kelola Kasus','Audit Reports':'Laporan Audit','Map View':'Tampilan Peta','User Accounts':'Akun Pengguna','Settings':'Pengaturan','Logout':'Keluar','CHO Profile':'Profil CHO','Specialist':'Spesialis','Profile Settings':'Pengaturan Profil','Account Security':'Keamanan Akun','Notifications':'Notifikasi','System Preferences':'Preferensi Sistem','Data Management':'Manajemen Data','Save Preferences':'Simpan Preferensi','Save Changes':'Simpan Perubahan','Cancel':'Batal','Edit Profile':'Edit Profil' },
-  vi: { 'Dashboard':'Bảng điều khiển','Manage Cases':'Quản lý ca bệnh','Audit Reports':'Báo cáo kiểm toán','Map View':'Xem bản đồ','User Accounts':'Tài khoản người dùng','Settings':'Cài đặt','Logout':'Đăng xuất','CHO Profile':'Hồ sơ CHO','Specialist':'Chuyên viên','Profile Settings':'Cài đặt hồ sơ','Account Security':'Bảo mật tài khoản','Notifications':'Thông báo','System Preferences':'Tùy chọn hệ thống','Data Management':'Quản lý dữ liệu','Save Preferences':'Lưu tùy chọn','Save Changes':'Lưu thay đổi','Cancel':'Hủy','Edit Profile':'Chỉnh sửa hồ sơ' },
-  th: { 'Dashboard':'แดชบอร์ด','Manage Cases':'จัดการเคส','Audit Reports':'รายงานการตรวจสอบ','Map View':'มุมมองแผนที่','User Accounts':'บัญชีผู้ใช้','Settings':'การตั้งค่า','Logout':'ออกจากระบบ','CHO Profile':'โปรไฟล์ CHO','Specialist':'ผู้เชี่ยวชาญ','Profile Settings':'การตั้งค่าโปรไฟล์','Account Security':'ความปลอดภัยของบัญชี','Notifications':'การแจ้งเตือน','System Preferences':'การตั้งค่าระบบ','Data Management':'การจัดการข้อมูล','Save Preferences':'บันทึกการตั้งค่า','Save Changes':'บันทึกการเปลี่ยนแปลง','Cancel':'ยกเลิก','Edit Profile':'แก้ไขโปรไฟล์' },
-};
-
 function App() {
+  const { t, setLang } = useI18n();
   const savedSession = (() => { try { return JSON.parse(localStorage.getItem('cdms_session')); } catch { return null; } })();
   const [isLoggedIn, setIsLoggedIn]       = useState(!!savedSession);
   const [loginRole, setLoginRole]         = useState(savedSession?.role || 'CHO');
@@ -113,7 +107,6 @@ function App() {
   const [dashYear, setDashYear]           = useState(() => loadStored('cdms_dash_year', new Date().getFullYear()));
   const [caseFilter, setCaseFilter]       = useState({ disease: '', barangay: '', purok: '' });
 
-  const [language, setLanguage]           = useState('en');
   const [timeZone, setTimeZone]           = useState('Asia/Manila');
   const [dateFormat, setDateFormat]       = useState(() => localStorage.getItem('cdms_date_format') || 'MM/DD/YY');
   const [autoSave, setAutoSave]           = useState(() => localStorage.getItem('cdms_autoSave') !== 'false');
@@ -307,13 +300,11 @@ function App() {
 
   // ── Load saved prefs from localStorage ──
   useEffect(() => {
-    const lang = localStorage.getItem('cdms_language');
     let tz = localStorage.getItem('cdms_timeZone');
     const df = localStorage.getItem('cdms_dateFormat');
     const as = localStorage.getItem('cdms_autoSave');
     const cd = localStorage.getItem('cdms_confirm_delete');
     const ks = localStorage.getItem('cdms_keyboardShortcuts');
-    if (lang) setLanguage(lang);
     if (tz) {
       tz = tz.split(' (')[0];
       setTimeZone(tz);
@@ -651,7 +642,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
     Promise.race([logoutFetch, timeout]).finally(teardown);
   };
 
-  const handleLanguageChange = (langCode) => { setLanguage(langCode); localStorage.setItem('cdms_language', langCode); };
+  const handleLanguageChange = (langCode) => { setLang(langCode); };
   const handleTimeZoneChange = (tzVal) => { setTimeZone(tzVal); localStorage.setItem('cdms_timeZone', tzVal); };
   const handleDateFormatChange = (df) => { setDateFormat(df); localStorage.setItem('cdms_date_format', df); };
   const handleAutoSaveChange = (val) => { setAutoSave(val); localStorage.setItem('cdms_autoSave', String(val)); };
@@ -739,8 +730,6 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
     }
   };
 
-  const t = (key) => translations[language]?.[key] || key;
-
   if (!isLoggedIn) {
     if (authView === 'recover') {
       return (
@@ -771,7 +760,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
 
   return (
     <div className="dashboard-layout">
-      <Sidebar role={loginRole} activeTab={activeTab} setActiveTab={setActiveTab} language={language} choUnit={sidebarChoUnit} />
+      <Sidebar role={loginRole} activeTab={activeTab} setActiveTab={setActiveTab} choUnit={sidebarChoUnit} />
 
       {mustChangePassword && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
@@ -863,7 +852,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                 }}
                 style={{
                   position: 'relative', background: 'none', border: 'none',
-                  cursor: 'pointer', padding: '6px', color: 'var(--text-main)',
+                  cursor: 'pointer', padding: '6px', color: '#FFFFFF',
                   display: 'flex', alignItems: 'center', justifyContent: 'center'
                 }}
               >

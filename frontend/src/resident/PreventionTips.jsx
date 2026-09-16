@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { useI18n } from '../i18n';
 import BackButton from '../components/BackButton';
 import { onDiseasesChanged } from '../diseaseSignal';
 import { FeverIcon, InfluenzaAIcon, LeptospirosisIcon, TuberculosisIcon, TyphoidIcon, RabiesIcon, FecesIcon, SoreEyesIcon, AvianIcon, ContactBloodborneIcon } from '../components/DiseaseIcons';
@@ -594,6 +595,7 @@ const CATEGORIES = ['All', 'Vector-borne', 'Waterborne', 'Airborne', 'Blood-born
 const ALL_BARANGAYS = ['All Barangays','Baclaran','Banay-Banay','Banlic','Barangay Dos (Poblacion)','Barangay Tres (Poblacion)','Barangay Uno (Poblacion)','Bigaa','Butong','Casile','Diezmo','Gulod','Mamatid','Marinig','Niugan','Pittland','Pulo','Sala','San Isidro'];
 
 export default function PreventionTips() {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState(null);
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('All');
@@ -897,7 +899,7 @@ export default function PreventionTips() {
               <div style={{ padding: '0 18px 16px', borderTop: '1px solid var(--border-color)' }}>
                 <ul style={{ margin: '12px 0', paddingLeft: '18px', fontSize: '17px', color: 'var(--text-main)', lineHeight: '1.8' }}>
                   {disease.tips.map((tip, i) => (
-                    <li key={i}>{tip}</li>
+                    <li key={i}>{t(tip)}</li>
                   ))}
                 </ul>
                 {disease.videoId && (
@@ -1012,7 +1014,7 @@ export default function PreventionTips() {
                       border: scAnswers[idx] !== undefined ? '1px solid #129968' : '1px solid var(--border-color)',
                     }}>
                       <div style={{ fontSize: '17px', color: 'var(--text-main)', marginBottom: '8px' }}>
-                        {idx + 1}. {q}
+                        {idx + 1}. {t(q)}
                       </div>
                       <div style={{ display: 'flex', gap: '10px' }}>
                         <button onClick={() => answerQuestion(idx, true)}

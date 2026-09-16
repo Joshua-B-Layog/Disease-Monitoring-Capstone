@@ -3,6 +3,7 @@ import axios from 'axios';
 import { API_URL } from './config';
 import { cacheUsers, getCachedUsers, getCachedBarangays, isOnline } from './offlineSync';
 import { formatDateTime } from './formatDate';
+import { useI18n } from './i18n';
 
 const CHO_BARANGAYS = {
   'CHO Unit I': [
@@ -63,6 +64,7 @@ const EMPTY_FORM = {
 };
 
 export default function UserManagement({ confirmDelete, fontScale, compactMode, dateFormat, loggedUserId, loginRole, sessionContext, setActiveTab }) {
+  const { t } = useI18n();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [barangayList, setBarangayList] = useState([]);
@@ -209,9 +211,9 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
   };
 
   const handleExportUsers = () => {
-    const headers = 'User ID,Full Name,Username,Barangay,Role,Status,Email,Mobile\n';
+    const headers = [t('User ID'), t('Full Name'), t('Username'), t('Barangay'), t('Role'), t('Status'), t('Email'), t('Mobile')].join(',') + '\n';
     const rows = filteredUsers.map(u =>
-      `"U-${String(u.user_id).padStart(3, '0')}","${u.full_name || ''}","${u.username || ''}","${u.barangay_name || ''}","${u.role || ''}","${u.is_active ? 'Active' : 'Inactive'}","${u.email || ''}","${u.mobile_number || ''}"`
+      `"U-${String(u.user_id).padStart(3, '0')}","${u.full_name || ''}","${u.username || ''}","${u.barangay_name || ''}","${u.role || ''}","${u.is_active ? t('Active') : t('Inactive')}","${u.email || ''}","${u.mobile_number || ''}"`
     ).join('\n');
     const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -271,17 +273,17 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
     );
 
     if (duplicateUsername) {
-        setSubmitMsg('Error: A user with this username already exists.');
+        setSubmitMsg(t('Error: A user with this username already exists.'));
         setSubmitLoading(false);
         return;
     }
     if (duplicateEmail) {
-        setSubmitMsg('Error: A user with this email already exists.');
+        setSubmitMsg(t('Error: A user with this email already exists.'));
         setSubmitLoading(false);
         return;
     }
     if (duplicateMobile) {
-        setSubmitMsg('Error: A user with this contact number already exists.');
+        setSubmitMsg(t('Error: A user with this contact number already exists.'));
         setSubmitLoading(false);
         return;
     }
@@ -299,9 +301,9 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
       const msgs = [];
-      if (errors.email) msgs.push('Enter a valid email address');
-      if (errors.mobile) msgs.push('Use valid PH phone (e.g., 09123456789)');
-      setSubmitMsg(msgs.length > 0 ? `Error: ${msgs.join('. ')}.` : 'Error: Please fill in all required fields highlighted in red.');
+      if (errors.email) msgs.push(t('Enter a valid email address'));
+      if (errors.mobile) msgs.push(t('Use valid PH phone (e.g., 09123456789)'));
+      setSubmitMsg(msgs.length > 0 ? `Error: ${msgs.join('. ')}.` : t('Error: Please fill in all required fields highlighted in red.'));
       setSubmitLoading(false);
       return;
     }
@@ -314,7 +316,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
     if (hasCustomPw) {
       const pwErrors = getUserPasswordErrors(formData.password, formData.firstName, formData.lastName, formData.role);
       if (pwErrors.length > 0) {
-        setSubmitMsg('Error: ' + pwErrors.join(' '));
+        setSubmitMsg('Error: ' + pwErrors.map(x => t(x)).join(' '));
         setSubmitLoading(false);
         return;
       }
@@ -342,10 +344,10 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
     try {
       if (editingUser) {
         await axios.put(`${API_URL}/api/users/${editingUser.user_id}`, payload, roleHeaders);
-        setSubmitMsg('User updated successfully!');
+        setSubmitMsg(t('User updated successfully!'));
       } else {
         await axios.post(API_URL + '/api/users', payload, roleHeaders);
-        setSubmitMsg('User account created successfully!');
+        setSubmitMsg(t('User account created successfully!'));
       }
       fetchUsers();
       const nextIdx = editQueueIndex + 1;
@@ -386,7 +388,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
         setDeleteTarget(null);
       }
     } catch (err) {
-      setSubmitMsg('Archive failed: ' + (err.response?.data?.error || err.message));
+      setSubmitMsg(t('Archive failed: ') + (err.response?.data?.error || err.message));
       setTimeout(() => setSubmitMsg(''), 3000);
     } finally {
       setDeleteLoading(false);
@@ -427,10 +429,10 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
     <div style={{ padding: compactMode ? '14px' : '24px', color: 'var(--text-main)' }}>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2 style={{ margin: 0, fontSize: '22px', color: 'var(--text-h)', fontWeight: '700' }}>User Accounts</h2>
+        <h2 style={{ margin: 0, fontSize: '22px', color: 'var(--text-h)', fontWeight: '700' }}>{t('User Accounts')}</h2>
         {offlineMode && (
           <span style={{ fontSize: '15px', color: '#D97706', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '6px', padding: '4px 10px' }}>
-            Offline - showing cached data
+            {t('Offline - showing cached data')}
           </span>
         )}
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -440,7 +442,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
             className="cdms-export-btn"
             style={{ padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', display: 'flex', gap: '8px', alignItems: 'center', fontSize: '15px', fontWeight: '500' }}>
             <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14a3 3 0 003-3V6a3 3 0 10-6 0v5a3 3 0 003 3z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14v5m-4 0h8"/></svg>
-            Roles &amp; Permissions
+            {t('Roles & Permissions')}
           </button>
           <button onClick={handleExportUsers}
             onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
@@ -448,7 +450,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
             className="cdms-export-btn"
             style={{ padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', display: 'flex', gap: '8px', alignItems: 'center', fontSize: '15px', fontWeight: '500' }}>
             <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-            Export Accounts List
+            {t('Export Accounts List')}
           </button>
         </div>
       </div>
@@ -456,7 +458,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
       <div style={{ background: 'var(--bg-surface)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', border: '1px solid var(--border-color)' }}>
 
         <div style={{ display: 'flex', gap: '10px', marginBottom: '18px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <input type="text" placeholder="Search Accounts..."
+          <input type="text" placeholder={t('Search Accounts...')}
             value={searchQuery} onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
             style={{ ...inputStyle, width: '220px' }} />
           <div style={{ position: 'relative', width: '180px' }} ref={barangayRef}>
@@ -464,7 +466,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
               onClick={() => setBarangayOpen(!barangayOpen)}
               style={{ ...inputStyle, width: '100%', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}
             >
-              <span>{filterBarangay}</span>
+              <span>{t(filterBarangay)}</span>
               <span style={{ marginLeft: '6px', opacity: 0.6, transition: 'transform 0.2s', display: 'inline-block', transform: barangayOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
             </button>
             {barangayOpen && (
@@ -485,7 +487,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--input-bg)'}
                   onMouseLeave={e => { e.currentTarget.style.background = filterBarangay === 'All Barangays' ? 'var(--input-bg)' : 'transparent'; }}
                 >
-                  All Barangays
+                  {t('All Barangays')}
                 </div>
                 {barangayList.map(b => (
                   <div
@@ -509,7 +511,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
           <div style={{ position: 'relative' }} ref={statusRef}>
             <button type="button" onClick={() => setStatusOpen(!statusOpen)}
               style={{ ...inputStyle, width: '140px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}>
-              <span>{filterStatus}</span>
+              <span>{t(filterStatus)}</span>
               <span style={{ fontSize: '13px', opacity: 0.6, transition: 'transform 0.2s', transform: statusOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
             </button>
             {statusOpen && (
@@ -520,7 +522,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                     style={{ display: 'block', width: '100%', padding: '10px 14px', background: filterStatus === s ? 'var(--input-bg)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: filterStatus === s ? '#3B82F6' : 'var(--text-main)', cursor: 'pointer', fontWeight: filterStatus === s ? '600' : '400' }}
                     onMouseEnter={e => { if (filterStatus !== s) e.target.style.background = 'var(--input-bg)'; }}
                     onMouseLeave={e => { if (filterStatus !== s) e.target.style.background = 'transparent'; }}>
-                    {s}
+                    {t(s)}
                   </button>
                 ))}
               </div>
@@ -529,7 +531,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
           <div style={{ position: 'relative' }} ref={filterRoleRef}>
             <button type="button" onClick={() => setFilterRoleOpen(!filterRoleOpen)}
               style={{ ...inputStyle, width: '140px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}>
-              <span>{filterRole === 'CHO' ? 'CHO' : filterRole === 'BHW' ? 'BHW' : filterRole}</span>
+              <span>{filterRole === 'CHO' ? t('CHO') : filterRole === 'BHW' ? t('BHW') : t(filterRole)}</span>
               <span style={{ fontSize: '13px', opacity: 0.6, transition: 'transform 0.2s', transform: filterRoleOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
             </button>
             {filterRoleOpen && (
@@ -540,7 +542,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                     style={{ display: 'block', width: '100%', padding: '10px 14px', background: filterRole === r.value ? 'var(--input-bg)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: filterRole === r.value ? '#3B82F6' : 'var(--text-main)', cursor: 'pointer', fontWeight: filterRole === r.value ? '600' : '400' }}
                     onMouseEnter={e => { if (filterRole !== r.value) e.target.style.background = 'var(--input-bg)'; }}
                     onMouseLeave={e => { if (filterRole !== r.value) e.target.style.background = 'transparent'; }}>
-                    {r.label}
+                    {t(r.label)}
                   </button>
                 ))}
               </div>
@@ -556,7 +558,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
             }}
             disabled={offlineMode}
             style={{ padding: '8px 14px', background: showArchived ? '#121358' : 'transparent', border: `1px solid ${showArchived ? '#121358' : 'var(--border-color)'}`, color: showArchived ? '#fff' : 'var(--text-muted)', borderRadius: '6px', cursor: offlineMode ? 'not-allowed' : 'pointer', fontWeight: '600', fontSize: '15px', opacity: offlineMode ? 0.4 : 1, whiteSpace: 'nowrap' }}>
-            {showArchived ? '← Back to Active Accounts' : '🗄️ Show Archived Accounts'}
+            {showArchived ? t('← Back to Active Accounts') : t('🗄️ Show Archived Accounts')}
           </button>
           {selectedIds.length > 0 && (
             <>
@@ -569,7 +571,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                 onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                 onMouseLeave={e => e.currentTarget.style.opacity = '1'}
                 style={{ padding: '8px 16px', background: 'transparent', border: '1px solid #3b82f6', color: '#3b82f6', borderRadius: '6px', cursor: offlineMode ? 'not-allowed' : 'pointer', fontWeight: '500', fontSize: '15px', opacity: offlineMode ? 0.4 : 1 }}>
-                Edit Selected ({selectedIds.length})
+                {t('Edit Selected (')}{selectedIds.length})
               </button>
               )}
               {!showArchived && (
@@ -581,7 +583,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                 onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                 onMouseLeave={e => e.currentTarget.style.opacity = '1'}
                 style={{ padding: '8px 16px', background: 'transparent', border: '1px solid #ef4444', color: '#ef4444', borderRadius: '6px', cursor: offlineMode ? 'not-allowed' : 'pointer', fontWeight: '500', fontSize: '15px', opacity: offlineMode ? 0.4 : 1 }}>
-                Archive Selected ({selectedIds.length})
+                {t('Archive Selected (')}{selectedIds.length})
               </button>
               )}
             </>
@@ -591,12 +593,12 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
             onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
             onMouseLeave={e => e.currentTarget.style.opacity = '1'}
             style={{ marginLeft: selectedIds.length > 0 ? '0' : 'auto', padding: '10px 20px', background: '#129968', color: 'white', border: 'none', borderRadius: '6px', cursor: offlineMode ? 'not-allowed' : 'pointer', fontWeight: '600', fontSize: '15px', opacity: offlineMode ? 0.4 : 1 }}>
-            + Add User
+            {t('+ Add User')}
           </button>
         </div>
 
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading accounts from database...</div>
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('Loading accounts from database...')}</div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
@@ -606,18 +608,18 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                     checked={paginatedUsers.length > 0 && selectedIds.length === paginatedUsers.length}
                     onChange={toggleSelectAll} />
                 </th>
-                <th style={{ padding: compactMode ? '7px 6px' : '12px 10px', fontWeight: '600' }}>User ID</th>
-                <th style={{ padding: compactMode ? '7px 6px' : '12px 10px', fontWeight: '600' }}>Name</th>
-                <th style={{ padding: compactMode ? '7px 6px' : '12px 10px', fontWeight: '600' }}>Barangay</th>
-                <th style={{ padding: compactMode ? '7px 6px' : '12px 10px', fontWeight: '600' }}>Role</th>
-                <th style={{ padding: compactMode ? '7px 6px' : '12px 10px', fontWeight: '600' }}>Status</th>
-                <th style={{ padding: compactMode ? '7px 6px' : '12px 10px', fontWeight: '600' }}>Last Login</th>
-                <th style={{ padding: compactMode ? '7px 6px' : '12px 10px', fontWeight: '600', textAlign: 'center' }}>Actions</th>
+                <th style={{ padding: compactMode ? '7px 6px' : '12px 10px', fontWeight: '600' }}>{t('User ID')}</th>
+                <th style={{ padding: compactMode ? '7px 6px' : '12px 10px', fontWeight: '600' }}>{t('Name')}</th>
+                <th style={{ padding: compactMode ? '7px 6px' : '12px 10px', fontWeight: '600' }}>{t('Barangay')}</th>
+                <th style={{ padding: compactMode ? '7px 6px' : '12px 10px', fontWeight: '600' }}>{t('Role')}</th>
+                <th style={{ padding: compactMode ? '7px 6px' : '12px 10px', fontWeight: '600' }}>{t('Status')}</th>
+                <th style={{ padding: compactMode ? '7px 6px' : '12px 10px', fontWeight: '600' }}>{t('Last Login')}</th>
+                <th style={{ padding: compactMode ? '7px 6px' : '12px 10px', fontWeight: '600', textAlign: 'center' }}>{t('Actions')}</th>
               </tr>
             </thead>
             <tbody>
               {paginatedUsers.length === 0 ? (
-                <tr><td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No accounts found.</td></tr>
+                <tr><td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('No accounts found.')}</td></tr>
               ) : (
                 paginatedUsers.map(user => (
                   <tr key={user.user_id} style={{ borderBottom: '1px solid var(--border-color)', fontSize: '15px', color: 'var(--text-main)' }}>
@@ -627,14 +629,14 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                     <td style={{ padding: compactMode ? '8px 6px' : '15px 10px' }}>U-{String(user.user_id).padStart(3, '0')}</td>
                     <td style={{ padding: compactMode ? '8px 6px' : '15px 10px', fontWeight: '500' }}>{user.full_name}</td>
                     <td style={{ padding: compactMode ? '8px 6px' : '15px 10px' }}>{user.barangay_name || '—'}</td>
-                    <td style={{ padding: compactMode ? '8px 6px' : '15px 10px' }}>{user.role}</td>
+                    <td style={{ padding: compactMode ? '8px 6px' : '15px 10px' }}>{t(user.role)}</td>
                     <td style={{ padding: compactMode ? '8px 6px' : '15px 10px' }}>
                       {user.is_archived === 1 ? (
                         <span style={{
                           padding: '4px 12px', borderRadius: '20px', fontSize: '15px', fontWeight: '500',
                           background: '#fef3c7', color: '#d97706'
                         }}>
-                          Archived
+                          {t('Archived')}
                         </span>
                       ) : (
                         <span style={{
@@ -642,7 +644,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                           background: user.is_active ? '#121358' : 'var(--input-bg)',
                           color: user.is_active ? '#93c5fd' : 'var(--text-muted)'
                         }}>
-                          {user.is_active ? 'Active' : 'Inactive'}
+                          {user.is_active ? t('Active') : t('Inactive')}
                         </span>
                       )}
                     </td>
@@ -651,7 +653,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                     </td>
                     <td style={{ padding: compactMode ? '8px 6px' : '15px 10px' }}>
                       <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
-                        <button onClick={() => openEdit(user)} title="Edit"
+                        <button onClick={() => openEdit(user)} title={t('Edit')}
                           disabled={offlineMode}
                           onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                           onMouseLeave={e => e.currentTarget.style.opacity = '1'}
@@ -661,9 +663,9 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                         {user.is_archived === 1 ? (
                           <button onClick={() => {
                             axios.put(`${API_URL}/api/users/${user.user_id}/restore`)
-                              .then(() => { setSubmitMsg('User account restored successfully!'); setTimeout(() => setSubmitMsg(''), 3000); fetchUsers(true); })
-                              .catch(err => { setSubmitMsg('Restore failed: ' + (err.response?.data?.error || err.message)); setTimeout(() => setSubmitMsg(''), 3000); });
-                          }} title="Restore"
+                              .then(() => { setSubmitMsg(t('User account restored successfully!')); setTimeout(() => setSubmitMsg(''), 3000); fetchUsers(true); })
+                              .catch(err => { setSubmitMsg(t('Restore failed: ') + (err.response?.data?.error || err.message)); setTimeout(() => setSubmitMsg(''), 3000); });
+                          }} title={t('Restore')}
                             disabled={offlineMode}
                             onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                             onMouseLeave={e => e.currentTarget.style.opacity = '1'}
@@ -677,9 +679,9 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                                 } else {
                                   axios.delete(`${API_URL}/api/users/${user.user_id}`)
                                     .then(() => fetchUsers())
-                                    .catch(err => { setSubmitMsg('Archive failed: ' + (err.response?.data?.error || err.message)); setTimeout(() => setSubmitMsg(''), 3000); });
+                                    .catch(err => { setSubmitMsg(t('Archive failed: ') + (err.response?.data?.error || err.message)); setTimeout(() => setSubmitMsg(''), 3000); });
                                 }
-                              }} title="Archive"
+                              }} title={t('Archive')}
                             disabled={offlineMode}
                             onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                             onMouseLeave={e => e.currentTarget.style.opacity = '1'}
@@ -698,7 +700,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '18px', paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
           <span style={{ color: 'var(--text-muted)', fontSize: '15px' }}>
-            Showing {filteredUsers.length === 0 ? 0 : (currentPage - 1) * USERS_PER_PAGE + 1}–{Math.min(currentPage * USERS_PER_PAGE, filteredUsers.length)} of {filteredUsers.length} Accounts
+            {t('Showing ')}{filteredUsers.length === 0 ? 0 : (currentPage - 1) * USERS_PER_PAGE + 1}–{Math.min(currentPage * USERS_PER_PAGE, filteredUsers.length)}{t(' of ')}{filteredUsers.length}{t(' Accounts')}
           </span>
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
             <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1}
@@ -712,14 +714,14 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                     style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)', borderRadius: '6px', background: ellipsisOpen ? 'rgba(18,19,88,0.15)' : 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '16px', fontWeight: '700', letterSpacing: '2px' }}>...</button>
                   {ellipsisOpen && (
                     <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px', width: '160px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 100 }}>
-                      <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>Go to page (1–{totalPages})</div>
+                      <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>{t('Go to page (1–')}{totalPages})</div>
                       <div style={{ display: 'flex', gap: '4px' }}>
                         <input type="number" min="1" max={totalPages} value={ellipsisPageInput} placeholder="#"
                           onChange={e => setEllipsisPageInput(e.target.value)}
                           onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(ellipsisPageInput); if (v >= 1 && v <= totalPages) { setCurrentPage(v); setEllipsisOpen(false); setEllipsisPageInput(''); } } }}
                           style={{ flex: 1, padding: '5px 6px', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px', outline: 'none', width: '100%' }} />
                         <button onClick={() => { const v = parseInt(ellipsisPageInput); if (v >= 1 && v <= totalPages) { setCurrentPage(v); setEllipsisOpen(false); setEllipsisPageInput(''); } }}
-                          style={{ padding: '5px 8px', border: '1px solid #121358', borderRadius: '4px', background: '#121358', color: 'white', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>Go</button>
+                          style={{ padding: '5px 8px', border: '1px solid #121358', borderRadius: '4px', background: '#121358', color: 'white', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>{t('Go')}</button>
                       </div>
                     </div>
                   )}
@@ -741,7 +743,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
         <div className="cdms-modal-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
           <div className="cdms-modal-card" style={{ background: 'var(--bg-surface)', borderRadius: '14px', padding: '36px', width: '600px', maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 60px rgba(0,0,0,0.25)' }}>
             <h3 style={{ margin: '0 0 24px 0', fontSize: '22px', fontWeight: '700', color: 'var(--text-h)' }}>
-              {editingUser ? 'Edit User Account' : 'Add New User'}
+              {editingUser ? t('Edit User Account') : t('Add New User')}
             </h3>
 
             {submitMsg && (
@@ -751,39 +753,39 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
             )}
 
             <form onSubmit={handleSubmit}>
-              <p style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 12px 0' }}>Basic Information</p>
+              <p style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 12px 0' }}>{t('Basic Information')}</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>First Name *</label>
-                  <input type="text" required placeholder="Enter First Name"
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('First Name *')}</label>
+                  <input type="text" required placeholder={t('Enter First Name')}
                     style={{ ...inputStyle, border: formErrors.firstName ? '2px solid #ef4444' : '1px solid var(--input-border)', background: formErrors.firstName ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                     value={formData.firstName} onChange={e => { setFormData({ ...formData, firstName: e.target.value }); setFormErrors(prev => ({ ...prev, firstName: false })); }} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Last Name *</label>
-                  <input type="text" required placeholder="Enter Last Name"
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Last Name *')}</label>
+                  <input type="text" required placeholder={t('Enter Last Name')}
                     style={{ ...inputStyle, border: formErrors.lastName ? '2px solid #ef4444' : '1px solid var(--input-border)', background: formErrors.lastName ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                     value={formData.lastName} onChange={e => { setFormData({ ...formData, lastName: e.target.value }); setFormErrors(prev => ({ ...prev, lastName: false })); }} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Username *</label>
-                  <input type="text" required placeholder="Username" readOnly={!!editingUser}
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Username *')}</label>
+                  <input type="text" required placeholder={t('Username')} readOnly={!!editingUser}
                     style={{ ...inputStyle, border: formErrors.username ? '2px solid #ef4444' : '1px solid var(--input-border)', background: formErrors.username ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                     value={formData.username} onChange={e => { setFormData({ ...formData, username: e.target.value }); setFormErrors(prev => ({ ...prev, username: false })); }} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Email *</label>
-                  <input type="email" required placeholder="Email"
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Email *')}</label>
+                  <input type="email" required placeholder={t('Email')}
                     style={{ ...inputStyle, border: formErrors.email ? '2px solid #ef4444' : '1px solid var(--input-border)', background: formErrors.email ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                     value={formData.email} onChange={e => { setFormData({ ...formData, email: e.target.value }); setFormErrors(prev => ({ ...prev, email: false })); }} />
-                  {formErrors.email && <span style={{ fontSize: '13px', color: '#ef4444', marginTop: '3px', display: 'block' }}>Enter a valid email address</span>}
+                  {formErrors.email && <span style={{ fontSize: '13px', color: '#ef4444', marginTop: '3px', display: 'block' }}>{t('Enter a valid email address')}</span>}
                 </div>
                 <div>
-                <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Role *</label>
+                <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Role *')}</label>
                 <div style={{ position: 'relative' }} ref={roleRef}>
                   <button type="button" onClick={() => setRoleOpen(!roleOpen)}
                     style={{ ...inputStyle, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}>
-                    <span>{formData.role === 'BHW' ? 'Barangay Health Worker (BHW)' : 'City Health Office (CHO)'}</span>
+                    <span>{formData.role === 'BHW' ? t('Barangay Health Worker (BHW)') : t('City Health Office (CHO)')}</span>
                     <span style={{ fontSize: '13px', opacity: 0.6, transition: 'transform 0.2s', transform: roleOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                   </button>
                   {roleOpen && (
@@ -794,7 +796,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                           style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.role === r.value ? 'var(--input-bg)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: formData.role === r.value ? '#3B82F6' : 'var(--text-main)', cursor: 'pointer', fontWeight: formData.role === r.value ? '600' : '400' }}
                           onMouseEnter={e => { if (formData.role !== r.value) e.target.style.background = 'var(--input-bg)'; }}
                           onMouseLeave={e => { if (formData.role !== r.value) e.target.style.background = 'transparent'; }}>
-                          {r.label}
+                          {t(r.label)}
                         </button>
                       ))}
                     </div>
@@ -802,19 +804,19 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                 </div>
               </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Contact Number *</label>
-                  <input type="text" required placeholder="Contact Number"
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Contact Number *')}</label>
+                  <input type="text" required placeholder={t('Contact Number')}
                     style={{ ...inputStyle, border: formErrors.mobile ? '2px solid #ef4444' : '1px solid var(--input-border)', background: formErrors.mobile ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                     value={formData.mobile} onChange={e => { setFormData({ ...formData, mobile: e.target.value.replace(/\D/g, '').slice(0, 11) }); setFormErrors(prev => ({ ...prev, mobile: false })); }} />
-                  {formErrors.mobile && <span style={{ fontSize: '13px', color: '#ef4444', marginTop: '3px', display: 'block' }}>Use valid PH phone (e.g., 09123456789)</span>}
+                  {formErrors.mobile && <span style={{ fontSize: '13px', color: '#ef4444', marginTop: '3px', display: 'block' }}>{t('Use valid PH phone (e.g., 09123456789)')}</span>}
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Barangay Assignment *</label>
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Barangay Assignment *')}</label>
                     <div style={{ position: 'relative' }} ref={barangayAssignRef}>
                       <button type="button"
                         onClick={() => { setBarangayAssignOpen(!barangayAssignOpen); setShowAllBarangayAssign(false); }}
                         style={{ ...inputStyle, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left', border: formErrors.barangayId ? '2px solid #ef4444' : '1px solid var(--input-border)', background: formErrors.barangayId ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}>
-                        <span>{barangayList.find(b => b.id === formData.barangayId)?.name || '— Select Barangay —'}</span>
+                        <span>{barangayList.find(b => b.id === formData.barangayId)?.name || t('— Select Barangay —')}</span>
                         <span style={{ fontSize: '13px', opacity: 0.6, transition: 'transform 0.2s', transform: barangayAssignOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                       </button>
                       {barangayAssignOpen && (
@@ -826,16 +828,16 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                         }}>
                           <div onClick={() => { setFormData({ ...formData, barangayId: '' }); setBarangayAssignOpen(false); }}
                             style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '15px', color: 'var(--text-muted)', fontStyle: 'italic', borderBottom: '1px solid var(--border-color)' }}>
-                            — Select Barangay —
+                            {t('— Select Barangay —')}
                           </div>
-                          {visibleBarangayAssignOptions.length > 0 && <div style={{ padding: '6px 14px 2px', fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>CHO Unit I</div>}
+                          {visibleBarangayAssignOptions.length > 0 && <div style={{ padding: '6px 14px 2px', fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('CHO Unit I')}</div>}
                           {visibleBarangayAssignOptions.filter(b => unitIBarangays.includes(b)).map(b => (
                             <div key={b.id} onClick={() => { setFormData({ ...formData, barangayId: b.id }); setBarangayAssignOpen(false); }}
                               style={{ padding: '8px 14px 8px 18px', cursor: 'pointer', fontSize: '15px', color: formData.barangayId === b.id ? '#3B82F6' : 'var(--text-main)', background: formData.barangayId === b.id ? 'var(--input-bg)' : 'transparent', fontWeight: formData.barangayId === b.id ? '600' : '400' }}>
                               {b.name}
                             </div>
                           ))}
-                          {visibleBarangayAssignOptions.filter(b => unitIIBarangays.includes(b)).length > 0 && <div style={{ padding: '8px 14px 2px', fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>CHO Unit II</div>}
+                          {visibleBarangayAssignOptions.filter(b => unitIIBarangays.includes(b)).length > 0 && <div style={{ padding: '8px 14px 2px', fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('CHO Unit II')}</div>}
                           {visibleBarangayAssignOptions.filter(b => unitIIBarangays.includes(b)).map(b => (
                             <div key={b.id} onClick={() => { setFormData({ ...formData, barangayId: b.id }); setBarangayAssignOpen(false); }}
                               style={{ padding: '8px 14px 8px 18px', cursor: 'pointer', fontSize: '15px', color: formData.barangayId === b.id ? '#3B82F6' : 'var(--text-main)', background: formData.barangayId === b.id ? 'var(--input-bg)' : 'transparent', fontWeight: formData.barangayId === b.id ? '600' : '400' }}>
@@ -845,7 +847,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                            {!showAllBarangayAssign && scopedAssignOptions.length > 5 && (
                             <div onClick={() => setShowAllBarangayAssign(true)}
                               style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '15px', color: '#3B82F6', fontWeight: '600', borderTop: '1px solid var(--border-color)', textAlign: 'center' }}>
-                              Show all {scopedAssignOptions.length} barangays
+                              {t('Show all ')}{scopedAssignOptions.length}{t(' barangays')}
                             </div>
                           )}
                         </div>
@@ -854,26 +856,26 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                 </div>
                 {editingUser && (
                 <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Password</label>
-                  <input type="password" placeholder="Leave blank to keep current password" style={inputStyle}
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Password')}</label>
+                  <input type="password" placeholder={t('Leave blank to keep current password')} style={inputStyle}
                     value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} />
-                  <p style={{ margin: '6px 0 0', fontSize: '15px', color: 'var(--text-muted)' }}>If set, the user will receive an email notification with their new password.</p>
+                  <p style={{ margin: '6px 0 0', fontSize: '15px', color: 'var(--text-muted)' }}>{t('If set, the user will receive an email notification with their new password.')}</p>
                 </div>
                 )}
               </div>
 
-              <p style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '20px 0 12px 0' }}>Account Settings</p>
+              <p style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '20px 0 12px 0' }}>{t('Account Settings')}</p>
 
               {!editingUser && (
                 <div style={{ marginBottom: '14px' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', marginBottom: '10px' }}>
                     <input type="checkbox" checked={formData.generateTempPassword}
                       onChange={e => setFormData({ ...formData, generateTempPassword: e.target.checked })} />
-                    Generate temporary password
+                    {t('Generate temporary password')}
                   </label>
-                  <p style={{ margin: '0 0 10px 0', fontSize: '15px', color: 'var(--text-muted)' }}>Password will be emailed to user</p>
+                  <p style={{ margin: '0 0 10px 0', fontSize: '15px', color: 'var(--text-muted)' }}>{t('Password will be emailed to user')}</p>
                   {!formData.generateTempPassword && (
-                    <input type="password" placeholder="Set a password"
+                    <input type="password" placeholder={t('Set a password')}
                       style={{ ...inputStyle, border: formErrors.password ? '2px solid #ef4444' : '1px solid var(--input-border)', background: formErrors.password ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                       value={formData.password} onChange={e => { setFormData({ ...formData, password: e.target.value }); setFormErrors(prev => ({ ...prev, password: false })); }} />
                   )}
@@ -883,13 +885,13 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
               {editingUser && (
                 <>
                   <div style={{ marginBottom: '24px' }}>
-                    <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-muted)', marginBottom: '8px', fontWeight: '500' }}>Status</label>
+                    <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-muted)', marginBottom: '8px', fontWeight: '500' }}>{t('Status')}</label>
                     <div style={{ display: 'flex', gap: '20px' }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer' }}>
-                        <input type="radio" checked={formData.isActive} onChange={() => setFormData({ ...formData, isActive: true })} /> Active
+                        <input type="radio" checked={formData.isActive} onChange={() => setFormData({ ...formData, isActive: true })} /> {t('Active')}
                       </label>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer' }}>
-                        <input type="radio" checked={!formData.isActive} onChange={() => setFormData({ ...formData, isActive: false })} /> Inactive
+                        <input type="radio" checked={!formData.isActive} onChange={() => setFormData({ ...formData, isActive: false })} /> {t('Inactive')}
                       </label>
                     </div>
                   </div>
@@ -915,13 +917,13 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                   style={{ padding: '10px 24px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '15px', color: 'var(--text-muted)', cursor: 'pointer' }}
                   onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                   onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
-                  Cancel
+                  {t('Cancel')}
                 </button>
                 <button type="submit" disabled={submitLoading}
                   style={{ padding: '10px 28px', background: submitLoading ? '#6fd4a2' : '#129968', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: '600', color: 'white', cursor: submitLoading ? 'not-allowed' : 'pointer' }}
                   onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                   onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
-                  {submitLoading ? 'Saving...' : (editingUser ? 'Update User' : 'Add User')}
+                  {submitLoading ? t('Saving...') : (editingUser ? t('Update User') : t('Add User'))}
                 </button>
               </div>
             </form>
@@ -938,11 +940,11 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                 <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
               </svg>
             </div>
-            <h3 style={{ margin: '0 0 8px 0', fontSize: '22px', fontWeight: '700', color: 'var(--text-h)' }}>Archive this account?</h3>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: '22px', fontWeight: '700', color: 'var(--text-h)' }}>{t('Archive this account?')}</h3>
             <p style={{ margin: '0 0 20px 0', color: 'var(--text-muted)', fontSize: '15px', lineHeight: '1.6' }}>
-              This cannot be undone. The account will be hidden and will no longer be able to log in.<br />{bulkDeleteMode
-                ? `This will archive ${selectedIds.length} accounts. Are you sure?`
-                : 'This will archive the account of:'}
+              {t('This cannot be undone. The account will be hidden and will no longer be able to log in.')}<br />{bulkDeleteMode
+                ? <>{t('This will archive ')}{selectedIds.length}{t(' accounts. Are you sure?')}</>
+                : t('This will archive the account of:')}
             </p>
             {!bulkDeleteMode && (
             <div style={{ background: 'var(--input-bg)', borderLeft: '4px solid #ef4444', borderRadius: '6px', padding: '14px 18px', marginBottom: '20px', textAlign: 'left' }}>
@@ -950,21 +952,21 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                 {deleteTarget.full_name} (U-{String(deleteTarget.user_id).padStart(3, '0')})
               </div>
               <div style={{ color: 'var(--text-muted)', fontSize: '15px' }}>
-                {deleteTarget.role === 'BHW' ? 'Barangay Health Worker' : 'City Health Office Admin'} - {deleteTarget.barangay_name || 'No barangay assigned'}
+                {deleteTarget.role === 'BHW' ? t('Barangay Health Worker') : t('City Health Office Admin')} - {deleteTarget.barangay_name || t('No barangay assigned')}
               </div>
             </div>
             )}
             <p style={{ color: 'var(--text-muted)', fontSize: '15px', margin: '0 0 28px 0' }}>
-              You can restore this account from the Archived Accounts view at any time.
+              {t('You can restore this account from the Archived Accounts view at any time.')}
             </p>
             <div style={{ display: 'flex', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
               <button onClick={() => { setDeleteTarget(null); setBulkDeleteMode(false); }} disabled={deleteLoading}
                 style={{ flex: 1, padding: '14px', background: 'var(--input-bg)', border: 'none', borderRight: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '16px', fontWeight: '500', color: 'var(--text-main)' }}>
-                Cancel
+                {t('Cancel')}
               </button>
               <button onClick={executeDelete} disabled={deleteLoading}
                 style={{ flex: 1, padding: '14px', background: '#ef4444', border: 'none', cursor: deleteLoading ? 'not-allowed' : 'pointer', fontSize: '16px', fontWeight: '600', color: '#fff' }}>
-                {deleteLoading ? 'Archiving...' : 'Archive'}
+                {deleteLoading ? t('Archiving...') : t('Archive')}
               </button>
             </div>
           </div>

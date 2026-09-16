@@ -1,4 +1,5 @@
 import React from 'react';
+import { useI18n } from './i18n';
 import ChoLogoIcon from './assets/ChoLogo';
 import ChoLogoIconII from './assets/ChoLogoII';
 
@@ -38,33 +39,25 @@ const SettingsIcon = ({ color = '#64748b', size = 18 }) => (
   </svg>
 );
 
-const translations = {
-  en: { 'Dashboard':'Dashboard','Manage Cases':'Manage Cases','Audit Reports':'Audit Reports','Map View':'Map View','User Accounts':'User Accounts','Settings':'Settings','Roles & Permissions':'Roles & Permissions' },
-  fil: { 'Dashboard':'Dashboard','Manage Cases':'Pamahalaan ang mga Kaso','Audit Reports':'Mga Ulat ng Pag-audit','Map View':'Pananaw ng Mapa','User Accounts':'Mga Account ng User','Settings':'Mga Setting','Roles & Permissions':'Mga Tungkulin at Pahintulot' },
-  id: { 'Dashboard':'Dasbor','Manage Cases':'Kelola Kasus','Audit Reports':'Laporan Audit','Map View':'Tampilan Peta','User Accounts':'Akun Pengguna','Settings':'Pengaturan','Roles & Permissions':'Peran & Izin' },
-  vi: { 'Dashboard':'Bảng điều khiển','Manage Cases':'Quản lý ca bệnh','Audit Reports':'Báo cáo kiểm toán','Map View':'Xem bản đồ','User Accounts':'Tài khoản người dùng','Settings':'Cài đặt','Roles & Permissions':'Vai trò & Quyền' },
-  th: { 'Dashboard':'แดชบอร์ด','Manage Cases':'จัดการเคส','Audit Reports':'รายงานการตรวจสอบ','Map View':'มุมมองแผนที่','User Accounts':'บัญชีผู้ใช้','Settings':'การตั้งค่า','Roles & Permissions':'บทบาทและสิทธิ์' },
-};
-
-const Sidebar = ({ role, activeTab, setActiveTab, language, choUnit }) => {
-  const t = (key) => translations[language]?.[key] || key;
+const Sidebar = ({ role, activeTab, setActiveTab, choUnit }) => {
+  const { t } = useI18n();
   // Define menu configurations
   const menuConfig = {
     CHO: [
-      { name: 'Dashboard', icon: <DashboardIcon color="var(--text-h)" /> },
+      { name: 'Dashboard', icon: <DashboardIcon color="#E2E8F0" /> },
       { name: 'Manage Cases', icon: <CaseMgmtIcon color="#f59e0b" /> },
       { name: 'Audit Reports', icon: <AuditIcon color="#8b5cf6" /> },
       { name: 'Map View', icon: <MapIcon color="#10b981" /> },
       { name: 'User Accounts', icon: <UserIcon color="#0ea5e9" /> },
-      { name: 'Settings', icon: <SettingsIcon color="var(--text-muted)" /> }
+      { name: 'Settings', icon: <SettingsIcon color="#94A3B8" /> }
     ],
     BHW: [
-      { name: 'Dashboard', icon: <DashboardIcon color="var(--text-h)" /> },
+      { name: 'Dashboard', icon: <DashboardIcon color="#E2E8F0" /> },
       { name: 'Manage Cases', icon: <CaseMgmtIcon color="#f59e0b" /> },
       { name: 'Audit Reports', icon: <AuditIcon color="#8b5cf6" /> },
       { name: 'Map View', icon: <MapIcon color="#10b981" /> },
       { name: 'Roles & Permissions', icon: <UserIcon color="#6d28d9" /> },
-      { name: 'Settings', icon: <SettingsIcon color="var(--text-muted)" /> },
+      { name: 'Settings', icon: <SettingsIcon color="#94A3B8" /> },
     ]
   };
 
@@ -87,6 +80,8 @@ const Sidebar = ({ role, activeTab, setActiveTab, language, choUnit }) => {
             {item.icon} {t(item.name)}
           </div>
         ))}
+      </div>
+      <div className="sidebar-footer" style={{ marginTop: 'auto', padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.45)' }}>
       </div>
     </div>
   );

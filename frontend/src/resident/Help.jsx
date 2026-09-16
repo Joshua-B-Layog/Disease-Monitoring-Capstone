@@ -1,10 +1,13 @@
 import { useState } from 'react';
+import { useI18n } from '../i18n';
+
 
 export default function Help() {
+  const { t } = useI18n();
   return (
     <div className="resident-page">
       <h2 style={{ margin: '0 0 24px', fontSize: '26px', fontWeight: '700' }}>
-        Help & Resources
+        {t('Help & Resources')}
       </h2>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -12,36 +15,36 @@ export default function Help() {
         {/* Section 1: User Guides & Tutorials */}
         <Section title="User Guides & Video Tutorials" icon="📚">
           <p style={{ fontSize: '17px', color: 'var(--text-muted)', margin: '0 0 16px' }}>
-            Learn how to use the Cabuyao Disease Monitoring System and understand disease prevention.
+            {t('Learn how to use the Cabuyao Disease Monitoring System and understand disease prevention.')}
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <ResourceCard
-              title="How to Use the Disease Map"
-              desc="Learn to navigate the disease tracking map and understand case data."
+              title={t('How to Use the Disease Map')}
+              desc={t('Learn to navigate the disease tracking map and understand case data.')}
               type="Guide"
             />
             <ResourceCard
-              title="Understanding Disease Statistics"
-              desc="A guide to reading charts, trends, and outbreak indicators."
+              title={t('Understanding Disease Statistics')}
+              desc={t('A guide to reading charts, trends, and outbreak indicators.')}
               type="Guide"
             />
             <ResourceCard
-              title="Symptom Checker Tutorial"
-              desc="How to use the symptom checker to assess your health."
+              title={t('Symptom Checker Tutorial')}
+              desc={t('How to use the symptom checker to assess your health.')}
               type="Video"
             />
             <ResourceCard
-              title="Prevention Tips Overview"
-              desc="Quick overview of preventing common diseases in Cabuyao."
+              title={t('Prevention Tips Overview')}
+              desc={t('Quick overview of preventing common diseases in Cabuyao.')}
               type="Video"
             />
           </div>
           <div style={{ marginTop: '14px', textAlign: 'center' }}>
             <span style={{
-                padding: '8px 20px', background: 'var(--input-bg)', borderRadius: '6px',
-                fontSize: '17px', color: 'var(--text-muted)', cursor: 'pointer', display: 'inline-block',
-                wordBreak: 'break-word',
-              }}>
+              padding: '8px 20px', background: 'var(--input-bg)', borderRadius: '6px',
+              fontSize: '17px', color: 'var(--text-muted)', cursor: 'pointer', display: 'inline-block',
+              wordBreak: 'break-word',
+            }}>
               Contact Support: chosupport@cabuyao.gov.ph
             </span>
           </div>
@@ -50,7 +53,7 @@ export default function Help() {
         {/* Section 2: General Disease Symptoms */}
         <Section title="Common Disease Symptoms" icon="🩺">
           <p style={{ fontSize: '17px', color: 'var(--text-muted)', margin: '0 0 16px' }}>
-            If you or a family member experience any of these symptoms, consult a health professional.
+            {t('If you or a family member experience any of these symptoms, consult a health professional.')}
           </p>
           <div style={{
             display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',

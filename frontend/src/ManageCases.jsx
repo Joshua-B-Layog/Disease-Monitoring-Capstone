@@ -1720,7 +1720,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
   // ── EXPORT helpers ──
   const buildExportRows = () => filteredCases.map(c =>
-    `"${c.case_id}","${c.patient_name || ''}","${c.age || ''}","${c.barangay_name || ''}","${c.disease_name || ''}","${c.severity || ''}","${c.status || ''}","${c.date_reported || ''}"`
+    `"${c.case_id}","${c.patient_name || ''}","${c.age || ''}","${c.barangay_name || ''}","${c.disease_name || ''}","${c.severity || ''}","${translateStatus(c.status) || ''}","${c.date_reported || ''}"`
   ).join('\n');
 
   const handleExportCSV = () => {
@@ -1735,7 +1735,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const handleExportExcel = () => {
     const headers = 'Case ID\tPatient Name\tAge\tBarangay\tDisease\tSeverity\tStatus\tDate Reported\n';
     const rows = filteredCases.map(c =>
-      `${c.case_id}\t${c.patient_name || ''}\t${c.age || ''}\t${c.barangay_name || ''}\t${c.disease_name || ''}\t${c.severity || ''}\t${c.status || ''}\t${c.date_reported || ''}`
+      `${c.case_id}\t${c.patient_name || ''}\t${c.age || ''}\t${c.barangay_name || ''}\t${c.disease_name || ''}\t${c.severity || ''}\t${translateStatus(c.status) || ''}\t${c.date_reported || ''}`
     ).join('\n');
     const blob = new Blob([headers + rows], { type: 'application/vnd.ms-excel' });
     const url = URL.createObjectURL(blob);
@@ -3742,7 +3742,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       </td>
                       <td style={{ padding: compactMode ? '7px 8px' : '12px', textAlign: 'center' }}>
                         <span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '15px', fontWeight: '500', ...getStatusStyle(c.status) }}>
-                          {c.status}
+                          {translateStatus(c.status)}
                         </span>
                       </td>
                       <td style={{ padding: compactMode ? '7px 8px' : '12px', textAlign: 'center' }}>

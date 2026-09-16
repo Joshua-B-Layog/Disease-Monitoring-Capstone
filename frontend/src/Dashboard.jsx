@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useI18n } from './i18n';
 import axios from 'axios';
 import { API_URL } from './config';
 import { cacheCases, getCachedCases, isOnline } from './offlineSync';
@@ -90,6 +91,7 @@ const getPeriodRange = (period, quarter, year) => {
 };
 
 const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMode, loginRole, loginBarangay, sessionContext, selectedDisease, setSelectedDisease, dateRange, setDateRange, dashPeriod, setDashPeriod, dashQuarter, setDashQuarter, dashYear, setDashYear }) => {
+  const { t, translateStatus } = useI18n();
   const [cases, setCases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -278,18 +280,18 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     return (
       <div className="cdms-view-in" style={{ padding: compactMode ? '12px' : '4px 28px 28px 28px' }}>
         <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '4px' }}>
-          <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--accent, #60a5fa)' }} onClick={() => setShowAllDiseases(false)}>Dashboard</span>
-          {' / All Disease Count'}
+          <span style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--accent, #60a5fa)' }} onClick={() => setShowAllDiseases(false)}>{t('Dashboard')}</span>
+          {t(' / All Disease Count')}
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h2 style={{ margin: 0, fontSize: '22px', color: 'var(--text-main)' }}>All Disease Count</h2>
+          <h2 style={{ margin: 0, fontSize: '22px', color: 'var(--text-main)' }}>{t('All Disease Count')}</h2>
           <button
             onClick={() => setShowAllDiseases(false)}
             style={{ padding: '8px 18px', background: '#121358', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: '600' }}
             onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
             onMouseLeave={e => e.currentTarget.style.opacity = '1'}
           >
-            ← Back to Dashboard
+            {t('← Back to Dashboard')}
           </button>
         </div>
 
@@ -378,29 +380,29 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           {(allPeriod === 'weekly' || allPeriod === 'monthly' || allPeriod === 'custom') && (
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
               <DatePicker value={allDateRange.start} dateFormat={dateFormat} clearable={false}
-                placeholder="Start date"
+                placeholder={t('Start date')}
                 onChange={(v) => { if (v) { setAllDateRange({ ...allDateRange, start: v }); setAllPeriod('custom'); } }} />
-              <span style={{ color: 'var(--text-muted)', fontSize: '15px' }}>to</span>
+              <span style={{ color: 'var(--text-muted)', fontSize: '15px' }}>{t('to')}</span>
               <DatePicker value={allDateRange.end} dateFormat={dateFormat} clearable={false}
-                placeholder="End date"
+                placeholder={t('End date')}
                 onChange={(v) => { if (v) { setAllDateRange({ ...allDateRange, end: v }); setAllPeriod('custom'); } }} />
             </div>
           )}
 
           <span style={{ marginLeft: 'auto', fontSize: '15px', color: 'var(--text-muted)' }}>
-            {formatDateStr(allDateRange.start, dateFormat)} to {formatDateStr(allDateRange.end, dateFormat)}
+{formatDateStr(allDateRange.start, dateFormat)} {t('to')} {formatDateStr(allDateRange.end, dateFormat)}
           </span>
         </div>
 
         {/* ── Vertical Disease Bar Chart (28 diseases) ── */}
         <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' }}>
           <h4 style={{ color: 'var(--text-main)', margin: '0 0 16px 0', fontSize: '15px', fontWeight: '600' }}>
-            Disease Cases by Count
-            <span style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: '400', marginLeft: '8px' }}>({allTotalCases} total cases · {formatDateStr(allDateRange.start, dateFormat)} to {formatDateStr(allDateRange.end, dateFormat)})</span>
+            {t('Disease Cases by Count')}
+            <span style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: '400', marginLeft: '8px' }}>({allTotalCases} total cases · {formatDateStr(allDateRange.start, dateFormat)} {t('to')} {formatDateStr(allDateRange.end, dateFormat)})</span>
           </h4>
           {!hasCases ? (
             <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: '15px' }}>
-              No cases found for this date range.
+              {t('No cases found for this date range.')}
             </div>
           ) : (
             <div style={{ position: 'relative' }}>
@@ -439,7 +441,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                             fontSize: '13px', color: 'var(--text-main)', whiteSpace: 'nowrap', textAlign: 'center', zIndex: 10, pointerEvents: 'none',
                           }}>
                             <div style={{ fontWeight: '700', marginBottom: '2px' }}>{bar.label}</div>
-                            <div>{bar.count} cases ({hoveredBar.pct}%)</div>
+                            <div>{bar.count} {t('cases')} ({hoveredBar.pct}%)</div>
                           </div>
                         )}
                         <div style={{
@@ -493,11 +495,11 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   const recoveredCases = displayCases.filter(c => c.status === 'Recovered').length;
   const deathCases = displayCases.filter(c => c.status === 'Deceased').length;
   const STATUS_DIST = [
-    ['Active', displayCases.filter(c => c.status === 'Active').length, '#3B82F6'],
-    ['Pending', displayCases.filter(c => c.status === 'Pending').length, '#f59e0b'],
-    ['Under Treatment', displayCases.filter(c => c.status === 'Under Treatment').length, '#10b981'],
-    ['Recovered', displayCases.filter(c => c.status === 'Recovered').length, '#0D7A4E'],
-    ['Deceased', displayCases.filter(c => c.status === 'Deceased').length, '#DC2626'],
+    [t('Active'), displayCases.filter(c => c.status === 'Active').length, '#3B82F6'],
+    [t('Pending'), displayCases.filter(c => c.status === 'Pending').length, '#f59e0b'],
+    [t('Under Treatment'), displayCases.filter(c => c.status === 'Under Treatment').length, '#10b981'],
+    [t('Recovered'), displayCases.filter(c => c.status === 'Recovered').length, '#0D7A4E'],
+    [t('Deceased'), displayCases.filter(c => c.status === 'Deceased').length, '#DC2626'],
   ].filter(([, n]) => n > 0);
 
   // --- TREND COMPARISON: previous period ---
@@ -740,13 +742,13 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   // ── THRESHOLD ALERT BADGES ──
   const thresholdAlerts = (() => {
     const alerts = [];
-    if (deathCases > 0) alerts.push({ label: 'Mortality Alert', detail: `${deathCases} death(s) recorded`, color: '#DC2626', bg: 'rgba(220,38,38,0.1)', border: 'rgba(220,38,38,0.3)' });
-    if (activeCases > 5) alerts.push({ label: 'High Active Cases', detail: `${activeCases} cases under monitoring`, color: '#D97706', bg: 'rgba(217,119,6,0.1)', border: 'rgba(217,119,6,0.3)' });
+    if (deathCases > 0) alerts.push({ label: t('Mortality Alert'), detail: `${deathCases} death(s) recorded`, color: '#DC2626', bg: 'rgba(220,38,38,0.1)', border: 'rgba(220,38,38,0.3)' });
+    if (activeCases > 5) alerts.push({ label: t('High Active Cases'), detail: `${activeCases} cases under monitoring`, color: '#D97706', bg: 'rgba(217,119,6,0.1)', border: 'rgba(217,119,6,0.3)' });
     const totalPrev = prevTotal;
     if (totalCases > 0 && totalPrev > 0) {
       const growth = ((totalCases - totalPrev) / totalPrev) * 100;
-      if (growth >= 50) alerts.push({ label: 'Rapid Surge', detail: `+${Math.round(growth)}% vs previous period`, color: '#DC2626', bg: 'rgba(220,38,38,0.1)', border: 'rgba(220,38,38,0.3)' });
-      else if (growth >= 20) alerts.push({ label: 'Rising Trend', detail: `+${Math.round(growth)}% vs previous period`, color: '#D97706', bg: 'rgba(217,119,6,0.1)', border: 'rgba(217,119,6,0.3)' });
+      if (growth >= 50) alerts.push({ label: t('Rapid Surge'), detail: `+${Math.round(growth)}% vs previous period`, color: '#DC2626', bg: 'rgba(220,38,38,0.1)', border: 'rgba(220,38,38,0.3)' });
+      else if (growth >= 20) alerts.push({ label: t('Rising Trend'), detail: `+${Math.round(growth)}% vs previous period`, color: '#D97706', bg: 'rgba(217,119,6,0.1)', border: 'rgba(217,119,6,0.3)' });
     }
     return alerts;
   })();
@@ -786,7 +788,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             : dashPeriod === 'custom'
               ? `Custom Range (${formatDateStr(dateRange.start, dateFormat)} to ${formatDateStr(dateRange.end, dateFormat)})`
               : `Yearly Cases (${dashYear})`)
-    : (isBhw ? 'All Diseases - Case Counts' : `${selectedDisease} Cases by Barangay`);
+    : (isBhw ? t('All Diseases - Case Counts') : `${selectedDisease} Cases by Barangay`);
   const exportHighest = periodChart ? monthMax : (isBhw ? (diseaseBars.length > 0 ? diseaseBars[0].count : 1) : highestCount);
 
   const yearOptionStyle = (active) => ({
@@ -820,7 +822,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   // ─── SHARED: build bar chart HTML block for exports ───
   const buildBarChartHTML = (bars = sortedBars, title = `${selectedDisease} Cases by Barangay`, highest = highestCount) => {
     if (bars.length === 0) {
-      return `<p style="color:#64748b;font-size:14px;">No cases found.</p>`;
+      return `<p style="color:#64748b;font-size:14px;">${t('No cases found.')}</p>`;
     }
     const barRows = bars.map((bar, i) => {
       const pct = highest > 0 ? Math.round((bar.count / highest) * 100) : 0;
@@ -852,7 +854,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       <td>${c.barangay_name || ''}</td>
       <td>${c.disease_name || ''}</td>
       <td>${c.severity || 'N/A'}</td>
-      <td>${c.status || ''}</td>
+      <td>${translateStatus(c.status) || ''}</td>
     </tr>`
   ).join('');
 
@@ -874,15 +876,15 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         table.main tr:nth-child(even) td { background: #f9fafb; }
         .bar-section { margin: 8px 0 24px 0; }
       </style></head><body>
-      <h2>Cabuyao Disease Monitoring System - Dashboard Export</h2>
-      <p>Generated: ${formatDateStr(new Date(), dateFormat)} &nbsp;|&nbsp; Date Range: ${formatDateStr(dateRange.start, dateFormat)} to ${formatDateStr(dateRange.end, dateFormat)}</p>
+      <h2>${t('Cabuyao Disease Monitoring System - Dashboard Export')}</h2>
+      <p>${t('Generated:')} ${formatDateStr(new Date(), dateFormat)} &nbsp;|&nbsp; ${t('Date Range:')} ${formatDateStr(dateRange.start, dateFormat)} ${t('to')} ${formatDateStr(dateRange.end, dateFormat)}</p>
 
       <h3>${eTitle}</h3>
       <div class="bar-section">${buildBarChartHTML(eBars, eTitle, eHighest)}</div>
 
-      <h3>Case Records</h3>
+      <h3>${t('Case Records')}</h3>
       <table class="main">
-        <thead><tr><th>ID</th><th>Patient</th><th>Age</th><th>Barangay</th><th>Disease</th><th>Severity</th><th>Status</th></tr></thead>
+        <thead><tr><th>${t('ID')}</th><th>${t('Patient')}</th><th>${t('Age')}</th><th>${t('Barangay')}</th><th>${t('Disease')}</th><th>${t('Severity')}</th><th>${t('Status')}</th></tr></thead>
         <tbody>${buildTableRowsHTML(displayCases)}</tbody>
       </table>
       </body></html>`;
@@ -895,9 +897,9 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
   // --- EXPORT: EXCEL ---
   const handleExportExcel = () => {
-    const headers = 'Case ID\tPatient Name\tAge\tBarangay\tDisease\tSeverity\tStatus\tDate Reported\n';
+    const headers = `${t('Case ID')}\t${t('Patient Name')}\t${t('Age')}\t${t('Barangay')}\t${t('Disease')}\t${t('Severity')}\t${t('Status')}\t${t('Date Reported')}\n`;
     const rows = displayCases.map(c =>
-      `${c.case_id}\t${c.patient_name || ''}\t${c.age || ''}\t${c.barangay_name || ''}\t${c.disease_name || ''}\t${c.severity || ''}\t${c.status || ''}\t${formatDateStr(c.date_reported, dateFormat)}`
+      `${c.case_id}\t${c.patient_name || ''}\t${c.age || ''}\t${c.barangay_name || ''}\t${c.disease_name || ''}\t${c.severity || ''}\t${translateStatus(c.status) || ''}\t${formatDateStr(c.date_reported, dateFormat)}`
     ).join('\n');
     const blob = new Blob([headers + rows], { type: 'application/vnd.ms-excel' });
     const url = URL.createObjectURL(blob);
@@ -908,9 +910,9 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
   // --- EXPORT: CSV ---
   const handleExportCSV = () => {
-    const headers = 'Case ID,Patient Name,Age,Barangay,Disease,Severity,Status,Date Reported\n';
+    const headers = `${t('Case ID')},${t('Patient Name')},${t('Age')},${t('Barangay')},${t('Disease')},${t('Severity')},${t('Status')},${t('Date Reported')}\n`;
     const rows = displayCases.map(c =>
-      `"${c.case_id}","${c.patient_name || ''}","${c.age || ''}","${c.barangay_name || ''}","${c.disease_name || ''}","${c.severity || ''}","${c.status || ''}","${formatDateStr(c.date_reported, dateFormat)}"`
+      `"${c.case_id}","${c.patient_name || ''}","${c.age || ''}","${c.barangay_name || ''}","${c.disease_name || ''}","${c.severity || ''}","${translateStatus(c.status) || ''}","${formatDateStr(c.date_reported, dateFormat)}"`
     ).join('\n');
     const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -943,19 +945,19 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         .fill-blue { background: #3b82f6; height: 100%; border-radius: 4px; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; color: #fff; font-weight: 700; font-size: 14px; box-sizing: border-box; }
         footer { color: #4b5563; font-size: 12px; margin-top: 40px; border-top: 1px solid #1e293b; padding-top: 12px; }
       </style></head><body>
-      <h1>Cabuyao Disease Monitoring System</h1>
-      <p>Dashboard Export &nbsp;|&nbsp; Generated: ${formatDateStr(new Date(), dateFormat)} &nbsp;|&nbsp; ${formatDateStr(dateRange.start, dateFormat)} to ${formatDateStr(dateRange.end, dateFormat)}</p>
+      <h1>${t('Cabuyao Disease Monitoring System')}</h1>
+      <p>${t('Dashboard Export')} &nbsp;|&nbsp; ${t('Generated:')} ${formatDateStr(new Date(), dateFormat)} &nbsp;|&nbsp; ${formatDateStr(dateRange.start, dateFormat)} ${t('to')} ${formatDateStr(dateRange.end, dateFormat)}</p>
 
       <div class="stats">
-        <div class="stat"><div class="num">${totalCases}</div><div class="lbl">Total Cases</div></div>
-        <div class="stat"><div class="num" style="color:#D97706;">${activeCases}</div><div class="lbl">Active</div></div>
-        <div class="stat"><div class="num">${recoveredCases}</div><div class="lbl">Recovered</div></div>
-        <div class="stat"><div class="num" style="color:#ef4444;">${deathCases}</div><div class="lbl">Deaths</div></div>
+        <div class="stat"><div class="num">${totalCases}</div><div class="lbl">${t('Total Cases')}</div></div>
+        <div class="stat"><div class="num" style="color:#D97706;">${activeCases}</div><div class="lbl">${t('Active')}</div></div>
+        <div class="stat"><div class="num">${recoveredCases}</div><div class="lbl">${t('Recovered')}</div></div>
+        <div class="stat"><div class="num" style="color:#ef4444;">${deathCases}</div><div class="lbl">${t('Deaths')}</div></div>
       </div>
 
       <h2>${eTitle}</h2>
       ${eBars.length === 0
-        ? `<p>No cases found.</p>`
+        ? `<p>${t('No cases found.')}</p>`
         : `<table class="bars"><tbody>
             ${eBars.map((bar, i) => {
               const pct = eHighest > 0 ? Math.round((bar.count / eHighest) * 100) : 0;
@@ -968,7 +970,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           </tbody></table>`
       }
 
-      <footer>Copy content into PowerPoint for presentation. &copy; 2026 City Health Office (CHO) Cabuyao</footer>
+      <footer>${t('Copy content into PowerPoint for presentation.')} &copy; 2026 City Health Office (CHO) Cabuyao</footer>
       </body></html>`;
     const blob = new Blob([html], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
@@ -990,7 +992,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         <td>${c.barangay_name || ''}</td>
         <td>${c.disease_name || ''}</td>
         <td>${c.severity || 'N/A'}</td>
-        <td>${c.status || ''}</td>
+<td>${translateStatus(c.status) || ''}</td>
       </tr>`
     ).join('');
 
@@ -1009,20 +1011,20 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         .bar-section { margin-bottom: 24px; }
         @media print { button { display: none; } }
       </style></head><body>
-      <h2>Cabuyao Disease Monitoring System</h2>
-      <p>Report generated: ${formatDateStr(new Date(), dateFormat)} &nbsp;|&nbsp; Date Range: ${formatDateStr(dateRange.start, dateFormat)} to ${formatDateStr(dateRange.end, dateFormat)}</p>
+      <h2>${t('Cabuyao Disease Monitoring System')}</h2>
+      <p>${t('Report generated:')} ${formatDateStr(new Date(), dateFormat)} &nbsp;|&nbsp; ${t('Date Range:')} ${formatDateStr(dateRange.start, dateFormat)} ${t('to')} ${formatDateStr(dateRange.end, dateFormat)}</p>
 
       <h3>${eTitle}</h3>
       <div class="bar-section">${buildBarChartHTML(eBars, eTitle, eHighest)}</div>
 
-      <h3>Recent Case Records</h3>
+      <h3>${t('Recent Case Records')}</h3>
       <table class="main">
-        <thead><tr><th>ID</th><th>Patient Name</th><th>Age</th><th>Barangay</th><th>Disease</th><th>Severity</th><th>Status</th></tr></thead>
+        <thead><tr><th>${t('ID')}</th><th>${t('Patient Name')}</th><th>${t('Age')}</th><th>${t('Barangay')}</th><th>${t('Disease')}</th><th>${t('Severity')}</th><th>${t('Status')}</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
       <br/>
       <button onclick="window.print();" style="padding:10px 24px;background:#1e3a8a;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">
-        🖨️ Print / Save as PDF
+        🖨️ {t('Print / Save as PDF')}
       </button>
       </body></html>`);
     printWindow.document.close();
@@ -1045,17 +1047,17 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       {offlineMode && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '15px', color: '#D97706' }}>
           <span style={{ fontSize: '16px' }}>⚠</span>
-          Offline - showing cached data. Will refresh when reconnected.
+          {t('Offline - showing cached data. Will refresh when reconnected.')}
         </div>
       )}
 
       {/* ── WELCOME BANNER ── */}
       <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px 16px' : '20px 24px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <div style={{ color: 'var(--text-muted)', fontSize: '15px', fontWeight: '500' }}>
-          {new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening'}
+          {new Date().getHours() < 12 ? t('Good morning') : new Date().getHours() < 18 ? t('Good afternoon') : t('Good evening')}
         </div>
         <div style={{ color: 'var(--text-main)', fontSize: '22px', fontWeight: '700', marginTop: '2px' }}>
-          Welcome back, {loggedUser || 'User'}
+          {t('Welcome back')}, {loggedUser || t('User')}
         </div>
         <div style={{ color: 'var(--text-muted)', fontSize: '15px', marginTop: '4px' }}>
           {loginRole === 'CHO' ? `City Health Officer - ${sessionContext || ''}` : `Barangay Health Worker - ${loginBarangay || ''}`}
@@ -1067,14 +1069,14 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       {/* ── STAT CARDS ── */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: compactMode ? '10px' : '16px' }}>
         {[
-          { label: 'Total Cases', value: totalCases, color: '#3B82F6', trend: trendDelta(totalCases, prevTotal), invertTrend: false },
-          { label: 'Active', value: activeCases, color: '#D97706', trend: trendDelta(activeCases, prevActive), invertTrend: true },
-          { label: 'Recovered', value: recoveredCases, color: '#0D7A4E', trend: trendDelta(recoveredCases, prevRecovered), invertTrend: false },
-          { label: 'Deaths', value: deathCases, color: '#DC2626', trend: trendDelta(deathCases, prevDeaths), invertTrend: true },
-          { label: 'Cases Today', value: casesToday, color: '#6366F1', trend: null },
+          { label: t('Total Cases'), value: totalCases, color: '#3B82F6', trend: trendDelta(totalCases, prevTotal), invertTrend: false },
+          { label: t('Active'), value: activeCases, color: '#D97706', trend: trendDelta(activeCases, prevActive), invertTrend: true },
+          { label: t('Recovered'), value: recoveredCases, color: '#0D7A4E', trend: trendDelta(recoveredCases, prevRecovered), invertTrend: false },
+          { label: t('Deaths'), value: deathCases, color: '#DC2626', trend: trendDelta(deathCases, prevDeaths), invertTrend: true },
+          { label: t('Cases Today'), value: casesToday, color: '#6366F1', trend: null },
           isBhw
-            ? { label: 'Top Disease', value: topDiseaseName ? topDiseaseName.count : 0, color: '#0EA5E9', trend: null, subtitle: topDiseaseName ? topDiseaseName.name : 'N/A' }
-            : { label: 'Top Barangay', value: topBarangayName ? topBarangayName.count : 0, color: '#0EA5E9', trend: null, subtitle: topBarangayName ? topBarangayName.name : 'N/A' },
+            ? { label: t('Top Disease'), value: topDiseaseName ? topDiseaseName.count : 0, color: '#0EA5E9', trend: null, subtitle: topDiseaseName ? topDiseaseName.name : t('N/A') }
+            : { label: t('Top Barangay'), value: topBarangayName ? topBarangayName.count : 0, color: '#0EA5E9', trend: null, subtitle: topBarangayName ? topBarangayName.name : t('N/A') },
         ].map((card, i) => (
             <div key={`${card.label}-${statSignature}`} className="cdms-view-in" onClick={() => { if (i === 0 && setActiveTab) setActiveTab('Manage Cases'); }} onMouseEnter={() => { if (i === 0) setHoveredCard(i); }} onMouseLeave={() => { if (i === 0) setHoveredCard(null); }} style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', animationDelay: `${i * 80}ms`, cursor: i === 0 ? 'pointer' : 'default', transform: (i === 0 && hoveredCard === i) ? 'translateY(-2px)' : 'none', boxShadow: (i === 0 && hoveredCard === i) ? '0 4px 12px rgba(0,0,0,0.15)' : 'none', transition: 'transform 0.15s ease, box-shadow 0.15s ease' }}>
             <div style={{ color: 'var(--text-muted)', fontSize: '15px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{card.label}</div>
@@ -1082,7 +1084,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             {card.subtitle && <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={card.subtitle}>{card.subtitle}</div>}
             {card.trend && (
               <div style={{ fontSize: '13px', marginTop: '4px', fontWeight: '600', color: card.invertTrend ? (card.trend.up ? '#DC2626' : '#0D7A4E') : (card.trend.up ? '#0D7A4E' : '#DC2626') }}>
-                {card.trend.up ? '▲' : '▼'} {card.trend.pct}% vs prev. period
+                {card.trend.up ? '▲' : '▼'} {card.trend.pct}% {t('vs prev. period')}
               </div>
             )}
           </div>
@@ -1172,7 +1174,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                             const y = 184 - (pt.avg / gridLines.top) * 184;
                             return (
                               <circle key={`dot-${i}`} cx={`${xPct}%`} cy={y} r="3.5"
-                                fill="#f59e0b" stroke="var(--bg-surface)" strokeWidth="1.5"
+                                fill="#f59e0b" stroke="#f59e0b" strokeWidth="1.5"
                                 style={{ opacity: chartMounted ? 1 : 0, transition: 'opacity 0.8s ease 0.5s' }} />
                             );
                           })}
@@ -1190,7 +1192,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                 {hoveredBar && (
                   <div style={{ position: 'absolute', bottom: '44px', left: `calc(26px + ${(hoveredBar.idx + 0.5) * (100 / monthBars.length)}% - 24px)`, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px 14px', boxShadow: '0 4px 16px rgba(0,0,0,0.2)', fontSize: '13px', color: 'var(--text-main)', pointerEvents: 'none', whiteSpace: 'nowrap', zIndex: 10 }}>
                     <div style={{ fontWeight: '700', marginBottom: '2px' }}>{hoveredBar.label}</div>
-                    <div>{hoveredBar.count} cases ({hoveredBar.pct}%)</div>
+                    <div>{hoveredBar.count} {t('cases')} ({hoveredBar.pct}%)</div>
                   </div>
                 )}
               </div>
@@ -1204,7 +1206,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                 {movingAvgData && (
                   <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px', color: '#f59e0b', fontWeight: '600', marginLeft: '8px' }}>
                     <span style={{ width: '18px', height: '3px', background: '#f59e0b', borderRadius: '2px' }} />
-                    7-Day Avg
+                    {t('7-Day Avg')}
                   </span>
                 )}
               </div>
@@ -1236,7 +1238,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             </div>
           ) : sortedBars.length === 0 ? (
             <div style={{ color: 'var(--text-muted)', fontSize: '15px', padding: '20px 0' }}>
-              No cases found for {selectedDisease}.
+              {t('No cases found for')} {selectedDisease}.
             </div>
           ) : (
             <div style={{ maxHeight: '240px', overflowY: 'auto', paddingRight: '4px' }}>
@@ -1265,10 +1267,10 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
         {/* FILTER & CONTROLS - FIX: date inputs no longer overflow */}
           <div key={`filters-${statSignature}`} className="cdms-view-in" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <h4 style={{ color: 'var(--text-main)', margin: '0', fontSize: '15px', fontWeight: '600' }}>Filter & Controls</h4>
+          <h4 style={{ color: 'var(--text-main)', margin: '0', fontSize: '15px', fontWeight: '600' }}>{t('Filter & Controls')}</h4>
 
           {!isBhw && dashPeriod === 'weekly' && <div>
-            <label style={{ color: 'var(--text-muted)', fontSize: '15px', display: 'block', marginBottom: '4px' }}>Disease</label>
+            <label style={{ color: 'var(--text-muted)', fontSize: '15px', display: 'block', marginBottom: '4px' }}>{t('Disease')}</label>
             <div style={{ position: 'relative' }} ref={diseaseRef}>
               <button
                 onClick={() => setDiseaseOpen(!diseaseOpen)}
@@ -1307,7 +1309,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
           {/* ── Period + Date range ── */}
           <div>
-            <label style={{ color: 'var(--text-muted)', fontSize: '15px', display: 'block', marginBottom: '4px' }}>Date Range</label>
+            <label style={{ color: 'var(--text-muted)', fontSize: '15px', display: 'block', marginBottom: '4px' }}>{t('Date Range')}</label>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               {['weekly', 'monthly', 'quarterly', 'yearly'].map(p => (
                 <button
@@ -1334,7 +1336,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
             {dashPeriod === 'quarterly' && (
               <>
-                <label style={{ color: 'var(--text-muted)', fontSize: '15px', display: 'block', marginBottom: '4px', marginTop: '10px' }}>Quarter</label>
+                <label style={{ color: 'var(--text-muted)', fontSize: '15px', display: 'block', marginBottom: '4px', marginTop: '10px' }}>{t('Quarter')}</label>
                 <div style={{ display: 'flex', gap: '6px' }}>
                   {[1, 2, 3, 4].map(q => (
                     <button
@@ -1363,7 +1365,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxSizing: 'border-box',
                     }}
                   >
-                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dashPeriod === 'custom' ? 'Custom dates…' : dashYear}</span>
+                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dashPeriod === 'custom' ? t('Custom dates…') : dashYear}</span>
                     <span style={{ fontSize: '13px', opacity: 0.6, flexShrink: 0, marginLeft: '8px', transition: 'transform 0.2s', display: 'inline-block', transform: yearOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                   </button>
                   {yearOpen && (
@@ -1374,7 +1376,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                         onMouseEnter={e => { if (dashPeriod !== 'custom') { e.currentTarget.style.background = 'rgba(96,165,250,0.25)'; e.currentTarget.style.color = 'var(--text-main)'; } }}
                         onMouseLeave={e => { if (dashPeriod !== 'custom') { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-main)'; } }}
                       >
-                        <span style={{ flex: 1 }}>Custom dates…</span>
+                        <span style={{ flex: 1 }}>{t('Custom dates…')}</span>
                         {dashPeriod === 'custom' && <span style={{ color: '#60a5fa', fontSize: '15px' }}>✓</span>}
                       </div>
                       {yearOptions.map(y => (
@@ -1407,7 +1409,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxSizing: 'border-box',
                   }}
                 >
-                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dashPeriod === 'custom' ? 'Custom dates…' : dashYear}</span>
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dashPeriod === 'custom' ? t('Custom dates…') : dashYear}</span>
                   <span style={{ fontSize: '13px', opacity: 0.6, flexShrink: 0, marginLeft: '8px', transition: 'transform 0.2s', display: 'inline-block', transform: yearOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                 </button>
                 {yearOpen && (
@@ -1418,7 +1420,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                       onMouseEnter={e => { if (dashPeriod !== 'custom') { e.currentTarget.style.background = 'rgba(96,165,250,0.25)'; e.currentTarget.style.color = 'var(--text-main)'; } }}
                       onMouseLeave={e => { if (dashPeriod !== 'custom') { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-main)'; } }}
                     >
-                      <span style={{ flex: 1 }}>Custom dates…</span>
+                      <span style={{ flex: 1 }}>{t('Custom dates…')}</span>
                       {dashPeriod === 'custom' && <span style={{ color: '#60a5fa', fontSize: '15px' }}>✓</span>}
                     </div>
                     {yearOptions.map(y => (
@@ -1441,10 +1443,10 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             {(dashPeriod === 'weekly' || dashPeriod === 'monthly' || dashPeriod === 'custom') && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '8px' }}>
                 <DatePicker value={dateRange.start} dateFormat={dateFormat} clearable={false}
-                  placeholder="Start date"
+                  placeholder={t('Start date')}
                   onChange={(v) => { if (v) { setDateRange({ ...dateRange, start: v }); setDashPeriod('custom'); } }} />
                 <DatePicker value={dateRange.end} dateFormat={dateFormat} clearable={false}
-                  placeholder="End date"
+                  placeholder={t('End date')}
                   onChange={(v) => { if (v) { setDateRange({ ...dateRange, end: v }); setDashPeriod('custom'); } }} />
               </div>
             )}
@@ -1458,15 +1460,15 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
               onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
               onMouseLeave={e => e.currentTarget.style.opacity = '1'}
             >
-              📤 Export Data <span style={{ transition: 'transform 0.2s', display: 'inline-block', transform: showExportMenu ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+              📤 {t('Export Data')} <span style={{ transition: 'transform 0.2s', display: 'inline-block', transform: showExportMenu ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
             </button>
             {showExportMenu && (
               <div style={{ position: 'absolute', bottom: '110%', left: 0, width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
                 {[
-                  { label: '📄 Word (.doc)', action: handleExportWord },
-                  { label: '📊 Excel (.xls)', action: handleExportExcel },
-                  { label: '📋 CSV (.csv)', action: handleExportCSV },
-                  { label: '🎞️ PPT Slide (.html)', action: handleExportPPT },
+                  { label: t('📄 Word (.doc)'), action: handleExportWord },
+                  { label: t('📊 Excel (.xls)'), action: handleExportExcel },
+                  { label: t('📋 CSV (.csv)'), action: handleExportCSV },
+                  { label: t('🎞️ PPT Slide (.html)'), action: handleExportPPT },
                 ].map(item => (
                   <button
                     key={item.label}
@@ -1489,11 +1491,11 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
             onMouseLeave={e => e.currentTarget.style.opacity = '1'}
           >
-            🖨️ Print Report
+            🖨️ {t('Print Report')}
           </button>
 
           <div style={{ fontSize: '15px', color: 'var(--text-muted)', textAlign: 'center', paddingTop: '4px' }}>
-            {lastUpdated ? `Updated ${Math.round((now - lastUpdated) / 1000)}s ago` : 'Refreshing...'}
+            {lastUpdated ? `${t('Updated')} ${Math.round((now - lastUpdated) / 1000)}${t('s ago')}` : t('Refreshing...')}
           </div>
         </div>
       </div>
@@ -1534,11 +1536,11 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             {!isBhw && (
               <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' }}>
                 <h4 style={{ color: 'var(--text-main)', margin: '0 0 16px 0', fontSize: '15px', fontWeight: '600' }}>
-                  Top Barangays
-                  <span style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: '400', marginLeft: '8px' }}>({formatDateStr(dateRange.start, dateFormat)} to {formatDateStr(dateRange.end, dateFormat)})</span>
+                  {t('Top Barangays')}
+                  <span style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: '400', marginLeft: '8px' }}>({formatDateStr(dateRange.start, dateFormat)} {t('to')} {formatDateStr(dateRange.end, dateFormat)})</span>
                 </h4>
                 {topBarangayList.length === 0 ? (
-                  <div style={{ color: 'var(--text-muted)', fontSize: '15px', padding: '20px 0', textAlign: 'center' }}>No cases in this period</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '15px', padding: '20px 0', textAlign: 'center' }}>{t('No cases in this period')}</div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {topBarangayList.map((item, i) => (
@@ -1561,8 +1563,8 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <h4 style={{ color: 'var(--text-main)', margin: 0, fontSize: '15px', fontWeight: '600' }}>
-                  Top Diseases
-                  <span style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: '400', marginLeft: '8px' }}>({formatDateStr(dateRange.start, dateFormat)} to {formatDateStr(dateRange.end, dateFormat)})</span>
+                  {t('Top Diseases')}
+                  <span style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: '400', marginLeft: '8px' }}>({formatDateStr(dateRange.start, dateFormat)} {t('to')} {formatDateStr(dateRange.end, dateFormat)})</span>
                 </h4>
                 <button
                   onClick={() => setShowAllDiseases(true)}
@@ -1570,11 +1572,11 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                   onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                   onMouseLeave={e => e.currentTarget.style.opacity = '1'}
                 >
-                  View All Diseases →
+                  {t('View All Diseases')} →
                 </button>
               </div>
               {topDiseaseList.length === 0 ? (
-                <div style={{ color: 'var(--text-muted)', fontSize: '15px', padding: '20px 0', textAlign: 'center' }}>No cases in this period</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '15px', padding: '20px 0', textAlign: 'center' }}>{t('No cases in this period')}</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {topDiseaseList.map((item, i) => (
@@ -1604,7 +1606,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
               const total = segs.reduce((s, x) => s + x[1], 0);
               const C = 2 * Math.PI * 44;
               let acc = 0;
-              if (total === 0) return <circle cx="60" cy="60" r="44" fill="none" stroke="var(--border-color)" strokeWidth="16" />;
+              if (total === 0) return <circle cx="60" cy="60" r="44" fill="none" stroke="#94A3B8" strokeWidth="16" />;
               return segs.map(([label, n, color]) => {
                 const len = (n / total) * C;
                 const seg = (
@@ -1619,11 +1621,11 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           </svg>
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
             <span style={{ fontSize: '26px', fontWeight: '800', color: 'var(--text-main)' }}>{totalCases}</span>
-            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Total Cases</span>
+            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{t('Total Cases')}</span>
           </div>
         </div>
         <div style={{ flex: 1, minWidth: '220px' }}>
-          <h4 style={{ margin: '0 0 12px 0', fontSize: '15px', fontWeight: '600', color: 'var(--text-main)' }}>Case Status Distribution</h4>
+          <h4 style={{ margin: '0 0 12px 0', fontSize: '15px', fontWeight: '600', color: 'var(--text-main)' }}>{t('Case Status Distribution')}</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {STATUS_DIST.map(([label, n, color]) => {
               const pct = totalCases > 0 ? Math.round((n / totalCases) * 100) : 0;
@@ -1646,7 +1648,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <h4 style={{ color: 'var(--text-main)', margin: 0, fontSize: '15px', fontWeight: '600' }}>
-            Recent Case Reports
+            {t('Recent Case Reports')}
             <span style={{ color: 'var(--text-muted)', fontSize: '15px', fontWeight: '400', marginLeft: '8px' }}>
               ({displayCases.length} total)
             </span>
@@ -1657,7 +1659,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
             onMouseLeave={e => e.currentTarget.style.opacity = '1'}
           >
-            View All →
+            {t('View All')} →
           </button>
         </div>
 
@@ -1665,7 +1667,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              {['ID', 'Patient Name', 'Age', 'Barangay', 'Disease', 'Date Reported', 'Severity', 'Status'].map(h => (
+              {[t('ID'), t('Patient Name'), t('Age'), t('Barangay'), t('Disease'), t('Date Reported'), t('Severity'), t('Status')].map(h => (
                 <th key={h} style={{
                   textAlign: 'center', color: 'var(--text-muted)', fontSize: '15px',
                   fontWeight: '600', padding: compactMode ? '6px 8px' : '10px 12px', borderBottom: '1px solid var(--border-color)',
@@ -1680,15 +1682,15 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             {paginatedCases.map((c) => (
               <tr key={c.case_id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                 <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-muted)', fontSize: '15px', textAlign: 'center' }}>#{String(c.case_id).padStart(3, '0')}</td>
-                <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500', textAlign: 'center' }}>{c.patient_name || 'Unknown'}</td>
+                <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500', textAlign: 'center' }}>{c.patient_name || t('Unknown')}</td>
                 <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-main)', fontSize: '15px', textAlign: 'center' }}>{c.age || '--'}</td>
                 <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-main)', fontSize: '15px', textAlign: 'center' }}>{c.barangay_name || `ID: ${c.barangay_id}`}</td>
                 <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-main)', fontSize: '15px', textAlign: 'center' }}>{c.disease_name || '--'}</td>
                 <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-main)', fontSize: '15px', textAlign: 'center', whiteSpace: 'nowrap' }}>{formatDateStr(c.date_reported, dateFormat)}</td>
-                <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-main)', fontSize: '15px', textAlign: 'center' }}>{c.severity || 'N/A'}</td>
+                <td style={{ padding: compactMode ? '7px 8px' : '12px', color: 'var(--text-main)', fontSize: '15px', textAlign: 'center' }}>{c.severity || t('N/A')}</td>
                 <td style={{ padding: compactMode ? '7px 8px' : '12px', textAlign: 'center' }}>
                   <span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '15px', fontWeight: '500', ...getStatusStyle(c.status) }}>
-                    {c.status}
+                    {translateStatus(c.status)}
                   </span>
                 </td>
               </tr>
@@ -1699,7 +1701,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         {/* Pagination */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}>
           <span style={{ color: 'var(--text-muted)', fontSize: '15px' }}>
-            Showing {(currentPage - 1) * CASES_PER_PAGE + 1}–{Math.min(currentPage * CASES_PER_PAGE, displayCases.length)} of {displayCases.length} cases
+            {t('Showing')} {(currentPage - 1) * CASES_PER_PAGE + 1}–{Math.min(currentPage * CASES_PER_PAGE, displayCases.length)} {t('of')} {displayCases.length} {t('cases')}
           </span>
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
             <button
@@ -1718,7 +1720,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
               onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
               onMouseLeave={e => e.currentTarget.style.opacity = '1'}
             >
-              ← Prev
+              {t('← Prev')}
             </button>
             {getVisiblePages(currentPage, totalPages).map((p, i) =>
               p === '...' ? (
@@ -1727,14 +1729,14 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                     style={{ padding: '5px 8px', background: ellipsisOpen ? 'rgba(18,19,88,0.15)' : 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '15px', fontWeight: '700', letterSpacing: '2px' }}>...</button>
                   {ellipsisOpen && (
                     <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px', width: '160px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 100 }}>
-                      <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>Go to page (1–{totalPages})</div>
+                      <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>{t('Go to page')} (1–{totalPages})</div>
                       <div style={{ display: 'flex', gap: '4px' }}>
                         <input type="number" min="1" max={totalPages} value={ellipsisPageInput} placeholder="#"
                           onChange={e => setEllipsisPageInput(e.target.value)}
                           onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(ellipsisPageInput); if (v >= 1 && v <= totalPages) { setCurrentPage(v); setEllipsisOpen(false); setEllipsisPageInput(''); } } }}
                           style={{ flex: 1, padding: '5px 6px', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px', outline: 'none', width: '100%' }} />
                         <button onClick={() => { const v = parseInt(ellipsisPageInput); if (v >= 1 && v <= totalPages) { setCurrentPage(v); setEllipsisOpen(false); setEllipsisPageInput(''); } }}
-                          style={{ padding: '5px 8px', border: '1px solid #121358', borderRadius: '4px', background: '#121358', color: 'white', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>Go</button>
+                          style={{ padding: '5px 8px', border: '1px solid #121358', borderRadius: '4px', background: '#121358', color: 'white', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>{t('Go')}</button>
                       </div>
                     </div>
                   )}
@@ -1758,7 +1760,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
               onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
               onMouseLeave={e => e.currentTarget.style.opacity = '1'}
             >
-              Next →
+              {t('Next')} →
             </button>
             <button
               onClick={() => setCurrentPage(totalPages)}

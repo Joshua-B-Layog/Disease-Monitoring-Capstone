@@ -5,6 +5,7 @@ import { API_URL } from './config';
 import { cacheCases, getCachedCases, cacheAuditLogs, getCachedAuditLogs, cacheGeneratedReports, getCachedGeneratedReports } from './offlineSync';
 import { formatDate, formatDateTime } from './formatDate';
 import DatePicker from './components/DatePicker';
+import { useI18n } from './i18n';
 
 // ── CHO Unit → Barangay mapping ──
 const CHO_BARANGAYS = {
@@ -55,6 +56,7 @@ const REPORT_TYPE_SORT_OPTIONS = [
 
 
 export default function BarangayReports({ activeUser, fontScale, compactMode, dateFormat, loggedUserId }) {
+  const { t } = useI18n();
   const isBHW       = activeUser?.role === 'BHW';
   const choUnit     = activeUser?.context || 'CHO Unit I (Sala)';
 
@@ -122,7 +124,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
         const mapped = res.data.map(r => ({
           id: r.id,
           title: r.title,
-          timestamp: `Generated ${formatDateTime(r.created_at, dateFormat)}`,
+          timestamp: `${t('Generated ')}${formatDateTime(r.created_at, dateFormat)}`,
           period: r.period,
           entity: r.entity,
           details: r.details,
@@ -185,7 +187,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
   const [genError, setGenError]         = useState('');
 
   const handleGenerateReport = () => {
-    if (!genForm.name.trim()) { setGenError('Please enter a report name.'); return; }
+    if (!genForm.name.trim()) { setGenError(t('Please enter a report name.')); return; }
 
     const now = new Date();
     let cutoff;
@@ -202,7 +204,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
       : filteredAuditLogs;
 
     if (periodLogs.length === 0) {
-      setGenError(`No log entries found for the selected period (${genForm.period}). Try a different period or adjust your filters.`);
+      setGenError(`${t('No log entries found for the selected period (')}${genForm.period}${t('). Try a different period or adjust your filters.')}`);
       return;
     }
 
@@ -222,16 +224,16 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
       setGenError('');
     })
     .catch(err => {
-      setGenError('Failed to save report: ' + (err.response?.data?.error || err.message));
+      setGenError(t('Failed to save report: ') + (err.response?.data?.error || err.message));
     });
   };
 
   // ── Shared report letterhead ──
   const buildReportLetterhead = (title, period) => `
     <div style="text-align:center; margin-bottom:8px;">
-      <div style="font-size:13px; color:#333; margin-bottom:2px;">Republic of the Philippines</div>
-      <div style="font-size:13px; color:#333; margin-bottom:2px;">City of Cabuyao, Laguna</div>
-      <div style="font-size:18px; font-weight:bold; color:#1e3a8a; margin-bottom:12px;">City Health Office</div>
+      <div style="font-size:13px; color:#333; margin-bottom:2px;">${t('Republic of the Philippines')}</div>
+      <div style="font-size:13px; color:#333; margin-bottom:2px;">${t('City of Cabuyao, Laguna')}</div>
+      <div style="font-size:18px; font-weight:bold; color:#1e3a8a; margin-bottom:12px;">${t('City Health Office')}</div>
       <div style="font-size:16px; font-weight:bold; color:#111; margin-bottom:4px;">${title}</div>
       <div style="font-size:13px; color:#555; margin-bottom:14px;">${period}</div>
     </div>
@@ -239,14 +241,14 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
 
   const buildReportFooter = () => `
     <div style="text-align:center; margin-top:24px; padding-top:12px; border-top:1px solid #e5e7eb; font-size:11px; color:#999;">
-      Cabuyao City Disease Monitoring System
+      ${t('Cabuyao City Disease Monitoring System')}
     </div>`;
 
   // ── Download helpers ──
   const [showDownloadMenu, setShowDownloadMenu] = useState(null);
 
   const handleDownloadCSV = (report) => {
-    const headers = 'Timestamp,User ID,Name,Action,Entity,Details\n';
+    const headers = [t('Timestamp'), t('User ID'), t('Name'), t('Action'), t('Entity'), t('Details')].join(',') + '\n';
     const logRows = (report.snapshotLogs || []).map(l =>
       `"${l.created_at ? formatDateTime(l.created_at, dateFormat) : ''}","${l.user_id || ''}","${l.user_name || ''}","${l.action}","${l.entity}","${l.details}"`
     ).join('\n');
@@ -273,7 +275,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
     </style></head><body>
     ${letterhead}
     <table>
-      <thead><tr><th>Timestamp</th><th>User ID</th><th>Name</th><th>Action</th><th>Entity</th><th>Details</th></tr></thead>
+      <thead><tr><th>${t('Timestamp')}</th><th>${t('User ID')}</th><th>${t('Name')}</th><th>${t('Action')}</th><th>${t('Entity')}</th><th>${t('Details')}</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
     ${footer}
@@ -301,7 +303,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
     </style></head><body>
     ${letterhead}
     <table>
-      <thead><tr><th>Timestamp</th><th>User ID</th><th>Name</th><th>Action</th><th>Entity</th><th>Details</th></tr></thead>
+      <thead><tr><th>${t('Timestamp')}</th><th>${t('User ID')}</th><th>${t('Name')}</th><th>${t('Action')}</th><th>${t('Entity')}</th><th>${t('Details')}</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
     ${footer}
@@ -321,24 +323,24 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
   const handleDownloadExcel = (report) => {
     const wb = XLSX.utils.book_new();
     const metaRows = [
-      ['Report Title', report.title],
-      ['Period', report.period],
-      ['Category', report.entity],
-      ['Generated', report.timestamp],
-      ['Log Entries', (report.snapshotLogs || []).length],
+      [t('Report Title'), report.title],
+      [t('Period'), report.period],
+      [t('Category'), report.entity],
+      [t('Generated'), report.timestamp],
+      [t('Log Entries'), (report.snapshotLogs || []).length],
     ];
     const metaSheet = XLSX.utils.aoa_to_sheet(metaRows);
-    XLSX.utils.book_append_sheet(wb, metaSheet, 'Summary');
+    XLSX.utils.book_append_sheet(wb, metaSheet, t('Summary'));
     const logData = (report.snapshotLogs || []).map(l => ({
-      'Timestamp': l.created_at ? formatDateTime(l.created_at, dateFormat) : '',
-      'User ID': l.user_id || '',
-      'Name': l.user_name || '',
-      'Action': l.action,
-      'Entity': l.entity,
-      'Details': l.details,
+      [t('Timestamp')]: l.created_at ? formatDateTime(l.created_at, dateFormat) : '',
+      [t('User ID')]: l.user_id || '',
+      [t('Name')]: l.user_name || '',
+      [t('Action')]: l.action,
+      [t('Entity')]: l.entity,
+      [t('Details')]: l.details,
     }));
     const logSheet = XLSX.utils.json_to_sheet(logData);
-    XLSX.utils.book_append_sheet(wb, logSheet, 'Logs');
+    XLSX.utils.book_append_sheet(wb, logSheet, t('Logs'));
     XLSX.writeFile(wb, `${report.title.replace(/\s+/g, '_').replace(/—/g, '-')}.xlsx`);
     setShowDownloadMenu(null);
   };
@@ -346,13 +348,13 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
   // ── Audit log export (PDF / Excel / CSV) ──
   const handleAuditExport = (format) => {
     const rows = filteredAuditLogs.map(l => ({
-      'Timestamp': l.created_at ? formatDateTime(l.created_at, dateFormat) : '',
-      'User ID': l.user_id || '',
-      'Name': l.user_name || '',
-      'Role': l.user_role === 'CHO' ? 'CHO Admin' : 'BHW',
-      'Action': l.action,
-      'Entity': l.entity,
-      'Details': (l.details || '').replace(/\s*\(User ID:\s*\d+\)/gi, '').replace(/\s*\(Case ID:\s*\d+\)/gi, ''),
+      [t('Timestamp')]: l.created_at ? formatDateTime(l.created_at, dateFormat) : '',
+      [t('User ID')]: l.user_id || '',
+      [t('Name')]: l.user_name || '',
+      [t('Role')]: l.user_role === 'CHO' ? t('CHO Admin') : t('BHW'),
+      [t('Action')]: l.action,
+      [t('Entity')]: l.entity,
+      [t('Details')]: (l.details || '').replace(/\s*\(User ID:\s*\d+\)/gi, '').replace(/\s*\(Case ID:\s*\d+\)/gi, ''),
     }));
     const stamp = new Date().toISOString().split('T')[0];
     if (format === 'csv') {
@@ -364,12 +366,12 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
       a.href = url; a.download = `audit_logs_${stamp}.csv`; a.click();
     } else if (format === 'xlsx') {
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Audit Logs');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), t('Audit Logs'));
       XLSX.writeFile(wb, `audit_logs_${stamp}.xlsx`);
     } else {
       const headRow = `<tr>${Object.keys(rows[0] || {}).map(k => `<th>${k}</th>`).join('')}</tr>`;
       const bodyRows = rows.map(r => `<tr>${Object.values(r).map(v => `<td>${String(v ?? '')}</td>`).join('')}</tr>`).join('');
-      const letterhead = buildReportLetterhead('Cabuyao CDMS - Audit Log Export', `${rows.length} entries | Generated ${formatDateTime(new Date(), dateFormat)}`);
+      const letterhead = buildReportLetterhead(t('Cabuyao CDMS - Audit Log Export'), `${rows.length}${t(' entries | Generated ')}${formatDateTime(new Date(), dateFormat)}`);
       const footer = buildReportFooter();
       const htmlStr = `<html><head><meta charset="utf-8"><title>Audit Logs</title>
       <style>body{font-family:Arial,sans-serif;padding:32px;font-size:12px;color:#111;}table{width:100%;border-collapse:collapse;}th{background:#1e3a8a;color:white;padding:8px;text-align:left;font-size:11px;}td{padding:7px;border-bottom:1px solid #e5e7eb;font-size:11px;}tr:nth-child(even) td{background:#f9fafb;}</style></head><body>
@@ -408,7 +410,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
         setDeleteConfirm(null);
         if (viewReport && viewReport.id === deleteConfirm) { setViewReport(null); setModalShowAll(false); setModalPage(1); }
       })
-      .catch(err => notify('Delete failed: ' + (err.response?.data?.error || err.message), 'error'));
+      .catch(err => notify(t('Delete failed: ') + (err.response?.data?.error || err.message), 'error'));
   };
 
   // ── Report Logs filter / sort ──
@@ -635,16 +637,16 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
 
   // ── User role badge label helpers ──
   const userRoleLabel = () => {
-    if (filterUserRole === 'All Users') return 'All Users';
+    if (filterUserRole === 'All Users') return t('All Users');
     if (filterUserRole === 'CHO Users') {
-      if (filterUserSub === 'All') return 'CHO Users';
+      if (filterUserSub === 'All') return t('CHO Users');
       return `CHO - ${filterUserSub}`;
     }
     if (filterUserRole === 'BHW Users') {
-      if (filterUserSub === 'All') return 'BHW Users';
+      if (filterUserSub === 'All') return t('BHW Users');
       return `BHW - ${filterUserSub}`;
     }
-    return 'All Users';
+    return t('All Users');
   };
 
   const isUserFilterActive = filterUserRole !== 'All Users';
@@ -719,12 +721,12 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
 
             <div style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '14px 18px', marginBottom: '20px' }}>
               <div style={{ fontSize: '15px', color: 'var(--text-muted)' }}>
-                <strong style={{ color: 'var(--text-main)' }}>Category:</strong> {viewReport.entity} &nbsp;|&nbsp;
-                <strong style={{ color: 'var(--text-main)' }}>Entries:</strong> {(viewReport.snapshotLogs || []).length} log entries
+                <strong style={{ color: 'var(--text-main)' }}>{t('Category')}:</strong> {viewReport.entity} &nbsp;|&nbsp;
+                <strong style={{ color: 'var(--text-main)' }}>{t('Entries:')}</strong> {(viewReport.snapshotLogs || []).length} log entries
               </div>
               {viewReport.details && (
                 <div style={{ marginTop: '8px', fontSize: '15px', color: 'var(--text-muted)' }}>
-                  <strong style={{ color: 'var(--text-main)' }}>Notes:</strong> {viewReport.details}
+                  <strong style={{ color: 'var(--text-main)' }}>{t('Notes:')}</strong> {viewReport.details}
                 </div>
               )}
             </div>
@@ -734,11 +736,11 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
               const changeColor = season.change > 0 ? '#dc2626' : season.change < 0 ? '#10b981' : '#64748b';
               return (
                 <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderLeft: '4px solid #0d9488', borderRadius: '8px', padding: '14px 18px', marginBottom: '20px' }}>
-                  <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '8px' }}>Seasonal ({viewReport.period}) Comparison — live case data</div>
+                  <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '8px' }}>Seasonal ({viewReport.period}{t(') Comparison — live case data')}</div>
                   <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
-                    {[{ label: `Current (${season.curLabel})`, value: season.curCount, color: '#0d9488' },
-                      { label: `Previous (${season.prevLabel})`, value: season.prevCount, color: '#64748b' },
-                      { label: 'Change', value: `${season.change >= 0 ? '+' : ''}${season.change}%`, color: changeColor }].map(sm => (
+                    {[{ label: `${t('Current (')}${season.curLabel})`, value: season.curCount, color: '#0d9488' },
+                      { label: `${t('Previous (')}${season.prevLabel})`, value: season.prevCount, color: '#64748b' },
+                      { label: t('Change'), value: `${season.change >= 0 ? '+' : ''}${season.change}%`, color: changeColor }].map(sm => (
                       <div key={sm.label} style={{ flex: '1 1 120px', background: 'var(--input-bg)', borderRadius: '8px', padding: '8px 12px', textAlign: 'center' }}>
                         <div style={{ fontSize: '20px', fontWeight: '800', color: sm.color }}>{sm.value}</div>
                         <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-muted)', marginTop: '2px' }}>{sm.label}</div>
@@ -747,7 +749,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                   </div>
                   {season.topDiseases.length > 0 && (
                     <div style={{ marginTop: '8px', fontSize: '15px', color: 'var(--text-muted)' }}>
-                      <strong style={{ color: 'var(--text-main)' }}>Top diseases this period:</strong>{' '}
+                      <strong style={{ color: 'var(--text-main)' }}>{t('Top diseases this period:')}</strong>{' '}
                       {season.topDiseases.map(([d, n], i) => `${i + 1}. ${d} (${n})`).join('  ·  ')}
                     </div>
                   )}
@@ -756,13 +758,13 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
             })()}
 
             <h4 style={{ margin: '0 0 10px 0', fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              System Activity Log Snapshot
+              {t('System Activity Log Snapshot')}
             </h4>
             <div style={{ overflowX: 'auto', marginBottom: '24px' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '15px' }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid var(--border-color)' }}>
-                {['Timestamp', 'User', 'Action', 'Entity', 'Details', 'Updated By'].map(h => (
+                {[t('Timestamp'), t('User'), t('Action'), t('Entity'), t('Details'), t('Updated By')].map(h => (
                       <th key={h} style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '15px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -781,12 +783,12 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                         <td style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '15px' }}>{l.entity}</td>
                         <td style={{ padding: '8px 12px', color: 'var(--text-muted)', fontSize: '15px' }}>{(l.details || '').replace(/\s*\(User ID:\s*\d+\)/gi, '').replace(/\s*\(Case ID:\s*\d+\)/gi, '')}</td>
                         <td style={{ padding: '8px 12px', textAlign: 'center', fontSize: '15px', fontWeight: '600', color: l.user_role === 'CHO' ? '#2563eb' : '#129968' }}>
-                          {l.user_role === 'CHO' ? 'CHO Admin' : 'BHW'}
+                          {l.user_role === 'CHO' ? t('CHO Admin') : t('BHW')}
                         </td>
                       </tr>
                   ))}
                   {(viewReport.snapshotLogs || []).length === 0 && (
-                    <tr><td colSpan="6" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>No log entries in this report.</td></tr>
+                    <tr><td colSpan="6" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>{t('No log entries in this report.')}</td></tr>
                   )}
                 </tbody>
               </table>
@@ -812,14 +814,14 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                           style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)', borderRadius: '6px', background: modalEllipsisOpen ? 'rgba(18,19,88,0.15)' : 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '16px', fontWeight: '700', letterSpacing: '2px' }}>...</button>
                         {modalEllipsisOpen && (
                           <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px', width: '160px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 100 }}>
-                            <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>Go to page (1–{modalTotalPages})</div>
+                            <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>{t('Go to page')} (1–{modalTotalPages})</div>
                             <div style={{ display: 'flex', gap: '4px' }}>
                               <input type="number" min="1" max={modalTotalPages} value={modalEllipsisInput} placeholder="#"
                                 onChange={e => setModalEllipsisInput(e.target.value)}
                                 onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(modalEllipsisInput); if (v >= 1 && v <= modalTotalPages) { setModalPage(v); setModalEllipsisOpen(false); setModalEllipsisInput(''); } } }}
                                 style={{ flex: 1, padding: '5px 6px', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px', outline: 'none', width: '100%' }} />
                               <button onClick={() => { const v = parseInt(modalEllipsisInput); if (v >= 1 && v <= modalTotalPages) { setModalPage(v); setModalEllipsisOpen(false); setModalEllipsisInput(''); } }}
-                                style={{ padding: '5px 8px', border: '1px solid #2563eb', borderRadius: '4px', background: '#2563eb', color: 'white', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>Go</button>
+style={{ padding: '5px 8px', border: '1px solid #2563eb', borderRadius: '4px', background: '#2563eb', color: 'white', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>{t('Go')}</button>
                             </div>
                           </div>
                         )}
@@ -845,13 +847,13 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
 
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '16px' }}>
               <button onClick={() => handleDownloadPDF(viewReport)}
-                style={{ padding: '8px 16px', background: 'rgba(220,38,38,0.15)', border: '1px solid rgba(220,38,38,0.35)', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#ef4444', cursor: 'pointer' }}>⬇ PDF</button>
+                style={{ padding: '8px 16px', background: 'rgba(220,38,38,0.15)', border: '1px solid rgba(220,38,38,0.35)', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#ef4444', cursor: 'pointer' }}>⬇ {t('PDF')}</button>
               <button onClick={() => handleDownloadWord(viewReport)}
-                style={{ padding: '8px 16px', background: 'rgba(37,99,235,0.15)', border: '1px solid rgba(37,99,235,0.35)', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#5b8def', cursor: 'pointer' }}>⬇ Word</button>
+                style={{ padding: '8px 16px', background: 'rgba(37,99,235,0.15)', border: '1px solid rgba(37,99,235,0.35)', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#5b8def', cursor: 'pointer' }}>⬇ {t('Word')}</button>
               <button onClick={() => handleDownloadExcel(viewReport)}
-                style={{ padding: '8px 16px', background: 'rgba(18,153,104,0.15)', border: '1px solid rgba(18,153,104,0.35)', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#16b877', cursor: 'pointer' }}>⬇ Excel</button>
+                style={{ padding: '8px 16px', background: 'rgba(18,153,104,0.15)', border: '1px solid rgba(18,153,104,0.35)', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#16b877', cursor: 'pointer' }}>⬇ {t('Excel')}</button>
               <button onClick={() => handleDownloadCSV(viewReport)}
-                style={{ padding: '8px 16px', background: 'rgba(217,119,6,0.15)', border: '1px solid rgba(217,119,6,0.35)', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#fbbf24', cursor: 'pointer' }}>⬇ CSV</button>
+                style={{ padding: '8px 16px', background: 'rgba(217,119,6,0.15)', border: '1px solid rgba(217,119,6,0.35)', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#fbbf24', cursor: 'pointer' }}>⬇ {t('CSV')}</button>
             </div>
 
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
@@ -860,17 +862,17 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                 style={{ padding: '10px 20px', background: 'rgba(220,38,38,0.15)', border: '1px solid rgba(220,38,38,0.35)', borderRadius: '8px', fontSize: '15px', fontWeight: '600', color: '#ef4444', cursor: offlineMode ? 'not-allowed' : 'pointer', opacity: offlineMode ? 0.4 : 1 }}
                 onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                 onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
-                🗑️ Delete Report
+                🗑️ {t('Delete Report')}
               </button>
               <button onClick={() => { setModalShowAll(s => !s); setModalPage(1); }}
                 style={{ padding: '10px 20px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '15px', fontWeight: '600', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                {modalShowAll ? 'Show Less' : 'Show All'}
+                {modalShowAll ? t('Show Less') : t('Show All')}
               </button>
               <button onClick={() => { setViewReport(null); setModalShowAll(false); setModalPage(1); }}
                 style={{ padding: '10px 28px', background: '#2563eb', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: '600', color: '#fff', cursor: 'pointer' }}
                 onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
-                onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
-                OK
+onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
+                {t('Generate Report')}
               </button>
             </div>
           </div>
@@ -881,9 +883,9 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
       {showGenModal && (
         <div className="cdms-modal-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
           <div className="cdms-modal-card" style={{ background: 'var(--bg-surface)', borderRadius: '14px', padding: '36px', width: '520px', maxWidth: '95vw', boxShadow: '0 24px 60px rgba(0,0,0,0.2)' }}>
-            <h3 style={{ margin: '0 0 4px 0', fontSize: '22px', fontWeight: '700', color: 'var(--text-h)' }}>Generate New Report</h3>
+            <h3 style={{ margin: '0 0 4px 0', fontSize: '22px', fontWeight: '700', color: 'var(--text-h)' }}>{t('Generate New Report')}</h3>
             <p style={{ margin: '0 0 24px 0', fontSize: '15px', color: 'var(--text-muted)' }}>
-              A snapshot of the current system activity log will be saved with this report.
+              {t('A snapshot of the current system activity log will be saved with this report.')}
             </p>
 
             {genError && (
@@ -891,40 +893,40 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
             )}
 
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ ...s.label, display: 'block', marginBottom: '6px' }}>Report Name *</label>
-              <input type="text" placeholder="e.g. Daily Dengue Summary Report" style={s.input}
+              <label style={{ ...s.label, display: 'block', marginBottom: '6px' }}>{t('Report Name *')}</label>
+              <input type="text" placeholder={t('e.g. Daily Dengue Summary Report')} style={s.input}
                 value={genForm.name} onChange={e => { setGenForm({ ...genForm, name: e.target.value }); setGenError(''); }} />
             </div>
 
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ ...s.label, display: 'block', marginBottom: '6px' }}>Report Period</label>
+              <label style={{ ...s.label, display: 'block', marginBottom: '6px' }}>{t('Report Period')}</label>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 {PERIOD_OPTIONS.map(p => (
                   <button key={p} type="button" onClick={() => setGenForm({ ...genForm, period: p })}
                     style={{ padding: '7px 16px', borderRadius: '20px', border: '1px solid', fontSize: '15px', fontWeight: '500', cursor: 'pointer',
                       background: genForm.period === p ? '#0d9488' : 'var(--input-bg)', color: genForm.period === p ? '#fff' : 'var(--text-muted)', borderColor: genForm.period === p ? '#0d9488' : 'var(--border-color)' }}>
-                    {p}
+                    {t(p)}
                   </button>
                 ))}
               </div>
             </div>
 
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ ...s.label, display: 'block', marginBottom: '6px' }}>Report Entity / Category</label>
+              <label style={{ ...s.label, display: 'block', marginBottom: '6px' }}>{t('Report Entity / Category')}</label>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 {ENTITY_OPTIONS.map(e => (
                   <button key={e} type="button" onClick={() => setGenForm({ ...genForm, entity: e })}
                     style={{ padding: '7px 14px', borderRadius: '20px', border: '1px solid', fontSize: '15px', fontWeight: '500', cursor: 'pointer',
                       background: genForm.entity === e ? '#2563eb' : 'var(--input-bg)', color: genForm.entity === e ? '#fff' : 'var(--text-muted)', borderColor: genForm.entity === e ? '#2563eb' : 'var(--border-color)' }}>
-                    {e}
+                    {t(e)}
                   </button>
                 ))}
               </div>
             </div>
 
             <div style={{ marginBottom: '24px' }}>
-              <label style={{ ...s.label, display: 'block', marginBottom: '6px' }}>Notes (optional)</label>
-              <textarea placeholder="Describe what this report covers..." rows={3}
+              <label style={{ ...s.label, display: 'block', marginBottom: '6px' }}>{t('Notes (optional)')}</label>
+              <textarea placeholder={t('Describe what this report covers...')} rows={3}
                 style={{ ...s.input, resize: 'vertical', lineHeight: '1.5' }}
                 value={genForm.details} onChange={e => setGenForm({ ...genForm, details: e.target.value })} />
             </div>
@@ -934,12 +936,12 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                 style={{ padding: '10px 24px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '15px', color: 'var(--text-muted)', cursor: 'pointer' }}
                 onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                 onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
-                Cancel
+                {t('Cancel')}
               </button>
               <button onClick={handleGenerateReport}
                 disabled={offlineMode}
                 style={{ padding: '10px 28px', background: '#129968', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: '600', color: '#fff', cursor: offlineMode ? 'not-allowed' : 'pointer', opacity: offlineMode ? 0.4 : 1 }}>
-                Generate Report
+{t('Generate Report')}
               </button>
             </div>
           </div>
@@ -949,10 +951,10 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
       {/* ── PAGE HEADER ── */}
       <div style={{ marginBottom: '20px', textAlign: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-          <h2 style={{ margin: '0 0 2px 0', fontSize: '22px', fontWeight: '700', color: 'var(--text-h)' }}>Audit Reports</h2>
+          <h2 style={{ margin: '0 0 2px 0', fontSize: '22px', fontWeight: '700', color: 'var(--text-h)' }}>{t('Audit Reports')}</h2>
           {offlineMode && (
             <span style={{ fontSize: '15px', color: '#D97706', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '6px', padding: '4px 10px' }}>
-              Offline - showing cached data
+              {t('Offline - showing cached data')}
             </span>
           )}
         </div>
@@ -966,7 +968,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
         <div style={{ position: 'relative', width: '160px', flex: '0 0 auto' }} ref={periodRef}>
           <button onClick={() => { setPeriodOpen(!periodOpen); setTypeOpen(false); }}
             style={{ ...s.dropBtn(reportPeriod !== ''), width: '100%', boxSizing: 'border-box', justifyContent: 'space-between' }}>
-            {reportPeriod || 'Report Period'}
+            {reportPeriod || t('Report Period')}
             <span style={{ fontSize: '13px', opacity: 0.6, transition: 'transform 0.2s', transform: periodOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
           </button>
           {periodOpen && (
@@ -975,27 +977,27 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                 onClick={() => { setReportPeriod(''); setPeriodOpen(false); }}
                 onMouseEnter={e => { if (reportPeriod !== '') e.target.style.background = 'var(--input-bg)'; }}
                 onMouseLeave={e => { if (reportPeriod !== '') e.target.style.background = 'transparent'; }}>
-                Report Period
+                {t('Report Period')}
               </button>
               {PERIOD_OPTIONS.map(p => (
                 <button key={p} style={s.dropItem(reportPeriod === p)}
                   onClick={() => { setReportPeriod(p); setPeriodOpen(false); }}
                   onMouseEnter={e => { if (reportPeriod !== p) e.target.style.background = 'var(--input-bg)'; }}
                   onMouseLeave={e => { if (reportPeriod !== p) e.target.style.background = 'transparent'; }}>
-                  {p}
+                  {t(p)}
                 </button>
               ))}
             </div>
           )}
         </div>
-        <DatePicker value={reportDateStart} dateFormat={dateFormat} placeholder="Start date"
+        <DatePicker value={reportDateStart} dateFormat={dateFormat} placeholder={t('Start date')}
           onChange={v => setReportDateStart(v)} style={{ width: '165px', flex: '0 0 auto' }} />
-        <DatePicker value={reportDateEnd} dateFormat={dateFormat} placeholder="End date"
+        <DatePicker value={reportDateEnd} dateFormat={dateFormat} placeholder={t('End date')}
           onChange={v => setReportDateEnd(v)} style={{ width: '165px', flex: '0 0 auto' }} />
         <div style={{ position: 'relative', flex: 1, minWidth: '160px' }} ref={typeRef}>
           <button onClick={() => { setTypeOpen(!typeOpen); setPeriodOpen(false); }}
             style={{ ...s.dropBtn(reportType !== ''), width: '100%', boxSizing: 'border-box', justifyContent: 'space-between' }}>
-            {reportType || 'Report Type'}
+            {reportType || t('Report Type')}
             <span style={{ fontSize: '13px', opacity: 0.6, transition: 'transform 0.2s', transform: typeOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
           </button>
           {typeOpen && (
@@ -1004,14 +1006,14 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                 onClick={() => { setReportType(''); setTypeOpen(false); }}
                 onMouseEnter={e => { if (reportType !== '') e.target.style.background = 'var(--input-bg)'; }}
                 onMouseLeave={e => { if (reportType !== '') e.target.style.background = 'transparent'; }}>
-                Report Type
+                {t('Report Type')}
               </button>
               {ENTITY_OPTIONS.map(e => (
                 <button key={e} style={s.dropItem(reportType === e)}
                   onClick={() => { setReportType(e); setTypeOpen(false); }}
                   onMouseEnter={e2 => { if (reportType !== e) e2.target.style.background = 'var(--input-bg)'; }}
                   onMouseLeave={e2 => { if (reportType !== e) e2.target.style.background = 'transparent'; }}>
-                  {e}
+                  {t(e)}
                 </button>
               ))}
             </div>
@@ -1022,7 +1024,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
           style={{ padding: '9px 22px', background: '#129968', color: '#fff', border: 'none', borderRadius: '7px', fontWeight: '600', fontSize: '15px', cursor: offlineMode ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', flexShrink: 0, opacity: offlineMode ? 0.4 : 1 }}
           onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
           onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
-          Generate Report
+          {t('Generate Report')}
         </button>
       </div>
 
@@ -1032,13 +1034,13 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
         {/* ── Generated Reports Logs ── */}
         <div style={s.card}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: 'var(--text-main)' }}>Generated Reports Logs</h3>
+            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: 'var(--text-main)' }}>{t('Generated Reports Logs')}</h3>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontSize: '15px', color: 'var(--text-muted)' }}>{sortedReportLogs.length} of {reportLogs.length} reports</span>
+              <span style={{ fontSize: '15px', color: 'var(--text-muted)' }}>{sortedReportLogs.length}{t(' of ')}{reportLogs.length}{t(' reports')}</span>
               <div style={{ position: 'relative' }} ref={reportSortRef}>
                 <button onClick={() => setShowReportSortDrop(!showReportSortDrop)}
                   style={{ padding: '7px 14px', border: '1px solid var(--border-color)', borderRadius: '7px', fontSize: '15px', color: 'var(--text-muted)', background: 'var(--bg-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '500' }}>
-                  {REPORT_TYPE_SORT_OPTIONS.find(o => o.value === reportSortType)?.label || 'Sort by'}
+                  {REPORT_TYPE_SORT_OPTIONS.find(o => o.value === reportSortType)?.label ? t(REPORT_TYPE_SORT_OPTIONS.find(o => o.value === reportSortType).label) : t('Sort by')}
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
                 </button>
                 {showReportSortDrop && (
@@ -1047,7 +1049,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                       <button key={opt.value}
                         onClick={() => { setReportSortType(opt.value); setShowReportSortDrop(false); }}
                         style={{ display: 'block', width: '100%', padding: '10px 16px', background: reportSortType === opt.value ? 'rgba(13,148,136,0.15)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: reportSortType === opt.value ? '#0d9488' : 'var(--text-main)', cursor: 'pointer', fontWeight: reportSortType === opt.value ? '600' : '400' }}>
-                        {opt.label}
+                        {t(opt.label)}
                       </button>
                     ))}
                   </div>
@@ -1059,8 +1061,8 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
           {sortedReportLogs.length === 0 && (
             <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)', fontSize: '15px' }}>
               {reportLogs.length === 0
-                ? 'No reports generated yet. Click "Generate Report" to create one.'
-                : 'No reports match your current filters.'}
+                ? t('No reports generated yet. Click "Generate Report" to create one.')
+                : t('No reports match your current filters.')}
             </div>
           )}
 
@@ -1069,7 +1071,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
               <div style={{ flex: 1, minWidth: 0, marginRight: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
                   <span style={{ fontSize: '15px', fontWeight: '600', padding: '2px 8px', borderRadius: '10px', background: 'rgba(14,165,233,0.15)', color: '#38bdf8', flexShrink: 0 }}>
-                    {file.period || 'Manual'}
+                    {file.period || t('Manual')}
                   </span>
                   <p style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>
                     {file.title}
@@ -1082,7 +1084,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                   </p>
                 )}
                 <p style={{ margin: '4px 0 0 0', fontSize: '15px', color: '#0d9488', fontWeight: '500' }}>
-                  {(file.snapshotLogs || []).length} log entries captured
+                  {(file.snapshotLogs || []).length}{t(' log entries captured')}
                 </p>
               </div>
 
@@ -1090,29 +1092,29 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                 <div style={{ position: 'relative' }}>
                   <button onClick={() => setShowDownloadMenu(showDownloadMenu === file.id ? null : file.id)}
                     style={{ padding: '6px 14px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '15px', cursor: 'pointer', color: 'var(--text-muted)', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    ⬇ Download <span style={{ transition: 'transform 0.2s', display: 'inline-block', transform: showDownloadMenu === file.id ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                    ⬇ {t('Download')} <span style={{ transition: 'transform 0.2s', display: 'inline-block', transform: showDownloadMenu === file.id ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                   </button>
                   {showDownloadMenu === file.id && (
                     <div style={{ position: 'absolute', top: '110%', right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 300, minWidth: '160px', overflow: 'hidden' }}>
                       <button onClick={() => handleDownloadWord(file)}
                         style={{ display: 'block', width: '100%', padding: '10px 16px', background: 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer' }}
                         onMouseEnter={e => e.target.style.background = 'var(--input-bg)'} onMouseLeave={e => e.target.style.background = 'transparent'}>
-                        📄 Word (.doc)
+                        📄 {t('Word (.doc)')}
                       </button>
                       <button onClick={() => handleDownloadPDF(file)}
                         style={{ display: 'block', width: '100%', padding: '10px 16px', background: 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer' }}
                         onMouseEnter={e => e.target.style.background = 'var(--input-bg)'} onMouseLeave={e => e.target.style.background = 'transparent'}>
-                        📕 PDF (.pdf)
+                        📕 {t('PDF (.pdf)')}
                       </button>
                       <button onClick={() => handleDownloadExcel(file)}
                         style={{ display: 'block', width: '100%', padding: '10px 16px', background: 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer' }}
                         onMouseEnter={e => e.target.style.background = 'var(--input-bg)'} onMouseLeave={e => e.target.style.background = 'transparent'}>
-                        📊 Excel (.xlsx)
+                        📊 {t('Excel (.xlsx)')}
                       </button>
                       <button onClick={() => handleDownloadCSV(file)}
                         style={{ display: 'block', width: '100%', padding: '10px 16px', background: 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer' }}
                         onMouseEnter={e => e.target.style.background = 'var(--input-bg)'} onMouseLeave={e => e.target.style.background = 'transparent'}>
-                        📋 CSV (.csv)
+                        📋 {t('CSV (.csv)')}
                       </button>
                     </div>
                   )}
@@ -1121,7 +1123,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                   style={{ padding: '6px 14px', background: 'rgba(18,153,104,0.15)', border: '1px solid rgba(18,153,104,0.35)', borderRadius: '6px', fontSize: '15px', cursor: 'pointer', color: '#16b877', fontWeight: '500' }}
                   onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                   onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
-                  View
+                  {t('View')}
                 </button>
               </div>
             </div>
@@ -1130,18 +1132,18 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
 
         {/* ── Quick Stats ── */}
         <div style={s.card}>
-          <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', fontWeight: '700', color: 'var(--text-main)' }}>Quick Stats</h3>
+          <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', fontWeight: '700', color: 'var(--text-main)' }}>{t('Quick Stats')}</h3>
           <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: 'var(--text-muted)' }}>{isBHW ? `Brgy. ${myBarangayName}` : choUnit}</p>
 
           {statsLoading ? (
-            <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '15px' }}>Loading from database...</div>
+            <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '15px' }}>{t('Loading from database...')}</div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               {[
-                { label: 'Cases Added',      value: casesAdded,      color: '#5b8def', bg: 'rgba(37,99,235,0.15)' },
-                { label: 'Cases Updated',    value: casesUpdated,    color: '#38bdf8', bg: 'rgba(14,165,233,0.15)' },
-                { label: 'Cases Deleted',    value: casesDeleted,    color: '#ef4444', bg: 'rgba(220,38,38,0.15)' },
-                { label: 'Accounts Created', value: accountsCreated, color: '#16b877', bg: 'rgba(18,153,104,0.15)' },
+                { label: t('Cases Added'),      value: casesAdded,      color: '#5b8def', bg: 'rgba(37,99,235,0.15)' },
+                { label: t('Cases Updated'),    value: casesUpdated,    color: '#38bdf8', bg: 'rgba(14,165,233,0.15)' },
+                { label: t('Cases Deleted'),    value: casesDeleted,    color: '#ef4444', bg: 'rgba(220,38,38,0.15)' },
+                { label: t('Accounts Created'), value: accountsCreated, color: '#16b877', bg: 'rgba(18,153,104,0.15)' },
               ].map(stat => (
                 <div key={stat.label} style={{ background: stat.bg, borderRadius: '8px', padding: '14px', textAlign: 'center' }}>
                   <div style={{ fontSize: '26px', fontWeight: '800', color: stat.color }}>{stat.value}</div>
@@ -1152,20 +1154,20 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
           )}
 
           <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
-            <p style={{ ...s.label, display: 'block', marginBottom: '8px' }}>Period Comparison</p>
+            <p style={{ ...s.label, display: 'block', marginBottom: '8px' }}>{t('Period Comparison')}</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <div style={{ background: 'var(--input-bg)', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '15px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '4px' }}>This Week</div>
+                <div style={{ fontSize: '15px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '4px' }}>{t('This Week')}</div>
                 <div style={{ fontSize: '22px', fontWeight: '800', color: '#5b8def' }}>{thisWeekCases}</div>
                 <div style={{ fontSize: '13px', fontWeight: '600', color: weekDiff > 0 ? '#dc2626' : weekDiff < 0 ? '#16a34a' : 'var(--text-muted)', marginTop: '2px' }}>
-                  {weekDiff === 0 ? 'No change' : `${weekDiff > 0 ? '+' : ''}${weekDiff} (${weekPct > 0 ? '+' : ''}${weekPct}%) vs prev`}
+                  {weekDiff === 0 ? t('No change') : `${weekDiff > 0 ? '+' : ''}${weekDiff} (${weekPct > 0 ? '+' : ''}${weekPct}%)${t(' vs prev')}`}
                 </div>
               </div>
               <div style={{ background: 'var(--input-bg)', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '15px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '4px' }}>This Month</div>
+                <div style={{ fontSize: '15px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '4px' }}>{t('This Month')}</div>
                 <div style={{ fontSize: '22px', fontWeight: '800', color: '#38bdf8' }}>{thisMonthCases}</div>
                 <div style={{ fontSize: '13px', fontWeight: '600', color: monthDiff > 0 ? '#dc2626' : monthDiff < 0 ? '#16a34a' : 'var(--text-muted)', marginTop: '2px' }}>
-                  {monthDiff === 0 ? 'No change' : `${monthDiff > 0 ? '+' : ''}${monthDiff} (${monthPct > 0 ? '+' : ''}${monthPct}%) vs prev`}
+                  {monthDiff === 0 ? t('No change') : `${monthDiff > 0 ? '+' : ''}${monthDiff} (${monthPct > 0 ? '+' : ''}${monthPct}%)${t(' vs prev')}`}
                 </div>
               </div>
             </div>
@@ -1173,7 +1175,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
 
           <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
             <p style={{ ...s.label, display: 'block', marginBottom: '8px' }}>
-              {isBHW ? 'Assigned Barangay' : 'Covered Barangays'}
+              {isBHW ? t('Assigned Barangay') : t('Covered Barangays')}
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
               {myBarangays.map(b => (
@@ -1187,25 +1189,25 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
       {/* ── AUDIT LOG TABLE ── */}
       <div style={s.card}>
         <div style={{ marginBottom: '16px' }}>
-          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: 'var(--text-main)' }}>Generated System Logs</h3>
+          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: 'var(--text-main)' }}>{t('Generated System Logs')}</h3>
         </div>
 
         {/* ── AUDIT SUMMARY CHIPS ── */}
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '16px' }}>
           {[
-            { label: 'Total', count: filteredAuditLogs.length, color: '#5b8def', bg: 'rgba(37,99,235,0.15)' },
-            { label: 'Created', count: filteredAuditLogs.filter(l => l.action === 'Created').length, color: '#16b877', bg: 'rgba(18,153,104,0.15)' },
-            { label: 'Updated', count: filteredAuditLogs.filter(l => l.action === 'Updated').length, color: '#5b8def', bg: 'rgba(37,99,235,0.15)' },
-            { label: 'Deleted', count: filteredAuditLogs.filter(l => l.action === 'Deleted').length, color: '#ef4444', bg: 'rgba(220,38,38,0.15)' },
-            { label: 'Archived', count: filteredAuditLogs.filter(l => l.action === 'Archived').length, color: '#d97706', bg: 'rgba(245,158,11,0.15)' },
-            { label: 'Restored', count: filteredAuditLogs.filter(l => l.action === 'Restored').length, color: '#16b877', bg: 'rgba(18,153,104,0.15)' },
-            { label: 'Logged In', count: filteredAuditLogs.filter(l => l.action === 'Logged In' || l.action === 'Logged In (2FA)').length, color: '#a78bfa', bg: 'rgba(124,58,237,0.15)' },
-            { label: 'Logged Out', count: filteredAuditLogs.filter(l => l.action === 'Logged Out').length, color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
-            { label: 'Edit Requests', count: filteredAuditLogs.filter(l => l.action === 'Requested Edit').length, color: '#fbbf24', bg: 'rgba(217,119,6,0.15)' },
-            { label: 'Registrations', count: filteredAuditLogs.filter(l => l.action === 'Approved' || l.action === 'Rejected').length, color: '#2dd4bf', bg: 'rgba(20,184,166,0.15)' },
+            { label: t('Total'), count: filteredAuditLogs.length, color: '#5b8def', bg: 'rgba(37,99,235,0.15)' },
+            { label: t('Created'), count: filteredAuditLogs.filter(l => l.action === 'Created').length, color: '#16b877', bg: 'rgba(18,153,104,0.15)' },
+            { label: t('Updated'), count: filteredAuditLogs.filter(l => l.action === 'Updated').length, color: '#5b8def', bg: 'rgba(37,99,235,0.15)' },
+            { label: t('Deleted'), count: filteredAuditLogs.filter(l => l.action === 'Deleted').length, color: '#ef4444', bg: 'rgba(220,38,38,0.15)' },
+            { label: t('Archived'), count: filteredAuditLogs.filter(l => l.action === 'Archived').length, color: '#d97706', bg: 'rgba(245,158,11,0.15)' },
+            { label: t('Restored'), count: filteredAuditLogs.filter(l => l.action === 'Restored').length, color: '#16b877', bg: 'rgba(18,153,104,0.15)' },
+            { label: t('Logged In'), count: filteredAuditLogs.filter(l => l.action === 'Logged In' || l.action === 'Logged In (2FA)').length, color: '#a78bfa', bg: 'rgba(124,58,237,0.15)' },
+            { label: t('Logged Out'), count: filteredAuditLogs.filter(l => l.action === 'Logged Out').length, color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
+            { label: t('Edit Requests'), count: filteredAuditLogs.filter(l => l.action === 'Requested Edit').length, color: '#fbbf24', bg: 'rgba(217,119,6,0.15)' },
+            { label: t('Registrations'), count: filteredAuditLogs.filter(l => l.action === 'Approved' || l.action === 'Rejected').length, color: '#2dd4bf', bg: 'rgba(20,184,166,0.15)' },
           ].map(chip => (
             <span key={chip.label} style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 12px', borderRadius: '16px', fontSize: '13px', fontWeight: '600', color: chip.color, background: chip.bg }}>
-              {chip.label}: {chip.count}
+              {t(chip.label)}: {chip.count}
             </span>
           ))}
         </div>
@@ -1216,7 +1218,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
           {/* Search */}
           <div style={{ position: 'relative' }}>
             <svg style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" placeholder="Search Logs..."
+            <input type="text" placeholder={t('Search Logs...')}
               value={searchLog} onChange={e => { setSearchLog(e.target.value); setLogPage(1); }}
               style={{ ...s.input, width: '200px', paddingLeft: '32px' }} />
           </div>
@@ -1225,7 +1227,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
           <div style={{ position: 'relative' }} ref={actionDropRef}>
             <button onClick={() => { setShowActionDrop(!showActionDrop); setShowUserDrop(false); setShowSubDrop(false); setShowDatePicker(false); setShowDiseaseDrop(false); }}
               style={s.dropBtn(filterAction !== 'All Actions')}>
-              {filterAction}
+              {t(filterAction)}
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
             {showActionDrop && (
@@ -1239,7 +1241,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                       <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', marginRight: '8px',
                         background: a === 'Created' ? '#129968' : a === 'Updated' ? '#2563eb' : a === 'Deleted' ? '#dc2626' : a === 'Archived' ? '#d97706' : a === 'Restored' ? '#16b877' : a === 'Requested Edit' ? '#fbbf24' : a === 'Approved' ? '#2dd4bf' : a === 'Rejected' ? '#ef4444' : a === 'Logged Out' ? '#ef4444' : '#7c3aed' }} />
                     )}
-                    {a}
+                    {t(a)}
                   </button>
                 ))}
               </div>
@@ -1251,7 +1253,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
             <div style={{ position: 'relative' }} ref={diseaseDropRef}>
               <button onClick={() => { setShowDiseaseDrop(!showDiseaseDrop); setShowActionDrop(false); setShowUserDrop(false); setShowSubDrop(false); setShowDatePicker(false); }}
                 style={s.dropBtn(filterDisease !== 'All Diseases')}>
-                {filterDisease === 'All Diseases' ? 'All Diseases' : filterDisease}
+                {filterDisease === 'All Diseases' ? t('All Diseases') : filterDisease}
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
               {showDiseaseDrop && (
@@ -1260,7 +1262,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                     onClick={() => { setFilterDisease('All Diseases'); setShowDiseaseDrop(false); setLogPage(1); }}
                     onMouseEnter={e => { if (filterDisease !== 'All Diseases') e.target.style.background = 'var(--input-bg)'; }}
                     onMouseLeave={e => { if (filterDisease !== 'All Diseases') e.target.style.background = 'transparent'; }}>
-                    All Diseases
+                    {t('All Diseases')}
                   </button>
                   {diseaseList.map(d => (
                     <button key={d} style={s.dropItem(filterDisease === d)}
@@ -1281,7 +1283,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
               onClick={() => { setShowUserDrop(!showUserDrop); setShowActionDrop(false); setShowSubDrop(false); setShowDatePicker(false); }}
               style={s.dropBtn(filterUserRole !== 'All Users')}
             >
-              {filterUserRole === 'All Users' ? 'All Users' : filterUserRole}
+              {filterUserRole === 'All Users' ? t('All Users') : t(filterUserRole)}
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
             {showUserDrop && (
@@ -1295,7 +1297,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                     {role === 'CHO Users' && <span style={{ marginRight: '8px' }}>🏢</span>}
                     {role === 'BHW Users' && <span style={{ marginRight: '8px' }}>📍</span>}
                     {role === 'All Users' && <span style={{ marginRight: '8px' }}>👥</span>}
-                    {role}
+                    {t(role)}
                   </button>
                 ))}
               </div>
@@ -1310,8 +1312,8 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                 style={s.dropBtn(filterUserSub !== 'All')}
               >
                 {filterUserRole === 'CHO Users'
-                  ? (filterUserSub === 'All' ? 'All CHO Units' : filterUserSub)
-                  : (filterUserSub === 'All' ? 'All Barangays' : filterUserSub)}
+                  ? (filterUserSub === 'All' ? t('All CHO Units') : filterUserSub)
+                  : (filterUserSub === 'All' ? t('All Barangays') : filterUserSub)}
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
               {showSubDrop && (
@@ -1322,7 +1324,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                       onMouseEnter={e => { if (filterUserSub !== opt) e.target.style.background = 'var(--input-bg)'; }}
                       onMouseLeave={e => { if (filterUserSub !== opt) e.target.style.background = 'transparent'; }}>
                       {opt === 'All'
-                        ? (filterUserRole === 'CHO Users' ? '🏢 All CHO Units' : '📍 All Barangays')
+                        ? (filterUserRole === 'CHO Users' ? `🏢 ${t('All CHO Units')}` : `📍 ${t('All Barangays')}`)
                         : opt}
                     </button>
                   ))}
@@ -1336,19 +1338,19 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
             <button onClick={() => { setShowDatePicker(!showDatePicker); setShowActionDrop(false); setShowUserDrop(false); setShowSubDrop(false); }}
               style={s.dropBtn(!!dateRange.start)}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              {dateRange.start ? `${formatDate(dateRange.start, dateFormat)}${dateRange.end ? ' - ' + formatDate(dateRange.end, dateFormat) : ''}` : 'Date Range'}
+              {dateRange.start ? `${formatDate(dateRange.start, dateFormat)}${dateRange.end ? ' - ' + formatDate(dateRange.end, dateFormat) : ''}` : t('Date Range')}
             </button>
             {showDatePicker && (
               <div style={{ position: 'absolute', top: '110%', left: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', boxShadow: '0 8px 32px rgba(0,0,0,0.14)', zIndex: 300, padding: '16px', width: '280px' }}>
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                   <div style={{ flex: 1, textAlign: 'center' }}>
-                    <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '3px', fontWeight: '600' }}>Start Date</div>
+                    <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '3px', fontWeight: '600' }}>{t('Start Date')}</div>
                     <div style={{ padding: '6px', background: selectingStart ? 'rgba(13,148,136,0.15)' : 'var(--input-bg)', border: `1px solid ${selectingStart ? '#0d9488' : 'var(--border-color)'}`, borderRadius: '6px', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer' }} onClick={() => setSelectingStart(true)}>
                       {dateRange.start ? formatDate(dateRange.start, dateFormat) : '—'}
                     </div>
                   </div>
                   <div style={{ flex: 1, textAlign: 'center' }}>
-                    <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '3px', fontWeight: '600' }}>End Date</div>
+                    <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '3px', fontWeight: '600' }}>{t('End Date')}</div>
                     <div style={{ padding: '6px', background: !selectingStart ? 'rgba(13,148,136,0.15)' : 'var(--input-bg)', border: `1px solid ${!selectingStart ? '#0d9488' : 'var(--border-color)'}`, borderRadius: '6px', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer' }} onClick={() => setSelectingStart(false)}>
                       {dateRange.end ? formatDate(dateRange.end, dateFormat) : '—'}
                     </div>
@@ -1384,7 +1386,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                 {(dateRange.start || dateRange.end) && (
                   <button onClick={() => { setDateRange({ start: '', end: '' }); setSelectingStart(true); setLogPage(1); }}
                     style={{ marginTop: '10px', width: '100%', padding: '7px', background: 'rgba(220,38,38,0.15)', border: '1px solid rgba(220,38,38,0.3)', borderRadius: '6px', fontSize: '15px', color: '#ef4444', cursor: 'pointer', fontWeight: '500' }}>
-                    Clear Date Range
+                    {t('Clear Date Range')}
                   </button>
                 )}
               </div>
@@ -1410,14 +1412,14 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
               style={{ ...s.dropBtn(false), fontWeight: '600' }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Export
+              {t('Export')}
             </button>
             {showExportDrop && (
               <div style={s.dropMenu}>
                 <div style={{ padding: '8px 16px', fontSize: '15px', color: 'var(--text-muted)', fontWeight: '600', borderBottom: '1px solid var(--border-color)' }}>
-                  {filteredAuditLogs.length} entries
+{filteredAuditLogs.length}{t(' entries')}
                 </div>
-                {[{ fmt: 'pdf', label: 'Export as PDF', color: '#dc2626' }, { fmt: 'xlsx', label: 'Export as Excel', color: '#129968' }, { fmt: 'csv', label: 'Export as CSV', color: '#2563eb' }].map(opt => (
+                {[{ fmt: 'pdf', label: t('Export as PDF'), color: '#dc2626' }, { fmt: 'xlsx', label: t('Export as Excel'), color: '#129968' }, { fmt: 'csv', label: t('Export as CSV'), color: '#2563eb' }].map(opt => (
                   <button key={opt.fmt} style={s.dropItem(false)}
                     onClick={() => handleAuditExport(opt.fmt)}
                     onMouseEnter={e => { e.target.style.background = 'var(--input-bg)'; }}
@@ -1431,12 +1433,12 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
           </div>
 
           <span style={{ fontSize: '15px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-            Showing {Math.min((logPage - 1) * ITEMS_PER_PAGE + 1, filteredAuditLogs.length)}–{Math.min(logPage * ITEMS_PER_PAGE, filteredAuditLogs.length)} of {filteredAuditLogs.length} entries
+            {t('Showing ')}{Math.min((logPage - 1) * ITEMS_PER_PAGE + 1, filteredAuditLogs.length)}–{Math.min(logPage * ITEMS_PER_PAGE, filteredAuditLogs.length)}{t(' of ')}{filteredAuditLogs.length}{t(' entries')}
           </span>
         </div>
 
         <div style={{ fontSize: '15px', color: 'var(--text-muted)', textAlign: 'right', marginBottom: '6px' }}>
-          {lastUpdated ? `Updated ${Math.round((now - lastUpdated) / 1000)}s ago` : 'Refreshing...'}
+          {lastUpdated ? `${t('Updated ')}${Math.round((now - lastUpdated) / 1000)}${t('s ago')}` : t('Refreshing...')}
         </div>
 
         {/* Table */}
@@ -1444,7 +1446,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border-color)' }}>
-                {['Timestamp', 'User', 'Action', 'Entity', 'Details', 'Updated By'].map(h => (
+                {[t('Timestamp'), t('User'), t('Action'), t('Entity'), t('Details'), t('Updated By')].map(h => (
                   <th key={h} style={{ padding: compactMode ? '6px 8px' : '10px 14px', textAlign: 'center', fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>
                     {h}
                   </th>
@@ -1453,9 +1455,9 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
             </thead>
             <tbody>
               {auditLoading ? (
-                <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '15px' }}>Loading audit logs...</td></tr>
+                <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '15px' }}>{t('Loading audit logs...')}</td></tr>
               ) : paginatedLogs.length === 0 ? (
-                <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '15px' }}>No logs found matching your filters.</td></tr>
+                <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '15px' }}>{t('No logs found matching your filters.')}</td></tr>
               ) : (
                 paginatedLogs.map(log => (
                   <tr key={log.id} style={{ borderBottom: '1px solid var(--border-color)' }}
@@ -1485,7 +1487,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                     <td style={{ padding: compactMode ? '7px 8px' : '13px 14px', fontSize: '15px', color: 'var(--text-muted)', textAlign: 'center' }}>{log.entity}</td>
                     <td style={{ padding: compactMode ? '7px 8px' : '13px 14px', fontSize: '15px', color: 'var(--text-muted)', maxWidth: '320px', textAlign: 'center' }}>{(log.details || '').replace(/\s*\(User ID:\s*\d+\)/gi, '').replace(/\s*\(Case ID:\s*\d+\)/gi, '')}</td>
                     <td style={{ padding: compactMode ? '7px 8px' : '13px 14px', textAlign: 'center', fontSize: '15px', fontWeight: '600', color: log.user_role === 'CHO' ? '#2563eb' : '#129968' }}>
-                      {log.user_role === 'CHO' ? 'CHO Admin' : 'BHW'}
+                      {log.user_role === 'CHO' ? t('CHO Admin') : t('BHW')}
                     </td>
                   </tr>
                 ))
@@ -1512,14 +1514,14 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                     style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)', borderRadius: '6px', background: logEllipsisOpen ? 'rgba(18,19,88,0.15)' : 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '16px', fontWeight: '700', letterSpacing: '2px' }}>...</button>
                   {logEllipsisOpen && (
                     <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px', width: '160px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 100 }}>
-                      <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>Go to page (1–{totalLogPages})</div>
+                      <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>{t('Go to page')} (1–{totalLogPages})</div>
                       <div style={{ display: 'flex', gap: '4px' }}>
                         <input type="number" min="1" max={totalLogPages} value={logEllipsisInput} placeholder="#"
                           onChange={e => setLogEllipsisInput(e.target.value)}
                           onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(logEllipsisInput); if (v >= 1 && v <= totalLogPages) { setLogPage(v); setLogEllipsisOpen(false); setLogEllipsisInput(''); } } }}
                           style={{ flex: 1, padding: '5px 6px', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px', outline: 'none', width: '100%' }} />
                         <button onClick={() => { const v = parseInt(logEllipsisInput); if (v >= 1 && v <= totalLogPages) { setLogPage(v); setLogEllipsisOpen(false); setLogEllipsisInput(''); } }}
-                          style={{ padding: '5px 8px', border: '1px solid #2563eb', borderRadius: '4px', background: '#2563eb', color: 'white', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>Go</button>
+                          style={{ padding: '5px 8px', border: '1px solid #2563eb', borderRadius: '4px', background: '#2563eb', color: 'white', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>{t('Go')}</button>
                       </div>
                     </div>
                   )}
@@ -1549,13 +1551,13 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
           onClick={() => setDeleteConfirm(null)}>
           <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '28px 32px', maxWidth: '400px', width: '90%', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}
             onClick={e => e.stopPropagation()}>
-            <h3 style={{ margin: '0 0 10px', fontSize: '18px', fontWeight: '700', color: 'var(--text-main)' }}>Delete Report?</h3>
-            <p style={{ margin: '0 0 20px', fontSize: '15px', color: 'var(--text-muted)', lineHeight: '1.5' }}>This action cannot be undone. The report and all its snapshot data will be permanently removed.</p>
+            <h3 style={{ margin: '0 0 10px', fontSize: '18px', fontWeight: '700', color: 'var(--text-main)' }}>{t('Delete Report?')}</h3>
+            <p style={{ margin: '0 0 20px', fontSize: '15px', color: 'var(--text-muted)', lineHeight: '1.5' }}>{t('This action cannot be undone. The report and all its snapshot data will be permanently removed.')}</p>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button onClick={() => setDeleteConfirm(null)}
-                style={{ padding: '8px 18px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '15px', cursor: 'pointer', color: 'var(--text-main)' }}>Cancel</button>
+                style={{ padding: '8px 18px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '15px', cursor: 'pointer', color: 'var(--text-main)' }}>{t('Cancel')}</button>
               <button onClick={confirmDeleteReport}
-                style={{ padding: '8px 18px', background: '#dc2626', border: 'none', borderRadius: '6px', fontSize: '15px', fontWeight: '600', color: '#fff', cursor: 'pointer' }}>Delete</button>
+                style={{ padding: '8px 18px', background: '#dc2626', border: 'none', borderRadius: '6px', fontSize: '15px', fontWeight: '600', color: '#fff', cursor: 'pointer' }}>{t('Delete')}</button>
             </div>
           </div>
         </div>

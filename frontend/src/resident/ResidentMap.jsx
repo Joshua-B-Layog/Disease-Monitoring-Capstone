@@ -8,6 +8,7 @@ import { cacheCases, getCachedCases } from '../offlineSync';
 import cabuyaoBoundaries from '../data/cabuyao_barangays.geojson.json';
 import { getPointInBarangay, pointInFeature } from '../data/coordinates';
 import { onDiseasesChanged } from '../diseaseSignal';
+import { useI18n } from '../i18n';
 
 const CABUYAO_CENTER = [14.2253, 121.1254];
 const CABUYAO_BOUNDS = [
@@ -379,12 +380,6 @@ const findCanonicalName = (rawName) => {
   return match || rawName;
 };
 
-const getRisk = (count) => {
-  if (count >= 20) return { color: '#DC2626', ring: 'rgba(220,38,38,0.3)', label: 'High Risk' };
-  if (count >= 10) return { color: '#f59e0b', ring: 'rgba(245,158,11,0.3)', label: 'Medium Risk' };
-  return { color: '#10b981', ring: 'rgba(16,185,129,0.3)', label: 'Low Risk' };
-};
-
 function getGradientColor(count) {
   const clamped = Math.min(count, 40);
   if (clamped <= 10) {
@@ -545,6 +540,14 @@ export default function ResidentMap() {
   const [lastUpdated, setLastUpdated]   = useState(null);
   const [now, setNow]                   = useState(Date.now());
   const [offlineMode, setOfflineMode]   = useState(false);
+  const { t } = useI18n();
+
+  const getRisk = (count) => {
+    if (count >= 20) return { color: '#DC2626', ring: 'rgba(220,38,38,0.3)', label: t('High Risk') };
+    if (count >= 10) return { color: '#f59e0b', ring: 'rgba(245,158,11,0.3)', label: t('Medium Risk') };
+    return { color: '#10b981', ring: 'rgba(16,185,129,0.3)', label: t('Low Risk') };
+  };
+
   const [selectedBrgy, setSelectedBrgy] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchMatches, setSearchMatches] = useState([]);
@@ -756,11 +759,11 @@ export default function ResidentMap() {
   return (
     <div className="resident-page">
       <h2 style={{ margin: '0 0 16px', fontSize: '26px', fontWeight: '700' }}>
-        Disease Map
+        {t('Disease Map')}
       </h2>
-<p style={{ margin: '0 0 20px', color: 'var(--text-main)', fontSize: '17px' }}>
-  Hover over a barangay for a quick summary. Click for full disease breakdown. Zoom in (≥17) to see purok-level pulse markers.
-</p>
+      <p style={{ margin: '0 0 20px', color: 'var(--text-main)', fontSize: '17px' }}>
+        {t('Hover over a barangay for a quick summary. Click for full disease breakdown. Zoom in (≥17) to see purok-level pulse markers.')}
+      </p>
 
       {/* City Health Overview */}
       <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '12px', marginBottom: '20px', overflow: 'hidden' }}>
@@ -770,7 +773,7 @@ export default function ResidentMap() {
             <svg viewBox="0 0 24 24" width="22" height="22" fill="var(--text-main)" style={{ flexShrink: 0 }}>
               <path d="m23.58 8.536-3.362-5.4-4.945 3.08v-6.216h-6.546v6.216l-4.945-3.08-3.362 5.4 5.563 3.464-5.563 3.464 3.362 5.4 4.945-3.08v6.216h6.546v-6.216l4.945 3.08 3.362-5.4-5.563-3.464z"/>
             </svg>
-            City Health Overview
+{t('City Health Overview')}
           </span>
           <span style={{ fontSize: '18px', color: 'var(--text-muted)' }}>{showOverview ? '▲' : '▼'}</span>
         </button>
@@ -789,11 +792,11 @@ export default function ResidentMap() {
             {/* Stat cards */}
             <div className="resident-stat-cards" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '20px' }}>
               {[
-                { label: 'Total Cases', value: totalCases, color: 'var(--text-h)', bg: 'var(--bg-surface)' },
-                { label: 'Most Affected', value: mostAffected ? mostAffected.barangayName : '-', sub: mostAffected ? `${mostAffected.totalCases} cases` : '', color: '#dc2626', bg: '#fef2f2' },
-                { label: 'Top Disease', value: topDiseaseCitywide ? topDiseaseCitywide[0] : '-', sub: topDiseaseCitywide ? `${topDiseaseCitywide[1]} cases` : '', color: '#7c3aed', bg: '#f5f3ff' },
-                { label: 'Active Cases', value: activeCases, color: '#f59e0b', bg: '#fffbeb' },
-                { label: 'Affected Barangays', value: `${affectedBrgyCount} / ${ALL_BARANGAYS.length}`, color: '#10b981', bg: '#ecfdf5' },
+                { label: t('Total Cases'), value: totalCases, color: 'var(--text-h)', bg: 'var(--bg-surface)' },
+                { label: t('Most Affected'), value: mostAffected ? mostAffected.barangayName : '-', sub: mostAffected ? `${mostAffected.totalCases} cases` : '', color: '#dc2626', bg: '#fef2f2' },
+                { label: t('Top Disease'), value: topDiseaseCitywide ? topDiseaseCitywide[0] : '-', sub: topDiseaseCitywide ? `${topDiseaseCitywide[1]} cases` : '', color: '#7c3aed', bg: '#f5f3ff' },
+                { label: t('Active Cases'), value: activeCases, color: '#f59e0b', bg: '#fffbeb' },
+                { label: t('Affected Barangays'), value: `${affectedBrgyCount} / ${ALL_BARANGAYS.length}`, color: '#10b981', bg: '#ecfdf5' },
               ].map(card => (
                 <div key={card.label} style={{ flex: '1 1 120px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '10px 10px', textAlign: 'center' }}>
                   <div style={{ fontSize: '24px', fontWeight: '800', color: card.color, lineHeight: '1.2' }}>{card.value}</div>
@@ -848,7 +851,7 @@ export default function ResidentMap() {
             {/* Top Diseases Distribution */}
             {top8Diseases.length > 0 && (
               <div>
-                <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Top Diseases City-Wide</div>
+                <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>{t('Top Diseases City-Wide')}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {top8Diseases.map(([disease, count]) => (
                     <div key={disease} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -918,7 +921,7 @@ export default function ResidentMap() {
         </div>
       {offlineMode && (
         <div style={{ padding: '8px 14px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '17px', color: '#F59E0B' }}>
-          Offline - showing cached data. Will refresh when reconnected.
+          {t('Offline - showing cached data. Will refresh when reconnected.')}
         </div>
       )}
 
@@ -946,14 +949,14 @@ export default function ResidentMap() {
       <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
         <input
           type="text"
-          placeholder="Search your barangay..."
+          placeholder={t('Search your barangay...')}
           value={searchQuery}
           onChange={e => { setSearchQuery(e.target.value); handleSearch(e.target.value); }}
           onKeyDown={e => { if (e.key === 'Enter') handleSearch(); }}
           style={{ flex: 1, padding: '12px 16px', border: '1px solid var(--border-color)', borderRadius: '10px', fontSize: '17px', outline: 'none', boxSizing: 'border-box', background: 'var(--bg-surface)', color: 'var(--text-main)' }}
         />
         <button onClick={handleSearch} style={{ padding: '12px 24px', background: '#10B981', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', fontSize: '17px', whiteSpace: 'nowrap' }}>
-          Search
+          {t('Search')}
         </button>
       </div>
 
@@ -1107,7 +1110,7 @@ export default function ResidentMap() {
               {getRisk(tooltip.totalCases).label} · {tooltip.totalCases} case{tooltip.totalCases !== 1 ? 's' : ''}
             </div>
             <div style={{ fontSize: '17px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '7px' }}>
-              Top Diseases
+{t('Top Diseases')}
             </div>
             {getTop5(tooltip.diseases).map(([disease, count], i) => (
               <div key={disease} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
@@ -1117,7 +1120,7 @@ export default function ResidentMap() {
                 <span style={{ fontSize: '17px', fontWeight: '700', color: '#10b981', marginLeft: '12px' }}>{count}</span>
               </div>
             ))}
-            <div style={{ marginTop: '8px', fontSize: '17px', color: 'var(--text-muted)', fontStyle: 'italic' }}>Click pin for full details</div>
+            <div style={{ marginTop: '8px', fontSize: '17px', color: 'var(--text-muted)', fontStyle: 'italic' }}>{t('Click pin for full details')}</div>
           </div>
         )}
 
@@ -1185,7 +1188,7 @@ export default function ResidentMap() {
 
             <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
             <p style={{ margin: '0 0 10px 0', fontSize: '17px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              All Diseases in this Barangay
+              {t('All Diseases in this Barangay')}
             </p>
 
             {Object.entries(popup.diseases)
@@ -1223,17 +1226,17 @@ export default function ResidentMap() {
       {/* Legend */}
       <div style={{ marginTop: '16px', display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '24px', padding: '0 16px', alignItems: 'start' }}>
         <div>
-          <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Risk Levels</div>
+          <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>{t('Risk Levels')}</div>
           <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-            <LegendItem color="#DC2626" label="High Risk (20+)" />
-            <LegendItem color="#f59e0b" label="Medium (10-20)" />
-            <LegendItem color="#10b981" label="Low (<10)" />
-            <LegendItem color="#374151" label="No cases" />
+            <LegendItem color="#DC2626" label={t('High Risk (20+)')} />
+            <LegendItem color="#f59e0b" label={t('Medium (10-20)')} />
+            <LegendItem color="#10b981" label={t('Low (<10)')} />
+            <LegendItem color="#374151" label={t('No cases')} />
           </div>
         </div>
         {usedDiseaseColors.length > 0 && (
           <div>
-            <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Top Diseases</div>
+            {t('Top Diseases')}
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
               {usedDiseaseColors.map(({ disease, color }) => (
                 <div key={disease} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '17px', color: 'var(--text-muted)' }}>

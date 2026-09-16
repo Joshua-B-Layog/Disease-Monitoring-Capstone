@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useI18n } from '../i18n';
 import axios from 'axios';
 import { API_URL } from '../config';
 import { isOnline } from '../offlineSync';
@@ -30,6 +31,7 @@ function MapCenterUpdater({ center }) {
 }
 
 export default function ContactUs() {
+  const { t } = useI18n();
   const [form, setForm] = useState({ name: '', age: '', gender: '', contact: '', address: '', targetCho: 'BHW', targetBarangay: '', disease: '', message: '' });
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -66,9 +68,9 @@ export default function ContactUs() {
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
       const msgs = [];
-      if (errors.age) msgs.push('Age must be 0–150');
-      if (errors.contact) msgs.push('Use valid PH phone (e.g., 09123456789)');
-      setError(msgs.length > 0 ? msgs.join('. ') + '.' : 'Please fill in all required fields highlighted in red.');
+      if (errors.age) msgs.push(t('Age must be 0–150'));
+      if (errors.contact) msgs.push(t('Use valid PH phone (e.g., 09123456789)'));
+      setError(msgs.length > 0 ? msgs.join('. ') + '.' : t('Please fill in all required fields highlighted in red.'));
       return;
     }
     setFormErrors({});
@@ -177,10 +179,10 @@ export default function ContactUs() {
           ) : (
             <form onSubmit={handleSubmit}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <input required placeholder="Your Name"
+                  <input required placeholder={t('Your Name')}
                     value={form.name} onChange={e => { setForm({...form, name: e.target.value}); setFormErrors(prev => ({...prev, name: false})); }}
                     style={{ ...inputStyle, border: formErrors.name ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.name ? 'rgba(239,68,68,0.1)' : 'var(--bg-surface)' }} />
-                  <input required type="number" placeholder="Age"
+                  <input required type="number" placeholder={t('Age')}
                     value={form.age} onChange={e => { setForm({...form, age: e.target.value}); setFormErrors(prev => ({...prev, age: false})); }}
                     style={{ ...inputStyle, border: formErrors.age ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.age ? 'rgba(239,68,68,0.1)' : 'var(--bg-surface)' }} min="0" max="150" />
                   {formErrors.age && <span style={{ fontSize: '15px', color: '#ef4444' }}>Age must be between 0 and 150</span>}
@@ -191,11 +193,11 @@ export default function ContactUs() {
                     <option value="Female">Female</option>
                     <option value="Other">Other</option>
                   </select>
-                  <input required type="tel" placeholder="Contact Number"
+                  <input required type="tel" placeholder={t('Contact Number')}
                     value={form.contact} onChange={e => { setForm({...form, contact: e.target.value}); setFormErrors(prev => ({...prev, contact: false})); }}
                     style={{ ...inputStyle, border: formErrors.contact ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.contact ? 'rgba(239,68,68,0.1)' : 'var(--bg-surface)' }} />
                   {formErrors.contact && <span style={{ fontSize: '15px', color: '#ef4444' }}>Enter a valid PH number (e.g., 09123456789)</span>}
-                  <input required placeholder="Your Address"
+                  <input required placeholder={t('Your Address')}
                     value={form.address} onChange={e => { setForm({...form, address: e.target.value}); setFormErrors(prev => ({...prev, address: false})); }}
                     style={{ ...inputStyle, border: formErrors.address ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.address ? 'rgba(239,68,68,0.1)' : 'var(--bg-surface)' }} />
                 <div ref={targetBarangayRef} style={{ position: 'relative' }}>
@@ -254,7 +256,7 @@ export default function ContactUs() {
                     </div>
                   )}
                 </div>
-                  <textarea required placeholder="Your Message"
+                  <textarea required placeholder={t('Your Message')}
                     value={form.message} onChange={e => { setForm({...form, message: e.target.value}); setFormErrors(prev => ({...prev, message: false})); }}
                     rows={4} style={{...inputStyle, resize: 'vertical', border: formErrors.message ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.message ? 'rgba(239,68,68,0.1)' : 'var(--bg-surface)'}} />
                   {error && <div style={{ color: '#ef4444', fontSize: '17px' }}>{error}</div>}
@@ -266,7 +268,7 @@ export default function ContactUs() {
                   }}
                   onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                   onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
-                  {sending ? 'Sending...' : 'Send Message'}
+                  {sending ? t('Sending...') : t('Send Message')}
                 </button>
               </div>
             </form>
@@ -279,10 +281,10 @@ export default function ContactUs() {
           padding: '24px',
         }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '17px', fontWeight: '700', color: 'var(--text-main)' }}>
-            Connect with Us
+            {t('Connect with Us')}
           </h3>
           <p style={{ fontSize: '17px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-            Follow us on Facebook for the latest health updates and announcements.
+            {t('Follow us on Facebook for the latest health updates and announcements.')}
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <a href="https://www.facebook.com/cho1cabuyao/" target="_blank" rel="noopener noreferrer"
@@ -314,7 +316,7 @@ export default function ContactUs() {
           padding: '24px',
         }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '17px', fontWeight: '700', color: 'var(--text-main)' }}>
-            Our Location
+{t('Our Location')}
           </h3>
           <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
             <button onClick={() => setLocationView('cho1')}
@@ -360,15 +362,15 @@ export default function ContactUs() {
             <a href={`https://www.google.com/maps?q=${currentLoc.coords[0]},${currentLoc.coords[1]}`}
               target="_blank" rel="noopener noreferrer"
               style={{ fontSize: '17px', color: 'var(--text-muted)', textDecoration: 'none' }}>
-              Get directions ↗
+              {t('Get directions')} ↗
             </a>
           </div>
 
           <div style={{ fontSize: '17px', color: 'var(--text-muted)', lineHeight: '1.7', wordBreak: 'break-word' }}>
-            <div><strong style={{ color: 'var(--text-main)' }}>Address:</strong> {currentLoc.address}</div>
-            <div><strong style={{ color: 'var(--text-main)' }}>Phone:</strong> {currentLoc.phone}</div>
-            <div><strong style={{ color: 'var(--text-main)' }}>Email:</strong> {currentLoc.email}</div>
-            <div><strong style={{ color: 'var(--text-main)' }}>Hours:</strong> {currentLoc.hours}</div>
+            <div><strong style={{ color: 'var(--text-main)' }}>{t('Address:')}</strong> {currentLoc.address}</div>
+            <div><strong style={{ color: 'var(--text-main)' }}>{t('Phone:')}</strong> {currentLoc.phone}</div>
+            <div><strong style={{ color: 'var(--text-main)' }}>{t('Email:')}</strong> {currentLoc.email}</div>
+            <div><strong style={{ color: 'var(--text-main)' }}>{t('Hours:')}</strong> {currentLoc.hours}</div>
           </div>
         </div>
       </div>
@@ -380,10 +382,10 @@ export default function ContactUs() {
         borderRadius: '10px',
       }}>
         <div style={{ fontSize: '17px', color: 'var(--warning-text)', fontWeight: '600' }}>
-          National Emergency Hotline: <strong style={{ fontSize: '22px' }}>911</strong>
+          {t('National Emergency Hotline')}: <strong style={{ fontSize: '22px' }}>911</strong>
         </div>
         <div style={{ fontSize: '17px', color: 'var(--warning-text)', marginTop: '4px' }}>
-          DOH: 1555 | Red Cross: 143 | PNP: 117
+          {t('DOH')}: 1555 | {t('Red Cross')}: 143 | {t('PNP')}: 117
         </div>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useI18n } from '../i18n';
 
 const CHO_UNITS = [
   {
@@ -48,15 +49,16 @@ const CHO_UNITS = [
 ];
 
 export default function AboutCho() {
+  const { t } = useI18n();
   const [selected, setSelected] = useState(CHO_UNITS[0]);
 
   return (
     <div className="resident-page">
       <h2 style={{ margin: '0 0 8px', fontSize: '26px', fontWeight: '700' }}>
-        About the City Health Office
+        {t('About the City Health Office')}
       </h2>
       <p style={{ margin: '0 0 24px', color: 'var(--text-muted)', fontSize: '17px' }}>
-        Cabuyao City Health Office is divided into two units. Select a unit below to learn more.
+        {t('Cabuyao City Health Office is divided into two units. Select a unit below to learn more.')}
       </p>
 
       {/* Unit selector */}
@@ -135,7 +137,7 @@ export default function AboutCho() {
                   </div>
                   <div>
                     <div style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-main)' }}>{s.name}</div>
-                    <div style={{ fontSize: '17px', color: 'var(--text-muted)' }}>{s.role}</div>
+                    <div style={{ fontSize: '17px', color: 'var(--text-muted)' }}>{t(s.role)}</div>
                   </div>
                 </div>
               ))}
@@ -147,12 +149,12 @@ export default function AboutCho() {
             display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
             gap: '12px',
           }}>
-            <InfoCard label="Office Hours" value={selected.hours} />
-            <InfoCard label="Location" value={selected.address} />
-            <InfoCard label="Phone" value={selected.phone} />
-            <InfoCard label="Email" value={selected.email} />
-            <InfoCard label="Covered Residents" value={selected.residentCount} />
-            <InfoCard label="Accreditation" value={selected.accreditation} />
+            <InfoCard label={t('Office Hours')} value={selected.hours} />
+            <InfoCard label={t('Location')} value={selected.address} />
+            <InfoCard label={t('Phone')} value={selected.phone} />
+            <InfoCard label={t('Email')} value={selected.email} />
+            <InfoCard label={t('Covered Residents')} value={selected.residentCount} />
+            <InfoCard label={t('Accreditation')} value={selected.accreditation} />
           </div>
 
           {/* Covered barangays */}

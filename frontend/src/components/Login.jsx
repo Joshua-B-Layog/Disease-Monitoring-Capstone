@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useI18n } from '../i18n';
 import { API_URL } from '../config';
 import ChoLogoIcon from '../assets/ChoLogo';
 import { getCachedUsers, upsertCachedUser } from '../offlineSync';
@@ -122,7 +123,7 @@ const FooterIcon = ({ type }) => {
   );
 };
 
-function CityHealthBranding() {
+function CityHealthBranding({ brandingFeatures }) {
   return (
     <div className="login-branding">
       <div className="login-branding-dots" />
@@ -136,15 +137,16 @@ function CityHealthBranding() {
           <span>CITY HEALTH OFFICE</span>
         </div>
 
-        <h1 className="login-branding-title">Building a Healthier Cabuyao, Together.</h1>
-        <p className="login-branding-subtitle">City of Cabuyao · City Health Office - Laguna</p>
-        <p className="login-branding-desc">
+        <h1 className="login-branding-title">{brandingFeatures[0]?.title}</h1>
+        <p className="login-branding-subtitle">{brandingFeatures[0]?.subtitle}</p>
+
+        <div className="login-branding-desc">
           Real-time communicable disease surveillance across all 18 barangays, mapping every case down to
           barangay and purok level to guide prompt community health response across the city.
-        </p>
+        </div>
 
         <div className="login-branding-features">
-          {BRANDING_FEATURES.map((f, i) => (
+          {brandingFeatures.map((f, i) => (
             <div key={i} className="login-branding-feature">
               <span className="login-branding-feature-tile" style={{ borderColor: f.color, backgroundColor: f.color }}>{f.icon}</span>
               <span className="login-branding-feature-text">
@@ -259,6 +261,13 @@ function AnimatedMapView({ setFade, active, onSequenceComplete }) {
   export default function Login({ onLoginSuccess, onForgotPassword, theme, toggleTheme }) {
     const [step, setStep] = useState('role'); // 'role', 'cho_select', 'bhw_select', 'auth', 'forgot_password', 'signup', 'cho_contact', 'signup_role'
     const [pendingUser, setPendingUser] = useState(null); // holds session data while waiting for OTP
+    const { t } = useI18n();
+    const BRANDING_FEATURES = [
+      { icon: '🛰️', title: t('Continuous Surveillance'), subtitle: t('Real-time monitoring & early detection'), color: '#3b82f6' },
+      { icon: '🗺️', title: t('Barangay & Purok Mapping'), subtitle: t('Localized clusters across 18 barangays'), color: '#dc2626' },
+      { icon: '🔔', title: t('Automated Alerts'), subtitle: t('Timely updates and outbreak warnings'), color: '#3b82f6' },
+      { icon: '📊', title: t('Decision Support'), subtitle: t('Accurate reports for CHO health response'), color: '#dc2626' },
+    ];
     const [loginOtp, setLoginOtp] = useState('');
     const [otpError, setOtpError] = useState('');
     const [otpLoading, setOtpLoading] = useState(false);
@@ -700,7 +709,7 @@ const handleLoginOtpSubmit = async (e) => {
 
         <div className="login-left">
           <div style={{ position: 'absolute', inset: 0, opacity: leftPanel === 0 ? 1 : 0, transition: 'opacity 0.7s ease-in-out', pointerEvents: 'none' }}>
-            <CityHealthBranding />
+            <CityHealthBranding brandingFeatures={BRANDING_FEATURES} />
           </div>
           <div style={{ position: 'absolute', inset: 0, opacity: leftPanel === 1 ? 1 : 0, transition: 'opacity 0.7s ease-in-out' }}>
             <div style={{ position: 'absolute', inset: 0, opacity: mapFade, transition: 'opacity 0.7s ease-in-out' }}>
@@ -792,24 +801,24 @@ const handleLoginOtpSubmit = async (e) => {
             {step === 'role' && (
               <>
                 <div className="login-header" style={{ marginBottom: '28px', textAlign: 'left' }}>
-                  <h2 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '8px' }}>Welcome back!</h2>
-                  <p style={{ color: 'var(--text-muted)' }}>Select your system surveillance portal access group.</p>
+                  <h2>{t('Welcome back!')}</h2>
+                  <p style={{ color: 'var(--text-muted)' }}>{t('Select your system surveillance portal access group.')}</p>
                   <div className="accent-bar" />
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <button type="button" className="portal-card portal-card-cho" onClick={() => handleRoleSelection('CHO')} aria-label="Select City Health Office portal">
+                    <button type="button" className="portal-card portal-card-cho" onClick={() => handleRoleSelection('CHO')} aria-label="Select City Health Office portal">
                     <div className="portal-card-body">
-                      <span className="portal-card-title" style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '16px' }}>City Health Office (CHO)</span>
-                      <span className="portal-card-sub" style={{ color: 'var(--text-muted)', fontSize: '15px', marginTop: '2px' }}>Central Systems &amp; Analytics</span>
+                      <span className="portal-card-title">{t('City Health Office (CHO)')}</span>
+                      <span className="portal-card-sub">{t('Central Systems & Analytics')}</span>
                     </div>
                     <span className="portal-card-arrow">→</span>
                   </button>
 
                   <button type="button" className="portal-card portal-card-bhw" onClick={() => handleRoleSelection('BHW')} aria-label="Select Barangay Health Worker portal">
                     <div className="portal-card-body">
-                      <span className="portal-card-title" style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '16px' }}>Barangay Health Worker</span>
-                      <span className="portal-card-sub" style={{ color: 'var(--text-muted)', fontSize: '15px', marginTop: '2px' }}>Community Surveillance Data Entry</span>
+                      <span className="portal-card-title">{t('Barangay Health Worker')}</span>
+                      <span className="portal-card-sub">{t('Community Surveillance Data Entry')}</span>
                     </div>
                     <span className="portal-card-arrow">→</span>
                   </button>
@@ -822,24 +831,24 @@ const handleLoginOtpSubmit = async (e) => {
               <>
                 <div className="login-header" style={{ marginBottom: '25px', textAlign: 'left' }}>
                   <BackButton onClick={handleBackNavigation} color="#129968" style={{ marginBottom: '10px' }}>Back</BackButton>
-                  <h2 style={{ fontSize: '26px', color: 'var(--text-main)', marginBottom: '6px' }}>Select Health Unit</h2>
-                  <p style={{ color: 'var(--text-muted)' }}>Identify your current administrative station hub.</p>
+                  <h2>{t('Select Health Unit')}</h2>
+                  <p style={{ color: 'var(--text-muted)' }}>{t('Identify your current administrative station hub.')}</p>
                   <div className="accent-bar" />
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   <button type="button" className="portal-card portal-card-cho" onClick={() => handleChoSelection('CHO Unit I (Sala)')} aria-label="Select CHO Unit I">
                     <div className="portal-card-body">
-                      <span className="portal-card-title" style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '16px' }}>CHO Unit I (Main)</span>
-                      <span className="portal-card-sub" style={{ color: 'var(--text-muted)', fontSize: '15px', marginTop: '2px' }}>City Hall Complex, Brgy. Sala Cabuyao, Laguna</span>
+                      <span className="portal-card-title">{t('CHO Unit I (Main)')}</span>
+                      <span className="portal-card-sub">City Hall Complex, Brgy. Sala Cabuyao, Laguna</span>
                     </div>
                     <span className="portal-card-arrow">→</span>
                   </button>
 
                   <button type="button" className="portal-card portal-card-cho" onClick={() => handleChoSelection('CHO Unit II (Pulo)')} aria-label="Select CHO Unit II">
                     <div className="portal-card-body">
-                      <span className="portal-card-title" style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '16px' }}>CHO Unit II (Extension)</span>
-                      <span className="portal-card-sub" style={{ color: 'var(--text-muted)', fontSize: '15px', marginTop: '2px' }}>Pulo Health Center, Brgy. Pulo Cabuyao, Laguna</span>
+                      <span className="portal-card-title">{t('CHO Unit II (Extension)')}</span>
+                      <span className="portal-card-sub">Pulo Health Center, Brgy. Pulo Cabuyao, Laguna</span>
                     </div>
                     <span className="portal-card-arrow">→</span>
                   </button>
@@ -851,7 +860,7 @@ const handleLoginOtpSubmit = async (e) => {
             {step === 'bhw_select' && (
               <>
                 <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
-                  <BackButton onClick={handleBackNavigation} color="#129968" style={{ marginBottom: '10px' }}>Back</BackButton>
+                  <BackButton onClick={handleBackNavigation} color="#129968" style={{ marginBottom: '10px' }}>{t('Back')}</BackButton>
                   <h2 style={{ fontSize: '26px', color: 'var(--text-main)', marginBottom: '6px' }}>Assigned Locality</h2>
                   <p style={{ color: 'var(--text-muted)' }}>Select your designated community operations sector.</p>
                 </div>
@@ -865,9 +874,7 @@ const handleLoginOtpSubmit = async (e) => {
                   ))}
                 </div>
 
-                <button type="button" className="submit-btn" onClick={handleBhwProceed} style={{ backgroundColor: '#129968', color: '#FFFFFF', width: '100%' }}>
-                  Confirm Barangay Block
-                </button>
+              <button type="button" className="submit-btn" onClick={handleBhwProceed}>{t('Confirm Barangay Block')}</button>
               </>
             )}
 
@@ -882,7 +889,7 @@ const handleLoginOtpSubmit = async (e) => {
 
                 <form onSubmit={handleFormSubmit}>
                   <div className="form-group" style={{ textAlign: 'left' }}>
-                    <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Username or Email address</label>
+                    <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontSize: '17px', fontWeight: '500' }}>Username or Email address</label>
                     <input 
                       type="text"
                       className="form-input" 
@@ -894,7 +901,7 @@ const handleLoginOtpSubmit = async (e) => {
                   </div>
                   
                   <div className="form-group" style={{ marginTop: '20px', textAlign: 'left' }}>
-                    <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Password</label>
+                    <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontSize: '17px', fontWeight: '500' }}>Password</label>
                     
                     <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                       <input 
@@ -930,8 +937,8 @@ const handleLoginOtpSubmit = async (e) => {
                     </div>
                   </div>
 
-                  <div className="form-options" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '20px 0' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)', cursor: 'pointer', fontSize: '15px' }}>
+                    <div className="form-options" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '20px 0' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)', cursor: 'pointer', fontSize: '17px' }}>
                       <input 
                         type="checkbox" 
                         checked={rememberMe}
@@ -940,14 +947,23 @@ const handleLoginOtpSubmit = async (e) => {
                       /> 
                       Remember me
                     </label>
-                    <span onClick={() => setStep('forgot_password')} style={{ color: '#129968', cursor: 'pointer', fontSize: '15px', fontWeight: '500' }}>
-                      Forgot password?
-                    </span>
+                    <button type="button" 
+                      onClick={() => setStep('forgot_password')}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#129968',
+                        cursor: 'pointer',
+                        fontSize: '17px',
+                        fontWeight: '500',
+                        textDecoration: 'underline',
+                        padding: 0
+                      }}>
+                      {t('Forgot password?')}
+                    </button>
                   </div>
 
-                  <button type="submit" className="submit-btn" style={{ backgroundColor: '#129968', color: '#FFFFFF', marginTop: '10px' }}>
-                    Sign In as {selectedRole}
-                  </button>
+                  <button type="submit" className="submit-btn">{t('Sign In as')} {selectedRole}</button>
                 </form>
               </>
             )}
@@ -961,9 +977,9 @@ const handleLoginOtpSubmit = async (e) => {
         We sent a 6-digit code to your registered email. Enter it below to complete sign-in.
       </p>
     </div>
-    <form onSubmit={handleLoginOtpSubmit}>
+      <form onSubmit={handleLoginOtpSubmit}>
       <div className="form-group" style={{ textAlign: 'left' }}>
-        <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>
+        <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontSize: '17px', fontWeight: '500' }}>
           Verification Code
         </label>
         <input
@@ -1124,7 +1140,7 @@ const handleLoginOtpSubmit = async (e) => {
 
                     <div className="cdms-auth-notice cdms-auth-notice-signup">
                         <span className="cdms-auth-notice-icon">ℹ</span>
-                        <span>Registrations require approval from the City Health Office administrator before account activation.</span>
+                        <span> Registrations require approval from the City Health Office administrator before account activation.</span>
                     </div>
 
                     <form onSubmit={handleSignupSubmit}>
@@ -1312,16 +1328,13 @@ const handleLoginOtpSubmit = async (e) => {
                                 return <p style={{ fontSize: '15px', marginTop: '5px', color: s.color }}>{s.text}</p>;
                             })()}
                         </div>
-
-                        <button type="submit" className="submit-btn" style={{ backgroundColor: '#129968', color: '#FFFFFF', marginTop: '20px', width: '100%' }}>
-                            Submit Account Registration
-                        </button>
+                    <button type="submit" className="submit-btn" style={{ backgroundColor: '#129968', color: '#FFFFFF', marginTop: '20px', width: '100%' }}>Submit Account Registration</button>
                     </form>
                 </>
             )}
 
             {/* SHARED FOOTER ROUTING */}
-            {step !== 'signup' && step !== 'forgot_password' && step !== 'cho_contact' && step !== 'signup_role' ? (
+              {step !== 'signup' && step !== 'forgot_password' && step !== 'cho_contact' && step !== 'signup_role' ? (
               <div style={{ marginTop: '30px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '15px' }}>
                 Don't have an account? <span onClick={() => {
                   if (step === 'role') {
@@ -1348,8 +1361,7 @@ const handleLoginOtpSubmit = async (e) => {
                   Already have an account? <span onClick={() => setStep('role')} style={{ color: '#129968', cursor: 'pointer', fontWeight: '500' }}>Sign In</span>
                 </div>
               )
-            )}  
-
+            )}
             </div>
           </div>
         </div>
