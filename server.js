@@ -274,7 +274,20 @@ if (process.env.BREVO_API_KEY) {
 // 2. MIDDLEWARE
 // ==========================================
 app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true); // non-browser calls (curl, health checks, server-to-server)
+    let host;
+    try { host = new URL(origin).hostname.toLowerCase(); } catch (e) { return cb(null, false); }
+    const base = (process.env.FRONTEND_URL || '')
+      .replace(/^https?:\/\//, '').split('/')[0].toLowerCase();
+    const ok =
+      host === base ||
+      host.endsWith('.vercel.app') ||    // any Vercel deployment/preview URL (incl. Deployments tab)
+      host.endsWith('.railway.app') ||   // backend preview URLs
+      host === 'localhost' || host.startsWith('127.');
+    cb(null, ok);
+  },
+  credentials: true,
 }));
 app.use(express.json({ limit: '10mb' })); // increased for base64 photo if needed later
 
