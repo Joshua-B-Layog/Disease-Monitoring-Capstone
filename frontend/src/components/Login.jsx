@@ -77,7 +77,7 @@ const ANIM_SCENES = [
 ];
 
 const BRANDING_FEATURES = [
-  { icon: '🛰️', title: 'Continuous Surveillance', subtitle: 'Real-time monitoring & early detection', color: '#3b82f6' },
+  { icon: '🛰️', title: 'Continuous Disease Surveillance ', subtitle: 'Real-time monitoring & early detection', color: '#3b82f6' },
   { icon: '🗺️', title: 'Barangay & Purok Mapping', subtitle: 'Localized clusters across 18 barangays', color: '#dc2626' },
   { icon: '🔔', title: 'Automated Alerts', subtitle: 'Timely updates and outbreak warnings', color: '#3b82f6' },
   { icon: '📊', title: 'Decision Support', subtitle: 'Accurate reports for CHO health response', color: '#dc2626' },
@@ -263,7 +263,7 @@ function AnimatedMapView({ setFade, active, onSequenceComplete }) {
     const [pendingUser, setPendingUser] = useState(null); // holds session data while waiting for OTP
     const { t } = useI18n();
     const BRANDING_FEATURES = [
-      { icon: '🛰️', title: t('Continuous Surveillance'), subtitle: t('Real-time monitoring & early detection'), color: '#3b82f6' },
+      { icon: '🛰️', title: t('Cabuyao Disease Monitoring and Mapping System'), subtitle: t('Early Monitoring & Early Detection'), color: '#3b82f6' },
       { icon: '🗺️', title: t('Barangay & Purok Mapping'), subtitle: t('Localized clusters across 18 barangays'), color: '#dc2626' },
       { icon: '🔔', title: t('Automated Alerts'), subtitle: t('Timely updates and outbreak warnings'), color: '#3b82f6' },
       { icon: '📊', title: t('Decision Support'), subtitle: t('Accurate reports for CHO health response'), color: '#dc2626' },
@@ -889,7 +889,7 @@ const handleLoginOtpSubmit = async (e) => {
 
                 <form onSubmit={handleFormSubmit}>
                   <div className="form-group" style={{ textAlign: 'left' }}>
-                    <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontSize: '17px', fontWeight: '500' }}>Username or Email address</label>
+                    <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Username or Email address</label>
                     <input 
                       type="text"
                       className="form-input" 
@@ -901,7 +901,7 @@ const handleLoginOtpSubmit = async (e) => {
                   </div>
                   
                   <div className="form-group" style={{ marginTop: '20px', textAlign: 'left' }}>
-                    <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontSize: '17px', fontWeight: '500' }}>Password</label>
+                    <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Password</label>
                     
                     <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                       <input 
@@ -938,7 +938,7 @@ const handleLoginOtpSubmit = async (e) => {
                   </div>
 
                     <div className="form-options" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '20px 0' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)', cursor: 'pointer', fontSize: '17px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)', cursor: 'pointer', fontSize: '15px' }}>
                       <input 
                         type="checkbox" 
                         checked={rememberMe}
@@ -954,7 +954,7 @@ const handleLoginOtpSubmit = async (e) => {
                         border: 'none',
                         color: '#129968',
                         cursor: 'pointer',
-                        fontSize: '17px',
+                        fontSize: '15px',
                         fontWeight: '500',
                         textDecoration: 'underline',
                         padding: 0
@@ -979,7 +979,7 @@ const handleLoginOtpSubmit = async (e) => {
     </div>
       <form onSubmit={handleLoginOtpSubmit}>
       <div className="form-group" style={{ textAlign: 'left' }}>
-        <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontSize: '17px', fontWeight: '500' }}>
+        <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>
           Verification Code
         </label>
         <input
@@ -989,7 +989,7 @@ const handleLoginOtpSubmit = async (e) => {
           maxLength="6"
           value={loginOtp}
           onChange={(e) => setLoginOtp(e.target.value.replace(/\D/g, ''))}
-          style={{ letterSpacing: '6px', textAlign: 'center', fontSize: '22px', fontWeight: 'bold' }}
+          style={{ letterSpacing: '6px', textAlign: 'center', fontWeight: 'bold', fontSize: '20px' }}
           required
           autoFocus
         />

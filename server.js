@@ -90,10 +90,55 @@ const VALID_GENDERS = ['Male', 'Female', 'Other'];
 const VALID_SEVERITIES = ['Asymptomatic', 'Mild', 'Moderate', 'Severe', 'Critical'];
 const VALID_CASE_STATUSES = ['Active', 'Pending', 'Under Treatment', 'Recovered', 'Deceased', 'Draft'];
 
+// ── Disease classification: notification timing + case type ──
+// notif_type: 'immediate' → report within 24h to CHO / surveillance (Level 1 IDSR);
+//             'weekly'    → included in the consolidated weekly summary (Level 2 FHSIS).
+// case_type:  'probable' → clinically consistent, awaiting/without lab confirmation;
+//             'confirmed' → laboratory-confirmed.
+// Defaults are best-practice (Philippine IDSR / FHSIS) and can be adjusted per
+// disease via the "Add Disease" classification dropdowns or the DB constant below.
+const DISEASE_CLASSIFICATIONS = {
+  'Avian Influenza': { notif_type: 'immediate', case_type: 'probable' },
+  'Cholera': { notif_type: 'immediate', case_type: 'confirmed' },
+  'Covid-19': { notif_type: 'immediate', case_type: 'confirmed' },
+  'Dengue': { notif_type: 'immediate', case_type: 'probable' },
+  'Diphtheria': { notif_type: 'immediate', case_type: 'probable' },
+  'Ebola': { notif_type: 'immediate', case_type: 'probable' },
+  'HIV/AIDS': { notif_type: 'immediate', case_type: 'confirmed' },
+  'Influenza A': { notif_type: 'immediate', case_type: 'probable' },
+  'Leptospirosis': { notif_type: 'immediate', case_type: 'probable' },
+  'Measles': { notif_type: 'immediate', case_type: 'probable' },
+  'Meningococcemia': { notif_type: 'immediate', case_type: 'probable' },
+  'Pertussis': { notif_type: 'immediate', case_type: 'probable' },
+  'Poliomyelitis': { notif_type: 'immediate', case_type: 'probable' },
+  'Rabies': { notif_type: 'immediate', case_type: 'probable' },
+  'SARS': { notif_type: 'immediate', case_type: 'probable' },
+  'Tuberculosis': { notif_type: 'weekly', case_type: 'confirmed' },
+  'Typhoid Fever': { notif_type: 'weekly', case_type: 'confirmed' },
+  'Acute Respiratory Infection': { notif_type: 'weekly', case_type: 'probable' },
+  'Chickenpox': { notif_type: 'weekly', case_type: 'probable' },
+  'Diarrhea': { notif_type: 'weekly', case_type: 'probable' },
+  'Hand Foot and Mouth Disease': { notif_type: 'weekly', case_type: 'probable' },
+  'Hepatitis A': { notif_type: 'weekly', case_type: 'confirmed' },
+  'Hepatitis B': { notif_type: 'weekly', case_type: 'confirmed' },
+  'Hepatitis C': { notif_type: 'weekly', case_type: 'confirmed' },
+  'Influenza': { notif_type: 'weekly', case_type: 'probable' },
+  'Leprosy': { notif_type: 'weekly', case_type: 'confirmed' },
+  'Malaria': { notif_type: 'weekly', case_type: 'confirmed' },
+  'Sore Eyes': { notif_type: 'weekly', case_type: 'probable' },
+};
+// Helper to fetch a disease's classification (with sensible fallbacks).
+function diseaseClassification(name) {
+  const key = String(name || '').trim();
+  const cls = DISEASE_CLASSIFICATIONS[key] ||
+    DISEASE_CLASSIFICATIONS[Object.keys(DISEASE_CLASSIFICATIONS).find(k => k.toLowerCase() === key.toLowerCase())];
+  return { notif_type: (cls && cls.notif_type) || 'weekly', case_type: (cls && cls.case_type) || 'probable' };
+}
+
 function validateCasePayload(payload = {}) {
   const errors = [];
   const {
-    patient_name, age, gender, contact, onset_date, severity, case_status, status, disease_name,
+    patient_name, age, gender, contact, onset_date, severity, case_status, status, disease_name, case_type,
   } = payload;
   const st = case_status || status || 'Active';
 
@@ -133,6 +178,9 @@ function validateCasePayload(payload = {}) {
       const endOfToday = new Date(); endOfToday.setHours(23, 59, 59, 999);
       if (od.getTime() > endOfToday.getTime()) errors.push('Onset date cannot be in the future.');
     }
+  }
+  if (case_type !== undefined && case_type !== null && case_type !== '' && !['Suspected', 'Probable', 'Confirmed'].includes(case_type)) {
+    errors.push(`Case type must be one of: Suspected, Probable, Confirmed.`);
   }
   return errors;
 }
@@ -209,6 +257,10 @@ if (!process.env.JWT_SECRET) {
   console.warn('⚠ WARNING: JWT_SECRET is not set. Using an insecure development secret. Set JWT_SECRET in your environment.');
 }
 
+// Password brute-force lockout policy: 5 failed attempts -> locked for 5 minutes
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOGIN_LOCKOUT_MS = 5 * 60 * 1000;
+
 // Warn at boot if BREVO_API_KEY doesn't look like a valid Brevo API key (xkeysib-<64 hex>-<suffix>)
 if (process.env.BREVO_API_KEY) {
   const brevoKey = process.env.BREVO_API_KEY.trim();
@@ -271,6 +323,16 @@ db.query("SHOW COLUMNS FROM users LIKE 'login_otp_attempts'", (err, rows) => {
     }
 });
 
+// Add login_attempts + login_locked_until columns to users if missing (password brute-force lockout)
+db.query("SHOW COLUMNS FROM users LIKE 'login_attempts'", (err, rows) => {
+    if (!err && rows.length === 0) {
+        db.query("ALTER TABLE users ADD COLUMN login_attempts INT DEFAULT 0, ADD COLUMN login_locked_until DATETIME DEFAULT NULL", (alterErr) => {
+            if (alterErr) console.error('Migration error adding login_attempts/login_locked_until:', alterErr.message);
+            else console.log('Migration: added login_attempts/login_locked_until columns to users table');
+        });
+    }
+});
+
 // Add updated_at column to disease_cases if missing (required for offline sync conflict detection)
 db.query("SHOW COLUMNS FROM disease_cases LIKE 'updated_at'", (err, rows) => {
     if (!err && rows.length === 0) {
@@ -307,6 +369,100 @@ db.query("SHOW COLUMNS FROM diseases LIKE 'active'", (err, rows) => {
         db.query("ALTER TABLE diseases ADD COLUMN active TINYINT(1) NOT NULL DEFAULT 1", (alterErr) => {
             if (alterErr) console.error('Migration error adding active column:', alterErr.message);
             else console.log('Migration: added active column to diseases table');
+        });
+    }
+});
+
+// Migration: notif_type (immediate/weekly) + case_type (probable/confirmed) classification columns
+db.query("SHOW COLUMNS FROM diseases LIKE 'notif_type'", (err, rows) => {
+    if (!err && rows.length === 0) {
+        db.query("ALTER TABLE diseases ADD COLUMN notif_type VARCHAR(10) NOT NULL DEFAULT 'weekly', ADD COLUMN case_type VARCHAR(10) NOT NULL DEFAULT 'probable'", (alterErr) => {
+            if (alterErr) console.error('Migration error adding disease classification columns:', alterErr.message);
+            else console.log('Migration: added notif_type/case_type columns to diseases table');
+        });
+    }
+});
+
+// Backfill: apply DISEASE_CLASSIFICATIONS defaults to existing diseases (idempotent UPDATEs).
+// Reclassify by name on every boot so rows that were seeded with the 'weekly' column default
+// (before notif_type existed) are corrected to their authoritative Immediate/Weekly type.
+db.query("SELECT id, name FROM diseases", (e, rows) => {
+    if (!e && rows && rows.length) {
+        rows.forEach(r => {
+            const cls = diseaseClassification(r.name); // null for admin/custom diseases → leave as-is
+            if (!cls) return;
+            db.query("UPDATE diseases SET notif_type = ?, case_type = ? WHERE id = ?", [cls.notif_type, cls.case_type, r.id], (ue) => {
+                if (ue) console.error(`Error backfilling classification for disease #${r.id}:`, ue.message);
+            });
+        });
+        console.log(`Disease classification synced for ${rows.length} disease(s)`);
+    }
+});
+
+// Migration: per-case classification columns on disease_cases (probable/confirmed/suspected + subtype text)
+db.query("SHOW COLUMNS FROM disease_cases LIKE 'case_type'", (err, rows) => {
+    if (!err && rows.length === 0) {
+        db.query("ALTER TABLE disease_cases ADD COLUMN case_type VARCHAR(10) NOT NULL DEFAULT 'probable' AFTER severity, ADD COLUMN disease_type VARCHAR(100) NULL AFTER case_type", (alterErr) => {
+            if (alterErr) console.error('Migration error adding case classification columns:', alterErr.message);
+            else console.log('Migration: added case_type/disease_type columns to disease_cases table');
+        });
+    }
+});
+
+// Migration: pending add requests carry the same classification columns so approval prefill + insert stay in sync
+db.query("SHOW COLUMNS FROM case_add_requests LIKE 'case_type'", (err, rows) => {
+    if (!err && rows.length === 0) {
+        db.query("ALTER TABLE case_add_requests ADD COLUMN case_type VARCHAR(10) NULL DEFAULT 'probable' AFTER severity, ADD COLUMN disease_type VARCHAR(100) NULL AFTER case_type", (alterErr) => {
+            if (alterErr) console.error('Migration error adding case classification columns to case_add_requests:', alterErr.message);
+            else console.log('Migration: added case_type/disease_type columns to case_add_requests table');
+        });
+    }
+});
+
+// Migration: disease subtype options (JSON array of strings) on diseases — powers the case-form subtype dropdown
+db.query("SHOW COLUMNS FROM diseases LIKE 'subtypes'", (err, rows) => {
+    if (!err && rows.length === 0) {
+        db.query("ALTER TABLE diseases ADD COLUMN subtypes JSON NULL", (alterErr) => {
+            if (alterErr) console.error('Migration error adding subtypes column:', alterErr.message);
+            else console.log('Migration: added subtypes column to diseases table');
+        });
+    }
+});
+
+// Seed default subtype lists for commonly surveillance-tracked diseases (idempotent per-disease)
+const DISEASE_SUBTYPES_SEED = {
+  'Dengue': ['Dengue Fever (without warning signs)', 'Dengue with Warning Signs', 'Severe Dengue (DHF/DSS)'],
+  'Covid-19': ['Symptomatic', 'Asymptomatic', 'Mild COVID-19', 'Moderate COVID-19', 'Severe/Critical COVID-19'],
+  'Influenza': ['Influenza A (H1N1)', 'Influenza A (H3N2)', 'Influenza B', 'Influenza C'],
+  'Influenza A': ['H1N1', 'H3N2', 'H5N1', 'Other'],
+  'Tuberculosis': ['Pulmonary TB', 'Extrapulmonary TB', 'DS-TB', 'DR-TB (MDR/XDR)'],
+  'Leprosy': ['Paucibacillary (PB)', 'Multibacillary (MB)'],
+  'Hepatitis A': ['Acute', 'Cholestatic', 'Fulminant'],
+  'Hepatitis B': ['Acute', 'Chronic', 'Inactive Carrier'],
+  'Hepatitis C': ['Acute', 'Chronic'],
+  'HIV/AIDS': ['HIV (Asymptomatic)', 'HIV (Symptomatic)', 'AIDS'],
+  'Malaria': ['Plasmodium falciparum', 'Plasmodium vivax', 'Plasmodium malariae', 'Plasmodium knowlesi'],
+  'Rabies': ['Furious Rabies', 'Paralytic (Dumb) Rabies'],
+  'Chickenpox': ['Varicella (Classic)', 'Breakthrough Varicella'],
+  'Measles': ['Typical Measles', 'Modified Measles', 'Atypical Measles'],
+  'Typhoid Fever': ['Uncomplicated', 'Complicated'],
+  'Leptospirosis': ['Anicteric', 'Icteric (Weil\'s Disease)'],
+  'Hand Foot and Mouth Disease': ['Typical HFMD', 'Atypical HFMD'],
+  'Poliomyelitis': ['Acute Flaccid Paralysis (AFP)', 'Non-paralytic Polio', 'Paralytic Polio'],
+};
+db.query("SELECT id, name FROM diseases WHERE name IS NOT NULL", (e, rows) => {
+    if (!e && rows) {
+        rows.forEach(r => {
+            const seed = DISEASE_SUBTYPES_SEED[r.name];
+            if (!seed) return;
+            db.query("SELECT subtypes FROM diseases WHERE id = ?", [r.id], (se, srows) => {
+                if (se || !srows || srows.length === 0) return;
+                const existing = srows[0].subtypes;
+                if (existing) return;
+                db.query("UPDATE diseases SET subtypes = ? WHERE id = ?", [JSON.stringify(seed), r.id], (ue) => {
+                    if (ue) console.error(`Error seeding subtypes for ${r.name}:`, ue.message);
+                });
+            });
         });
     }
 });
@@ -958,6 +1114,8 @@ app.get('/api/disease_cases', (req, res) => {
             dc.longitude,
             dc.onset_date,
             dc.severity,
+            dc.case_type,
+            dc.disease_type,
             dc.status, 
             dc.date_reported,
             dc.is_archived,
@@ -1016,7 +1174,14 @@ app.get('/api/patients/lookup', authenticate, (req, res) => {
 app.get('/api/diseases', (req, res) => {
     db.query("SELECT * FROM diseases ORDER BY name", (err, results) => {
         if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
-        res.json(results);
+        const out = (results || []).map(r => {
+            let subtypes = null;
+            if (r.subtypes) {
+                try { const p = JSON.parse(r.subtypes); subtypes = Array.isArray(p) ? p : null; } catch (e) { subtypes = null; }
+            }
+            return { ...r, subtypes };
+        });
+        res.json(out);
     });
 });
 
@@ -1030,10 +1195,14 @@ app.post('/api/diseases', authenticate, (req, res) => {
     const symptoms = (req.body && req.body.symptoms != null && String(req.body.symptoms).trim() !== '' ? String(req.body.symptoms) : null);
     const videoUrl = (req.body && req.body.videoUrl ? String(req.body.videoUrl).slice(0, 255) : null);
     if (!name) return res.status(400).json({ error: 'Disease name is required.' });
-    db.query('INSERT IGNORE INTO diseases (name, icon, color, description, prevention_tips, symptoms, video_url) VALUES (?, ?, ?, ?, ?, ?, ?)', [name, icon, color, description, preventionTips, symptoms, videoUrl], (err, result) => {
+    const auto = diseaseClassification(name);
+    const notifType = ['immediate', 'weekly'].includes(req.body && req.body.notif_type) ? req.body.notif_type : auto.notif_type;
+    const caseType = ['probable', 'confirmed'].includes(req.body && req.body.case_type) ? req.body.case_type : auto.case_type;
+    const subtypes = Array.isArray(req.body && req.body.subtypes) ? req.body.subtypes.map(s => String(s).trim()).filter(Boolean).slice(0, 50) : [];
+    db.query('INSERT IGNORE INTO diseases (name, icon, color, description, prevention_tips, symptoms, video_url, notif_type, case_type, subtypes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [name, icon, color, description, preventionTips, symptoms, videoUrl, notifType, caseType, subtypes.length ? JSON.stringify(subtypes) : null], (err, result) => {
         if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
         if (result.affectedRows === 0) return res.status(409).json({ error: 'Disease already exists.' });
-        res.status(201).json({ message: 'Disease added successfully.', id: result.insertId });
+        res.status(201).json({ message: 'Disease added successfully.', id: result.insertId, notif_type: notifType, case_type: caseType });
     });
 });
 
@@ -1045,9 +1214,17 @@ app.put('/api/diseases/:id', authenticate, requireRole('CHO'), (req, res) => {
     const preventionTips = (req.body != null && req.body.preventionTips != null && String(req.body.preventionTips).trim() !== '' ? String(req.body.preventionTips) : null);
     const symptoms = (req.body != null && req.body.symptoms != null && String(req.body.symptoms).trim() !== '' ? String(req.body.symptoms) : null);
     const videoUrl = (req.body != null && req.body.videoUrl ? String(req.body.videoUrl).slice(0, 255) : null);
+    const notifType = (req.body != null && ['immediate', 'weekly'].includes(req.body.notif_type)) ? req.body.notif_type : null;
+    const caseType = (req.body != null && ['probable', 'confirmed'].includes(req.body.case_type)) ? req.body.case_type : null;
+    const subtypes = (req.body != null && Array.isArray(req.body.subtypes)) ? req.body.subtypes.map(s => String(s).trim()).filter(Boolean).slice(0, 50) : null;
+    const subtypesJson = subtypes ? JSON.stringify(subtypes) : null;
+    const extraClause = (notifType || caseType || subtypesJson) ? ', notif_type = COALESCE(?, notif_type), case_type = COALESCE(?, case_type), subtypes = COALESCE(?, subtypes)' : '';
+    const params = [description, preventionTips, symptoms, videoUrl];
+    if (notifType || caseType || subtypesJson) params.push(notifType, caseType, subtypesJson);
+    params.push(id);
     db.query(
-        'UPDATE diseases SET description = ?, prevention_tips = ?, symptoms = ?, video_url = ? WHERE id = ?',
-        [description, preventionTips, symptoms, videoUrl, id],
+        `UPDATE diseases SET description = ?, prevention_tips = ?, symptoms = ?, video_url = ?${extraClause} WHERE id = ?`,
+        params,
         (err, result) => {
             if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
             if (result.affectedRows === 0) return res.status(404).json({ error: 'Disease not found.' });
@@ -1292,7 +1469,8 @@ app.post('/api/cases', authenticate, (req, res) => {
     const {
         patient_name, disease_name, age, severity, gender,
         status, contact, onset_date, address, barangay_id,
-        symptoms, physician, latitude, longitude
+        symptoms, physician, latitude, longitude, case_type,
+        disease_type,
     } = req.body;
 
     console.log("--- Add Case ---", { patient_name, disease_name, barangay_id });
@@ -1396,14 +1574,17 @@ app.post('/api/cases', authenticate, (req, res) => {
 
             const doInsert = (dId) => {
             const reportTs = (req.body && req.body._offlineTimestamp) ? new Date(req.body._offlineTimestamp) : null;
+            const autoCls = diseaseClassification(disease_name);
+            const resolvedCaseType = ['Suspected', 'Probable', 'Confirmed'].includes(case_type) ? case_type : autoCls.case_type;
+            const resolvedDiseaseType = disease_type != null && String(disease_type).trim() !== '' ? String(disease_type).trim().slice(0, 100) : null;
             const insertQuery = `
                 INSERT INTO disease_cases 
-                (patient_name, disease_id, age, severity, gender, status, contact, 
+                (patient_name, disease_id, age, severity, case_type, disease_type, gender, status, contact, 
                  onset_date, address, barangay_id, symptoms, physician, latitude, longitude, date_reported, created_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, NOW()), ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, NOW()), ?)
             `;
             const vals = [
-                patient_name, dId, age || 0, severity, gender || 'Male',
+                patient_name, dId, age || 0, severity, resolvedCaseType, resolvedDiseaseType, gender || 'Male',
                 status || 'Active', contact || null, onset_date || null, address || null,
                 barangay_id || null, symptoms || null, physician || null,
                 latitude || null, longitude || null, reportTs, req.body.user_id || null
@@ -1522,7 +1703,8 @@ app.post('/api/cases/route-to-barangay-inbox', authenticate, (req, res) => {
     const {
         patient_name, disease_name, age, severity, gender, status, contact,
         onset_date, address, symptoms, physician, latitude, longitude,
-        submitter_user_id, submitter_name, from_cho_unit, target_barangay_name, notes
+        submitter_user_id, submitter_name, from_cho_unit, target_barangay_name, notes,
+        case_type, disease_type,
     } = req.body;
 
     db.query('SELECT id FROM barangays WHERE LOWER(name) = LOWER(?)', [target_barangay_name], (bErr, bResults) => {
@@ -1535,12 +1717,15 @@ app.post('/api/cases/route-to-barangay-inbox', authenticate, (req, res) => {
         const findDiseaseQuery = 'SELECT id FROM diseases WHERE LOWER(name) = LOWER(?)';
         db.query(findDiseaseQuery, [disease_name], (err, diseaseResults) => {
             const diseaseId = diseaseResults && diseaseResults.length > 0 ? diseaseResults[0].id : null;
+            const autoCls = diseaseClassification(disease_name);
+            const resolvedCaseType = ['Suspected', 'Probable', 'Confirmed'].includes(case_type) ? case_type : autoCls.case_type;
+            const resolvedDiseaseType = disease_type != null && String(disease_type).trim() !== '' ? String(disease_type).trim().slice(0, 100) : null;
             db.query(
                 `INSERT INTO disease_cases
-                (patient_name, disease_id, age, severity, gender, status, contact,
+                (patient_name, disease_id, age, severity, case_type, disease_type, gender, status, contact,
                  onset_date, address, barangay_id, symptoms, physician, latitude, longitude, date_reported)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, NOW())`,
-                [patient_name, diseaseId, age || 0, severity, gender || 'Male', status || 'Pending',
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, NOW())`,
+                [patient_name, diseaseId, age || 0, severity, resolvedCaseType, resolvedDiseaseType, gender || 'Male', status || 'Pending',
                  contact || null, onset_date || null, address || null, symptoms || null,
                  physician || null, latitude || null, longitude || null],
                 (insertErr, result) => {
@@ -1956,7 +2141,8 @@ app.post('/api/cases/request-add', authenticate, (req, res) => {
   const {
     patient_name, disease_name, age, severity, gender, case_status, contact,
     onset_date, address, barangay_id, symptoms, physician, latitude, longitude,
-    requested_by, requested_by_name, from_barangay_name, submitter_cho_unit, note
+    requested_by, requested_by_name, from_barangay_name, submitter_cho_unit, note,
+    case_type, disease_type,
   } = req.body;
 
   if (!requested_by || !patient_name || !disease_name) {
@@ -1983,12 +2169,16 @@ app.post('/api/cases/request-add', authenticate, (req, res) => {
     if (detectedBarangay) targetChoUnit = getChoUnitForBarangayName(detectedBarangay) || targetChoUnit;
     if (barangayName) targetChoUnit = getChoUnitForBarangayName(barangayName) || targetChoUnit;
 
+    const autoCls = diseaseClassification(disease_name);
+    const resolvedCaseType = ['Suspected', 'Probable', 'Confirmed'].includes(case_type) ? case_type : autoCls.case_type;
+    const resolvedDiseaseType = disease_type != null && String(disease_type).trim() !== '' ? String(disease_type).trim().slice(0, 100) : null;
+
     db.query(
       `INSERT INTO case_add_requests
-        (patient_name, disease_name, age, severity, gender, case_status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude,
+        (patient_name, disease_name, age, severity, case_type, disease_type, gender, case_status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude,
          requested_by, requested_by_name, from_barangay_name, target_cho_unit, note)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [patient_name, disease_name, age || 0, severity, gender || 'Male', case_status || 'Active', contact || null, onset_date || null, address || null,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [patient_name, disease_name, age || 0, severity, resolvedCaseType, resolvedDiseaseType, gender || 'Male', case_status || 'Active', contact || null, onset_date || null, address || null,
         barangay_id || null, symptoms || null, physician || null, latitude || null, longitude || null,
         requested_by, requested_by_name || 'Unknown', from_barangay_name || null, targetChoUnit || null, note || null],
       (err, result) => {
@@ -2050,7 +2240,8 @@ app.put('/api/case-add-requests/:id/approve', authenticate, (req, res) => {
   const body = req.body || {};
   const {
     patient_name, disease_name, age, severity, gender, case_status, contact,
-    onset_date, address, barangay_id, symptoms, physician, latitude, longitude
+    onset_date, address, barangay_id, symptoms, physician, latitude, longitude,
+    case_type, disease_type,
   } = body;
 
   db.query('SELECT * FROM case_add_requests WHERE id = ? AND status = ?', [id, 'pending'], (qErr, rows) => {
@@ -2072,6 +2263,8 @@ app.put('/api/case-add-requests/:id/approve', authenticate, (req, res) => {
       physician: physician || reqRow.physician,
       latitude: latitude || reqRow.latitude,
       longitude: longitude || reqRow.longitude,
+      case_type: ['Suspected', 'Probable', 'Confirmed'].includes(case_type) ? case_type : (reqRow.case_type || diseaseClassification(reqRow.disease_name).case_type),
+      disease_type: (disease_type !== undefined && disease_type !== null && String(disease_type).trim() !== '') ? String(disease_type).trim().slice(0, 100) : reqRow.disease_type,
     };
 
     // ── Server-side validation mirror (2.4) ──
@@ -2104,9 +2297,9 @@ app.put('/api/case-add-requests/:id/approve', authenticate, (req, res) => {
         const doInsert = (finalId) => {
           db.query(
             `INSERT INTO disease_cases
-                (patient_name, disease_id, age, severity, gender, status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude, created_by)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [final.patient_name, finalId, final.age || 0, final.severity, final.gender, final.case_status,
+                (patient_name, disease_id, age, severity, case_type, disease_type, gender, status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude, created_by)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [final.patient_name, finalId, final.age || 0, final.severity, final.case_type, final.disease_type || null, final.gender, final.case_status,
               final.contact || null, final.onset_date || null, final.address || null, final.barangay_id,
               final.symptoms || null, final.physician || null, final.latitude || null, final.longitude || null, reqRow.requested_by || null],
             (insErr, insResult) => {
@@ -2393,7 +2586,8 @@ app.put('/api/cases/:id', authenticate, (req, res) => {
     const {
         patient_name, disease_name, age, severity, gender,
         status, contact, onset_date, address, barangay_id,
-        symptoms, physician, latitude, longitude
+        symptoms, physician, latitude, longitude, case_type,
+        disease_type,
     } = req.body;
 
     console.log("--- Update Case ---", { id, patient_name });
@@ -2422,6 +2616,7 @@ app.put('/api/cases/:id', authenticate, (req, res) => {
                 patient_name: 'Patient Name', age: 'Age', severity: 'Severity', gender: 'Gender',
                 status: 'Status', contact: 'Contact', onset_date: 'Date of Onset', address: 'Address',
                 symptoms: 'Symptoms', physician: 'Physician', latitude: 'Latitude', longitude: 'Longitude',
+                case_type: 'Case Type', disease_type: 'Disease Type',
               };
               const normalize = (v) => (v === null || v === undefined || v === '') ? '' : String(v).trim();
               const fmtDateVal = (v) => {
@@ -2435,7 +2630,7 @@ app.put('/api/cases/:id', authenticate, (req, res) => {
               const canonicalVal = (payloadKey, v) => (payloadKey === 'onset_date' ? fmtDateVal(v) : normalize(v));
               const buildChangeSummary = () => {
                 if (!oldRow) return '';
-                const FIELD_MAP = { patient_name: 'patient_name', age: 'age', severity: 'severity', gender: 'gender', status: 'status', contact: 'contact', onset_date: 'onset_date', address: 'address', symptoms: 'symptoms', physician: 'physician', latitude: 'latitude', longitude: 'longitude' };
+                const FIELD_MAP = { patient_name: 'patient_name', age: 'age', severity: 'severity', gender: 'gender', status: 'status', contact: 'contact', onset_date: 'onset_date', address: 'address', symptoms: 'symptoms', physician: 'physician', latitude: 'latitude', longitude: 'longitude', case_type: 'case_type', disease_type: 'disease_type' };
                 const changes = [];
                 for (const [payloadKey, label] of Object.entries(FIELD_LABELS)) {
                   let newVal;
@@ -2473,14 +2668,18 @@ app.put('/api/cases/:id', authenticate, (req, res) => {
             const applyUpdate = () => {
             const updateQuery = `
                 UPDATE disease_cases SET
-                    patient_name = ?, disease_id = ?, age = ?, severity = ?, gender = ?,
+                    patient_name = ?, disease_id = ?, age = ?, severity = ?, case_type = ?, disease_type = ?, gender = ?,
                     status = ?, contact = ?, onset_date = ?, address = ?,
                     barangay_id = ?, symptoms = ?, physician = ?,
                     latitude = ?, longitude = ?
                 WHERE case_id = ?
             `;
+            const resolvedCaseType = ['Suspected', 'Probable', 'Confirmed'].includes(case_type)
+                ? case_type
+                : ((oldRow && oldRow.case_type) || diseaseClassification(disease_name).case_type);
+            const resolvedDiseaseType = disease_type != null && String(disease_type).trim() !== '' ? String(disease_type).trim().slice(0, 100) : null;
             const vals = [
-                patient_name, dId, age || 0, severity, gender || 'Male',
+                patient_name, dId, age || 0, severity, resolvedCaseType, resolvedDiseaseType, gender || 'Male',
                 status, contact || null, onset_date || null, address || null,
                 barangay_id || null, symptoms || null, physician || null,
                 latitude || null, longitude || null, id
@@ -3066,6 +3265,15 @@ app.post('/api/login', (req, res) => {
 
         const user = results[0];
 
+        // Lockout guard: block login while a lockout window is active
+        if (user.login_locked_until && new Date(user.login_locked_until) > new Date()) {
+            const mins = Math.max(1, Math.ceil((new Date(user.login_locked_until) - new Date()) / 60000));
+            console.warn(`[AUTH-LOCK] ${email} is locked out. Retry in ~${mins} min.`);
+            return res.status(429).json({
+                error: `Too many failed login attempts. This account is locked for ${mins} more minute${mins === 1 ? '' : 's'}. Please try again later.`
+            });
+        }
+
         // Verify password: try bcrypt first, fallback to plaintext for legacy accounts
         let passwordMatch = false;
         try {
@@ -3084,8 +3292,29 @@ app.post('/api/login', (req, res) => {
             storedLen: stored.length,
             looksLikeBcrypt: /^\$2[abxy]\$/.test(stored),
           }));
-          return res.status(401).json({ error: 'Invalid credentials or account not found.' });
+          // Count the failed attempt against the brute-force lockout policy
+          db.query('UPDATE users SET login_attempts = login_attempts + 1 WHERE user_id = ?', [user.user_id], (attemptErr) => {
+              if (attemptErr) return;
+              db.query('SELECT login_attempts FROM users WHERE user_id = ?', [user.user_id], (err2, rows) => {
+                  const attempts = (rows && rows[0] && rows[0].login_attempts) || 0;
+                  if (attempts >= MAX_LOGIN_ATTEMPTS) {
+                      const lockedUntil = new Date(Date.now() + LOGIN_LOCKOUT_MS);
+                      db.query('UPDATE users SET login_attempts = 0, login_locked_until = ? WHERE user_id = ?', [lockedUntil, user.user_id], (lockErr) => {
+                          if (!lockErr) {
+                              console.warn(`[AUTH-LOCK] ${email} exceeded ${MAX_LOGIN_ATTEMPTS} failed attempts. Account locked until ${lockedUntil.toISOString()}.`);
+                          }
+                      });
+                      return res.status(429).json({ error: 'Too many failed login attempts. This account is locked for 5 minutes. Please try again later.' });
+                  }
+                  const remaining = MAX_LOGIN_ATTEMPTS - attempts;
+                  return res.status(401).json({ error: `Invalid credentials or account not found. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining before lockout.` });
+              });
+          });
+          return;
         }
+
+        // Successful login — clear failed-attempt counters
+        db.query('UPDATE users SET login_attempts = 0, login_locked_until = NULL WHERE user_id = ?', [user.user_id]);
 
         // Auto-upgrade plaintext password to bcrypt on first login after hashing was added
         if (plaintextMatch) {
@@ -3348,14 +3577,16 @@ app.post('/api/sync', authenticate, (req, res) => {
         if (type === 'create' && endpoint === '/api/cases') {
             const p = payload || {};
             const doInsert = (dId) => {
-                const insertQuery = `
-                    INSERT INTO disease_cases
-                        (patient_name, disease_id, age, severity, gender, status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude, date_reported, created_by)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                `;
                 const ts = p._offlineTimestamp ? new Date(p._offlineTimestamp) : new Date();
-                db.query(insertQuery, [
-                    p.patient_name, dId, p.age, p.severity || 'Moderate',
+                const autoCls = diseaseClassification(p.disease_name);
+                const resolvedCaseType = ['Suspected', 'Probable', 'Confirmed'].includes(p.case_type) ? p.case_type : autoCls.case_type;
+                const resolvedDiseaseType = p.disease_type != null && String(p.disease_type).trim() !== '' ? String(p.disease_type).trim().slice(0, 100) : null;
+                db.query(
+                    `INSERT INTO disease_cases
+                        (patient_name, disease_id, age, severity, case_type, disease_type, gender, status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude, date_reported, created_by)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `, [
+                    p.patient_name, dId, p.age, p.severity || 'Moderate', resolvedCaseType, resolvedDiseaseType,
                     p.gender || 'Other', p.status || 'Active', p.contact,
                     p.onset_date, p.address, p.barangay_id, p.symptoms,
                     p.physician, p.latitude, p.longitude, ts, p._offlineUserId || null
@@ -3405,15 +3636,17 @@ app.post('/api/sync', authenticate, (req, res) => {
             const caseId = endpoint.split('/').pop();
             const p = payload || {};
             const doEdit = (dId) => {
-                const updateQuery = `
-                    UPDATE disease_cases SET
-                        patient_name=?, disease_id=?, age=?, severity=?, gender=?, status=?,
+                const autoCls = diseaseClassification(p.disease_name);
+                const resolvedCaseType = ['Suspected', 'Probable', 'Confirmed'].includes(p.case_type) ? p.case_type : autoCls.case_type;
+                const resolvedDiseaseType = p.disease_type != null && String(p.disease_type).trim() !== '' ? String(p.disease_type).trim().slice(0, 100) : null;
+                db.query(
+                    `UPDATE disease_cases SET
+                        patient_name=?, disease_id=?, age=?, severity=?, case_type=?, disease_type=?, gender=?, status=?,
                         contact=?, onset_date=?, address=?, barangay_id=?, symptoms=?,
                         physician=?, latitude=?, longitude=?, updated_at=NOW()
                     WHERE case_id=?
-                `;
-                db.query(updateQuery, [
-                    p.patient_name, dId, p.age, p.severity,
+                `, [
+                    p.patient_name, dId, p.age, p.severity, resolvedCaseType, resolvedDiseaseType,
                     p.gender, p.status, p.contact, p.onset_date, p.address,
                     p.barangay_id, p.symptoms, p.physician, p.latitude, p.longitude, caseId
                 ], (err) => {
@@ -3532,12 +3765,15 @@ app.post('/api/sync', authenticate, (req, res) => {
               let targetChoUnit = p.submitter_cho_unit || null;
               if (detectedBarangay) targetChoUnit = getChoUnitForBarangayName(detectedBarangay) || targetChoUnit;
               if (barangayName) targetChoUnit = getChoUnitForBarangayName(barangayName) || targetChoUnit;
+              const autoCls = diseaseClassification(p.disease_name);
+              const resolvedCaseType = ['Suspected', 'Probable', 'Confirmed'].includes(p.case_type) ? p.case_type : autoCls.case_type;
+              const resolvedDiseaseType = p.disease_type != null && String(p.disease_type).trim() !== '' ? String(p.disease_type).trim().slice(0, 100) : null;
               db.query(
                 `INSERT INTO case_add_requests
-                  (patient_name, disease_name, age, severity, gender, case_status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude,
+                  (patient_name, disease_name, age, severity, case_type, disease_type, gender, case_status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude,
                    requested_by, requested_by_name, from_barangay_name, target_cho_unit, note)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [p.patient_name, p.disease_name, p.age || 0, p.severity || 'Moderate', p.gender || 'Male', p.status || 'Active', p.contact || null, p.onset_date || null, p.address || null,
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [p.patient_name, p.disease_name, p.age || 0, p.severity || 'Moderate', resolvedCaseType, resolvedDiseaseType, p.gender || 'Male', p.status || 'Active', p.contact || null, p.onset_date || null, p.address || null,
                   p.barangay_id || null, p.symptoms || null, p.physician || null, p.latitude || null, p.longitude || null,
                   p._offlineUserId || null, p._offlineUserName || 'Offline BHW', p.from_barangay_name || null, targetChoUnit || null, p.note || null],
                 (err, result) => {
@@ -4436,7 +4672,7 @@ app.get('/api/export-all', authenticate, (req, res) => {
   const sql = `
     SELECT dc.case_id, dc.patient_name, dc.age, dc.gender, dc.contact,
            dc.address, dc.symptoms, dc.physician, dc.onset_date,
-           dc.severity, dc.status, dc.date_reported,
+           dc.severity, dc.case_type, dc.disease_type, dc.status, dc.date_reported,
            dc.latitude, dc.longitude,
            d.name AS disease_name,
            b.name AS barangay_name
@@ -4451,13 +4687,13 @@ app.get('/api/export-all', authenticate, (req, res) => {
 
     if (format === 'csv') {
       const headers = 'Case ID,Patient Name,Age,Gender,Contact,Address,' +
-        'Disease,Barangay,Severity,Status,Onset Date,Date Reported\n';
+        'Disease,Barangay,Severity,Case Type,Disease Type,Status,Onset Date,Date Reported\n';
       const rows = results.map(r =>
         `"${r.case_id}","${r.patient_name||''}","${r.age||''}",` +
         `"${r.gender||''}","${r.contact||''}","${r.address||''}",` +
         `"${r.disease_name||''}","${r.barangay_name||''}",` +
-        `"${r.severity||''}","${r.status||''}","${r.onset_date||''}",` +
-        `"${r.date_reported||''}"`
+        `"${r.severity||''}","${r.case_type||''}","${r.disease_type||''}",` +
+        `"${r.status||''}","${r.onset_date||''}","${r.date_reported||''}"`
       ).join('\n');
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition',

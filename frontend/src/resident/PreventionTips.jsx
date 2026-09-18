@@ -32,7 +32,11 @@ const renderDiseaseIcon = (disease, size = 26) => {
       </span>
     );
   }
-  return <span style={{ fontSize: size, lineHeight: 1 }}>{disease.icon}</span>;
+  const icon = disease && disease.icon;
+  if (typeof icon === 'string' && /^[a-z0-9_.\-/:]*(\.svg|\.png|\.jpg|\.jpeg|\.webp|data:image\/svg|data:image\/png|http)/i.test(icon)) {
+    return <img src={icon} alt={disease ? disease.name : 'icon'} style={{ width: size, height: size, objectFit: 'contain', verticalAlign: 'middle', display: 'inline-flex' }} />;
+  }
+  return <span style={{ fontSize: size, lineHeight: 1 }}>{icon}</span>;
 };
 
 export const DISEASES = [

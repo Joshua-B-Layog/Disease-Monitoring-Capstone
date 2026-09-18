@@ -14,6 +14,8 @@ import { emitDiseasesChanged } from './diseaseSignal';
 import { FeverIcon, InfluenzaAIcon, LeptospirosisIcon, TuberculosisIcon, TyphoidIcon, RabiesIcon, FecesIcon, SoreEyesIcon, AvianIcon, ContactBloodborneIcon } from './components/DiseaseIcons';
 import { formatDate as formatDateStr, formatDateTime } from './formatDate';
 import DatePicker from './components/DatePicker';
+import ExportPreviewModal from './components/ExportPreview';
+import { useI18n } from './i18n';
 
 const AllDiseasesIcon = ({ color = '#121358', size = 28 }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
@@ -174,6 +176,21 @@ const ALL_DISEASE_ENTRIES = [
   { id: 27, name: 'Tuberculosis',                  dbName: 'Tuberculosis', icon: <TuberculosisIcon color="#F97316" />, color: '#F97316', desc: 'An infectious bacterial disease that primarily affects the lungs, requiring long-term treatment.' },
   { id: 28, name: 'Typhoid Fever',                 dbName: 'Typhoid Fever', icon: <TyphoidIcon color="#8B5CF6" />, color: '#8B5CF6', desc: 'A systemic infection caused by Salmonella Typhi, spread through contaminated food and water.' },
 ];
+
+// Diseases flagged as "Immediate" (report within 24h / Level 1 IDSR) — fallback for the
+// Immediate/Weekly grouping when a disease row's notif_type hasn't been persisted yet.
+const IMMEDIATE_DISEASE_NAMES = new Set([
+  'Avian Influenza', 'Cholera', 'Covid-19', 'Dengue', 'Diphtheria', 'Ebola', 'HIV/AIDS',
+  'Influenza A', 'Leptospirosis', 'Measles', 'Meningococcemia', 'Pertussis',
+  'Poliomyelitis', 'Rabies', 'SARS',
+]);
+const notifTypeForEntry = (entry, dbList) => {
+  const db = (dbList || []).find(
+    x => String(x.name || '').toLowerCase() === String(entry.dbName || '').toLowerCase()
+  );
+  if (db && db.notif_type) return db.notif_type;
+  return IMMEDIATE_DISEASE_NAMES.has(entry.dbName || '') ? 'immediate' : 'weekly';
+};
 
 // Icon picker choices: every disease's own icon (SVG components + emojis) labelled by disease name,
 // keyed by serializable token, with duplicate emoji icons removed (only the first disease using that emoji is kept),
@@ -403,7 +420,7 @@ function extractLocationUnit(address) {
 const CASES_PER_PAGE = 10;
 
 const EMPTY_FORM = {
-  patientName: '', diseaseType: '', age: '', severity: 'Mild',
+  patientName: '', diseaseType: '', age: '', severity: 'Mild', caseType: 'Probable', diseaseSubtype: '',
   gender: 'Male', status: 'Active', contact: '', onsetDate: '',
   address: '', purok: '', barangayId: '', symptoms: '', physician: '',
   lat: '', lng: ''
@@ -413,6 +430,7 @@ const CATEGORIES_PER_PAGE = 8;
 const DISEASES_PER_PAGE = 12;
 
 export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, autoSave, confirmDelete, keyboardShortcuts, fontScale, compactMode, loggedUserId, loggedUser, loginRole, loginBarangay, sessionContext, initialView, onInitialViewConsumed, pendingOpenCaseId, onPendingCaseConsumed }) {
+  const { t, translateStatus } = useI18n();
   const [view, setView] = useState('categories');
   const [inboxItems, setInboxItems] = useState([]);
   const [outboxItems, setOutboxItems] = useState([]);
@@ -460,6 +478,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const [newDiseaseDesc, setNewDiseaseDesc] = useState('');
   const [newDiseaseCategory, setNewDiseaseCategory] = useState('all');
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [newDiseaseNotifType, setNewDiseaseNotifType] = useState('weekly');
+  const [newDiseaseCaseType, setNewDiseaseCaseType] = useState('probable');
   const [addDiseaseMsg, setAddDiseaseMsg] = useState('');
 
   const [tipsList, setTipsList] = useState([]);
@@ -515,7 +535,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     setTipsOpen(true);
     axios.get(`${API_URL}/api/diseases`)
       .then(res => { setTipsList(Array.isArray(res.data) ? res.data : []); })
-      .catch(err => setTipsMsg('Error: ' + (err.response?.data?.error || err.message)));
+      .catch(err => setTipsMsg(t('Error') + ': ' + (err.response?.data?.error || err.message)));
   };
 
   const openTipsEditor = (d) => {
@@ -525,6 +545,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       preventionTips: d.prevention_tips || (hard && Array.isArray(hard.tips) ? hard.tips.join('\n') : ''),
       symptoms: d.symptoms || (hard && Array.isArray(hard.symptoms) ? hard.symptoms.join('\n') : ''),
       videoUrl: d.video_url || (hard && hard.videoUrl ? hard.videoUrl : ''),
+      subtypes: (Array.isArray(d.subtypes) ? d.subtypes.join('\n') : '') || '',
     });
     setTipsMsg('');
   };
@@ -537,13 +558,14 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         preventionTips: tipsEditor.preventionTips,
         symptoms: tipsEditor.symptoms,
         videoUrl: tipsEditor.videoUrl,
+        subtypes: String(tipsEditor.subtypes || '').split('\n').map(s => s.trim()).filter(Boolean),
       }, { headers: { 'x-user-role': 'CHO', 'x-user-id': loggedUserId || '', 'x-user-name': loggedUser || '' } });
-      notify('Prevention tips updated successfully!', 'success');
+      notify(t('Prevention tips updated successfully!'), 'success');
       emitDiseasesChanged();
       setTipsEditor(null);
       openTipsManager();
     } catch (err) {
-      setTipsMsg('Error: ' + (err.response?.data?.error || err.message));
+      setTipsMsg(t('Error') + ': ' + (err.response?.data?.error || err.message));
     } finally {
       setTipsSaving(false);
     }
@@ -562,7 +584,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   };
 
   const saveBox2Tips = async () => {
-    if (!box2DiseaseId) { setBox2Msg('Error: Select a disease first.'); return; }
+    if (!box2DiseaseId) { setBox2Msg(t('Error') + ': ' + t('Select a disease first.')); return; }
     setBox2Saving(true);
     try {
       await axios.put(`${API_URL}/api/diseases/${box2DiseaseId}`, {
@@ -570,7 +592,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         symptoms: box2Symptoms,
         videoUrl: box2Video,
       }, { headers: { 'x-user-role': 'CHO', 'x-user-id': loggedUserId || '', 'x-user-name': loggedUser || '' } });
-      notify('Prevention tips saved!', 'success');
+      notify(t('Prevention tips saved!'), 'success');
       emitDiseasesChanged();
       setBox2Msg('');
       const dres = await axios.get(API_URL + '/api/diseases');
@@ -579,7 +601,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       const updated = (dres.data || []).find(x => String(x.id) === String(box2DiseaseId));
       if (updated) { setBox2Tips(updated.prevention_tips || ''); setBox2Symptoms(updated.symptoms || ''); setBox2Video(updated.video_url || ''); }
     } catch (err) {
-      setBox2Msg('Error: ' + (err.response?.data?.error || err.message));
+      setBox2Msg(t('Error') + ': ' + (err.response?.data?.error || err.message));
     } finally {
       setBox2Saving(false);
     }
@@ -590,13 +612,13 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     try {
       await axios.patch(`${API_URL}/api/diseases/${d.id}/visibility`, { active: next },
         { headers: { 'x-user-role': 'CHO', 'x-user-id': loggedUserId || '', 'x-user-name': loggedUser || '' } });
-      notify(next ? `"${d.name}" is now visible to residents.` : `"${d.name}" hidden from residents.`, 'info');
+      notify(next ? t('"') + d.name + t(' is now visible to residents.') : t('"') + d.name + t(' hidden from residents.'), 'info');
       emitDiseasesChanged();
       const dres = await axios.get(API_URL + '/api/diseases');
       setTipsList(dres.data);
       setAllDiseases(dres.data);
     } catch (err) {
-      notify('Error: ' + (err.response?.data?.error || err.message), 'error');
+      notify(t('Error') + ': ' + (err.response?.data?.error || err.message), 'error');
     }
   };
 
@@ -642,6 +664,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
   // Export dropdown
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exportPreview, setExportPreview] = useState(false);
   const exportRef = useRef(null);
 
   // Keyboard shortcuts guide
@@ -679,6 +702,11 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   // Add New Disease category dropdown
   const [categoryOpen, setCategoryOpen] = useState(false);
   const categoryRef = useRef(null);
+  const [notifTypeOpen, setNotifTypeOpen] = useState(false);
+  const notifTypeRef = useRef(null);
+  const [caseTypeOpen, setCaseTypeOpen] = useState(false);
+  const caseTypeRef = useRef(null);
+  const [diseaseClassHint, setDiseaseClassHint] = useState('');
 
   // Form dropdowns
   const [barangayFormOpen, setBarangayFormOpen] = useState(false);
@@ -695,6 +723,10 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const genderRef = useRef(null);
   const [severityOpen, setSeverityOpen] = useState(false);
   const severityRef = useRef(null);
+  const [subtypeOpen, setSubtypeOpen] = useState(false);
+  const subtypeRef = useRef(null);
+  const [subtypeCustomOpen, setSubtypeCustomOpen] = useState(false);
+  const [subtypeCustomText, setSubtypeCustomText] = useState('');
   const [patientStatusOpen, setPatientStatusOpen] = useState(false);
   const patientStatusRef = useRef(null);
 
@@ -943,7 +975,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           longitude: item.longitude,
         });
       })
-      .catch(err => notify('Accept failed: ' + (err.response?.data?.error || err.message), 'error'));
+      .catch(err => notify(t('Accept failed: ') + (err.response?.data?.error || err.message), 'error'));
   };
 
   const performAddRequestSubmit = async (pendingPayload) => {
@@ -965,8 +997,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         fetchOutbox();
       }
       const routedMsg = ownedUnit && targetUnit && targetUnit !== ownedUnit
-        ? `Case submitted to ${targetUnit} for approval!`
-        : 'Case submitted to your CHO for approval!';
+        ? t('Case submitted to ') + targetUnit + t(' for approval!')
+        : t('Case submitted to your CHO for approval!');
       setSubmitMsg(routedMsg);
       notify(routedMsg, 'success');
       await fetchCases();
@@ -991,12 +1023,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           userId: loggedUserId,
           userName: loggedUser,
         });
-        setSubmitMsg('Case submitted to CHO for approval (offline) - will sync when reconnected.');
-        notify('Submitted to CHO for approval. Will sync when reconnected.', 'info');
+        setSubmitMsg(t('Case submitted to CHO for approval (offline) - will sync when reconnected.'));
+        notify(t('Submitted to CHO for approval. Will sync when reconnected.'), 'info');
         setOfflineMode(true);
         setTimeout(() => { setView('list'); setSubmitMsg(''); setSubmitLoading(false); }, 1800);
       } else {
-        const errMsg = 'Submit failed: ' + (err.response?.data?.error || err.message);
+        const errMsg = t('Submit failed: ') + (err.response?.data?.error || err.message);
         setSubmitMsg(errMsg);
         notify(errMsg, 'error');
       }
@@ -1029,17 +1061,17 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         });
         setView('add');
       })
-      .catch(err => notify('Failed to mark message pending: ' + (err.response?.data?.error || err.message), 'error'));
+      .catch(err => notify(t('Failed to mark message pending: ') + (err.response?.data?.error || err.message), 'error'));
   };
 
   const handleRejectContactMessage = (msg) => {
-    if (!window.confirm(`Reject message from ${msg.name}?`)) return;
+    if (!window.confirm(t('Reject message from ') + msg.name + t('?'))) return;
     axios.put(`${API_URL}/api/contact-messages/${msg.id}/reject`)
       .then(() => {
         fetchContactMessages();
         fetchOutbox();
       })
-      .catch(err => notify('Failed to reject message: ' + (err.response?.data?.error || err.message), 'error'));
+      .catch(err => notify(t('Failed to reject message: ') + (err.response?.data?.error || err.message), 'error'));
   };
 
   const handleMessageToCase = (msg) => {
@@ -1068,7 +1100,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           longitude: null,
         });
       })
-      .catch(err => notify('Failed to add case: ' + (err.response?.data?.error || err.message), 'error'));
+      .catch(err => notify(t('Failed to add case: ') + (err.response?.data?.error || err.message), 'error'));
   };
 
   // ── BHW's OWN EDIT REQUESTS (for BHW Referrals tab) ──
@@ -1145,15 +1177,15 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const handleApproveRegistration = (reg) => {
     axios.put(`${API_URL}/api/pending-registrations/${reg.user_id}/approve`, { actor_id: loggedUserId })
       .then(() => { fetchPendingRegistrations(); })
-      .catch(err => notify('Approve failed: ' + (err.response?.data?.error || err.message), 'error'));
+      .catch(err => notify(t('Approve failed: ') + (err.response?.data?.error || err.message), 'error'));
   };
 
   const handleRejectRegistration = (reg) => {
-    const reason = window.prompt(`Reject registration for ${reg.full_name}? Enter optional reason (or leave blank):`);
+    const reason = window.prompt(t('Reject registration for ') + reg.full_name + t('? Enter optional reason (or leave blank):'));
     if (reason === null) return; // user cancelled
     axios.put(`${API_URL}/api/pending-registrations/${reg.user_id}/reject`, { reason, actor_id: loggedUserId })
       .then(() => { fetchPendingRegistrations(); })
-      .catch(err => notify('Reject failed: ' + (err.response?.data?.error || err.message), 'error'));
+      .catch(err => notify(t('Reject failed: ') + (err.response?.data?.error || err.message), 'error'));
   };
 
   const handleSendEditRequest = async () => {
@@ -1170,6 +1202,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         disease_name: formData.diseaseType,
         age: formData.age,
         severity: formData.severity,
+        case_type: formData.caseType || 'Probable',
+        disease_type: formData.diseaseSubtype || null,
         gender: formData.gender,
         status: formData.status,
         contact: formData.contact,
@@ -1194,16 +1228,18 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           userName: loggedUser,
         });
         setEditRequestSuccess(loggedUser);
+        notify(t('Edit request submitted to CHO (offline - will sync when reconnected)!'), 'success');
         setShowEditRequestForm(false);
         setEditRequestNote('');
       } catch (err) {
-        notify('Failed to queue edit request: ' + err.message, 'error');
+        notify(t('Failed to queue edit request: ') + err.message, 'error');
       }
       return;
     }
     try {
       await axios.post(`${API_URL}/api/cases/${editingCase.case_id}/request-edit`, editPayload);
       setEditRequestSuccess(loggedUser);
+      notify(t('Edit request submitted to CHO!'), 'success');
       setShowEditRequestForm(false);
       setEditRequestNote('');
     } catch (err) {
@@ -1218,14 +1254,15 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             userName: loggedUser,
           });
           setEditRequestSuccess(loggedUser);
+          notify(t('Edit request submitted to CHO (offline - will sync when reconnected)!'), 'success');
           setShowEditRequestForm(false);
           setEditRequestNote('');
         } catch (queueErr) {
-          notify('Failed to queue edit request: ' + queueErr.message, 'error');
+          notify(t('Failed to queue edit request: ') + queueErr.message, 'error');
         }
         return;
       }
-      notify('Failed to send edit request: ' + (err.response?.data?.error || err.message), 'error');
+      notify(t('Failed to send edit request: ') + (err.response?.data?.error || err.message), 'error');
     }
   };
 
@@ -1244,6 +1281,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             disease_name: (proposed && proposed.disease_name) || c.disease_name,
             age: (proposed && proposed.age) || c.age,
             severity: (proposed && proposed.severity) || c.severity,
+            case_type: (proposed && proposed.case_type) || c.case_type,
+            disease_type: (proposed && proposed.disease_type) || c.disease_type,
             gender: (proposed && proposed.gender) || c.gender,
             status: (proposed && proposed.status) || c.status,
             contact: (proposed && proposed.contact) || c.contact,
@@ -1257,16 +1296,16 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             longitude: (proposed && proposed.longitude) || c.longitude,
           });
         } else {
-          notify('Case found, but data not loaded yet. Please refresh.', 'error');
+          notify(t('Case found, but data not loaded yet. Please refresh.'), 'error');
         }
       })
-      .catch(err => notify('Failed to accept edit request: ' + (err.response?.data?.error || err.message), 'error'));
+      .catch(err => notify(t('Failed to accept edit request: ') + (err.response?.data?.error || err.message), 'error'));
   };
 
   const handleRejectEditRequest = (req) => {
     axios.put(`${API_URL}/api/case-edit-requests/${req.id}/reject`)
       .then(() => fetchEditRequests())
-      .catch(err => notify('Failed to reject edit request: ' + (err.response?.data?.error || err.message), 'error'));
+      .catch(err => notify(t('Failed to reject edit request: ') + (err.response?.data?.error || err.message), 'error'));
   };
 
   // ── ADD REQUEST APPROVAL (CHO reviews a BHW-submitted case) ──
@@ -1288,6 +1327,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       diseaseType: req.disease_name || '',
       age: req.age || '',
       severity: req.severity || 'Moderate',
+      caseType: ['Suspected', 'Probable', 'Confirmed'].includes(req.case_type) ? req.case_type : 'Probable',
+      diseaseSubtype: req.disease_type || '',
       gender: req.gender || 'Male',
       status: req.case_status || 'Active',
       contact: req.contact || '',
@@ -1311,7 +1352,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   };
 
   const handleRejectAddRequest = (req) => {
-    const reason = (window.prompt('Reason for rejection (shown to the BHW):', '') || '').trim();
+    const reason = (window.prompt(t('Reason for rejection (shown to the BHW):'), '') || '').trim();
     axios.put(`${API_URL}/api/case-add-requests/${req.id}/reject`, {
       reason: reason || null,
       actor_id: loggedUserId,
@@ -1319,19 +1360,19 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       actor_role: loginRole || 'CHO',
     })
       .then(() => { fetchAddRequests(); })
-      .catch(err => notify('Failed to reject add request: ' + (err.response?.data?.error || err.message), 'error'));
+      .catch(err => notify(t('Failed to reject add request: ') + (err.response?.data?.error || err.message), 'error'));
   };
 
   // ── PASSWORD REQUEST HANDLERS ──
   const handleAcceptPasswordRequest = (req) => {
     axios.put(`${API_URL}/api/password-change-requests/${req.id}/accept`)
       .then(() => { fetchPasswordRequests(); })
-      .catch(err => notify('Failed to accept request: ' + (err.response?.data?.error || err.message), 'error'));
+      .catch(err => notify(t('Failed to accept request: ') + (err.response?.data?.error || err.message), 'error'));
   };
   const handleRejectPasswordRequest = (req) => {
     axios.put(`${API_URL}/api/password-change-requests/${req.id}/reject`)
       .then(() => { fetchPasswordRequests(); })
-      .catch(err => notify('Failed to reject request: ' + (err.response?.data?.error || err.message), 'error'));
+      .catch(err => notify(t('Failed to reject request: ') + (err.response?.data?.error || err.message), 'error'));
   };
 
   const handleRoutingDelete = () => {
@@ -1365,7 +1406,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         to_cho_unit: targetUnit,
         notes: routingDescription || null,
       });
-      setSubmitMsg('Case sent to ' + targetUnit + ' inbox successfully!');
+      setSubmitMsg(t('Case sent to ') + targetUnit + t(' inbox successfully!'));
       setRoutingStep(null);
       setRoutingData(null);
       setRoutingDescription('');
@@ -1374,7 +1415,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       await fetchCases();
       setTimeout(() => { setView('list'); setSubmitMsg(''); setSubmitLoading(false); }, 1200);
     } catch (routeErr) {
-      setSubmitMsg('Error: ' + (routeErr.response?.data?.error || routeErr.message));
+      setSubmitMsg(t('Error') + ': ' + (routeErr.response?.data?.error || routeErr.message));
       setSubmitLoading(false);
     }
   };
@@ -1382,7 +1423,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const handleRejectInboxItem = (item) => {
     axios.put(`${API_URL}/api/case-inbox/${item.id}/reject`)
       .then(() => fetchInbox())
-      .catch(err => notify('Reject failed: ' + (err.response?.data?.error || err.message), 'error'));
+      .catch(err => notify(t('Reject failed: ') + (err.response?.data?.error || err.message), 'error'));
   };
 
   useEffect(() => {
@@ -1449,6 +1490,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       if (categoryRef.current && !categoryRef.current.contains(e.target)) {
         setCategoryOpen(false);
       }
+      if (notifTypeRef.current && !notifTypeRef.current.contains(e.target)) {
+        setNotifTypeOpen(false);
+      }
+      if (caseTypeRef.current && !caseTypeRef.current.contains(e.target)) {
+        setCaseTypeOpen(false);
+      }
       if (barangayFormRef.current && !barangayFormRef.current.contains(e.target)) setBarangayFormOpen(false);
       if (diseaseFormRef.current && !diseaseFormRef.current.contains(e.target)) setDiseaseOpen(false);
       if (statusRef.current && !statusRef.current.contains(e.target)) {
@@ -1459,6 +1506,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       }
       if (severityRef.current && !severityRef.current.contains(e.target)) {
         setSeverityOpen(false);
+      }
+      if (caseTypeRef.current && !caseTypeRef.current.contains(e.target)) {
+        setCaseTypeOpen(false);
+      }
+      if (subtypeRef.current && !subtypeRef.current.contains(e.target)) {
+        setSubtypeOpen(false);
       }
       if (patientStatusRef.current && !patientStatusRef.current.contains(e.target)) {
         setPatientStatusOpen(false);
@@ -1487,7 +1540,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
       request
         .then(() => {
-          setAutoSaveToast('Draft auto-saved at ' + new Date().toLocaleTimeString());
+          notify(t('Draft auto-saved at ') + new Date().toLocaleTimeString(), 'info');
           fetchCases();
         })
         .catch(() => {});
@@ -1719,45 +1772,97 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   };
 
   // ── EXPORT helpers ──
-  const buildExportRows = () => filteredCases.map(c =>
-    `"${c.case_id}","${c.patient_name || ''}","${c.age || ''}","${c.barangay_name || ''}","${c.disease_name || ''}","${c.severity || ''}","${translateStatus(c.status) || ''}","${c.date_reported || ''}"`
-  ).join('\n');
+  const downloadBlob = (blob, filename) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const openPrint = (html) => {
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    setTimeout(() => { try { w.focus(); w.print(); } catch (e) { /* ignore */ } }, 300);
+  };
 
   const handleExportCSV = () => {
-    const headers = 'Case ID,Patient Name,Age,Barangay,Disease,Severity,Status,Date Reported\n';
-    const blob = new Blob([headers + buildExportRows()], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url;
-    a.download = `CDMS_${selectedDisease?.name || 'Cases'}_Export.csv`; a.click();
+    const columns = [t('Case ID'), t('Patient Name'), t('Age'), t('Barangay'), t('Disease'), t('Severity'), t('Case Type'), t('Disease Subtype'), t('Status'), t('Date Reported')];
+    const rows = filteredCases.map(c => [
+      c.case_id, c.patient_name || '', c.age || '', c.barangay_name || '', c.disease_name || '', c.severity || '', c.case_type || '', c.disease_type || '', translateStatus(c.status) || '', c.date_reported || ''
+    ]);
+    const csv = columns.join(',') + '\n' + rows.map(r => `"${r.join('","')}"`).join('\n');
+    setExportPreview({
+      title: t('Preview: CSV Export'),
+      columns,
+      rows,
+      actions: [{
+        label: `⬇ ${t('Download CSV (.csv)')}`,
+        primary: true,
+        onClick: () => {
+          downloadBlob(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' }), `CDMS_${selectedDisease?.name || t('Cases')}_Export.csv`);
+          setExportPreview(null);
+        },
+      }],
+    });
     setShowExportMenu(false);
   };
 
   const handleExportExcel = () => {
-    const headers = 'Case ID\tPatient Name\tAge\tBarangay\tDisease\tSeverity\tStatus\tDate Reported\n';
-    const rows = filteredCases.map(c =>
-      `${c.case_id}\t${c.patient_name || ''}\t${c.age || ''}\t${c.barangay_name || ''}\t${c.disease_name || ''}\t${c.severity || ''}\t${translateStatus(c.status) || ''}\t${c.date_reported || ''}`
-    ).join('\n');
-    const blob = new Blob([headers + rows], { type: 'application/vnd.ms-excel' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url;
-    a.download = `CDMS_${selectedDisease?.name || 'Cases'}_Export.xls`; a.click();
+    const columns = [t('Case ID'), t('Patient Name'), t('Age'), t('Barangay'), t('Disease'), t('Severity'), t('Case Type'), t('Disease Subtype'), t('Status'), t('Date Reported')];
+    const rows = filteredCases.map(c => [
+      c.case_id, c.patient_name || '', c.age || '', c.barangay_name || '', c.disease_name || '', c.severity || '', c.case_type || '', c.disease_type || '', translateStatus(c.status) || '', c.date_reported || ''
+    ]);
+    const tab = columns.join('\t') + '\n' + rows.map(r => r.join('\t')).join('\n');
+    setExportPreview({
+      title: t('Preview: Excel Export'),
+      columns,
+      rows,
+      actions: [{
+        label: `⬇ ${t('Download Excel (.xls)')}`,
+        primary: true,
+        onClick: () => {
+          downloadBlob(new Blob([tab], { type: 'application/vnd.ms-excel' }), `CDMS_${selectedDisease?.name || t('Cases')}_Export.xls`);
+          setExportPreview(null);
+        },
+      }],
+    });
     setShowExportMenu(false);
   };
 
   const handleExportWord = () => {
     const rows = filteredCases.map(c =>
-      `<tr><td>${c.case_id}</td><td>${c.patient_name || ''}</td><td>${c.age || ''}</td><td>${c.barangay_name || ''}</td><td>${c.disease_name || ''}</td><td>${c.severity || ''}</td><td>${c.status || ''}</td></tr>`
+      `<tr><td>${c.case_id}</td><td>${c.patient_name || ''}</td><td>${c.age || ''}</td><td>${c.barangay_name || ''}</td><td>${c.disease_name || ''}</td><td>${c.severity || ''}</td><td>${c.case_type || ''}</td><td>${c.disease_type || ''}</td><td>${translateStatus(c.status) || ''}</td></tr>`
     ).join('');
     const html = `<html><head><meta charset="utf-8"></head><body>
-      <h2>CDMS - ${selectedDisease?.name || 'Cases'} Export</h2>
+      <h2>${t('CDMS - ')}${selectedDisease?.name || t('Cases')}${t(' Export')}</h2>
       <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:13px;">
-        <thead><tr style="background:#1e3a8a;color:white;"><th>ID</th><th>Patient</th><th>Age</th><th>Barangay</th><th>Disease</th><th>Severity</th><th>Status</th></tr></thead>
+        <thead><tr style="background:#1e3a8a;color:white;"><th>${t('ID')}</th><th>${t('Patient')}</th><th>${t('Age')}</th><th>${t('Barangay')}</th><th>${t('Disease')}</th><th>${t('Severity')}</th><th>${t('Case Type')}</th><th>${t('Disease Subtype')}</th><th>${t('Status')}</th></tr></thead>
         <tbody>${rows}</tbody>
       </table></body></html>`;
-    const blob = new Blob(['\ufeff' + html], { type: 'application/msword' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url;
-    a.download = `CDMS_${selectedDisease?.name || 'Cases'}_Export.doc`; a.click();
+    setExportPreview({
+      title: t('Preview: Word Document'),
+      html,
+      actions: [
+        {
+          label: `⬇ ${t('Download Word (.doc)')}`,
+          primary: true,
+          onClick: () => {
+            downloadBlob(new Blob(['\ufeff' + html], { type: 'application/msword' }), `CDMS_${selectedDisease?.name || t('Cases')}_Export.doc`);
+            setExportPreview(null);
+          },
+        },
+        {
+          label: `🖨 ${t('Print / Save as PDF')}`,
+          primary: false,
+          onClick: () => openPrint(html),
+        },
+      ],
+    });
     setShowExportMenu(false);
   };
 
@@ -1794,9 +1899,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       await axios.delete(`${API_URL}/api/cases/${deleteTarget.case_id}`);
       fetchCases();
       setDeleteTarget(null);
-      notify('Case archived successfully!', 'success');
+      notify(t('Case archived successfully!'), 'success');
     } catch (err) {
-      notify('Archive failed: ' + (err.response?.data?.error || err.message), 'error');
+      notify(t('Archive failed: ') + (err.response?.data?.error || err.message), 'error');
     } finally {
       setDeleteLoading(false);
     }
@@ -1820,6 +1925,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       diseaseType: caseItem.disease_name || '',
       age: caseItem.age || '',
       severity: caseItem.severity || 'Mild',
+      caseType: ['Suspected', 'Probable', 'Confirmed'].includes(caseItem.case_type) ? caseItem.case_type : 'Probable',
+      diseaseSubtype: caseItem.disease_type || '',
       gender: caseItem.gender || 'Male',
       status: caseItem.status || 'Active',
       contact: caseItem.contact || '',
@@ -1902,11 +2009,11 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
   const handleAddNewDisease = async () => {
     if (!newDiseaseName.trim()) {
-      setAddDiseaseMsg('Error: Disease name is required.');
+      setAddDiseaseMsg(t('Error') + ': ' + t('Disease name is required.'));
       return;
     }
     if (newDiseaseCategory === '__new__' && !newCategoryName.trim()) {
-      setAddDiseaseMsg('Error: New category name is required.');
+      setAddDiseaseMsg(t('Error') + ': ' + t('New category name is required.'));
       return;
     }
     try {
@@ -1915,6 +2022,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         icon: newDiseaseIcon || '🦠',
         color: newDiseaseColor,
         description: newDiseaseDesc,
+        notif_type: newDiseaseNotifType,
+        case_type: newDiseaseCaseType,
       });
       const entry = {
         id: res.data.id,
@@ -1953,7 +2062,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       }
       ALL_DISEASE_OPTIONS.length = 0;
       ALL_DISEASE_OPTIONS.push(...ALL_DISEASE_ENTRIES.map(d => d.name).sort());
-      setAddDiseaseMsg('✅ Disease added successfully!');
+      setAddDiseaseMsg(t('✅ Disease added successfully!'));
       const addedName = newDiseaseName.trim();
       setNewDiseaseName('');
       setNewDiseaseDesc('');
@@ -1961,18 +2070,21 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       setNewDiseaseColor('#3B82F6');
       setNewDiseaseCategory('all');
       setNewCategoryName('');
+      setNewDiseaseNotifType('weekly');
+      setNewDiseaseCaseType('probable');
+      setDiseaseClassHint('');
       const dres = await axios.get(API_URL + '/api/diseases');
       setAllDiseases(dres.data);
       setTipsList(dres.data);
       cacheDiseases(dres.data).catch(() => {});
-      notify('Disease added!', 'success');
+      notify(t('Disease added!'), 'success');
       emitDiseasesChanged();
       const added = (dres.data || []).find(d => d.name === addedName);
       setAddTipsPrompt(added ? { id: added.id, name: added.name } : { id: null, name: addedName });
       setCarouselIndex(2);
       setAddDiseaseMsg('');
     } catch (err) {
-      setAddDiseaseMsg('Error: ' + (err.response?.data?.error || err.message));
+      setAddDiseaseMsg(t('Error') + ': ' + (err.response?.data?.error || err.message));
     }
   };
 
@@ -1989,6 +2101,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         age: payload.age,
         gender: payload.gender,
         severity: payload.severity,
+        case_type: payload.case_type,
+        disease_type: payload.disease_type,
         status: payload.status,
         contact: payload.contact,
         onset_date: payload.onset_date,
@@ -2013,6 +2127,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         age: payload.age,
         gender: payload.gender,
         severity: payload.severity,
+        case_type: payload.case_type,
+        disease_type: payload.disease_type,
         status: payload.status,
         contact: payload.contact,
         onset_date: payload.onset_date,
@@ -2039,7 +2155,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
     if (!formData.barangayId) {
       setFormErrors({ barangayId: true });
-      setSubmitMsg('Error: Please select an assigned barangay.');
+      notify(t('Please select an assigned barangay.'), 'error');
       setSubmitLoading(false);
       return;
     }
@@ -2070,10 +2186,11 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       if (Object.keys(errors).length > 0) {
         setFormErrors(errors);
         const msgs = [];
-        if (errors.age) msgs.push('Age must be 0–130');
-        if (errors.contact) msgs.push('Use valid PH phone (e.g., 09123456789)');
-        if (errors.onsetDate) msgs.push('Onset date cannot be in the future');
-        setSubmitMsg(msgs.length > 0 ? `Error: ${msgs.join('. ')}.` : 'Error: Please fill in all required fields highlighted in red.');
+        if (errors.age) msgs.push(t('Age must be 0–130'));
+        if (errors.contact) msgs.push(t('Use valid PH phone (e.g., 09123456789)'));
+        if (errors.onsetDate) msgs.push(t('Onset date cannot be in the future'));
+        const errText = msgs.length > 0 ? msgs.join('. ') + '.' : t('Please fill in all required fields highlighted in red.');
+        notify(t('Error') + ': ' + errText, 'error');
         setSubmitLoading(false);
         return;
       }
@@ -2094,6 +2211,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       disease_name: diseaseNameToSave,
       age: formData.age || null,
       severity: formData.severity,
+      case_type: formData.caseType || 'Probable',
+      disease_type: formData.diseaseSubtype || null,
       gender: formData.gender,
       status: isDraft ? 'Draft' : formData.status,
       contact: formData.contact,
@@ -2111,8 +2230,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     if (approvalRequest) {
       try {
         if (!isOnline() || !appOnlineRef.current) {
-          setSubmitMsg('Error: approving an add request requires a connection.');
-          notify('You are offline. Reconnect to approve add requests.', 'error');
+          setSubmitMsg(t('Error') + ': ' + t('approving an add request requires a connection.'));
+          notify(t('You are offline. Reconnect to approve add requests.'), 'error');
           setSubmitLoading(false);
           return;
         }
@@ -2122,16 +2241,16 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           actor_name: loggedUser || 'CHO',
           actor_role: loginRole || 'CHO',
         });
-        setSubmitMsg('Add request approved - case added to records!');
-        notify('Add request approved!', 'success');
+        setSubmitMsg(t('Add request approved - case added to records!'));
+        notify(t('Add request approved!'), 'success');
         setApprovalRequest(null);
         await fetchCases();
         fetchAddRequests();
         setTimeout(() => { setView('inbox'); setSubmitMsg(''); setSubmitLoading(false); setInboxSubTab('add-requests'); }, 1200);
         return;
       } catch (errApproval) {
-        setSubmitMsg('Error: ' + (errApproval.response?.data?.error || errApproval.message));
-        notify('Approval failed: ' + (errApproval.response?.data?.error || errApproval.message), 'error');
+        setSubmitMsg(t('Error') + ': ' + (errApproval.response?.data?.error || errApproval.message));
+        notify(t('Approval failed: ') + (errApproval.response?.data?.error || errApproval.message), 'error');
         setSubmitLoading(false);
         return;
       }
@@ -2151,8 +2270,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           };
           await enqueueOperation(op);
           await applyLocalOfflineCase(op, editingCase);
-          setSubmitMsg('Case saved offline - will sync when reconnected.');
-          notify('Case saved offline - will sync when reconnected.', 'info');
+          setSubmitMsg(t('Case saved offline - will sync when reconnected.'));
+          notify(t('Case saved offline - will sync when reconnected.'), 'info');
         } else if (loginRole === 'BHW' && !isDraft) {
           const op = {
             type: 'add_request',
@@ -2170,8 +2289,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             userName: loggedUser,
           };
           await enqueueOperation(op);
-          setSubmitMsg('Case submitted to CHO for approval (offline) - will sync when reconnected.');
-          notify('Submitted to CHO for approval. Will sync when reconnected.', 'info');
+          setSubmitMsg(t('Case submitted to CHO for approval (offline) - will sync when reconnected.'));
+          notify(t('Submitted to CHO for approval. Will sync when reconnected.'), 'info');
         } else {
           const op = {
             type: 'create',
@@ -2183,8 +2302,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           };
           await enqueueOperation(op);
           await applyLocalOfflineCase(op);
-          setSubmitMsg(isDraft ? 'Draft saved offline - will sync when reconnected.' : 'Case saved offline - will sync when reconnected.');
-          notify(isDraft ? 'Draft saved offline - will sync when reconnected.' : 'Case saved offline - will sync when reconnected.', 'info');
+          setSubmitMsg(isDraft ? t('Draft saved offline - will sync when reconnected.') : t('Case saved offline - will sync when reconnected.'));
+          notify(isDraft ? t('Draft saved offline - will sync when reconnected.') : t('Case saved offline - will sync when reconnected.'), 'info');
         }
         setOfflineMode(true);
         setTimeout(() => { setView('list'); setSubmitMsg(''); setSubmitLoading(false); }, 1800);
@@ -2193,8 +2312,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
       if (editingCase) {
         await axios.put(`${API_URL}/api/cases/${editingCase.case_id}`, payload);
-        setSubmitMsg('Case updated successfully!');
-        notify('Case updated successfully!', 'success');
+        setSubmitMsg(t('Case updated successfully!'));
+        notify(t('Case updated successfully!'), 'success');
       } else if (loginRole === 'BHW' && !isDraft) {
         // BHW adds now go through CHO approval (leader requirement)
         // Cross-unit: confirm when the address belongs to another CHO unit's barangay
@@ -2222,8 +2341,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           fetchOutbox();
         }
         const routedMsg = ownedUnit && targetUnit && targetUnit !== ownedUnit
-          ? `Case submitted to ${targetUnit} for approval!`
-          : 'Case submitted to your CHO for approval!';
+          ? t('Case submitted to ') + targetUnit + t(' for approval!')
+          : t('Case submitted to your CHO for approval!');
         setSubmitMsg(routedMsg);
         notify(routedMsg, 'success');
       } else {
@@ -2239,8 +2358,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           setPendingContactMessageId(null);
           fetchOutbox();
         }
-        setSubmitMsg(isDraft ? 'Case saved as draft!' : 'Case added successfully!');
-        notify(isDraft ? 'Case saved as draft!' : 'Case added successfully!', 'success');
+        setSubmitMsg(isDraft ? t('Case saved as draft!') : t('Case added successfully!'));
+        notify(isDraft ? t('Case saved as draft!') : t('Case added successfully!'), 'success');
       }
       await fetchCases();
       const diseaseEntry = findDiseaseEntry(formData.diseaseType);
@@ -2274,12 +2393,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             await enqueueOperation(op);
             await applyLocalOfflineCase(op);
           }
-          setSubmitMsg('Case saved offline - will sync when reconnected.');
+          setSubmitMsg(t('Case saved offline - will sync when reconnected.'));
           setOfflineMode(true);
           setTimeout(() => { setView('list'); setSubmitMsg(''); setSubmitLoading(false); }, 1800);
         } catch (queueErr) {
-          setSubmitMsg('Error saving offline: ' + queueErr.message);
-          notify('Error saving offline: ' + queueErr.message, 'error');
+          setSubmitMsg(t('Error saving offline: ') + queueErr.message);
+          notify(t('Error saving offline: ') + queueErr.message, 'error');
           setSubmitLoading(false);
         }
         return;
@@ -2296,20 +2415,20 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               from_cho_unit: (loginRole === 'BHW' && loginBarangay ? getChoUnitForBarangay(loginBarangay) : sessionContext) || null,
               target_barangay_name: detectedBarangay,
             });
-            setSubmitMsg('Case sent to ' + detectedBarangay + ' BHW inbox successfully!');
-          notify('Case sent to ' + detectedBarangay + ' BHW inbox successfully!', 'success');
+            setSubmitMsg(t('Case sent to ') + detectedBarangay + t(' BHW inbox successfully!'));
+            notify(t('Case sent to ') + detectedBarangay + t(' BHW inbox successfully!'), 'success');
             await fetchCases();
             const diseaseEntry = findDiseaseEntry(formData.diseaseType);
             if (diseaseEntry) { setSelectedDisease(diseaseEntry); setSelectedCategory(null); setCategoryPage(0); }
             setTimeout(() => { setView('list'); setSubmitMsg(''); setSubmitLoading(false); }, 1200);
           } catch (routeErr) {
-            setSubmitMsg('Error: ' + (routeErr.response?.data?.error || routeErr.message));
-            notify('Error: ' + (routeErr.response?.data?.error || routeErr.message), 'error');
+            setSubmitMsg(t('Error') + ': ' + (routeErr.response?.data?.error || routeErr.message));
+            notify(t('Error') + ': ' + (routeErr.response?.data?.error || routeErr.message), 'error');
             setSubmitLoading(false);
           }
         } else {
-          setSubmitMsg('Please select the correct assigned barangay.');
-          notify('Please select the correct assigned barangay.', 'error');
+          setSubmitMsg(t('Please select the correct assigned barangay.'));
+          notify(t('Please select the correct assigned barangay.'), 'error');
           setSubmitLoading(false);
         }
         return;
@@ -2321,8 +2440,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         setSubmitLoading(false);
         return;
       }
-      setSubmitMsg('Error: ' + (err.response?.data?.error || err.message));
-      notify('Error: ' + (err.response?.data?.error || err.message), 'error');
+      setSubmitMsg(t('Error') + ': ' + (err.response?.data?.error || err.message));
+      notify(t('Error') + ': ' + (err.response?.data?.error || err.message), 'error');
       setSubmitLoading(false);
     }
   };
@@ -2346,9 +2465,18 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     const gridCategories = DISEASE_CATEGORIES.filter(c => c.id !== 'exclusive');
     const builtinCategories = gridCategories.filter(c => !String(c.id).startsWith('custom-'));
     const totalCategoryPages = Math.ceil(builtinCategories.length / CATEGORIES_PER_PAGE);
-    const currentCategories = builtinCategories.slice(categoryPage * CATEGORIES_PER_PAGE, (categoryPage + 1) * CATEGORIES_PER_PAGE);
+    const currentCategories = [
+      ...builtinCategories.filter(c => c.id === 'all'),
+      { id: 'notif-immediate', name: t('🕐 Immediate Diseases'), icon: '🕐', color: '#DC2626', desc: t('Report within 24 hours (Level 1 IDSR)'), diseases: ALL_DISEASE_ENTRIES.filter(e => notifTypeForEntry(e, allDiseases) === 'immediate') },
+      { id: 'notif-weekly', name: t('🗓️ Weekly Diseases'), icon: '🗓️', color: '#129968', desc: t('Included in the consolidated weekly summary (Level 2 FHSIS)'), diseases: ALL_DISEASE_ENTRIES.filter(e => notifTypeForEntry(e, allDiseases) === 'weekly') },
+      ...builtinCategories.filter(c => c.id !== 'all').slice(categoryPage * CATEGORIES_PER_PAGE, (categoryPage + 1) * CATEGORIES_PER_PAGE),
+    ];
 
-    const category = selectedCategory ? DISEASE_CATEGORIES.find(c => c.id === selectedCategory) : null;
+    const category = selectedCategory
+      ? ([{ id: 'notif-immediate', name: t('🕐 Immediate Diseases'), icon: '🕐', color: '#DC2626', desc: t('Report within 24 hours (Level 1 IDSR)'), diseases: ALL_DISEASE_ENTRIES.filter(e => notifTypeForEntry(e, allDiseases) === 'immediate') },
+          { id: 'notif-weekly', name: t('🗓️ Weekly Diseases'), icon: '🗓️', color: '#129968', desc: t('Included in the consolidated weekly summary (Level 2 FHSIS)'), diseases: ALL_DISEASE_ENTRIES.filter(e => notifTypeForEntry(e, allDiseases) === 'weekly') }].find(c => c.id === selectedCategory)
+        || DISEASE_CATEGORIES.find(c => c.id === selectedCategory))
+      : null;
     const diseaseEntries = category ? category.diseases : [];
     const totalDiseasePages = Math.ceil(diseaseEntries.length / DISEASES_PER_PAGE);
     const currentDiseases = diseaseEntries.slice(diseasePage * DISEASES_PER_PAGE, (diseasePage + 1) * DISEASES_PER_PAGE);
@@ -2453,16 +2581,16 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           {offlineMode && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '15px', color: '#D97706' }}>
               <span style={{ fontSize: '16px' }}>⚠</span>
-              Offline - showing cached data. Changes will sync when reconnected.
+              {t('Offline - showing cached data. Changes will sync when reconnected.')}
             </div>
           )}
-          <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>Dashboard / Manage Cases / Other Categories</div>
+          <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>{t('Dashboard / Manage Cases / Other Categories')}</div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
             <div>
-              <h2 style={{ margin: '0 0 4px 0', fontSize: '22px' }}>Other Categories</h2>
-              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '15px' }}>All disease categories in the system</p>
+              <h2 style={{ margin: '0 0 4px 0', fontSize: '22px' }}>{t('Other Categories')}</h2>
+              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '15px' }}>{t('All disease categories in the system')}</p>
             </div>
-            <BackButton onClick={() => setBrowseAllCategories(false)}>Back</BackButton>
+            <BackButton onClick={() => setBrowseAllCategories(false)}>{t('Back')}</BackButton>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: compactMode ? '12px' : '16px' }}>
             {gridCategories.map(cat => renderCategoryCard(cat))}
@@ -2478,16 +2606,16 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           {offlineMode && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '15px', color: '#D97706' }}>
               <span style={{ fontSize: '16px' }}>⚠</span>
-              Offline - showing cached data. Changes will sync when reconnected.
+              {t('Offline - showing cached data. Changes will sync when reconnected.')}
             </div>
           )}
-          <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>Dashboard / Manage Cases / Other Exclusive Diseases</div>
+          <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>{t('Dashboard / Manage Cases / Other Exclusive Diseases')}</div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
             <div>
-              <h2 style={{ margin: '0 0 4px 0', fontSize: '22px' }}>⚠️ Other Exclusive Diseases</h2>
+              <h2 style={{ margin: '0 0 4px 0', fontSize: '22px' }}>{t('⚠️ Other Exclusive Diseases')}</h2>
               <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '15px' }}>{exclusiveCat?.desc}</p>
             </div>
-            <BackButton onClick={() => setBrowseAllExclusive(false)}>Back</BackButton>
+            <BackButton onClick={() => setBrowseAllExclusive(false)}>{t('Back')}</BackButton>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: compactMode ? '12px' : '16px' }}>
             {(exclusiveCat?.diseases || []).map(d => renderDiseaseCard(d, false))}
@@ -2501,25 +2629,25 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         {offlineMode && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '15px', color: '#D97706' }}>
             <span style={{ fontSize: '16px' }}>⚠</span>
-            Offline - showing cached data. Changes will sync when reconnected.
+            {t('Offline - showing cached data. Changes will sync when reconnected.')}
           </div>
         )}
         <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>
-          Dashboard / Manage Cases {category ? `/ ${category.name}` : ''}
+          {t('Dashboard / Manage Cases')} {category ? `/ ${category.name}` : ''}
         </div>
         <div style={{ textAlign: 'center', marginBottom: '16px' }}>
           {category ? (
             <div>
               <h2 style={{ margin: '0 0 4px 0', fontSize: '22px' }}>{category.icon} {category.name}</h2>
               <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '15px' }}>
-                Select a disease to view, add, or manage cases
+                {t('Select a disease to view, add, or manage cases')}
               </p>
             </div>
           ) : (
             <div>
-              <h2 style={{ margin: '0 0 4px 0', fontSize: '22px' }}>Select a Disease to Manage</h2>
+              <h2 style={{ margin: '0 0 4px 0', fontSize: '22px' }}>{t('Select a Disease to Manage')}</h2>
               <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '15px' }}>
-                Choose a category then a disease program
+                {t('Choose a category then a disease program')}
               </p>
             </div>
           )}
@@ -2529,26 +2657,26 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
               <div onClick={() => { setView('inbox'); setInboxSubTab('referrals'); }}
                 style={{ padding: '6px 14px', borderRadius: '20px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '15px', fontWeight: '500', color: 'var(--text-main)', whiteSpace: 'nowrap', textAlign: 'center', minWidth: '70px' }}>
-                Inbox
+                {t('Inbox')}
               </div>
               <div onClick={() => { setView('outbox'); }}
                 style={{ padding: '6px 14px', borderRadius: '20px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '15px', fontWeight: '500', color: 'var(--text-main)', whiteSpace: 'nowrap', textAlign: 'center', minWidth: '70px' }}>
-                Outbox
+                {t('Outbox')}
               </div>
             </div>
             {category && (
-              <BackButton style={{ alignSelf: 'flex-end' }} onClick={() => { setSelectedCategory(null); setCategoryPage(0); setDiseasePage(0); setCarouselIndex(0); setBrowseAllCategories(false); setBrowseAllExclusive(false); }}>Back to Categories</BackButton>
+              <BackButton style={{ alignSelf: 'flex-end' }} onClick={() => { setSelectedCategory(null); setCategoryPage(0); setDiseasePage(0); setCarouselIndex(0); setBrowseAllCategories(false); setBrowseAllExclusive(false); }}>{t('Back to Categories')}</BackButton>
             )}
             {category && showDiseasePagination && (
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <span style={{ color: 'var(--text-muted)', fontSize: '15px' }}>Page {diseasePage + 1} / {totalDiseasePages}</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: '15px' }}>{t('Page ') + (diseasePage + 1) + ' / ' + totalDiseasePages}</span>
                 <button onClick={() => setDiseasePage(Math.max(0, diseasePage - 1))} disabled={diseasePage === 0}
                   style={{ padding: '7px 16px', background: diseasePage === 0 ? 'var(--input-bg)' : '#121358', color: diseasePage === 0 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: diseasePage === 0 ? 'not-allowed' : 'pointer', fontSize: '15px' }}>
-                  ← Prev
+                  {t('← Prev')}
                 </button>
                 <button onClick={() => setDiseasePage(Math.min(totalDiseasePages - 1, diseasePage + 1))} disabled={diseasePage >= totalDiseasePages - 1}
                   style={{ padding: '7px 16px', background: diseasePage >= totalDiseasePages - 1 ? 'var(--input-bg)' : '#121358', color: diseasePage >= totalDiseasePages - 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: diseasePage >= totalDiseasePages - 1 ? 'not-allowed' : 'pointer', fontSize: '15px' }}>
-                  Next →
+                  {t('Next →')}
                 </button>
               </div>
             )}
@@ -2562,11 +2690,11 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     </button>
                     {showShortcutsGuide && (
                       <div style={{ position: 'absolute', top: '110%', right: 0, width: '240px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', padding: '14px', fontSize: '15px' }}>
-                        <div style={{ fontWeight: '700', marginBottom: '10px', color: 'var(--text-main)' }}>Keyboard Shortcuts</div>
+<div style={{ fontWeight: '700', marginBottom: '10px', color: 'var(--text-main)' }}>{t('Keyboard Shortcuts')}</div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>New Case</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '15px', border: '1px solid var(--border-color)' }}>N</kbd></div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>Save Form</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '15px', border: '1px solid var(--border-color)' }}>Ctrl+S</kbd></div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>Close / Back</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '15px', border: '1px solid var(--border-color)' }}>Esc</kbd></div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>{t('New Case')}</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '15px', border: '1px solid var(--border-color)' }}>N</kbd></div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>{t('Save Form')}</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '15px', border: '1px solid var(--border-color)' }}>Ctrl+S</kbd></div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>{t('Close / Back')}</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '15px', border: '1px solid var(--border-color)' }}>Esc</kbd></div>
                         </div>
                       </div>
                     )}
@@ -2596,9 +2724,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             <div key={carouselIndex} className="cdms-carousel-slide" style={{ textAlign: 'center' }}>
               {carouselIndex === 0 && (
                 <div>
-                  <h3 style={{ margin: '0 0 6px 0', fontSize: '17px', color: 'var(--text-main)' }}>📋 All Diseases & Categories</h3>
+                  <h3 style={{ margin: '0 0 6px 0', fontSize: '17px', color: 'var(--text-main)' }}>{t('📋 All Diseases & Categories')}</h3>
                   <p style={{ margin: '0 0 14px 0', fontSize: '15px', color: 'var(--text-muted)' }}>
-                    Browse all disease categories below, or use the ◀ ▶ arrows for exclusive diseases and to add a new one.
+                    {t('Browse all disease categories below, or use the ◀ ▶ arrows for exclusive diseases and to add a new one.')}
                   </p>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: compactMode ? '12px' : '16px', textAlign: 'left', maxWidth: '900px', margin: '0 auto' }}>
                     {currentCategories.map(cat => renderCategoryCard(cat))}
@@ -2615,7 +2743,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     <div style={{ textAlign: 'center', marginTop: '16px' }}>
                       <button onClick={() => setBrowseAllCategories(true)}
                         style={{ padding: '10px 20px', background: '#121358', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
-                        More Categories
+                        {t('More Categories')}
                       </button>
                     </div>
                   )}
@@ -2625,7 +2753,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 const exclusiveCat = DISEASE_CATEGORIES.find(c => c.id === 'exclusive');
                 return (
                   <div>
-                    <h3 style={{ margin: '0 0 6px 0', fontSize: '15px', color: 'var(--text-main)' }}>⚠️ Exclusive Diseases</h3>
+                    <h3 style={{ margin: '0 0 6px 0', fontSize: '15px', color: 'var(--text-main)' }}>{t('⚠️ Exclusive Diseases')}</h3>
                     <p style={{ margin: '0 0 14px 0', fontSize: '15px', color: 'var(--text-muted)' }}>{exclusiveCat?.desc}</p>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', textAlign: 'left', maxWidth: '760px', margin: '0 auto' }}>
                       {(exclusiveCat?.diseases || []).slice(0, 6).map(d => (
@@ -2655,7 +2783,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       <div style={{ textAlign: 'center', marginTop: '16px' }}>
                         <button onClick={() => { setBrowseAllExclusive(true); }}
                           style={{ padding: '10px 20px', background: '#121358', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
-                          Other Exclusive Diseases
+                          {t('Other Exclusive Diseases')}
                         </button>
                       </div>
                     )}
@@ -2665,24 +2793,34 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               {carouselIndex === 2 && (
                 <div style={{ maxWidth: '760px', margin: '0 auto', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '20px' }}>
                   <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '22px 24px', boxShadow: '0 2px 10px rgba(0,0,0,0.04)' }}>
-                  <h3 style={{ margin: '0 0 12px 0', fontSize: '17px', color: 'var(--text-main)', textAlign: 'center' }}>➕ Add New Disease</h3>
+                  <h3 style={{ margin: '0 0 12px 0', fontSize: '17px', color: 'var(--text-main)', textAlign: 'center' }}>{t('➕ Add New Disease')}</h3>
                   {addDiseaseMsg && (
                     <div style={{ padding: '8px 12px', marginBottom: '10px', borderRadius: '6px', fontSize: '15px', background: addDiseaseMsg.startsWith('Error') ? '#fee2e2' : '#d1f5e9', color: addDiseaseMsg.startsWith('Error') ? '#991b1b' : '#0a5e42' }}>
                       {addDiseaseMsg}
                     </div>
                   )}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                    <input type="text" placeholder="Disease name" value={newDiseaseName}
-                      onChange={e => setNewDiseaseName(e.target.value)}
+                    <input type="text" placeholder={t('Disease name')} value={newDiseaseName}
+                      onChange={e => {
+                        setNewDiseaseName(e.target.value);
+                        const match = (allDiseases || []).find(d => String(d.name).toLowerCase() === e.target.value.trim().toLowerCase());
+                        if (match && match.notif_type && match.case_type) {
+                          setNewDiseaseNotifType(match.notif_type);
+                          setNewDiseaseCaseType(match.case_type);
+                          setDiseaseClassHint(t('Pre-filled from existing disease record.'));
+                        } else {
+                          setDiseaseClassHint('');
+                        }
+                      }}
                       style={{ padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px' }} />
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 10px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)' }}>
-                      <label style={{ fontSize: '15px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Color</label>
+                      <label style={{ fontSize: '15px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{t('Color')}</label>
                       <input type="color" value={newDiseaseColor}
                         onChange={e => setNewDiseaseColor(e.target.value)}
                         style={{ width: '100%', height: '32px', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }} />
                     </div>
                   </div>
-                  <label style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>Icon</label>
+                  <label style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>{t('Icon')}</label>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', maxHeight: '132px', overflowY: 'auto', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', marginBottom: '12px' }}>
                     {DISEASE_ICON_CHOICES.map(c => {
                       const active = newDiseaseIcon === c.key;
@@ -2707,9 +2845,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     <div style={{ position: 'relative' }} ref={categoryRef}>
                       <button className="mc-custom-dropdown-btn" style={{ width: '100%' }} onClick={() => setCategoryOpen(!categoryOpen)}>
                         <span>
-                          {newDiseaseCategory === '__new__' ? '➕ Add new category...'
-                            : newDiseaseCategory === 'all' ? 'All Diseases'
-                            : (DISEASE_CATEGORIES.find(c => c.id === newDiseaseCategory)?.name || 'All Diseases')}
+                          {newDiseaseCategory === '__new__' ? t('➕ Add new category...')
+                            : newDiseaseCategory === 'all' ? t('All Diseases')
+                            : (DISEASE_CATEGORIES.find(c => c.id === newDiseaseCategory)?.name || t('All Diseases'))}
                         </span>
                         <span style={{ marginLeft: '6px', opacity: 0.6, transition: 'transform 0.2s', display: 'inline-block', transform: categoryOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                       </button>
@@ -2719,7 +2857,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                             className={`mc-custom-dropdown-item ${newDiseaseCategory === 'all' ? 'mc-custom-dropdown-item--active' : ''}`}
                             onClick={() => { setNewDiseaseCategory('all'); setCategoryOpen(false); }}
                           >
-                            All Diseases
+                            {t('All Diseases')}
                           </div>
                           {DISEASE_CATEGORIES.filter(c => c.id !== 'all').map(c => (
                             <div
@@ -2734,19 +2872,60 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                             className={`mc-custom-dropdown-item ${newDiseaseCategory === '__new__' ? 'mc-custom-dropdown-item--active' : ''}`}
                             onClick={() => { setNewDiseaseCategory('__new__'); setCategoryOpen(false); }}
                           >
-                            ➕ Add new category...
+                            {t('➕ Add new category...')}
                           </div>
                         </div>
                       )}
                     </div>
-                    <textarea placeholder="Short description" value={newDiseaseDesc} rows={1}
+                    <textarea placeholder={t('Short description')} value={newDiseaseDesc} rows={1}
                       onChange={e => setNewDiseaseDesc(e.target.value)}
                       style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px', boxSizing: 'border-box', resize: 'vertical' }} />
                   </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                    <div style={{ position: 'relative' }} ref={notifTypeRef}>
+                      <button className="mc-custom-dropdown-btn" style={{ width: '100%' }} type="button" onClick={() => { setNotifTypeOpen(!notifTypeOpen); setCaseTypeOpen(false); }}>
+                        <span>{newDiseaseNotifType === 'immediate' ? t('Immediate (report within 24h)') : t('Weekly (consolidated summary)')}</span>
+                        <span style={{ marginLeft: '6px', opacity: 0.6, transition: 'transform 0.2s', display: 'inline-block', transform: notifTypeOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                      </button>
+                      {notifTypeOpen && (
+                        <div className="mc-custom-dropdown-panel">
+                          <div className={`mc-custom-dropdown-item ${newDiseaseNotifType === 'immediate' ? 'mc-custom-dropdown-item--active' : ''}`}
+                            onClick={() => { setNewDiseaseNotifType('immediate'); setNotifTypeOpen(false); }}>
+                            {t('Immediate (report within 24h)')}
+                          </div>
+                          <div className={`mc-custom-dropdown-item ${newDiseaseNotifType === 'weekly' ? 'mc-custom-dropdown-item--active' : ''}`}
+                            onClick={() => { setNewDiseaseNotifType('weekly'); setNotifTypeOpen(false); }}>
+                            {t('Weekly (consolidated summary)')}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ position: 'relative' }} ref={caseTypeRef}>
+                      <button className="mc-custom-dropdown-btn" style={{ width: '100%' }} type="button" onClick={() => { setCaseTypeOpen(!caseTypeOpen); setNotifTypeOpen(false); }}>
+                        <span>{newDiseaseCaseType === 'probable' ? t('Probable (not lab-confirmed)') : t('Confirmed (lab-confirmed)')}</span>
+                        <span style={{ marginLeft: '6px', opacity: 0.6, transition: 'transform 0.2s', display: 'inline-block', transform: caseTypeOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                      </button>
+                      {caseTypeOpen && (
+                        <div className="mc-custom-dropdown-panel">
+                          <div className={`mc-custom-dropdown-item ${newDiseaseCaseType === 'probable' ? 'mc-custom-dropdown-item--active' : ''}`}
+                            onClick={() => { setNewDiseaseCaseType('probable'); setCaseTypeOpen(false); }}>
+                            {t('Probable (not lab-confirmed)')}
+                          </div>
+                          <div className={`mc-custom-dropdown-item ${newDiseaseCaseType === 'confirmed' ? 'mc-custom-dropdown-item--active' : ''}`}
+                            onClick={() => { setNewDiseaseCaseType('confirmed'); setCaseTypeOpen(false); }}>
+                            {t('Confirmed (lab-confirmed)')}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {diseaseClassHint && (
+                    <div style={{ fontSize: '15px', color: '#0d9488', marginBottom: '12px' }}>{diseaseClassHint}</div>
+                  )}
                   {newDiseaseCategory === '__new__' && (
                     <div style={{ marginBottom: '12px' }}>
-                      <label style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>New category name</label>
-                      <input type="text" placeholder="e.g. Rare Diseases" value={newCategoryName}
+                      <label style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>{t('New category name')}</label>
+                      <input type="text" placeholder={t('e.g. Rare Diseases')} value={newCategoryName}
                         onChange={e => setNewCategoryName(e.target.value)}
                         style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px' }} />
                     </div>
@@ -2754,34 +2933,34 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   <div style={{ textAlign: 'center' }}>
                     <button onClick={handleAddNewDisease}
                       style={{ padding: '10px 24px', background: '#129968', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
-                      Save Disease
+                      {t('Save Disease')}
                     </button>
                   </div>
                   </div>
 
                   <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '22px 24px', boxShadow: '0 2px 10px rgba(0,0,0,0.04)' }}>
-                    <h3 style={{ margin: '0 0 6px 0', fontSize: '17px', color: 'var(--text-main)', textAlign: 'center' }}>➕ Add / Edit Prevention Tips</h3>
-                    <p style={{ margin: '0 0 14px 0', color: 'var(--text-muted)', fontSize: '14px', textAlign: 'center' }}>Select a disease, then add or edit its prevention tips, symptom-checker questions, and video.</p>
+                    <h3 style={{ margin: '0 0 6px 0', fontSize: '17px', color: 'var(--text-main)', textAlign: 'center' }}>{t('➕ Add / Edit Prevention Tips')}</h3>
+                    <p style={{ margin: '0 0 14px 0', color: 'var(--text-muted)', fontSize: '14px', textAlign: 'center' }}>{t('Select a disease, then add or edit its prevention tips, symptom-checker questions, and video.')}</p>
                     {box2Msg && (
                       <div style={{ padding: '8px 12px', marginBottom: '10px', borderRadius: '6px', fontSize: '15px', background: box2Msg.startsWith('Error') ? '#fee2e2' : '#d1f5e9', color: box2Msg.startsWith('Error') ? '#991b1b' : '#0a5e42' }}>
                         {box2Msg}
                       </div>
                     )}
                     <div style={{ marginBottom: '12px' }}>
-                      <label style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '6px' }}>Disease</label>
+                      <label style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '6px' }}>{t('Disease')}</label>
                       <div style={{ position: 'relative' }} ref={box2DiseaseRef}>
                         <button className="mc-custom-dropdown-btn" style={{ width: '100%' }} onClick={() => setBox2DiseaseOpen(!box2DiseaseOpen)}>
                           <span>
                             {box2DiseaseId
-                              ? (allDiseases.find(d => String(d.id) === String(box2DiseaseId))?.name || 'Select a disease...')
-                              : 'Select a disease...'}
+                              ? (allDiseases.find(d => String(d.id) === String(box2DiseaseId))?.name || t('Select a disease...'))
+                              : t('Select a disease...')}
                           </span>
                           <span style={{ marginLeft: '6px', opacity: 0.6, transition: 'transform 0.2s', display: 'inline-block', transform: box2DiseaseOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                         </button>
                         {box2DiseaseOpen && (
                           <div className="mc-custom-dropdown-panel" style={{ maxHeight: '260px', overflowY: 'auto' }}>
                             {allDiseases.length === 0 && (
-                              <div className="mc-custom-dropdown-item mc-custom-dropdown-item--active">No diseases</div>
+                              <div className="mc-custom-dropdown-item mc-custom-dropdown-item--active">{t('No diseases')}</div>
                             )}
                             {allDiseases.map(d => (
                               <div
@@ -2789,7 +2968,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                                 className={`mc-custom-dropdown-item ${String(d.id) === String(box2DiseaseId) ? 'mc-custom-dropdown-item--active' : ''}`}
                                 onClick={() => { loadBox2(d.id); setBox2DiseaseOpen(false); }}
                               >
-                                {d.name}{d.active ? '' : ' (hidden)'}
+                                {d.name}{d.active ? '' : t(' (hidden)')}
                               </div>
                             ))}
                           </div>
@@ -2798,19 +2977,19 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       <div>
-                        <label style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '6px' }}>Prevention Tips <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>(one per line)</span></label>
+                        <label style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '6px' }}>{t('Prevention Tips')} <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>{t('(one per line)')}</span></label>
                         <textarea value={box2Tips} onChange={e => setBox2Tips(e.target.value)} rows={5}
-                          placeholder="Type prevention tips here, one per line..."
+                          placeholder={t('Type prevention tips here, one per line...')}
                           style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontFamily: 'var(--sans)', fontSize: '15px', resize: 'vertical' }} />
                       </div>
                       <div>
-                        <label style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '6px' }}>Symptom Checker Questions <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>(one per line)</span></label>
+                        <label style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '6px' }}>{t('Symptom Checker Questions')} <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>{t('(one per line)')}</span></label>
                         <textarea value={box2Symptoms} onChange={e => setBox2Symptoms(e.target.value)} rows={3}
-                          placeholder="Type symptom-checker questions here, one per line..."
+                          placeholder={t('Type symptom-checker questions here, one per line...')}
                           style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontFamily: 'var(--sans)', fontSize: '15px', resize: 'vertical' }} />
                       </div>
                       <div>
-                        <label style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '6px' }}>External Video URL <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>(optional)</span></label>
+                        <label style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '6px' }}>{t('External Video URL')} <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>{t('(optional)')}</span></label>
                         <input type="url" value={box2Video} onChange={e => setBox2Video(e.target.value)}
                           placeholder="https://..."
                           style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px', outline: 'none' }} />
@@ -2819,11 +2998,11 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     <div style={{ display: 'flex', gap: '0', marginTop: '16px' }}>
                       <button onClick={saveBox2Tips} disabled={box2Saving}
                         style={{ flex: 1, padding: '12px', background: '#129968', border: 'none', borderRight: '1px solid var(--bg-main)', cursor: box2Saving ? 'not-allowed' : 'pointer', fontSize: '15px', fontWeight: '600', color: '#fff', borderRadius: '8px 0 0 8px' }}>
-                        {box2Saving ? 'Saving...' : '💾 Save Prevention Tips'}
+                        {box2Saving ? t('Saving...') : t('💾 Save Prevention Tips')}
                       </button>
                       <button onClick={openTipsManager}
                         style={{ flex: 1, padding: '12px', background: 'var(--success-bg)', color: 'var(--success-text)', border: '1px solid var(--success-border)', borderLeft: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: '600', borderRadius: '0 8px 8px 0' }}>
-                        ✏️ Manage Prevention Tips
+                        {t('✏️ Manage Prevention Tips')}
                       </button>
                     </div>
                   </div>
@@ -2836,16 +3015,16 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         <div style={{ position: 'fixed', left: r ? r.left : 0, top: r ? r.top : 0, width: r ? r.width : '100%', height: r ? r.height : '100%', background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10050 }}>
                           <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '26px 28px', maxWidth: '440px', width: '92%', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', textAlign: 'center' }}>
                             <div style={{ fontSize: '34px', marginBottom: '10px' }}>🦠</div>
-                            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '700', color: 'var(--text-main)' }}>Add prevention tips for &quot;{addTipsPrompt.name}&quot;?</h3>
-                            <p style={{ margin: '0 0 18px 0', color: 'var(--text-muted)', fontSize: '15px' }}>You can add prevention tips now, or later from the &quot;Add / Edit Prevention Tips&quot; box below.</p>
+                            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '700', color: 'var(--text-main)' }}>{t('Add prevention tips for "')}{addTipsPrompt.name}{t('"?')}</h3>
+                            <p style={{ margin: '0 0 18px 0', color: 'var(--text-muted)', fontSize: '15px' }}>{t('You can add prevention tips now, or later from the "Add / Edit Prevention Tips" box below.')}</p>
                             <div style={{ display: 'flex', gap: '10px' }}>
                               <button onClick={() => { if (addTipsPrompt.id) { setBox2DiseaseId(String(addTipsPrompt.id)); loadBox2(addTipsPrompt.id); } setAddTipsPrompt(null); }}
                                 style={{ flex: 1, padding: '12px', background: '#129968', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
-                                Yes, add tips
+                                {t('Yes, add tips')}
                               </button>
                               <button onClick={() => setAddTipsPrompt(null)}
                                 style={{ flex: 1, padding: '12px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
-                                Not now
+                                {t('Not now')}
                               </button>
                             </div>
                           </div>
@@ -2859,7 +3038,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             </div>
 
             {/* Left / Right carousel controls */}
-            <button onClick={() => changeCarousel(-1)} title="Previous" className="cdms-carousel-arrow"
+            <button onClick={() => changeCarousel(-1)} title={t('Previous')} className="cdms-carousel-arrow"
               style={{
                 position: 'absolute', top: '50%', left: '-18px', transform: 'translateY(-50%)',
                 width: '36px', height: '36px', borderRadius: '50%', background: '#121358',
@@ -2869,7 +3048,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               }}>
               ◀
             </button>
-            <button onClick={() => changeCarousel(1)} title="Next" className="cdms-carousel-arrow"
+            <button onClick={() => changeCarousel(1)} title={t('Next')} className="cdms-carousel-arrow"
               style={{
                 position: 'absolute', top: '50%', right: '-18px', transform: 'translateY(-50%)',
                 width: '36px', height: '36px', borderRadius: '50%', background: '#121358',
@@ -2903,14 +3082,14 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 <div className="cdms-modal-card" onClick={e => e.stopPropagation()} style={{ background: 'var(--bg-surface)', borderRadius: '16px', padding: '28px 28px', width: '560px', maxHeight: '82vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
                     <span style={{ fontSize: '26px' }}>{tipsEditor.icon}</span>
-                    <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: 'var(--text-main)' }}>Edit Prevention - {tipsEditor.name}</h3>
+                    <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: 'var(--text-main)' }}>{t('Edit Prevention - ')}{tipsEditor.name}</h3>
                   </div>
                   {tipsMsg && (
                     <div style={{ padding: '10px 12px', marginBottom: '14px', borderRadius: '6px', fontSize: '15px', background: tipsMsg.startsWith('Error') ? 'var(--error-bg, #fee2e2)' : '#d1f5e9', color: tipsMsg.startsWith('Error') ? '#991b1b' : '#0a5e42' }}>{tipsMsg}</div>
                   )}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     <div>
-                      <label style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '6px' }}>Prevention Tips <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>(one per line)</span></label>
+                      <label style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '6px' }}>{t('Prevention Tips')} <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>{t('(one per line)')}</span></label>
                       <textarea
                         value={tipsEditor.preventionTips}
                         onChange={e => setTipsEditor({ ...tipsEditor, preventionTips: e.target.value })}
@@ -2919,7 +3098,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       />
                     </div>
                     <div>
-                      <label style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '6px' }}>Symptom Checker Questions <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>(one per line)</span></label>
+                      <label style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '6px' }}>{t('Symptom Checker Questions')} <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>{t('(one per line)')}</span></label>
                       <textarea
                         value={tipsEditor.symptoms}
                         onChange={e => setTipsEditor({ ...tipsEditor, symptoms: e.target.value })}
@@ -2928,7 +3107,17 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       />
                     </div>
                     <div>
-                      <label style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '6px' }}>External Video URL <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>(optional)</span></label>
+                      <label style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '6px' }}>{t('Disease Subtypes')} <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>{t('(one per line — shown as dropdown options on the case form)')}</span></label>
+                      <textarea
+                        value={tipsEditor.subtypes || ''}
+                        onChange={e => setTipsEditor({ ...tipsEditor, subtypes: e.target.value })}
+                        rows={3}
+                        placeholder={t('e.g. Dengue Fever (without warning signs)')}
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontFamily: 'var(--sans)', fontSize: '15px', boxSizing: 'border-box', resize: 'vertical' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '6px' }}>{t('External Video URL')} <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>{t('(optional)')}</span></label>
                       <input
                         type="url"
                         value={tipsEditor.videoUrl}
@@ -2941,11 +3130,11 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   <div style={{ display: 'flex', borderTop: '1px solid var(--border-color)', paddingTop: '16px', marginTop: '20px', gap: '0' }}>
                     <button onClick={() => { setTipsEditor(null); setTipsMsg(''); }}
                       style={{ flex: 1, padding: '13px', background: 'var(--input-bg)', border: 'none', borderRight: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '16px', fontWeight: '500', color: 'var(--text-main)', borderRadius: '6px 0 0 6px' }}>
-                      Back to list
+                      {t('Back to list')}
                     </button>
                     <button onClick={saveTips} disabled={tipsSaving}
                       style={{ flex: 2, padding: '13px', background: '#129968', border: 'none', cursor: tipsSaving ? 'not-allowed' : 'pointer', fontSize: '16px', fontWeight: '600', color: '#fff', borderRadius: '0 6px 6px 0' }}>
-                      {tipsSaving ? 'Saving...' : 'Save Prevention Tips'}
+                      {tipsSaving ? t('Saving...') : t('Save Prevention Tips')}
                     </button>
                   </div>
                 </div>
@@ -2956,32 +3145,32 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             <div className="cdms-modal-backdrop" onClick={closeTipsManager} style={tipsBackdrop}>
               <div className="cdms-modal-card" onClick={e => e.stopPropagation()} style={{ background: 'var(--bg-surface)', borderRadius: '16px', padding: '24px 24px', width: '620px', maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                  <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: 'var(--text-main)' }}>✏️ Manage Prevention Tips</h3>
+                  <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: 'var(--text-main)' }}>{t('✏️ Manage Prevention Tips')}</h3>
                   <button onClick={closeTipsManager} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '22px', lineHeight: 1 }}>✕</button>
                 </div>
-                <p style={{ margin: '0 0 6px 0', color: 'var(--text-muted)', fontSize: '14px' }}>Select a disease to edit its prevention tips, symptom-checker questions, and video.</p>
+                <p style={{ margin: '0 0 6px 0', color: 'var(--text-muted)', fontSize: '14px' }}>{t('Select a disease to edit its prevention tips, symptom-checker questions, and video.')}</p>
                 {tipsMsg && (
                   <div style={{ padding: '10px 12px', marginBottom: '10px', borderRadius: '6px', fontSize: '15px', background: '#fee2e2', color: '#991b1b' }}>{tipsMsg}</div>
                 )}
                 <div style={{ overflowY: 'auto', flex: 1, marginTop: '8px' }}>
-                  {tipsList.length === 0 && <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '30px 0', fontSize: '15px' }}>Loading diseases…</div>}
+                  {tipsList.length === 0 && <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '30px 0', fontSize: '15px' }}>{t('Loading diseases…')}</div>}
                   {tipsList.map(d => (
                     <div key={d.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderBottom: '1px solid var(--border-color)', gap: '10px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
                         <span style={{ fontSize: '22px' }}>{d.icon || '🦠'}</span>
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.name}{d.active === 0 ? ' (hidden)' : ''}</div>
-                          <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{(() => { const hard = DEFAULT_DISEASES.find(h => h.name === d.name); if (d.prevention_tips) return `${d.prevention_tips.split('\n').filter(Boolean).length} tips`; return hard ? `Default tips (${(hard.tips || []).length}) - will save to DB on Edit` : 'No tips set'; })()}</div>
+                          <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.name}{d.active === 0 ? t(' (hidden)') : ''}</div>
+                          <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{(() => { const hard = DEFAULT_DISEASES.find(h => h.name === d.name); if (d.prevention_tips) return `${d.prevention_tips.split('\n').filter(Boolean).length}${t(' tips')}`; return hard ? `${t('Default tips (')}${(hard.tips || []).length}${t(') - will save to DB on Edit')}` : t('No tips set'); })()}</div>
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                        <button onClick={() => { if (window.confirm(d.active === 0 ? `Un-hide "${d.name}" so it shows again on the Resident portal?` : `Hide "${d.name}" from the Resident portal? Its prevention tips and data will be kept and can be restored anytime.`)) toggleDiseaseActive(d); }}
+                        <button onClick={() => { if (window.confirm(d.active === 0 ? `${t('Un-hide "')}${d.name}${t('" so it shows again on the Resident portal?')}` : `${t('Hide "')}${d.name}${t('" from the Resident portal? Its prevention tips and data will be kept and can be restored anytime.')}`)) toggleDiseaseActive(d); }}
                           style={{ padding: '7px 12px', background: d.active === 0 ? 'var(--success-bg)' : 'transparent', color: d.active === 0 ? 'var(--success-text)' : '#D97706', border: '1px solid ' + (d.active === 0 ? 'var(--success-border)' : '#D97706'), borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
-                          {d.active === 0 ? 'Un-hide' : 'Hide'}
+                          {d.active === 0 ? t('Un-hide') : t('Hide')}
                         </button>
                         <button onClick={() => openTipsEditor(d)}
                           style={{ padding: '7px 14px', background: '#121358', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}>
-                          Edit
+                          {t('Edit')}
                         </button>
                       </div>
                     </div>
@@ -3003,10 +3192,10 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       <div style={{ padding: compactMode ? '14px' : '28px', color: 'var(--text-main)', fontSize: `calc(15px * ${fs})` }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <div>
-            <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '4px' }}>Dashboard / Manage Cases / Inbox</div>
-            <h2 style={{ margin: 0, fontSize: '22px' }}> Inbox</h2>
+            <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '4px' }}>{t('Dashboard / Manage Cases / Inbox')}</div>
+            <h2 style={{ margin: 0, fontSize: '22px' }}>{t(' Inbox')}</h2>
           </div>
-          <BackButton onClick={() => setView('categories')}>Back</BackButton>
+          <BackButton onClick={() => setView('categories')}>{t('Back')}</BackButton>
         </div>
         {/* Sub-tabs */}
         <div style={{ display: 'flex', gap: '0', marginBottom: '12px', borderBottom: '1px solid var(--border-color)' }}>
@@ -3017,7 +3206,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               borderBottom: inboxSubTab === 'referrals' ? '2px solid #129968' : '2px solid transparent',
               transition: 'all 0.15s',
             }}>
-            {loginRole === 'BHW' ? 'My Requests' : 'Referrals'} ({loginRole === 'BHW' ? myEditRequests.length + myAddRequests.length : inboxItems.length})
+            {loginRole === 'BHW' ? t('My Requests') : t('Referrals')} ({loginRole === 'BHW' ? myEditRequests.length + myAddRequests.length : inboxItems.length})
           </div>
           {loginRole === 'BHW' && (
             <div onClick={() => setInboxSubTab('messages')}
@@ -3027,7 +3216,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 borderBottom: inboxSubTab === 'messages' ? '2px solid #129968' : '2px solid transparent',
                 transition: 'all 0.15s',
               }}>
-              Messages ({contactMessages.filter(m => m.status === 'new' || m.status === 'pending').length})
+              {t('Messages')} ({contactMessages.filter(m => m.status === 'new' || m.status === 'pending').length})
             </div>
           )}
           {loginRole === 'CHO' && (
@@ -3038,7 +3227,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 borderBottom: inboxSubTab === 'edit-requests' ? '2px solid #8B5CF6' : '2px solid transparent',
                 transition: 'all 0.15s',
               }}>
-              Edit Requests ({editRequests.length + passwordRequests.length})
+              {t('Edit Requests')} ({editRequests.length + passwordRequests.length})
             </div>
           )}
           {loginRole === 'CHO' && (
@@ -3049,7 +3238,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 borderBottom: inboxSubTab === 'add-requests' ? '2px solid #3B82F6' : '2px solid transparent',
                 transition: 'all 0.15s',
               }}>
-              Add Requests ({addRequests.length})
+              {t('Add Requests')} ({addRequests.length})
             </div>
           )}
           {loginRole === 'CHO' && (
@@ -3060,7 +3249,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 borderBottom: inboxSubTab === 'registrations' ? '2px solid #D97706' : '2px solid transparent',
                 transition: 'all 0.15s',
               }}>
-              Registrations ({pendingRegistrations.length})
+              {t('Registrations')} ({pendingRegistrations.length})
             </div>
           )}
         </div>
@@ -3073,9 +3262,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           return (
             <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
               {(myEditRequestsLoading || myAddRequestsLoading) ? (
-                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading requests...</div>
+                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('Loading requests...')}</div>
               ) : merged.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No requests yet.</div>
+                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('No requests yet.')}</div>
               ) : (
                 merged.map((req, idx) => (
                   <div key={`${req._kind}-${req.id}`} className="cdms-row-in" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)', animationDelay: `${Math.min(idx, 10) * 45}ms` }}>
@@ -3084,17 +3273,17 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: '15px', color: 'var(--text-main)' }}>
-                        {req.patient_name || 'Unknown'} · {req.disease_name || req.disease_name_full || 'Unknown'}
+                        {req.patient_name || t('Unknown')} · {req.disease_name || req.disease_name_full || t('Unknown')}
                       </div>
                       <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                        {req._kind === 'edit' ? 'Edit request from ' : 'Case submitted to '}{req.from_barangay_name || 'your CHO'} · <span style={{ textTransform: 'capitalize', fontWeight: '600', color: req.status === 'accepted' ? '#129968' : req.status === 'rejected' ? '#ef4444' : '#D97706' }}>{req.status}</span>
-                        {req._kind === 'add' && req.status === 'accepted' && req.case_id ? ` · Case ID #${req.case_id}` : ''}
+                        {req._kind === 'edit' ? t('Edit request from ') : t('Case submitted to ')}{req.from_barangay_name || t('your CHO')} · <span style={{ textTransform: 'capitalize', fontWeight: '600', color: req.status === 'accepted' ? '#129968' : req.status === 'rejected' ? '#ef4444' : '#D97706' }}>{req.status}</span>
+                        {req._kind === 'add' && req.status === 'accepted' && req.case_id ? `${t(' · Case ID #')}${req.case_id}` : ''}
                       </div>
                       {req.note && (
                         <div style={{ fontSize: '15px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '2px' }}>"{req.note}"</div>
                       )}
                       {req.reject_reason && (
-                        <div style={{ fontSize: '15px', color: '#ef4444', marginTop: '2px' }}>Reason: {req.reject_reason}</div>
+                        <div style={{ fontSize: '15px', color: '#ef4444', marginTop: '2px' }}>{t('Reason: ')}{req.reject_reason}</div>
                       )}
                     </div>
                     <div style={{ fontSize: '15px', color: 'var(--text-muted)', flexShrink: 0 }}>
@@ -3106,7 +3295,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       if (req._kind === 'edit') setMyEditRequests(prev => prev.filter(r => r.id !== req.id));
                       else setMyAddRequests(prev => prev.filter(r => r.id !== req.id));
                       setView('outbox');
-                    }} title="View in Outbox"
+                    }} title={t('View in Outbox')}
                       style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #3B82F6', background: 'rgba(96,165,250,0.15)', color: '#3B82F6', cursor: 'pointer', fontSize: '16px', flexShrink: 0 }}>
                       →
                     </button>
@@ -3120,17 +3309,17 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         {inboxSubTab === 'referrals' && loginRole !== 'BHW' && (
           <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
             {inboxLoading ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading inbox...</div>
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('Loading inbox...')}</div>
             ) : inboxItems.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Inbox is empty.</div>
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('Inbox is empty.')}</div>
             ) : (
               inboxItems.map((item, idx) => (
                 <div key={item.id} className="cdms-row-in" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)', animationDelay: `${Math.min(idx, 10) * 45}ms` }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '15px', color: 'var(--text-muted)', lineHeight: 1, textAlign: 'left' }}>
                       {item.from_user_role === 'BHW'
-                        ? `From BHW (${item.from_sender_barangay_name || 'Unknown'})`
-                        : `From ${item.from_cho_unit || 'Unknown Unit'}`}
+                        ? `${t('From BHW (')}${item.from_sender_barangay_name || t('Unknown')}${t(')')}`
+                        : `${t('From ')}${item.from_cho_unit || t('Unknown Unit')}`}
                     </div>
                     <div style={{ display: 'flex', gap: '8px', marginTop: '6px', alignItems: 'center' }}>
                       <div className="inbox-avatar-circle">
@@ -3157,11 +3346,11 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     {formatDateStr(item.created_at, dateFormat)}
                   </div>
                   <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                    <button onClick={() => handleAcceptInboxItem(item)} title="Accept"
+                    <button onClick={() => handleAcceptInboxItem(item)} title={t('Accept')}
                       style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #129968', background: 'rgba(18,153,104,0.1)', color: '#129968', cursor: 'pointer', fontSize: '16px' }}>
                       ✓
                     </button>
-                    <button onClick={() => handleRejectInboxItem(item)} title="Reject"
+                    <button onClick={() => handleRejectInboxItem(item)} title={t('Reject')}
                       style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #ef4444', background: 'rgba(239,68,68,0.1)', color: '#ef4444', cursor: 'pointer', fontSize: '16px' }}>
                       ✕
                     </button>
@@ -3176,23 +3365,23 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           const loading = editRequestsLoading || passwordRequestsLoading;
           const allRequests = [
             ...editRequests.map(r => ({ ...r, _type: 'case-edit' })),
-            ...passwordRequests.map(r => ({ ...r, _type: 'password-change', from_barangay_name: 'N/A', patient_name: r.user_name || 'Unknown', note: 'Password change request' })),
+            ...passwordRequests.map(r => ({ ...r, _type: 'password-change', from_barangay_name: 'N/A', patient_name: r.user_name || 'Unknown', note: t('Password change request') })),
           ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
           return (
             <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
               {loading ? (
-                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading requests...</div>
+                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('Loading requests...')}</div>
               ) : allRequests.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No pending requests from BHWs.</div>
+                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('No pending requests from BHWs.')}</div>
               ) : (
                 allRequests.map((req, idx) => (
                   <div key={`${req._type}-${req.id}`} className="cdms-row-in" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)', animationDelay: `${Math.min(idx, 10) * 45}ms` }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: '15px', color: 'var(--text-muted)', lineHeight: 1, textAlign: 'left' }}>
                         {req._type === 'password-change' ? (
-                          <span>🔑 Password Change Request</span>
+                          <span>{t('🔑 Password Change Request')}</span>
                         ) : (
-                          <span>From BHW ({req.from_barangay_name || 'Unknown Barangay'})</span>
+                          <span>{t('From BHW (')}{req.from_barangay_name || t('Unknown Barangay')}{t(')')}</span>
                         )}
                       </div>
                       <div style={{ display: 'flex', gap: '8px', marginTop: '6px', alignItems: 'center' }}>
@@ -3202,12 +3391,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         <div style={{ flex: 1, minWidth: 0 }}>
                           {req._type === 'password-change' ? (
                             <div style={{ fontSize: '15px', color: 'var(--text-main)' }}>
-                              {req.user_name || 'Unknown BHW'} - requesting password change
+                              {req.user_name || t('Unknown BHW')} - {t('requesting password change')}
                             </div>
                           ) : (
                             <>
                               <div style={{ fontSize: '15px', color: 'var(--text-main)' }}>
-                                {req.patient_name || 'Unknown'} · {req.disease_name || req.disease_name_full || 'Unknown Disease'}
+                                {req.patient_name || t('Unknown')} · {req.disease_name || req.disease_name_full || t('Unknown Disease')}
                               </div>
                               {req.note && (
                                 <div style={{ fontSize: '15px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -3223,11 +3412,11 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       {formatDateStr(req.created_at, dateFormat)}
                     </div>
                     <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                      <button onClick={() => req._type === 'password-change' ? handleAcceptPasswordRequest(req) : handleAcceptEditRequest(req)} title="Accept"
+                      <button onClick={() => req._type === 'password-change' ? handleAcceptPasswordRequest(req) : handleAcceptEditRequest(req)} title={t('Accept')}
                         style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #129968', background: 'rgba(18,153,104,0.1)', color: '#129968', cursor: 'pointer', fontSize: '16px' }}>
                         ✓
                       </button>
-                      <button onClick={() => req._type === 'password-change' ? handleRejectPasswordRequest(req) : handleRejectEditRequest(req)} title="Reject"
+                      <button onClick={() => req._type === 'password-change' ? handleRejectPasswordRequest(req) : handleRejectEditRequest(req)} title={t('Reject')}
                         style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #ef4444', background: 'rgba(239,68,68,0.1)', color: '#ef4444', cursor: 'pointer', fontSize: '16px' }}>
                         ✕
                       </button>
@@ -3242,15 +3431,15 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         {inboxSubTab === 'add-requests' && loginRole === 'CHO' && (
           <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
             {addRequestsLoading ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading add requests...</div>
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('Loading add requests...')}</div>
             ) : addRequests.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No cases awaiting approval.</div>
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('No cases awaiting approval.')}</div>
             ) : (
               addRequests.map((req, idx) => (
                 <div key={req.id} className="cdms-row-in" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)', animationDelay: `${Math.min(idx, 10) * 45}ms` }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '15px', color: 'var(--text-muted)', lineHeight: 1, textAlign: 'left' }}>
-                      <span>New case from BHW ({req.from_barangay_name || 'Unknown Barangay'})</span>
+                      <span>{t('New case from BHW (')}{req.from_barangay_name || t('Unknown Barangay')}{t(')')}</span>
                     </div>
                     <div style={{ display: 'flex', gap: '8px', marginTop: '6px', alignItems: 'center' }}>
                       <div className="inbox-avatar-circle" style={{ background: '#3B82F6' }}>
@@ -3258,23 +3447,23 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: '15px', color: 'var(--text-main)' }}>
-                          {req.patient_name || 'Unknown'} · {req.disease_name || 'Unknown Disease'} ({req.severity || 'Moderate'})
+                          {req.patient_name || t('Unknown')} · {req.disease_name || t('Unknown Disease')} ({req.severity || t('Moderate')})
                         </div>
                         <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {req.address || 'No address'} · {req.barangay_name || ''}
+                          {req.address || t('No address')} · {req.barangay_name || ''}
                         </div>
                         <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          Submitted by {req.requested_by_name || 'BHW'} · {formatDateStr(req.created_at, dateFormat)}
+                          {t('Submitted by ')}{req.requested_by_name || t('BHW')} · {formatDateStr(req.created_at, dateFormat)}
                         </div>
                       </div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                    <button onClick={() => openApprovalReview(req)} title="Review & Approve"
+                    <button onClick={() => openApprovalReview(req)} title={t('Review & Approve')}
                       style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #129968', background: 'rgba(18,153,104,0.1)', color: '#129968', cursor: 'pointer', fontSize: '15px', fontWeight: '600' }}>
-                      ✓ Review
+                      {t('✓ Review')}
                     </button>
-                    <button onClick={() => handleRejectAddRequest(req)} title="Reject"
+                    <button onClick={() => handleRejectAddRequest(req)} title={t('Reject')}
                       style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #ef4444', background: 'rgba(239,68,68,0.1)', color: '#ef4444', cursor: 'pointer', fontSize: '16px' }}>
                       ✕
                     </button>
@@ -3288,9 +3477,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         {inboxSubTab === 'registrations' && loginRole === 'CHO' && (
           <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
             {pendingRegistrationsLoading ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading registrations...</div>
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('Loading registrations...')}</div>
             ) : pendingRegistrations.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No pending BHW registrations.</div>
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('No pending BHW registrations.')}</div>
             ) : (
               pendingRegistrations.map((reg, idx) => (
                 <div key={reg.user_id} className="cdms-row-in" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)', animationDelay: `${Math.min(idx, 10) * 45}ms` }}>
@@ -3302,7 +3491,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       {reg.full_name}
                     </div>
                     <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                      {reg.email} · {reg.barangay_name || 'No barangay'}
+                      {reg.email} · {reg.barangay_name || t('No barangay')}
                     </div>
                     {reg.mobile_number && (
                       <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '1px' }}>
@@ -3314,11 +3503,11 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     {formatDateStr(reg.created_at, dateFormat)}
                   </div>
                   <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                    <button onClick={() => handleApproveRegistration(reg)} title="Approve"
+                    <button onClick={() => handleApproveRegistration(reg)} title={t('Approve')}
                       style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #129968', background: 'rgba(18,153,104,0.1)', color: '#129968', cursor: 'pointer', fontSize: '16px' }}>
                       ✓
                     </button>
-                    <button onClick={() => handleRejectRegistration(reg)} title="Reject"
+                    <button onClick={() => handleRejectRegistration(reg)} title={t('Reject')}
                       style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #ef4444', background: 'rgba(239,68,68,0.1)', color: '#ef4444', cursor: 'pointer', fontSize: '16px' }}>
                       ✕
                     </button>
@@ -3332,16 +3521,16 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         {loginRole === 'BHW' && inboxSubTab === 'messages' && (
           <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
             {contactMessagesLoading ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading messages...</div>
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('Loading messages...')}</div>
             ) : contactMessages.filter(m => m.status === 'new' || m.status === 'pending').length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No messages from residents.</div>
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('No messages from residents.')}</div>
             ) : (
               contactMessages.filter(m => m.status === 'new' || m.status === 'pending').map((msg, idx) => (
                 <div key={msg.id} className="cdms-row-in" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)', background: msg.status === 'pending' ? 'rgba(245,158,11,0.06)' : 'rgba(13,148,136,0.04)', animationDelay: `${Math.min(idx, 10) * 45}ms` }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '15px', color: 'var(--text-muted)', lineHeight: 1, textAlign: 'left' }}>
-                      From Resident{msg.barangay ? ` (${msg.barangay})` : msg.target_cho_unit ? ` (${msg.target_cho_unit})` : ''}
-                      {msg.status === 'pending' && <span style={{ marginLeft: '8px', color: '#D97706', fontWeight: '600' }}>· Pending review</span>}
+                      {t('From Resident')}{msg.barangay ? ` (${msg.barangay})` : msg.target_cho_unit ? ` (${msg.target_cho_unit})` : ''}
+                      {msg.status === 'pending' && <span style={{ marginLeft: '8px', color: '#D97706', fontWeight: '600' }}>· {t('Pending review')}</span>}
                     </div>
                     <div style={{ display: 'flex', gap: '8px', marginTop: '6px', alignItems: 'center' }}>
                       <div className="inbox-avatar-circle" style={{ background: '#129968' }}>
@@ -3362,11 +3551,11 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   </div>
                   {msg.status === 'new' ? (
                     <>
-                      <button onClick={() => handlePendingContactMessage(msg)} title="Review"
+                      <button onClick={() => handlePendingContactMessage(msg)} title={t('Review')}
                         style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #129968', background: 'rgba(18,153,104,0.1)', color: '#129968', cursor: 'pointer', fontSize: '16px', flexShrink: 0 }}>
                         ✓
                       </button>
-                      <button onClick={() => handleRejectContactMessage(msg)} title="Reject"
+                      <button onClick={() => handleRejectContactMessage(msg)} title={t('Reject')}
                         style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #ef4444', background: 'rgba(239,68,68,0.1)', color: '#ef4444', cursor: 'pointer', fontSize: '16px', flexShrink: 0 }}>
                         ✕
                       </button>
@@ -3393,9 +3582,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         status: 'Active',
                       });
                       setView('add');
-                    }} title="Complete Case"
+                    }} title={t('Complete Case')}
                       style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #D97706', background: 'rgba(245,158,11,0.1)', color: '#D97706', cursor: 'pointer', fontSize: '15px', fontWeight: '600', flexShrink: 0 }}>
-                      Complete →
+                      {t('Complete →')}
                     </button>
                   )}
                 </div>
@@ -3415,14 +3604,14 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       <div style={{ padding: compactMode ? '14px' : '28px', color: 'var(--text-main)', fontSize: `calc(15px * ${fs})` }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <div>
-            <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '4px' }}>Dashboard / Manage Cases / Outbox</div>
-            <h2 style={{ margin: 0, fontSize: '22px' }}> Outbox</h2>
+            <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '4px' }}>{t('Dashboard / Manage Cases / Outbox')}</div>
+            <h2 style={{ margin: 0, fontSize: '22px' }}>{t(' Outbox')}</h2>
           </div>
-          <BackButton onClick={() => setView('categories')}>Back</BackButton>
+          <BackButton onClick={() => setView('categories')}>{t('Back')}</BackButton>
         </div>
         <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
           {outboxItems.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Outbox is empty.</div>
+            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('Outbox is empty.')}</div>
           ) : (
             outboxItems.map((item, idx) => (
               <div key={item.id} className="cdms-row-in" style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 20px', borderBottom: '1px solid var(--border-color)', animationDelay: `${Math.min(idx, 10) * 45}ms` }}>
@@ -3431,24 +3620,24 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: '15px', fontWeight: '600' }}>
-                    {item.patient_name || 'Unknown'} · {item.disease_name || 'Unknown'}
+                    {item.patient_name || t('Unknown')} · {item.disease_name || t('Unknown')}
                   </div>
                   <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '10px' }}>
                     {item.item_type === 'referral' ? (
                       <>
-                        {item.direction === 'sent' ? 'Sent to' : 'Received from'} {item.direction === 'sent' ? (item.to_cho_unit || item.to_barangay_name || '-') : (item.from_barangay_name ? `BHW (${item.from_barangay_name})` : item.from_cho_unit || '-')}
+                        {item.direction === 'sent' ? t('Sent to') : t('Received from')} {item.direction === 'sent' ? (item.to_cho_unit || item.to_barangay_name || '-') : (item.from_barangay_name ? `${t('BHW (')}${item.from_barangay_name}${t(')')}` : item.from_cho_unit || '-')}
                       </>
                     ) : item.item_type === 'resident' ? (
-                      <>Resident message from {item.barangay_name || '-'} · {item.to_cho_unit || '-'}</>
+                      <>{t('Resident message from ')}{item.barangay_name || '-'} · {item.to_cho_unit || '-'}</>
                     ) : item.item_type === 'add_request' ? (
-                      <>Submitted to CHO for approval{item.to_cho_unit ? ` → ${item.to_cho_unit}` : ''}</>
+                      <>{t('Submitted to CHO for approval')}{item.to_cho_unit ? ` → ${item.to_cho_unit}` : ''}</>
                     ) : item.item_type === 'edit_request' ? (
-                      <>Edit request from BHW ({item.from_barangay_name || '-'})</>
+                      <>{t('Edit request from BHW (')}{item.from_barangay_name || '-'}{t(')')}</>
                     ) : (
-                      <>{item.direction === 'sent' ? 'Sent to' : 'Received from'} {item.direction === 'sent' ? (item.to_cho_unit || item.to_barangay_name || '-') : (item.from_barangay_name ? `BHW (${item.from_barangay_name})` : item.from_cho_unit || '-')}</>
+                      <>{item.direction === 'sent' ? t('Sent to') : t('Received from')} {item.direction === 'sent' ? (item.to_cho_unit || item.to_barangay_name || '-') : (item.from_barangay_name ? `${t('BHW (')}${item.from_barangay_name}${t(')')}` : item.from_cho_unit || '-')}</>
                     )}
-                    <span> · Status: <span style={{ textTransform: 'capitalize', fontWeight: '600', color: item.status === 'accepted' ? '#129968' : item.status === 'rejected' ? '#ef4444' : '#D97706' }}>{item.status}</span></span>
-                    {item.barangay_name && <span> · {item.item_type === 'edit_request' ? 'Barangay' : 'Assigned to'} {item.barangay_name}</span>}
+                    <span> · {t('Status:')} <span style={{ textTransform: 'capitalize', fontWeight: '600', color: item.status === 'accepted' ? '#129968' : item.status === 'rejected' ? '#ef4444' : '#D97706' }}>{item.status}</span></span>
+                    {item.barangay_name && <span> · {item.item_type === 'edit_request' ? t('Barangay') : t('Assigned to')} {item.barangay_name}</span>}
                   </div>
                 </div>
                 <div style={{ fontSize: '15px', color: 'var(--text-muted)', flexShrink: 0 }}>
@@ -3512,10 +3701,10 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <div>
             <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '4px' }}>
-              Dashboard / Manage Cases / {selectedDisease?.name || 'All Cases'}
+              {t('Dashboard / Manage Cases / ')}{selectedDisease?.name || t('All Cases')}
             </div>
             <h2 style={{ margin: 0, fontSize: '22px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              {selectedDisease ? <span>{selectedDisease.icon}</span> : <span>📋</span>} {selectedDisease?.name || 'All Cases'}
+              {selectedDisease ? <span>{selectedDisease.icon}</span> : <span>📋</span>} {selectedDisease?.name || t('All Cases')}
             </h2>
           </div>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -3527,11 +3716,11 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 </button>
                 {showShortcutsGuide && (
                   <div style={{ position: 'absolute', top: '110%', right: 0, width: '240px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', padding: '14px', fontSize: '15px' }}>
-                    <div style={{ fontWeight: '700', marginBottom: '10px', color: 'var(--text-main)' }}>Keyboard Shortcuts</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>New Case</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '15px', border: '1px solid var(--border-color)' }}>N</kbd></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>Save Form</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '15px', border: '1px solid var(--border-color)' }}>Ctrl+S</kbd></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>Close / Back</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '15px', border: '1px solid var(--border-color)' }}>Esc</kbd></div>
+                    <div style={{ fontWeight: '700', marginBottom: '10px', color: 'var(--text-main)' }}>{t('Keyboard Shortcuts')}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>{t('New Case')}</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '15px', border: '1px solid var(--border-color)' }}>N</kbd></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>{t('Save Form')}</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '15px', border: '1px solid var(--border-color)' }}>Ctrl+S</kbd></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>{t('Close / Back')}</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '15px', border: '1px solid var(--border-color)' }}>Esc</kbd></div>
                     </div>
                   </div>
                 )}
@@ -3545,14 +3734,14 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                   <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
                 </svg>
-                Export <span style={{ transition: 'transform 0.2s', display: 'inline-block', transform: showExportMenu ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                { t('Export') } <span style={{ transition: 'transform 0.2s', display: 'inline-block', transform: showExportMenu ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
               </button>
               {showExportMenu && (
                 <div style={{ position: 'absolute', top: '110%', right: 0, width: '180px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
                   {[
-                    { label: '📄 Word (.doc)', action: handleExportWord },
-                    { label: '📊 Excel (.xls)', action: handleExportExcel },
-                    { label: '📋 CSV (.csv)', action: handleExportCSV },
+                    { label: t('📄 Word (.doc)'), action: handleExportWord },
+                    { label: t('📊 Excel (.xls)'), action: handleExportExcel },
+                    { label: t('📋 CSV (.csv)'), action: handleExportCSV },
                   ].map(item => (
                     <button key={item.label} onClick={item.action}
                       style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'transparent', border: 'none', color: 'var(--text-main)', cursor: 'pointer', textAlign: 'left', fontSize: '15px', borderBottom: '1px solid var(--border-color)' }}
@@ -3565,18 +3754,18 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               )}
             </div>
 
-            <BackButton onClick={() => { setView('categories'); setSelectedDisease(null); setSearchQuery(''); }}>Back</BackButton>
+            <BackButton onClick={() => { setView('categories'); setSelectedDisease(null); setSearchQuery(''); }}>{t('Back')}</BackButton>
             {loginRole !== 'CHO' && (
               <button onClick={openAdd}
                 style={{ padding: '8px 18px', background: '#129968', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
-                + Add Case
+                {t('+ Add Case')}
               </button>
             )}
           </div>
         </div>
 
         <div style={{ fontSize: '15px', color: 'var(--text-muted)', textAlign: 'right', marginBottom: '6px' }}>
-          {lastUpdated ? `Updated ${Math.round((now - lastUpdated) / 1000)}s ago` : 'Refreshing...'}
+          {lastUpdated ? `${t('Updated ')}${Math.round((now - lastUpdated) / 1000)}${t('s ago')}` : t('Refreshing...')}
         </div>
 
         {/* Table card */}
@@ -3587,17 +3776,17 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               <div style={{ display: 'flex', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
                 <button onClick={() => { setShowArchived(false); showArchivedRef.current = false; fetchCases(false); setTablePage(1); }}
                   style={{ padding: '8px 14px', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: '600', background: !showArchived ? '#121358' : 'transparent', color: !showArchived ? '#fff' : 'var(--text-muted)' }}>
-                  Active
+                  {t('Active')}
                 </button>
                 <button onClick={() => { setShowArchived(true); showArchivedRef.current = true; fetchCases(true); setTablePage(1); }}
                   style={{ padding: '8px 14px', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: '600', background: showArchived ? '#121358' : 'transparent', color: showArchived ? '#fff' : 'var(--text-muted)' }}>
-                  Archived
+                  {t('Archived')}
                 </button>
               </div>
             )}
 
             {/* Search */}
-            <input type="text" placeholder="Search Cases..."
+            <input type="text" placeholder={t('Search Cases...')}
               value={searchQuery} onChange={e => { setSearchQuery(e.target.value); setTablePage(1); }}
               style={{ padding: '8px 12px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)', fontSize: '15px', width: '180px' }} />
 
@@ -3605,7 +3794,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             {loginRole !== 'BHW' && (
               <div style={{ position: 'relative' }} ref={barangayRef}>
                 <button className="mc-custom-dropdown-btn" onClick={() => setBarangayOpen(!barangayOpen)}>
-                  <span>{filterBarangay}</span>
+                  <span>{t(filterBarangay)}</span>
                   <span style={{ marginLeft: '6px', opacity: 0.6, transition: 'transform 0.2s', display: 'inline-block', transform: barangayOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                 </button>
                 {barangayOpen && (
@@ -3614,7 +3803,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       className={`mc-custom-dropdown-item ${filterBarangay === 'All Barangays' ? 'mc-custom-dropdown-item--active' : ''}`}
                       onClick={() => { setFilterBarangay('All Barangays'); setTablePage(1); setBarangayOpen(false); }}
                     >
-                      All Barangays
+                      {t('All Barangays')}
                     </div>
                     {[...scopedBarangayOptions].sort().map(b => (
                       <div
@@ -3634,18 +3823,18 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             {loginRole === 'BHW' && (
               <div style={{ position: 'relative' }} ref={purokRef}>
                 <button className="mc-custom-dropdown-btn" onClick={() => setPurokOpen(!purokOpen)}>
-                  <span>{filterPurok}</span>
+                  <span>{t(filterPurok)}</span>
                   <span style={{ marginLeft: '6px', opacity: 0.6, transition: 'transform 0.2s', display: 'inline-block', transform: purokOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                 </button>
                 {purokOpen && (
                   <div className="mc-custom-dropdown-panel">
-                    {['All Puroks', ...dynamicPurokOptions].map(p => (
+                    {[t('All Puroks'), ...dynamicPurokOptions].map(p => (
                       <div
                         key={p}
                         className={`mc-custom-dropdown-item ${filterPurok === p ? 'mc-custom-dropdown-item--active' : ''}`}
                         onClick={() => { setFilterPurok(p); setTablePage(1); setPurokOpen(false); }}
                       >
-                        {p}
+                        {t(p)}
                       </div>
                     ))}
                   </div>
@@ -3657,7 +3846,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             <div style={{ position: 'relative' }} ref={statusRef}>
               <button type="button" onClick={() => setStatusOpen(!statusOpen)}
                 style={{ padding: '8px 12px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)', fontSize: '15px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}>
-                {filterStatus}
+{t(filterStatus)}
                 <span style={{ fontSize: '15px', opacity: 0.6, transition: 'transform 0.2s', transform: statusOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
               </button>
               {statusOpen && (
@@ -3668,7 +3857,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       style={{ display: 'block', width: '100%', padding: '10px 14px', background: filterStatus === s ? 'var(--input-bg)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: filterStatus === s ? '600' : '400' }}
                       onMouseEnter={e => { if (filterStatus !== s) e.target.style.background = 'var(--input-bg)'; }}
                       onMouseLeave={e => { if (filterStatus !== s) e.target.style.background = 'transparent'; }}>
-                      {s}
+                      {t(s)}
                     </button>
                   ))}
                 </div>
@@ -3676,7 +3865,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             </div>
 
             <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontSize: '15px' }}>
-              {filteredCases.length} case{filteredCases.length !== 1 ? 's' : ''} found
+              {filteredCases.length} {t('case')}{filteredCases.length !== 1 ? 's' : ''} {t('found')}
             </span>
           </div>
 
@@ -3700,7 +3889,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 <tr>
                   {['Case ID', 'Patient Name', 'Age', 'Barangay', 'Date Reported', 'Severity', 'Status', 'Actions'].map(h => (
                     <th key={h} style={{ textAlign: 'center', padding: compactMode ? '6px 8px' : '10px 12px', color: 'var(--text-muted)', fontSize: '15px', fontWeight: '600', borderBottom: '1px solid var(--border-color)', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
-                      {h}
+                      {t(h)}
                     </th>
                   ))}
                 </tr>
@@ -3709,9 +3898,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 {paginatedCases.length === 0 ? (
                   <tr>
                     <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '15px' }}>
-                      No cases found for <strong>{selectedDisease?.name}</strong>
+                      {t('No cases found for ')}<strong>{selectedDisease?.name}</strong>
                       {(searchQuery || filterBarangay !== 'All Barangays' || filterStatus !== 'All Status')
-                        ? ' with current filters.' : '.'}
+                        ? t(' with current filters.') : t('.')}
                     </td>
                   </tr>
                 ) : (
@@ -3722,11 +3911,11 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       <td style={{ padding: compactMode ? '7px 8px' : '12px', fontSize: '15px', color: 'var(--text-muted)', textAlign: 'center' }}>
                         #{String(c.case_id).padStart(3, '0')}
                         {c._pendingSync && (
-                          <span title="Pending sync - will upload when reconnected" style={{ marginLeft: '6px', fontSize: '15px', fontWeight: '600', color: '#D97706' }}>⏳</span>
+                          <span title={t('Pending sync - will upload when reconnected')} style={{ marginLeft: '6px', fontSize: '15px', fontWeight: '600', color: '#D97706' }}>⏳</span>
                         )}
                       </td>
                       <td style={{ padding: compactMode ? '7px 8px' : '12px', fontSize: '15px', fontWeight: '500', color: 'var(--text-main)', textAlign: 'center' }}>
-                        {c.patient_name || 'Unknown'}
+                        {c.patient_name || t('Unknown')}
                       </td>
                       <td style={{ padding: compactMode ? '7px 8px' : '12px', fontSize: '15px', color: 'var(--text-main)', textAlign: 'center' }}>
                         {c.age || '--'}
@@ -3738,7 +3927,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         {formatDateStr(c.date_reported, dateFormat)}
                       </td>
                       <td style={{ padding: compactMode ? '7px 8px' : '12px', fontSize: '15px', color: 'var(--text-main)', textAlign: 'center' }}>
-                        {c.severity || 'N/A'}
+                        {c.severity || t('N/A')}
                       </td>
                       <td style={{ padding: compactMode ? '7px 8px' : '12px', textAlign: 'center' }}>
                         <span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '15px', fontWeight: '500', ...getStatusStyle(c.status) }}>
@@ -3751,16 +3940,16 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           loginRole !== 'BHW' ? (
                             <button onClick={() => {
                               axios.post(`${API_URL}/api/cases/${c.case_id}/restore`)
-                                .then(() => { notify(`Case #${c.case_id} restored.`, 'success'); fetchCases(true); })
-                                .catch(err => notify('Restore failed: ' + (err.response?.data?.error || err.message), 'error'));
-                            }} title="Restore case"
+                                .then(() => { notify(`${t('Case #')}${c.case_id}${t(' restored.')}`, 'success'); fetchCases(true); })
+                                .catch(err => notify(t('Restore failed: ') + (err.response?.data?.error || err.message), 'error'));
+                            }} title={t('Restore case')}
                             style={{ padding: '5px 10px', background: 'transparent', border: '1px solid #129968', borderRadius: '4px', cursor: 'pointer', fontSize: '15px', color: '#129968' }}>
-                            ↩ Restore
+                            {t('↩ Restore')}
                           </button>
                           ) : null
                         ) : (
                         <>
-                          <button onClick={() => openEdit(c)} title="Edit case"
+                          <button onClick={() => openEdit(c)} title={t('Edit case')}
                             style={{ padding: '5px 10px', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer', color: 'var(--text-main)', fontSize: '15px' }}>
                             ✏️
                           </button>
@@ -3774,9 +3963,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                                 }
                                 axios.delete(`${API_URL}/api/cases/${c.case_id}`)
                                   .then(() => fetchCases())
-                                  .catch(err => notify('Delete failed: ' + (err.response?.data?.error || err.message), 'error'));
+                                  .catch(err => notify(t('Delete failed: ') + (err.response?.data?.error || err.message), 'error'));
                               }
-                            }} title="Archive case"
+                            }} title={t('Archive case')}
                             style={{ padding: '5px 10px', background: 'transparent', border: '1px solid #ef4444', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>
                             🗑️
                           </button>
@@ -3795,7 +3984,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           {totalTablePages > 1 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}>
               <span style={{ color: 'var(--text-muted)', fontSize: '15px' }}>
-                Showing {(tablePage - 1) * CASES_PER_PAGE + 1}–{Math.min(tablePage * CASES_PER_PAGE, filteredCases.length)} of {filteredCases.length}
+                {t('Showing ')}{(tablePage - 1) * CASES_PER_PAGE + 1}–{Math.min(tablePage * CASES_PER_PAGE, filteredCases.length)} {t('of ')}{filteredCases.length}
               </span>
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 <button onClick={() => setTablePage(1)} disabled={tablePage === 1}
@@ -3804,7 +3993,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 </button>
                 <button onClick={() => setTablePage(p => Math.max(1, p - 1))} disabled={tablePage === 1}
                   style={{ padding: '5px 12px', background: tablePage === 1 ? 'var(--input-bg)' : '#121358', color: tablePage === 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: tablePage === 1 ? 'not-allowed' : 'pointer', fontSize: '15px' }}>
-                  ← Prev
+                  {t('← Prev')}
                 </button>
                 {getVisiblePages(tablePage, totalTablePages).map((p, i) =>
                   p === '...' ? (
@@ -3813,14 +4002,14 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         style={{ padding: '5px 8px', background: tableEllipsisOpen ? 'rgba(18,19,88,0.15)' : 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '15px', fontWeight: '700', letterSpacing: '2px' }}>...</button>
                       {tableEllipsisOpen && (
                         <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px', width: '160px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 100 }}>
-                          <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>Go to page (1–{totalTablePages})</div>
+                          <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>{t('Go to page (1–')}{totalTablePages}{t(')')}</div>
                           <div style={{ display: 'flex', gap: '4px' }}>
                             <input type="number" min="1" max={totalTablePages} value={tableEllipsisInput} placeholder="#"
                               onChange={e => setTableEllipsisInput(e.target.value)}
                               onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(tableEllipsisInput); if (v >= 1 && v <= totalTablePages) { setTablePage(v); setTableEllipsisOpen(false); setTableEllipsisInput(''); } } }}
                               style={{ flex: 1, padding: '5px 6px', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px', outline: 'none', width: '100%' }} />
                             <button onClick={() => { const v = parseInt(tableEllipsisInput); if (v >= 1 && v <= totalTablePages) { setTablePage(v); setTableEllipsisOpen(false); setTableEllipsisInput(''); } }}
-                              style={{ padding: '5px 8px', border: '1px solid #121358', borderRadius: '4px', background: '#121358', color: 'white', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>Go</button>
+                              style={{ padding: '5px 8px', border: '1px solid #121358', borderRadius: '4px', background: '#121358', color: 'white', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>{t('Go')}</button>
                           </div>
                         </div>
                       )}
@@ -3834,7 +4023,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 )}
                 <button onClick={() => setTablePage(p => Math.min(totalTablePages, p + 1))} disabled={tablePage === totalTablePages}
                   style={{ padding: '5px 12px', background: tablePage === totalTablePages ? 'var(--input-bg)' : '#121358', color: tablePage === totalTablePages ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: tablePage === totalTablePages ? 'not-allowed' : 'pointer', fontSize: '15px' }}>
-                  Next →
+                  {t('Next →')}
                 </button>
                 <button onClick={() => setTablePage(totalTablePages)} disabled={tablePage === totalTablePages}
                   style={{ padding: '5px 8px', background: tablePage === totalTablePages ? 'var(--input-bg)' : '#121358', color: tablePage === totalTablePages ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: tablePage === totalTablePages ? 'not-allowed' : 'pointer', fontSize: '15px', fontWeight: '700' }}>
@@ -3862,43 +4051,25 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
     return (
       <div style={{ padding: compactMode ? '14px' : '28px', fontSize: `calc(15px * ${fs})` }}>
-        <BackButton onClick={() => { if (approvalRequest) { closeApprovalReview(); return; } setView('list'); setFilterPurok('All Puroks'); }} style={{ marginBottom: '20px' }}>{approvalRequest ? 'Back to Add Requests' : `Back to ${selectedDisease?.name} Cases`}</BackButton>
+        <BackButton onClick={() => { if (approvalRequest) { closeApprovalReview(); return; } setView('list'); setFilterPurok('All Puroks'); }} style={{ marginBottom: '20px' }}>{approvalRequest ? t('Back to Add Requests') : `${t('Back to ')}${selectedDisease?.name}${t(' Cases')}`}</BackButton>
 
         <div style={{ background: 'var(--bg-surface)', borderRadius: '12px', padding: '40px', color: 'var(--text-main)', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', maxWidth: '900px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '32px' }}>
             <h2 style={{ margin: '0 0 6px 0', fontSize: '24px', color: 'var(--text-main)' }}>
-              {approvalRequest ? 'Review Add Request' : (isEdit ? 'Edit Case Report' : 'New Case Report')}
+              {approvalRequest ? t('Review Add Request') : (isEdit ? t('Edit Case Report') : t('New Case Report'))}
             </h2>
             <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '15px' }}>
               {approvalRequest
-                ? `Submitted by ${approvalRequest.requested_by_name || 'BHW'} (${approvalRequest.from_barangay_name || 'no barangay'}) - ${approvalRequest.patient_name}`
-                : isEdit
-                  ? `Editing: Case #${String(editingCase?.case_id).padStart(3,'0')} - ${editingCase?.patient_name}`
-                  : `Encoding new case under: ${selectedDisease?.name}`}
+                  ? `${t('Submitted by ')}${approvalRequest.requested_by_name || t('BHW')} (${approvalRequest.from_barangay_name || t('no barangay')})${t(' - ')}${approvalRequest.patient_name}`
+                  : isEdit
+                    ? `${t('Editing: Case #')}${String(editingCase?.case_id).padStart(3,'0')} - ${editingCase?.patient_name}`
+                    : `${t('Encoding new case under: ')}${selectedDisease?.name}`}
             </p>
           </div>
 
           {approvalRequest && (
             <div className="cdms-msg-in" style={{ background: 'rgba(59,130,246,0.12)', color: '#3B82F6', padding: '12px', borderRadius: '8px', marginBottom: '20px', textAlign: 'center', fontSize: '15px', fontWeight: '500' }}>
-              📋 Review and adjust the details below, then click <strong>✓ Approve Case</strong> to add it to the records. Rejected requests return to the BHW with your reason.
-            </div>
-          )}
-
-          {submitMsg && (
-            <div className={`cdms-msg-in ${submitMsg.startsWith('Error') ? 'cdms-msg-shake' : ''}`} style={{ background: submitMsg.startsWith('Error') ? '#fee2e2' : '#d1f5e9', color: submitMsg.startsWith('Error') ? '#991b1b' : '#0a5e42', padding: '12px', borderRadius: '8px', marginBottom: '20px', textAlign: 'center', fontSize: '15px', fontWeight: '500' }}>
-              {submitMsg.startsWith('Error') ? '❌' : '✅'} {submitMsg}
-            </div>
-          )}
-
-          {autoSaveToast && (
-            <div className="cdms-msg-in" style={{ background: '#fef3c7', color: '#92400e', padding: '8px 16px', borderRadius: '8px', marginBottom: '12px', textAlign: 'center', fontSize: '15px', fontWeight: '500' }}>
-              💾 {autoSaveToast}
-            </div>
-          )}
-
-          {editRequestSuccess && (
-            <div className="cdms-msg-in" style={{ background: 'rgba(18,153,104,0.1)', color: '#3cb882', padding: '12px', borderRadius: '8px', marginBottom: '20px', textAlign: 'center', fontSize: '15px', fontWeight: '500' }}>
-              ✅ {editRequestSuccess} - It has been sent to the CHO for editing
+              {t('📋 Review and adjust the details below, then click ')}<strong>{t('✓ Approve Case')}</strong>{t(' to add it to the records. Rejected requests return to the BHW with your reason.')}
             </div>
           )}
 
@@ -3908,17 +4079,17 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               {/* LEFT: Patient Info */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <h4 style={{ margin: 0, color: 'var(--text-main)', fontSize: '15px', fontWeight: '700', paddingBottom: '8px' }}>
-                  Patient Information
+                  {t('Patient Information')}
                 </h4>
                 <div style={{ position: 'relative' }}>
                   <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>
-                    Patient Full Name
+                    {t('Patient Full Name')}
                       <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '15px', marginLeft: '6px' }}>
-                      (Type surname to auto-fill past records)
+                      {t('(Type surname to auto-fill past records)')}
                     </span>
                   </label>
                   <div style={{ position: 'relative' }}>
-                    <input type="text" required placeholder="e.g. Juan Dela Cruz" style={{ ...inputStyle, border: formErrors.patientName ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.patientName ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
+                    <input type="text" required placeholder={t('e.g. Juan Dela Cruz')} style={{ ...inputStyle, border: formErrors.patientName ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.patientName ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                       value={formData.patientName} onChange={e => { setFormData({ ...formData, patientName: e.target.value }); setFormErrors(prev => ({ ...prev, patientName: false })); }}
                       onFocus={() => { if (patientLookupResults.length > 0) setShowLookupDropdown(true); }}
                       readOnly={isBhwReadOnly} />
@@ -3935,7 +4106,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       padding: '4px',
                     }}>
                       <div style={{ padding: '6px 12px', fontSize: '15px', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-color)', marginBottom: '2px' }}>
-                        Multiple matching records - click to select
+                        {t('Multiple matching records - click to select')}
                       </div>
                       {patientLookupResults.map((p, i) => (
                         <div key={i}
@@ -3948,7 +4119,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           onMouseEnter={e => e.currentTarget.style.background = 'var(--input-bg)'}
                           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                         >
-                          <span><strong>{p.patient_name}</strong> <span style={{ color: 'var(--text-muted)' }}>- {p.barangay_name || 'N/A'}</span></span>
+                          <span><strong>{p.patient_name}</strong> <span style={{ color: 'var(--text-muted)' }}>- {p.barangay_name || t('N/A')}</span></span>
                           <span style={{ color: 'var(--text-muted)', fontSize: '15px' }}>
                             {p.age || '?'}y
                           </span>
@@ -3969,7 +4140,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         padding: '8px 12px', fontSize: '14px', fontWeight: 600, color: 'var(--text-main)',
                         borderBottom: '1px solid var(--border-color)', background: 'var(--input-bg)',
                       }}>
-                        🕘 Previous Cases for this Patient ({patientLookupResults.length})
+                        {t('🕘 Previous Cases for this Patient (')}{patientLookupResults.length}{t(')')}
                       </div>
                       <div style={{ maxHeight: '180px', overflowY: 'auto' }}>
                         {patientLookupResults.map((p, i) => (
@@ -3983,10 +4154,10 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                               {p.case_id ? `#${String(p.case_id).padStart(4, '0')}` : '--'}
                             </span>
                             <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {p.disease_name || 'Unknown'}
+                              {p.disease_name || t('Unknown')}
                             </span>
                             <span style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{formatDateStr(p.date_reported, dateFormat)}</span>
-                            <span style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap', maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.barangay_name || 'N/A'}</span>
+                            <span style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap', maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.barangay_name || t('N/A')}</span>
                             <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap', ...getStatusStyle(p.status) }}>
                               {p.status || '--'}
                             </span>
@@ -3999,17 +4170,17 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Age </label>
+                    <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Age')} </label>
                     <input type="number" min="0" max="120" placeholder="25" style={{ ...inputStyle, border: formErrors.age ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.age ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                       value={formData.age} onChange={e => setFormData({ ...formData, age: e.target.value })}
                       readOnly={isBhwReadOnly} />
-                    {formErrors.age && <span style={{ fontSize: '13px', color: '#ef4444', marginTop: '3px', display: 'block' }}>Age must be between 0 and 120</span>}
+                    {formErrors.age && <span style={{ fontSize: '13px', color: '#ef4444', marginTop: '3px', display: 'block' }}>{t('Age must be between 0 and 120')}</span>}
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Gender</label>
+                    <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Gender')}</label>
                     {isBhwReadOnly ? (
                       <div style={{ padding: '8px 12px', background: 'var(--input-bg, #f1f5f9)', borderRadius: '6px', fontSize: '15px', color: 'var(--text-main)' }}>
-                        {formData.gender || 'Not set'}
+                        {formData.gender || t('Not set')}
                       </div>
                     ) : (
                     <div style={{ position: 'relative' }} ref={genderRef}>
@@ -4026,7 +4197,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                               style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.gender === g ? 'rgba(18,153,104,0.12)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: formData.gender === g ? '600' : '400' }}
                               onMouseEnter={e => { if (formData.gender !== g) e.target.style.background = 'var(--input-bg)'; }}
                               onMouseLeave={e => { if (formData.gender !== g) e.target.style.background = 'transparent'; }}>
-                              {g}
+                              {t(g)}
                             </button>
                           ))}
                         </div>
@@ -4036,15 +4207,15 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   </div>
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Contact No.</label>
-                  <input type="text" placeholder="0918-234-2331" style={{ ...inputStyle, border: formErrors.contact ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.contact ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Contact No.')}</label>
+                  <input type="text" placeholder={t('0918-234-2331')} style={{ ...inputStyle, border: formErrors.contact ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.contact ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                     value={formData.contact} onChange={e => setFormData({ ...formData, contact: e.target.value })}
                     readOnly={isBhwReadOnly} />
-                  {formErrors.contact && <span style={{ fontSize: '13px', color: '#ef4444', marginTop: '3px', display: 'block' }}>Enter a valid PH number (e.g., 09123456789)</span>}
+                  {formErrors.contact && <span style={{ fontSize: '13px', color: '#ef4444', marginTop: '3px', display: 'block' }}>{t('Enter a valid PH number (e.g., 09123456789)')}</span>}
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Address </label>
-                  <input type="text" placeholder="123 Rizal St, San Isidro Cabuyao" style={inputStyle}
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Address')} </label>
+                  <input type="text" placeholder={t('123 Rizal St, San Isidro Cabuyao')} style={inputStyle}
                     value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })}
                     readOnly={isBhwReadOnly}
                     onBlur={async (e) => {
@@ -4249,16 +4420,16 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 {loginRole === 'BHW' ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Assigned Barangay</label>
+<label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Assigned Barangay')}</label>
                       <div style={{ padding: '8px 12px', background: 'var(--input-bg, #f1f5f9)', borderRadius: '6px', fontSize: '15px', color: 'var(--text-main)', fontWeight: '500' }}>
-                        {loginBarangay || scopedBarangayList.find(b => String(b.id) === String(formData.barangayId))?.name || 'Not set'}
+                        {loginBarangay || scopedBarangayList.find(b => String(b.id) === String(formData.barangayId))?.name || t('Not set')}
                       </div>
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Assigned Purok / Blk / Phase / Lot</label>
+                      <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Assigned Purok / Blk / Phase / Lot')}</label>
                     {isBhwReadOnly ? (
                       <div style={{ padding: '8px 12px', background: 'var(--input-bg, #f1f5f9)', borderRadius: '6px', fontSize: '15px', color: 'var(--text-main)' }}>
-                        {formData.purok || 'Not set'}
+                        {formData.purok || t('Not set')}
                       </div>
                     ) : (
                     <div style={{ position: 'relative' }} ref={purokRef}>
@@ -4272,7 +4443,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           border: `1px solid ${purokOpen ? '#3B82F6' : 'var(--border-color)'}`,
                         }}
                       >
-                          <span>{formData.purok || '- Select Location -'}</span>
+                          <span>{formData.purok || t('- Select Location -')}</span>
                         <span style={{
                           fontSize: '15px', opacity: 0.6, marginLeft: '8px',
                           transition: 'transform 0.2s', display: 'inline-block',
@@ -4297,7 +4468,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                             onMouseEnter={e => e.currentTarget.style.background = 'var(--input-bg)'}
                             onMouseLeave={e => { e.currentTarget.style.background = !formData.purok ? 'rgba(37,99,235,0.12)' : 'transparent'; }}
                           >
-                            -  Select Location -
+                            {t('- Select Location -')}
                           </div>
                           {dynamicPurokOptions.map(p => (
                             <div
@@ -4327,7 +4498,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Assigned Barangay</label>
                     {isBhwReadOnly ? (
                       <div style={{ padding: '8px 12px', background: 'var(--input-bg, #f1f5f9)', borderRadius: '6px', fontSize: '15px', color: 'var(--text-main)' }}>
-                        {scopedBarangayList.find(b => String(b.id) === String(formData.barangayId))?.name || 'Not set'}
+                        {scopedBarangayList.find(b => String(b.id) === String(formData.barangayId))?.name || t('Not set')}
                       </div>
                     ) : (
                     <div style={{ position: 'relative' }} ref={barangayFormRef}>
@@ -4342,7 +4513,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           background: formErrors.barangayId ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)',
                         }}
                       >
-                        <span>{scopedBarangayList.find(b => String(b.id) === String(formData.barangayId))?.name || '- Select Barangay -'}</span>
+                        <span>{scopedBarangayList.find(b => String(b.id) === String(formData.barangayId))?.name || t('- Select Barangay -')}</span>
                         <span style={{
                           fontSize: '15px', opacity: 0.6, marginLeft: '8px',
                           transition: 'transform 0.2s', display: 'inline-block',
@@ -4363,7 +4534,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                             onMouseEnter={e => e.currentTarget.style.background = 'var(--input-bg)'}
                             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                           >
-                            - Select Barangay -
+                            {t('- Select Barangay -')}
                           </div>
                           {scopedBarangayList.map(b => (
                             <div
@@ -4400,13 +4571,13 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               {/* RIGHT: Clinical Info */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <h4 style={{ margin: 0, color: 'var(--text-main)', fontSize: '15px', fontWeight: '700', paddingBottom: '8px' }}>
-                  Clinical Information
+                  {t('Clinical Information')}
                 </h4>
                 <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Disease Type</label>
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Disease Type')}</label>
                   {isBhwReadOnly ? (
                     <div style={{ padding: '8px 12px', background: 'var(--input-bg, #f1f5f9)', borderRadius: '6px', fontSize: '15px', color: 'var(--text-main)' }}>
-                      {formData.diseaseType || 'Not set'}
+                      {formData.diseaseType || t('Not set')}
                     </div>
                   ) : (
                   <div style={{ position: 'relative', outline: formErrors.diseaseType ? '2px solid #ef4444' : 'none', borderRadius: '6px' }} ref={diseaseFormRef}>
@@ -4420,7 +4591,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           border: `1px solid ${diseaseOpen ? '#3B82F6' : 'var(--border-color)'}`,
                       }}
                     >
-                      <span>{formData.diseaseType || '- Select Disease -'}</span>
+                      <span>{formData.diseaseType || t('- Select Disease -')}</span>
                       <span style={{
                         fontSize: '15px', opacity: 0.6, marginLeft: '8px',
                         transition: 'transform 0.2s', display: 'inline-block',
@@ -4441,7 +4612,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           onMouseEnter={e => e.currentTarget.style.background = 'var(--input-bg)'}
                           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                         >
-                          - Select Disease -
+                          {t('- Select Disease -')}
                         </div>
                         {ALL_DISEASE_OPTIONS.map(d => (
                           <div
@@ -4465,10 +4636,10 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   )}
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Severity Level</label>
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Severity Level')}</label>
                   {isBhwReadOnly ? (
                     <div style={{ padding: '8px 12px', background: 'var(--input-bg, #f1f5f9)', borderRadius: '6px', fontSize: '15px', color: 'var(--text-main)' }}>
-                      {formData.severity || 'Not set'}
+                      {formData.severity || t('Not set')}
                     </div>
                   ) : (
                   <div style={{ position: 'relative' }} ref={severityRef}>
@@ -4479,13 +4650,13 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     </button>
                     {severityOpen && (
                       <div style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 100, overflow: 'hidden' }}>
-                        {['Mild', 'Moderate', 'Severe', 'Asymptomatic'].sort().map(s => (
+                        {['Critical', 'Severe', 'Moderate', 'Mild', 'Asymptomatic'].map(s => (
                           <button key={s} type="button"
                             onClick={() => { setFormData({ ...formData, severity: s }); setSeverityOpen(false); }}
                             style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.severity === s ? 'rgba(18,153,104,0.12)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: formData.severity === s ? '600' : '400' }}
                             onMouseEnter={e => { if (formData.severity !== s) e.target.style.background = 'var(--input-bg)'; }}
                             onMouseLeave={e => { if (formData.severity !== s) e.target.style.background = 'transparent'; }}>
-                            {s}
+                            {t(s)}
                           </button>
                         ))}
                       </div>
@@ -4494,10 +4665,107 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   )}
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Patient Status</label>
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Case Type')}</label>
                   {isBhwReadOnly ? (
                     <div style={{ padding: '8px 12px', background: 'var(--input-bg, #f1f5f9)', borderRadius: '6px', fontSize: '15px', color: 'var(--text-main)' }}>
-                      {formData.status || 'Not set'}
+                      {formData.caseType || 'Probable'}
+                    </div>
+                  ) : (
+                  <div style={{ position: 'relative' }} ref={caseTypeRef}>
+                    <button type="button" onClick={() => setCaseTypeOpen(!caseTypeOpen)}
+                      style={{ ...inputStyle, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}>
+                      <span>{formData.caseType || 'Probable'}</span>
+                      <span style={{ fontSize: '15px', opacity: 0.6, transition: 'transform 0.2s', transform: caseTypeOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                    </button>
+                    {caseTypeOpen && (
+                      <div style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 100, overflow: 'hidden' }}>
+                        {['Suspected', 'Probable', 'Confirmed'].map(s => (
+                          <button key={s} type="button"
+                            onClick={() => { setFormData({ ...formData, caseType: s }); setCaseTypeOpen(false); }}
+                            style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.caseType === s ? 'rgba(18,153,104,0.12)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: formData.caseType === s ? '600' : '400' }}
+                            onMouseEnter={e => { if (formData.caseType !== s) e.target.style.background = 'var(--input-bg)'; }}
+                            onMouseLeave={e => { if (formData.caseType !== s) e.target.style.background = 'transparent'; }}>
+                            {t(s)}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  )}
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Disease Subtype')}</label>
+                  {isBhwReadOnly ? (
+                    <div style={{ padding: '8px 12px', background: 'var(--input-bg, #f1f5f9)', borderRadius: '6px', fontSize: '15px', color: 'var(--text-main)' }}>
+                      {formData.diseaseSubtype || t('Not set')}
+                    </div>
+                  ) : subtypeCustomOpen ? (
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        value={subtypeCustomText}
+                        onChange={e => setSubtypeCustomText(e.target.value)}
+                        placeholder={t('e.g. Dengue with Warning Signs')}
+                        style={{ ...inputStyle, flex: 1 }}
+                      />
+                      <button type="button"
+                        onClick={() => { const v = subtypeCustomText.trim(); if (v) { setFormData(prev => ({ ...prev, diseaseSubtype: v })); setSubtypeCustomOpen(false); setSubtypeCustomText(''); } }}
+                        style={{ padding: '8px 12px', borderRadius: '6px', background: 'var(--accent, #0d9488)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}>
+                        {t('Save')}
+                      </button>
+                      <button type="button"
+                        onClick={() => { setSubtypeCustomOpen(false); setSubtypeCustomText(''); }}
+                        style={{ padding: '8px 10px', borderRadius: '6px', background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '14px' }}>
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                  <div style={{ position: 'relative' }} ref={subtypeRef}>
+                    <button type="button" onClick={() => setSubtypeOpen(!subtypeOpen)}
+                      style={{ ...inputStyle, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}>
+                      <span style={{ color: formData.diseaseSubtype ? 'var(--text-main)' : 'var(--text-muted)' }}>{formData.diseaseSubtype || t('Not set (optional)')}</span>
+                      <span style={{ fontSize: '15px', opacity: 0.6, transition: 'transform 0.2s', transform: subtypeOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                    </button>
+                    {subtypeOpen && (() => {
+                      const diseaseRec = (allDiseases || []).find(d => String(d.name || '').toLowerCase() === String(formData.diseaseType || '').toLowerCase());
+                      const subtypeOptions = (diseaseRec && Array.isArray(diseaseRec.subtypes) && diseaseRec.subtypes.length) ? diseaseRec.subtypes : [];
+                      return (
+                        <div style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 100, overflow: 'hidden' }}>
+                          {subtypeOptions.length === 0 && (
+                            <div style={{ padding: '10px 14px', fontSize: '14px', color: 'var(--text-muted)' }}>{t('No preset subtypes for this disease — use the custom option below.')}</div>
+                          )}
+                          {subtypeOptions.map(s => (
+                            <button key={s} type="button"
+                              onClick={() => { setFormData({ ...formData, diseaseSubtype: s }); setSubtypeOpen(false); }}
+                              style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.diseaseSubtype === s ? 'rgba(18,153,104,0.12)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: formData.diseaseSubtype === s ? '600' : '400' }}
+                              onMouseEnter={e => { if (formData.diseaseSubtype !== s) e.target.style.background = 'var(--input-bg)'; }}
+                              onMouseLeave={e => { if (formData.diseaseSubtype !== s) e.target.style.background = 'transparent'; }}>
+                              {s}
+                            </button>
+                          ))}
+                          <button type="button"
+                            onClick={() => { setSubtypeCustomText(''); setSubtypeCustomOpen(true); setSubtypeOpen(false); }}
+                            style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--accent, #0d9488)', cursor: 'pointer', fontWeight: '600', borderTop: '1px solid var(--border-color)' }}>
+                            ✏️ {t('Add custom type...')}
+                          </button>
+                          {!!formData.diseaseSubtype && (
+                            <button type="button"
+                              onClick={() => { setFormData({ ...formData, diseaseSubtype: '' }); setSubtypeOpen(false); }}
+                              style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'transparent', border: 'none', textAlign: 'left', fontSize: '14px', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                              ✕ {t('Clear subtype')}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                  )}
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Patient Status')}</label>
+                  {isBhwReadOnly ? (
+                    <div style={{ padding: '8px 12px', background: 'var(--input-bg, #f1f5f9)', borderRadius: '6px', fontSize: '15px', color: 'var(--text-main)' }}>
+                      {formData.status || t('Not set')}
                     </div>
                   ) : (
                   <div style={{ position: 'relative' }} ref={patientStatusRef}>
@@ -4514,7 +4782,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                             style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.status === s ? 'rgba(18,153,104,0.12)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: formData.status === s ? '600' : '400' }}
                             onMouseEnter={e => { if (formData.status !== s) e.target.style.background = 'var(--input-bg)'; }}
                             onMouseLeave={e => { if (formData.status !== s) e.target.style.background = 'transparent'; }}>
-                            {s}
+                            {t(s)}
                           </button>
                         ))}
                       </div>
@@ -4526,21 +4794,21 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 {/* Status Transition Log */}
                 {editingCase && statusHistory.length > 0 && (
                   <div style={{ gridColumn: '1 / -1', marginTop: '4px', marginBottom: '4px' }}>
-                    <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: '600' }}>Status History</label>
+                    <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: '600' }}>{t('Status History')}</label>
                     <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
                       {statusHistory.map((entry, idx) => (
                         <div key={entry.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px', borderBottom: idx < statusHistory.length - 1 ? '1px solid var(--border-color)' : 'none', fontSize: '15px' }}>
                           <div style={{ width: '9px', height: '9px', borderRadius: '50%', background: idx === statusHistory.length - 1 ? '#129968' : '#94a3b8', flexShrink: 0, marginTop: '6px' }}></div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
-                              <span style={{ color: 'var(--text-muted)' }}>{entry.old_status || 'Initial'} → </span>
+                              <span style={{ color: 'var(--text-muted)' }}>{entry.old_status || t('Initial')} → </span>
                               <span style={{ fontWeight: '600', color: 'var(--text-main)' }}>{entry.new_status}</span>
                               {entry.changed_by_role && (
                                 <span style={{ fontSize: '12px', padding: '1px 8px', borderRadius: '10px', background: entry.changed_by_role === 'CHO' ? 'rgba(37,99,235,0.15)' : 'rgba(18,153,104,0.15)', color: entry.changed_by_role === 'CHO' ? 'var(--text-main)' : 'var(--text-main)', fontWeight: '600' }}>{entry.changed_by_role}</span>
                               )}
                             </div>
                             <div style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
-                              {entry.changed_by_name && <span>by {entry.changed_by_name}</span>}
+                              {entry.changed_by_name && <span>{t('by ')}{entry.changed_by_name}</span>}
                               {entry.changed_at && <span>{entry.changed_by_name ? ' · ' : ''}{formatDateTime(entry.changed_at, dateFormat)}</span>}
                             </div>
                             {entry.notes && <div style={{ color: 'var(--text-muted)', fontSize: '14px', fontStyle: 'italic', marginTop: '2px' }}>{entry.notes}</div>}
@@ -4552,9 +4820,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 )}
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Date of Onset</label>
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Date of Onset')}</label>
                   <DatePicker value={formData.onsetDate} dateFormat={dateFormat} clearable={false}
-                    placeholder="Select date" disabled={isBhwReadOnly} error={!!formErrors.onsetDate}
+                    placeholder={t('Select date')} disabled={isBhwReadOnly} error={!!formErrors.onsetDate}
                     style={{ width: '100%' }}
                     onChange={v => {
                       if (isBhwReadOnly) return;
@@ -4563,8 +4831,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     }} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Attending Physician</label>
-                  <input type="text" placeholder="Dr. Jose Reyes, MD" style={{ ...inputStyle, border: formErrors.physician ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.physician ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Attending Physician')}</label>
+                  <input type="text" placeholder={t('Dr. Jose Reyes, MD')} style={{ ...inputStyle, border: formErrors.physician ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.physician ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                     value={formData.physician} onChange={e => setFormData({ ...formData, physician: e.target.value })}
                     readOnly={isBhwReadOnly} />
                 </div>
@@ -4573,8 +4841,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
             {/* Symptoms full width */}
             <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Symptoms & Observations</label>
-              <textarea placeholder="e.g. Fever (39.5°C), Severe Headache, Muscle and Joint Pain..." rows="3"
+              <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Symptoms & Observations')}</label>
+              <textarea placeholder={t('e.g. Fever (39.5°C), Severe Headache, Muscle and Joint Pain...')} rows="3"
                 style={{ ...inputStyle, resize: 'vertical', border: formErrors.symptoms ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.symptoms ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                 value={formData.symptoms} onChange={e => setFormData({ ...formData, symptoms: e.target.value })}
                 readOnly={isBhwReadOnly} />
@@ -4583,7 +4851,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             {/* Location & Coordinates + map preview */}
             <div style={{ marginBottom: '28px' }}>
               <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-muted)', marginBottom: '10px', fontWeight: '600' }}>
-                Location & Coordinates
+                {t('Location & Coordinates')}
               </label>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', alignItems: 'start' }}>
@@ -4595,14 +4863,14 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   )}
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <div style={{ flex: 1 }}>
-                      <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px' }}>Latitude (N)</label>
-                      <input type="text" placeholder="e.g. 14.2253" style={{ ...inputStyle, border: formErrors.location ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.location ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
+                      <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px' }}>{t('Latitude (N)')}</label>
+                      <input type="text" placeholder={t('e.g. 14.2253')} style={{ ...inputStyle, border: formErrors.location ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.location ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                         value={formData.lat} onChange={e => setFormData({ ...formData, lat: e.target.value })}
                         readOnly={isBhwReadOnly} />
                     </div>
                     <div style={{ flex: 1 }}>
-                      <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px' }}>Longitude (E)</label>
-                      <input type="text" placeholder="e.g. 121.3025" style={{ ...inputStyle, border: formErrors.location ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.location ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
+                      <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px' }}>{t('Longitude (E)')}</label>
+                      <input type="text" placeholder={t('e.g. 121.3025')} style={{ ...inputStyle, border: formErrors.location ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.location ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                         value={formData.lng} onChange={e => setFormData({ ...formData, lng: e.target.value })}
                         readOnly={isBhwReadOnly} />
                     </div>
@@ -4620,19 +4888,19 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             <div style={{ display: 'flex', justifyContent: 'center', gap: '14px', paddingTop: '24px', borderTop: '1px solid var(--border-color)' }}>
               <button type="button" onClick={() => { setView('list'); setFilterPurok('All Puroks'); setIsBhwReadOnly(false); }}
                 style={{ padding: '10px 32px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-muted)', cursor: 'pointer', fontWeight: '500' }}>
-                Cancel
+                {t('Cancel')}
               </button>
               {isBhwReadOnly ? (
                 <>
                   {!showEditRequestForm ? (
                     <button type="button" onClick={() => setShowEditRequestForm(true)}
                       style={{ padding: '10px 28px', borderRadius: '6px', border: '1px solid #0d9488', background: 'rgba(13,148,136,0.1)', color: '#0d9488', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
-                      Edit Case to CHO
+                      {t('Edit Case to CHO')}
                     </button>
                   ) : (
                     <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                       <textarea
-                        placeholder="Describe what needs to be changed..."
+                        placeholder={t('Describe what needs to be changed...')}
                         value={editRequestNote}
                         onChange={e => setEditRequestNote(e.target.value)}
                         rows={2}
@@ -4641,9 +4909,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       <button type="button" onClick={() => handleSendEditRequest()}
                         disabled={!editRequestNote.trim()}
                         style={{ padding: '10px 28px', borderRadius: '6px', border: 'none', background: editRequestNote.trim() ? '#0d9488' : '#64748b', color: 'white', cursor: editRequestNote.trim() ? 'pointer' : 'not-allowed', fontWeight: '600', fontSize: '15px' }}>
-                        Send
+                        {t('Send')}
                       </button>
-                      <BackButton onClick={() => setShowEditRequestForm(false)}>Back</BackButton>
+                      <BackButton onClick={() => setShowEditRequestForm(false)}>{t('Back')}</BackButton>
                     </div>
                   )}
                 </>
@@ -4652,12 +4920,12 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   {!isEdit && !approvalRequest && (
                     <button type="button" onClick={(e) => handleSave(e, true)} disabled={submitLoading}
                       style={{ padding: '10px 28px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', cursor: submitLoading ? 'not-allowed' : 'pointer', fontWeight: '500' }}>
-                      Save As Draft
+                      {t('Save As Draft')}
                     </button>
                   )}
                   <button type="submit" disabled={submitLoading}
                     style={{ padding: '10px 40px', borderRadius: '6px', border: 'none', background: submitLoading ? '#6fd4a2' : approvalRequest ? '#2563EB' : '#129968', color: 'white', cursor: submitLoading ? 'not-allowed' : 'pointer', fontWeight: '600', fontSize: '15px' }}>
-                    {submitLoading ? 'Saving...' : (approvalRequest ? '✓ Approve Case' : (isEdit ? 'Update Case' : (loginRole === 'BHW' ? 'Submit to CHO' : 'Save Case')))}
+                    {submitLoading ? t('Saving...') : (approvalRequest ? t('✓ Approve Case') : (isEdit ? t('Update Case') : (loginRole === 'BHW' ? t('Submit to CHO') : t('Save Case'))))}
                   </button>
                 </>
               )}
@@ -4672,24 +4940,24 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               {routingStep === 'confirm' && (
                 <>
                   <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', color: 'var(--text-main)' }}>
-                    This address is not within our covered barangays, do you want to give it to {routingData?.targetUnit}?
+                    {`${t('This address is not within our covered barangays, do you want to give it to ')}${routingData?.targetUnit}${t('?')}`}
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
                     <button onClick={handleRoutingDelete}
                       style={{ padding: '10px 24px', borderRadius: '6px', border: '1px solid #ef4444', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontWeight: '500', fontSize: '15px' }}>
-                      ✕ Delete
+                      {t('✕ Delete')}
                     </button>
                     {loginRole === 'BHW' ? (
                       <>
                         <button onClick={handleRoutingSendToDescription}
                           style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#121358', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '15px' }}>
-                          → Send to {routingData?.targetUnit || 'CHO'}
+                          {`${t('→ Send to ')}${routingData?.targetUnit || 'CHO'}`}
                         </button>
                       </>
                     ) : (
                       <button onClick={handleRoutingSendToDescription}
                         style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#121358', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '15px' }}>
-                        → Send
+                        {t('→ Send')}
                       </button>
                     )}
                   </div>
@@ -4698,23 +4966,23 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               {routingStep === 'description' && (
                 <>
                   <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', color: 'var(--text-main)' }}>
-                    Add a note about this case
+                    {t('Add a note about this case')}
                   </div>
                   <textarea
                     value={routingDescription}
                     onChange={e => setRoutingDescription(e.target.value)}
-                    placeholder="Describe the issue or any additional information..."
+                    placeholder={t('Describe the issue or any additional information...')}
                     rows={4}
                     style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px', resize: 'vertical', boxSizing: 'border-box', outline: 'none' }}
                   />
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px' }}>
                     <button onClick={handleRoutingCancelDescription}
                       style={{ padding: '10px 24px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-main)', cursor: 'pointer', fontWeight: '500', fontSize: '15px' }}>
-                      ← Cancel
+                      {t('← Cancel')}
                     </button>
                     <button onClick={handleRoutingSend}
                       style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#121358', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '15px' }}>
-                      Send
+                      {t('Send')}
                     </button>
                   </div>
                 </>
@@ -4728,29 +4996,31 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           <div className="cdms-modal-backdrop" style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)' }}>
             <div className="cdms-modal-card" style={{ background: 'var(--bg-surface)', borderRadius: '12px', padding: '28px', maxWidth: '480px', width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }}>
               <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px', color: 'var(--text-main)' }}>
-                Submit to another CHO unit?
+                {t('Submit to another CHO unit?')}
               </div>
               <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '20px', lineHeight: '1.6' }}>
                 {crossUnit.routeBrgy ? (
-                  <>This case is located in <strong style={{ color: 'var(--text-main)' }}>Brgy. {crossUnit.routeBrgy}</strong> - under <strong style={{ color: 'var(--text-main)' }}>{crossUnit.targetUnit}</strong>.</>
+                  <>{t('This case is located in ')}<strong style={{ color: 'var(--text-main)' }}>{t('Brgy. ')}{crossUnit.routeBrgy}</strong>{t(' - under ')}<strong style={{ color: 'var(--text-main)' }}>{crossUnit.targetUnit}</strong>{t('.')}</>
                 ) : (
-                  <>This case appears to belong to a different CHO unit (<strong style={{ color: 'var(--text-main)' }}>{crossUnit.targetUnit}</strong>).</>
+                  <>{t('This case appears to belong to a different CHO unit (')}<strong style={{ color: 'var(--text-main)' }}>{crossUnit.targetUnit}</strong>{t(').')}</>
                 )}{' '}
-                Submit to that unit's CHO for approval?
+                {t('Submit to that unit\'s CHO for approval?')}
               </div>
               <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
                 <button onClick={() => setCrossUnit(null)}
                   style={{ padding: '10px 24px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-main)', cursor: 'pointer', fontWeight: '500', fontSize: '15px' }}>
-                  Cancel
+                  {t('Cancel')}
                 </button>
                 <button onClick={() => performAddRequestSubmit(crossUnit.payload)}
                   style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#129968', color: '#fff', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
-                  ✓ Submit to {crossUnit.targetUnit}
+                  {`${t('✓ Submit to ')}${crossUnit.targetUnit}`}
                 </button>
               </div>
             </div>
           </div>
         )}
+
+      <ExportPreviewModal preview={exportPreview} onClose={() => setExportPreview(null)} />
       </div>
     );
   }

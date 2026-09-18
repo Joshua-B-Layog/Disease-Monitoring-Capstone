@@ -575,6 +575,14 @@ html, body, #root {
 
 .form-input::placeholder { color: var(--text-muted); }
 
+/* Login/auth screen: more compact inputs (overrides the app-wide .form-input) */
+.login-form-container .form-input {
+  font-size: 16px !important;
+  padding: 12px 14px;
+}
+.login-form-container .form-group label { font-size: 14px; margin-bottom: 6px; }
+.login-form-container .submit-btn { font-size: 15px; padding: 12px 14px; }
+
 /* Input field left icons */
 .cdms-field-icon {
   padding-left: 42px;

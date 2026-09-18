@@ -5,6 +5,7 @@ import { API_URL } from './config';
 import { cacheCases, getCachedCases, isOnline } from './offlineSync';
 import { formatDate as formatDateStr } from './formatDate';
 import DatePicker from './components/DatePicker';
+import ExportPreviewModal from './components/ExportPreview';
 
 // Counts up (or down) to `value` whenever it changes
 const AnimatedNumber = ({ value, style }) => {
@@ -99,6 +100,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   const [ellipsisPageInput, setEllipsisPageInput] = useState('');
   const ellipsisRef = useRef(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exportPreview, setExportPreview] = useState(false);
   const exportRef = useRef(null);
   const [chartMounted, setChartMounted] = useState(false);
   const [hoveredBar, setHoveredBar] = useState(null);
@@ -777,7 +779,6 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     return all;
   })();
 
-  const exportBars = periodChart ? monthBars : (isBhw ? diseaseBars : sortedBars);
   const exportTitle = periodChart
     ? (dashPeriod === 'weekly'
         ? `Weekly Cases - ${selectedDisease} (${formatDateStr(dateRange.start, dateFormat)} to ${formatDateStr(dateRange.end, dateFormat)})`
@@ -789,7 +790,6 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
               ? `Custom Range (${formatDateStr(dateRange.start, dateFormat)} to ${formatDateStr(dateRange.end, dateFormat)})`
               : `Yearly Cases (${dashYear})`)
     : (isBhw ? t('All Diseases - Case Counts') : `${selectedDisease} Cases by Barangay`);
-  const exportHighest = periodChart ? monthMax : (isBhw ? (diseaseBars.length > 0 ? diseaseBars[0].count : 1) : highestCount);
 
   const yearOptionStyle = (active) => ({
     padding: '8px 14px', cursor: 'pointer', fontSize: '15px',
@@ -845,189 +845,295 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       </table>`;
   };
 
-  // ─── SHARED: build case table rows HTML ───
-  const buildTableRowsHTML = (caseList) => caseList.map(c =>
-    `<tr>
-      <td>${c.case_id}</td>
-      <td>${c.patient_name || ''}</td>
-      <td>${c.age || '--'}</td>
-      <td>${c.barangay_name || ''}</td>
-      <td>${c.disease_name || ''}</td>
-      <td>${c.severity || 'N/A'}</td>
-      <td>${translateStatus(c.status) || ''}</td>
-    </tr>`
-  ).join('');
-
-  // --- EXPORT: WORD ---
-  const handleExportWord = () => {
-    const eBars = exportBars;
-    const eTitle = exportTitle;
-    const eHighest = exportHighest;
-    const html = `
-      <html><head><meta charset="utf-8"><title>CDMS Report</title>
-      <style>
-        body { font-family: Arial, sans-serif; padding: 32px; font-size: 13px; color: #111; }
-        h2 { color: #1e3a8a; margin-bottom: 4px; }
-        p { color: #555; margin: 0 0 20px 0; }
-        h3 { color: #1e3a8a; margin: 24px 0 10px 0; font-size: 15px; }
-        table.main { width: 100%; border-collapse: collapse; margin-top: 8px; }
-        table.main th { background: #1e3a8a; color: white; padding: 9px 10px; text-align: center; font-size: 12px; }
-        table.main td { padding: 8px 10px; border-bottom: 1px solid #e5e7eb; text-align: center; font-size: 12px; }
-        table.main tr:nth-child(even) td { background: #f9fafb; }
-        .bar-section { margin: 8px 0 24px 0; }
-      </style></head><body>
-      <h2>${t('Cabuyao Disease Monitoring System - Dashboard Export')}</h2>
-      <p>${t('Generated:')} ${formatDateStr(new Date(), dateFormat)} &nbsp;|&nbsp; ${t('Date Range:')} ${formatDateStr(dateRange.start, dateFormat)} ${t('to')} ${formatDateStr(dateRange.end, dateFormat)}</p>
-
-      <h3>${eTitle}</h3>
-      <div class="bar-section">${buildBarChartHTML(eBars, eTitle, eHighest)}</div>
-
-      <h3>${t('Case Records')}</h3>
-      <table class="main">
-        <thead><tr><th>${t('ID')}</th><th>${t('Patient')}</th><th>${t('Age')}</th><th>${t('Barangay')}</th><th>${t('Disease')}</th><th>${t('Severity')}</th><th>${t('Status')}</th></tr></thead>
-        <tbody>${buildTableRowsHTML(displayCases)}</tbody>
-      </table>
-      </body></html>`;
-    const blob = new Blob(['\ufeff' + html], { type: 'application/msword' });
+  // ─── EXPORT HELPERS (preview-before-download flow) ───
+  const downloadBlob = (blob, filename) => {
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url;
-    a.download = 'CDMS_Dashboard_Export.doc'; a.click();
-    setShowExportMenu(false);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
-  // --- EXPORT: EXCEL ---
-  const handleExportExcel = () => {
-    const headers = `${t('Case ID')}\t${t('Patient Name')}\t${t('Age')}\t${t('Barangay')}\t${t('Disease')}\t${t('Severity')}\t${t('Status')}\t${t('Date Reported')}\n`;
-    const rows = displayCases.map(c =>
-      `${c.case_id}\t${c.patient_name || ''}\t${c.age || ''}\t${c.barangay_name || ''}\t${c.disease_name || ''}\t${c.severity || ''}\t${translateStatus(c.status) || ''}\t${formatDateStr(c.date_reported, dateFormat)}`
-    ).join('\n');
-    const blob = new Blob([headers + rows], { type: 'application/vnd.ms-excel' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url;
-    a.download = 'CDMS_Dashboard_Export.xls'; a.click();
-    setShowExportMenu(false);
+  const openPrint = (html) => {
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    setTimeout(() => { try { w.focus(); w.print(); } catch (e) { /* ignore */ } }, 300);
   };
 
-  // --- EXPORT: CSV ---
-  const handleExportCSV = () => {
-    const headers = `${t('Case ID')},${t('Patient Name')},${t('Age')},${t('Barangay')},${t('Disease')},${t('Severity')},${t('Status')},${t('Date Reported')}\n`;
-    const rows = displayCases.map(c =>
-      `"${c.case_id}","${c.patient_name || ''}","${c.age || ''}","${c.barangay_name || ''}","${c.disease_name || ''}","${c.severity || ''}","${translateStatus(c.status) || ''}","${formatDateStr(c.date_reported, dateFormat)}"`
-    ).join('\n');
-    const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url;
-    a.download = 'CDMS_Dashboard_Export.csv'; a.click();
-    setShowExportMenu(false);
+  const buildChartSectionHTML = (sectionTitle, bars, highest) =>
+    `<h3>${sectionTitle}</h3><div class="bar-section">${buildBarChartHTML(bars, sectionTitle, highest)}</div>`;
+
+  const buildStatusSectionHTML = () => {
+    if (STATUS_DIST.length === 0) {
+      return `<h3>${t('Case Status Distribution')}</h3><p style="color:#64748b;font-size:14px;">${t('No cases found.')}</p>`;
+    }
+    const sTotal = STATUS_DIST.reduce((s, [, n]) => s + n, 0);
+    const rows = STATUS_DIST.map(([label, n, color]) => {
+      const pct = sTotal > 0 ? Math.round((n / sTotal) * 100) : 0;
+      return `<tr class="srow"><td>${label}</td><td style="width:180px;"><div style="background:#e2e8f0;border-radius:4px;height:20px;overflow:hidden;"><div style="background:${color};height:100%;width:${pct}%;border-radius:4px;"></div></div></td><td style="text-align:right;font-weight:700;">${n}</td><td style="text-align:right;color:#64748b;width:70px;">${pct}%</td></tr>`;
+    }).join('');
+    return `<h3>${t('Case Status Distribution')}</h3><table class="alt"><tbody>${rows}</tbody></table>`;
   };
 
-  // --- EXPORT: PPT ---
-  const handleExportPPT = () => {
-    const eBars = exportBars;
-    const eTitle = exportTitle;
-    const eHighest = exportHighest;
-    const html = `
-      <html><head><meta charset="utf-8"><title>CDMS Slide Export</title>
-      <style>
-        body { font-family: Arial, sans-serif; background: #0B1120; color: white; padding: 40px; }
-        h1 { color: #129968; margin-bottom: 4px; } 
-        h2 { color: #3b82f6; margin-top: 36px; margin-bottom: 12px; font-size: 18px; }
-        p { color: #9ca3af; margin: 0 0 24px 0; font-size: 13px; }
-        .stats { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
-        .stat { background: #1e293b; padding: 18px 28px; border-radius: 8px; text-align: center; min-width: 100px; }
-        .stat .num { font-size: 32px; font-weight: bold; color: #129968; }
-        .stat .lbl { font-size: 12px; color: #9ca3af; margin-top: 4px; }
-        table.bars { width: 100%; border-collapse: collapse; }
-        table.bars td { padding: 5px 8px; font-size: 13px; color: #e2e8f0; }
-        .track { background: #334155; border-radius: 4px; height: 24px; width: 100%; overflow: hidden; position: relative; }
-        .fill-red { background: #ef4444; height: 100%; border-radius: 4px; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; color: #fff; font-weight: 700; font-size: 14px; box-sizing: border-box; }
-        .fill-amber { background: #D97706; height: 100%; border-radius: 4px; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; color: #fff; font-weight: 700; font-size: 14px; box-sizing: border-box; }
-        .fill-blue { background: #3b82f6; height: 100%; border-radius: 4px; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; color: #fff; font-weight: 700; font-size: 14px; box-sizing: border-box; }
-        footer { color: #4b5563; font-size: 12px; margin-top: 40px; border-top: 1px solid #1e293b; padding-top: 12px; }
-      </style></head><body>
-      <h1>${t('Cabuyao Disease Monitoring System')}</h1>
-      <p>${t('Dashboard Export')} &nbsp;|&nbsp; ${t('Generated:')} ${formatDateStr(new Date(), dateFormat)} &nbsp;|&nbsp; ${formatDateStr(dateRange.start, dateFormat)} ${t('to')} ${formatDateStr(dateRange.end, dateFormat)}</p>
-
-      <div class="stats">
-        <div class="stat"><div class="num">${totalCases}</div><div class="lbl">${t('Total Cases')}</div></div>
-        <div class="stat"><div class="num" style="color:#D97706;">${activeCases}</div><div class="lbl">${t('Active')}</div></div>
-        <div class="stat"><div class="num">${recoveredCases}</div><div class="lbl">${t('Recovered')}</div></div>
-        <div class="stat"><div class="num" style="color:#ef4444;">${deathCases}</div><div class="lbl">${t('Deaths')}</div></div>
-      </div>
-
-      <h2>${eTitle}</h2>
-      ${eBars.length === 0
-        ? `<p>${t('No cases found.')}</p>`
-        : `<table class="bars"><tbody>
-            ${eBars.map((bar, i) => {
-              const pct = eHighest > 0 ? Math.round((bar.count / eHighest) * 100) : 0;
-              const fillClass = i === 0 ? 'fill-red' : i === 1 ? 'fill-amber' : 'fill-blue';
-              return `<tr>
-                <td style="min-width:170px;white-space:nowrap;">${bar.label}</td>
-                <td style="width:100%;"><div class="track"><div class="${fillClass}" style="width:${pct}%;">${bar.count > 0 ? bar.count : ''}</div></div></td>
-              </tr>`;
-            }).join('')}
-          </tbody></table>`
-      }
-
-      <footer>${t('Copy content into PowerPoint for presentation.')} &copy; 2026 City Health Office (CHO) Cabuyao</footer>
-      </body></html>`;
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url;
-    a.download = 'CDMS_Slide_Export.html'; a.click();
-    setShowExportMenu(false);
+  const buildAlertsSectionHTML = () => {
+    if (thresholdAlerts.length === 0) return '';
+    return `<h3>${t('Alerts')}</h3>${thresholdAlerts.map(a =>
+      `<div class="alert ${a.color === '#D97706' ? 'amber' : ''}" style="border-left:4px solid ${a.color};"><strong>${a.label}</strong> &mdash; ${a.detail}</div>`
+    ).join('')}`;
   };
 
-  // --- PRINT ---
-  const handlePrint = () => {
-    const eBars = exportBars;
-    const eTitle = exportTitle;
-    const eHighest = exportHighest;
-    const rows = displayCases.map(c =>
-      `<tr>
-        <td>#${String(c.case_id).padStart(3,'0')}</td>
-        <td>${c.patient_name || ''}</td>
-        <td>${c.age || '--'}</td>
-        <td>${c.barangay_name || ''}</td>
-        <td>${c.disease_name || ''}</td>
-        <td>${c.severity || 'N/A'}</td>
-<td>${translateStatus(c.status) || ''}</td>
-      </tr>`
-    ).join('');
+  // Full-dashboard report for Word / PDF(Print) / PPT slide exports
+  const buildDashboardReportHTML = (variant) => {
+    const isSlide = variant === 'slide';
+    const weekBars = buildWeekBars();
+    const weekMax = weekBars.length > 0 ? Math.max(...weekBars.map(b => b.count)) : 1;
+    const monthWeeks = buildMonthlyWeekBars();
+    const monthWeeksMax = monthWeeks.length > 0 ? Math.max(...monthWeeks.map(b => b.count)) : 1;
+    const quarterMonths = buildMonthBars([qStartMonth, qStartMonth + 1, qStartMonth + 2]);
+    const quarterMax = quarterMonths.length > 0 ? Math.max(...quarterMonths.map(b => b.count)) : 1;
+    const yearMonths = buildMonthBars([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    const yearMax = yearMonths.length > 0 ? Math.max(...yearMonths.map(b => b.count)) : 1;
 
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-      <html><head><title>CDMS Print Report</title>
-      <style>
-        body { font-family: Arial, sans-serif; padding: 28px; font-size: 13px; color: #111; }
-        h2 { color: #1e3a8a; margin-bottom: 2px; }
-        p { color: #555; margin: 0 0 20px 0; }
-        h3 { color: #1e3a8a; margin: 20px 0 8px 0; font-size: 14px; }
-        table.main { width: 100%; border-collapse: collapse; }
-        table.main th { background: #1e3a8a; color: white; padding: 9px 10px; text-align: center; font-size: 12px; }
-        table.main td { padding: 8px 10px; border-bottom: 1px solid #e5e7eb; text-align: center; font-size: 12px; }
-        table.main tr:nth-child(even) td { background: #f9fafb; }
-        .bar-section { margin-bottom: 24px; }
-        @media print { button { display: none; } }
-      </style></head><body>
-      <h2>${t('Cabuyao Disease Monitoring System')}</h2>
-      <p>${t('Report generated:')} ${formatDateStr(new Date(), dateFormat)} &nbsp;|&nbsp; ${t('Date Range:')} ${formatDateStr(dateRange.start, dateFormat)} ${t('to')} ${formatDateStr(dateRange.end, dateFormat)}</p>
+    const brgyCounts = {};
+    displayCases.forEach(c => { if (c.barangay_name) brgyCounts[c.barangay_name] = (brgyCounts[c.barangay_name] || 0) + 1; });
+    const topBrgy = Object.entries(brgyCounts).sort((a, b) => b[1] - a[1]).map(([label, count]) => ({ label, count }));
+    const topBrgyMax = topBrgy.length > 0 ? topBrgy[0].count : 1;
+    const topDiseases = diseaseBars.filter(b => b.count > 0);
+    const topDiseaseMax = topDiseases.length > 0 ? topDiseases[0].count : 1;
 
-      <h3>${eTitle}</h3>
-      <div class="bar-section">${buildBarChartHTML(eBars, eTitle, eHighest)}</div>
+    const trendTxt = (td) => {
+      if (!td) return '';
+      if (td.pct === '0' || td.pct === '+0' || td.pct === '-0') return `<span class="trend-flat">${t('Flat')}</span>`;
+      return td.up
+        ? `<span class="trend-up">&#9650; +${td.pct}%</span>`
+        : `<span class="trend-down">&#9660; ${td.pct}%</span>`;
+    };
+    const statCards = [
+      { n: totalCases, l: t('Total Cases'), c: '#1e3a8a', td: trendDelta(totalCases, prevTotal) },
+      { n: activeCases, l: t('Active'), c: '#D97706', td: trendDelta(activeCases, prevActive) },
+      { n: recoveredCases, l: t('Recovered'), c: '#0D7A4E', td: trendDelta(recoveredCases, prevRecovered) },
+      { n: deathCases, l: t('Deaths'), c: '#DC2626', td: trendDelta(deathCases, prevDeaths) },
+    ];
+    const statCardsHTML = `<table class="statgrid"><tbody><tr>${statCards.map(s =>
+      `<td><div class="statnum" style="color:${s.c};">${s.n}</div><div class="statdir">${trendTxt(s.td)}</div><div class="statlbl">${s.l}</div></td>`
+    ).join('')}</tr></tbody></table>`;
+
+    const monthLabel = MONTH_FULL[new Date(dateRange.start || Date.now()).getMonth()] || dashYear;
+    const headCSS = isSlide ? `
+      body { font-family: 'Segoe UI', Arial, sans-serif; background:#0B1120; color:white; padding:40px; }
+      h1 { color: #129968; margin-bottom: 4px; font-size: 26px; }
+      h2 { color: #3b82f6; margin-top: 34px; font-size: 20px; border-bottom: 1px solid #1e293b; padding-bottom: 8px; }
+      p.meta { color: #94a3b8; margin: 0 0 18px 0; font-size: 13px; }
+      .title-line { color:#e2e8f0; font-size:15px; font-weight:600; margin: 0 0 4px 0; }
+      h3 { color: #3b82f6; margin: 22px 0 8px 0; font-size: 15px; }
+      table.main { width:100%; border-collapse: collapse; margin-top: 8px; }
+      table.main th { background:#1e293b; color:#e2e8f0; padding:8px 10px; text-align:center; font-size:12px; }
+      table.main td { padding:7px 10px; border-bottom:1px solid #1e293b; text-align:center; font-size:12px; color:#e2e8f0; }
+      table.alt { width:100%; border-collapse:collapse; }
+      table.alt td { padding:6px 10px; font-size:13px; color:#e2e8f0; }
+      .srow:nth-child(even) td { background:#1e293b; }
+      .bar-section { margin: 6px 0 22px 0; }
+      .statgrid { width:100%; border-collapse:separate; border-spacing:12px 0; }
+      .statgrid td { text-align:center; background:#1e293b; border-radius:10px; padding:14px 12px; }
+      .statnum { font-size:30px; font-weight:700; }
+      .statdir { margin-top:2px; }
+      .statlbl { font-size:13px; color:#94a3b8; margin-top:4px; }
+      .trend-up { color:#f87171; font-size:12px; }
+      .trend-down { color:#34d399; font-size:12px; }
+      .trend-flat { color:#64748b; font-size:12px; }
+      .alert { border:1px solid #f87171; background:#450a0a; border-radius:8px; padding:8px 14px; margin:6px 0; font-size:13px; color:#fecaca; }
+      .alert.amber { border-color:#fcd34d; background:#451a03; color:#fde68a; }
+      footer { color:#4b5563; font-size:12px; margin-top:40px; border-top:1px solid #1e293b; padding-top:12px; }
+    ` : `
+      body { font-family: Arial, sans-serif; padding: 32px; font-size: 13px; color: #111; }
+      h2 { color: #1e3a8a; margin-bottom: 4px; }
+      h3 { color: #1e3a8a; margin: 22px 0 8px 0; font-size: 15px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
+      p.meta { color: #555; margin: 0 0 8px 0; }
+      .title-line { font-size: 14px; font-weight: 600; margin: 0 0 4px 0; }
+      table.main { width: 100%; border-collapse: collapse; margin-top: 8px; }
+      table.main th { background: #1e3a8a; color: white; padding: 8px 10px; text-align: center; font-size: 11px; }
+      table.main td { padding: 7px 10px; border-bottom: 1px solid #e5e7eb; text-align: center; font-size: 11px; }
+      table.main tr:nth-child(even) td { background: #f9fafb; }
+      table.alt { width: 100%; border-collapse: collapse; }
+      table.alt td { padding: 6px 10px; font-size: 12px; }
+      .srow:nth-child(even) td { background: #f9fafb; }
+      .bar-section { margin: 6px 0 20px 0; }
+      .statgrid { width: 100%; border-collapse: separate; border-spacing: 10px 0; }
+      .statgrid td { text-align: center; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 10px; }
+      .statnum { font-size: 28px; font-weight: 700; }
+      .statdir { margin-top: 2px; }
+      .statlbl { font-size: 12px; color: #555; margin-top: 4px; }
+      .trend-up { color: #DC2626; font-size: 11px; }
+      .trend-down { color: #059669; font-size: 11px; }
+      .trend-flat { color: #64748b; font-size: 11px; }
+      .alert { border: 1px solid #fca5a5; background: #fef2f2; border-radius: 8px; padding: 8px 14px; margin: 6px 0; font-size: 12px; }
+      .alert.amber { border-color: #fcd34d; background: #fffbeb; }
+      .print-btn { padding: 10px 24px; background: #1e3a8a; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; margin-top: 24px; }
+      @media print { .print-btn { display: none; } }
+    `;
+
+    const rangeLine = `${formatDateStr(dateRange.start, dateFormat)} ${t('to')} ${formatDateStr(dateRange.end, dateFormat)}`;
+    return `
+      <html><head><meta charset="utf-8"><title>CDMS Dashboard Report</title>
+      <style>${headCSS}</style></head><body>
+      <h1 style="${isSlide ? 'color:#129968;margin:0 0 4px 0;' : 'color:#1e3a8a;margin:0 0 4px 0;'}" ${isSlide ? '' : ''}>${t('Cabuyao Disease Monitoring System')}</h1>
+      ${isSlide ? '' : `<h2>${t('Dashboard Export')}</h2>`}
+      <p class="meta">${t('Generated:')} ${formatDateStr(new Date(), dateFormat)} &nbsp;|&nbsp; ${t('Date Range:')} ${rangeLine} &nbsp;|&nbsp; ${t('Cases:')} ${totalCases}</p>
+
+      <h3>${t('Key Statistics')}</h3>
+      ${statCardsHTML}
+
+      ${buildAlertsSectionHTML()}
+
+      <h3>${t('Weekly Trend')}</h3>
+      ${weekBars.length === 0 ? `<p style="color:#64748b;font-size:14px;">${t('No cases found.')}</p>` : buildBarChartHTML(weekBars, t('Weekly Trend'), weekMax)}
+      ${buildChartSectionHTML(`${t('Monthly')} (${monthLabel} ${dashYear})`, monthWeeks, monthWeeksMax)}
+      ${buildChartSectionHTML(`${t('Quarterly')} (Q${dashQuarter} ${dashYear})`, quarterMonths, quarterMax)}
+      ${buildChartSectionHTML(`${t('Yearly')} (${dashYear})`, yearMonths, yearMax)}
+      ${buildChartSectionHTML(t('Top Barangays'), topBrgy, topBrgyMax)}
+      ${buildChartSectionHTML(t('Top Diseases'), topDiseases, topDiseaseMax)}
+      ${buildStatusSectionHTML()}
 
       <h3>${t('Recent Case Records')}</h3>
       <table class="main">
-        <thead><tr><th>${t('ID')}</th><th>${t('Patient Name')}</th><th>${t('Age')}</th><th>${t('Barangay')}</th><th>${t('Disease')}</th><th>${t('Severity')}</th><th>${t('Status')}</th></tr></thead>
-        <tbody>${rows}</tbody>
+        <thead><tr><th>${t('ID')}</th><th>${t('Patient')}</th><th>${t('Age')}</th><th>${t('Barangay')}</th><th>${t('Disease')}</th><th>${t('Severity')}</th><th>${t('Case Type')}</th><th>${t('Disease Subtype')}</th><th>${t('Status')}</th><th>${t('Date Reported')}</th></tr></thead>
+        <tbody>${displayCases.map(c =>
+          `<tr><td>#${String(c.case_id).padStart(3, '0')}</td><td>${c.patient_name || ''}</td><td>${c.age || '--'}</td><td>${c.barangay_name || ''}</td><td>${c.disease_name || ''}</td><td>${c.severity || 'N/A'}</td><td>${c.case_type || ''}</td><td>${c.disease_type || ''}</td><td>${translateStatus(c.status) || ''}</td><td>${formatDateStr(c.date_reported, dateFormat)}</td></tr>`
+        ).join('')}</tbody>
       </table>
       <br/>
-      <button onclick="window.print();" style="padding:10px 24px;background:#1e3a8a;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">
-        🖨️ {t('Print / Save as PDF')}
-      </button>
-      </body></html>`);
-    printWindow.document.close();
+      ${isSlide ? `<footer>${t('Copy content into PowerPoint for presentation.')} &copy; 2026 City Health Office (CHO) Cabuyao</footer>`
+                 : `<button class="print-btn" onclick="window.print();">🖨️ ${t('Print / Save as PDF')}</button>`}
+      </body></html>`;
+  };
+
+  // --- EXPORT: WORD (preview first) ---
+  const handleExportWord = () => {
+    const html = buildDashboardReportHTML('doc');
+    setExportPreview({
+      title: t('Preview: Word Document'),
+      html,
+      actions: [
+        {
+          label: `⬇ ${t('Download Word (.doc)')}`,
+          primary: true,
+          onClick: () => {
+            downloadBlob(new Blob(['\ufeff' + html], { type: 'application/msword' }), 'CDMS_Dashboard_Export.doc');
+            setExportPreview(null);
+          },
+        },
+        {
+          label: `🖨 ${t('Print / Save as PDF')}`,
+          primary: false,
+          onClick: () => openPrint(html),
+        },
+      ],
+    });
+    setShowExportMenu(false);
+  };
+
+  // --- EXPORT: EXCEL (preview first) ---
+  const handleExportExcel = () => {
+    const columns = [t('Case ID'), t('Patient Name'), t('Age'), t('Barangay'), t('Disease'), t('Severity'), t('Status'), t('Date Reported')];
+    const rows = displayCases.map(c => [
+      c.case_id,
+      c.patient_name || '',
+      c.age || '',
+      c.barangay_name || '',
+      c.disease_name || '',
+      c.severity || '',
+      translateStatus(c.status) || '',
+      formatDateStr(c.date_reported, dateFormat),
+    ]);
+    const tab = columns.join('\t') + '\n' + rows.map(r => r.join('\t')).join('\n');
+    setExportPreview({
+      title: t('Preview: Excel Export'),
+      columns,
+      rows,
+      actions: [{
+        label: `⬇ ${t('Download Excel (.xls)')}`,
+        primary: true,
+        onClick: () => {
+          downloadBlob(new Blob([tab], { type: 'application/vnd.ms-excel' }), 'CDMS_Dashboard_Export.xls');
+          setExportPreview(null);
+        },
+      }],
+    });
+    setShowExportMenu(false);
+  };
+
+  // --- EXPORT: CSV (preview first) ---
+  const handleExportCSV = () => {
+    const columns = [t('Case ID'), t('Patient Name'), t('Age'), t('Barangay'), t('Disease'), t('Severity'), t('Status'), t('Date Reported')];
+    const rows = displayCases.map(c => [
+      c.case_id,
+      c.patient_name || '',
+      c.age || '',
+      c.barangay_name || '',
+      c.disease_name || '',
+      c.severity || '',
+      translateStatus(c.status) || '',
+      formatDateStr(c.date_reported, dateFormat),
+    ]);
+    const csv = columns.join(',') + '\n' + rows.map(r => `"${r.join('","')}"`).join('\n');
+    setExportPreview({
+      title: t('Preview: CSV Export'),
+      columns,
+      rows,
+      actions: [{
+        label: `⬇ ${t('Download CSV (.csv)')}`,
+        primary: true,
+        onClick: () => {
+          downloadBlob(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' }), 'CDMS_Dashboard_Export.csv');
+          setExportPreview(null);
+        },
+      }],
+    });
+    setShowExportMenu(false);
+  };
+
+  // --- EXPORT: PPT (preview first) ---
+  const handleExportPPT = () => {
+    const html = buildDashboardReportHTML('slide');
+    setExportPreview({
+      title: t('Preview: PPT Slide'),
+      html,
+      actions: [
+        {
+          label: `⬇ ${t('Download PPT (.html)')}`,
+          primary: true,
+          onClick: () => {
+            downloadBlob(new Blob([html], { type: 'text/html' }), 'CDMS_Slide_Export.html');
+            setExportPreview(null);
+          },
+        },
+        {
+          label: `🖨 ${t('Print / Save as PDF')}`,
+          primary: false,
+          onClick: () => openPrint(html),
+        },
+      ],
+    });
+    setShowExportMenu(false);
+  };
+
+  // --- PRINT (preview first) ---
+  const handlePrint = () => {
+    const html = buildDashboardReportHTML('doc');
+    setExportPreview({
+      title: t('Preview: Print Report'),
+      html,
+      actions: [{
+        label: `🖨 ${t('Print / Save as PDF')}`,
+        primary: true,
+        onClick: () => openPrint(html),
+      }],
+    });
+    setShowExportMenu(false);
   };
 
   // --- STATUS BADGE STYLE ---
@@ -1775,6 +1881,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         </div>
       </div>
 
+      <ExportPreviewModal preview={exportPreview} onClose={() => setExportPreview(null)} />
     </div>
   );
 };

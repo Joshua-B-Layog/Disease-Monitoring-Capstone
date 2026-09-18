@@ -365,15 +365,15 @@ useEffect(() => {
     return () => clearInterval(interval);
   }, []);
 
-  // ── Session idle timeout (30 min) ──
+  // ── Session idle timeout (2 hours) ──
   const [idleWarning, setIdleWarning] = useState(false);
   const idleTimerRef = useRef(null);
   const warningTimerRef = useRef(null);
 
   useEffect(() => {
     if (!isLoggedIn) return;
-    const IDLE_LIMIT = 30 * 60 * 1000;
-    const WARNING_AT = 25 * 60 * 1000;
+    const IDLE_LIMIT = 120 * 60 * 1000;
+    const WARNING_AT = 115 * 60 * 1000;
 
     const resetTimers = () => {
       setIdleWarning(false);

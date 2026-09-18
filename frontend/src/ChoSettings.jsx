@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API_URL } from './config';
 import BackButton from './components/BackButton';
+import ExportPreviewModal from './components/ExportPreview';
 import { getAllQueueItems, clearCompleted, getSyncHistory, clearSyncHistory } from './syncEngine';
 import { cacheUserProfile, getCachedUserProfile, getCachedBarangays, isOnline, getCachedAtMap } from './offlineSync';
 import { authHeaders } from './auth';
@@ -226,6 +227,26 @@ export default function CHOSettings({
   const [autoBackupEnabled, setAutoBackupEnabled] = useState(() => localStorage.getItem('cdms_auto_backup') !== 'false');
   const [toastMsg, setToastMsg] = useState('');
   const [toastType, setToastType] = useState('success');
+  const [preview, setPreview] = useState(null);
+
+  const downloadBlob = (blob, filename) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const openPrint = (html, filename) => {
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    if (filename) w.document.title = filename.replace(/\.(pdf|doc)$/, '');
+    setTimeout(() => { try { w.focus(); w.print(); } catch (e) { /* ignore */ } }, 350);
+  };
 
   // ── Offline detection ──
   const [offlineMode, setOfflineMode] = useState(!isOnline());
@@ -896,6 +917,14 @@ if (security.newPassword !== security.confirmPassword) {
       updatedCaseReported: false,
       weeklySummary: false,
       systemMaintenance: false,
+    }));
+  } else if (key === 'pushNotifications' && value) {
+    // When push is turned ON, auto-enable the two case-report toggles
+    setNotifications(prev => ({
+      ...prev,
+      pushNotifications: true,
+      newCaseReported: true,
+      updatedCaseReported: true,
     }));
   } else if (key !== 'pushNotifications' && value && !notifications.pushNotifications) {
     // Can't turn on sub-toggles if push is off
@@ -1991,6 +2020,7 @@ if (security.newPassword !== security.confirmPassword) {
                           entity: l.entity || '',
                           details: l.details || '',
                         }));
+                        const stamp = new Date().toISOString().split('T')[0];
 
                         if (row.label === 'Export as PDF') {
                           const caseRows = cases.map(c =>
@@ -2013,7 +2043,7 @@ if (security.newPassword !== security.confirmPassword) {
                             .note{background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;padding:12px 16px;color:#92400e;font-size:13px;margin:16px 0;}
                             @media print{.print-btn{display:none;}}
                           </style></head><body>
-                          <button class="print-btn" onclick="window.print();">🖨️ Print / Save as PDF</button>
+                          <button class="print-btn" onclick="window.print();">🖨️ ${t('Print / Save as PDF')}</button>
                           <h2>Cabuyao CDMS - Full Data Export</h2>
                           <p class="meta">Generated: ${formatDateTime(new Date(), systemPrefs.dateFormat)} &nbsp;|&nbsp; ${cases.length} Cases, ${users.length} Users</p>
                           <h3>Case Records (${cases.length})</h3>
@@ -2023,9 +2053,15 @@ if (security.newPassword !== security.confirmPassword) {
                           <h3>System Activity Log</h3>
                           <div class="note">For detailed audit logs, please export from the Audit Reports section.</div>
                           </body></html>`;
-                          const printWindow = window.open('', '_blank');
-                          printWindow.document.write(html);
-                          printWindow.document.close();
+                          setPreview({
+                            title: t('Preview: PDF Document'),
+                            html,
+                            actions: [{
+                              label: `🖨 ${t('Print / Save as PDF')}`,
+                              primary: true,
+                              onClick: () => openPrint(html),
+                            }],
+                          });
                         } else if (row.label === 'Export as Excel') {
                           const sep = '\t';
                           const nl = '\n';
@@ -2039,12 +2075,21 @@ if (security.newPassword !== security.confirmPassword) {
                           content += nl + '=== SYSTEM LOGS ===' + nl;
                           content += '#' + sep + 'Timestamp' + sep + 'User' + sep + 'Role' + sep + 'Action' + sep + 'Entity' + sep + 'Details' + nl;
                           logs.forEach(l => { content += `${l.id}${sep}${l.timestamp}${sep}${l.userName}${sep}${l.userRole}${sep}${l.action}${sep}${l.entity}${sep}${l.details}${nl}`; });
-                          const blob = new Blob([content], { type: 'application/vnd.ms-excel' });
-                          const url = URL.createObjectURL(blob);
-                          const a = document.createElement('a');
-                          a.href = url;
-                          a.download = `CDMS_Export_${new Date().toISOString().split('T')[0]}.xls`;
-                          a.click();
+                          const columns = [t('Case ID'), t('Patient Name'), t('Age'), t('Barangay'), t('Disease'), t('Severity'), t('Status'), t('Date Reported')];
+                          const previewRows = cases.map(c => [c.case_id, c.patient_name||'', c.age||'', c.barangay_name||'', c.disease_name||'', c.severity||'', translateStatus(c.status)||'', c.date_reported||'']);
+                          setPreview({
+                            title: t('Preview: Excel Export'),
+                            columns,
+                            rows: previewRows,
+                            actions: [{
+                              label: `⬇ ${t('Download Excel (.xls)')}`,
+                              primary: true,
+                              onClick: () => {
+                                downloadBlob(new Blob([content], { type: 'application/vnd.ms-excel' }), `CDMS_Export_${stamp}.xls`);
+                                setPreview(null);
+                              },
+                            }],
+                          });
                         } else if (row.label === 'Export as CSV') {
                           const sep = ',';
                           const nl = '\n';
@@ -2058,12 +2103,21 @@ if (security.newPassword !== security.confirmPassword) {
                           content += nl + '=== SYSTEM LOGS ===' + nl;
                           content += '#' + sep + 'Timestamp' + sep + 'User' + sep + 'Role' + sep + 'Action' + sep + 'Entity' + sep + 'Details' + nl;
                           logs.forEach(l => { content += `${l.id}${sep}${l.timestamp}${sep}${l.userName}${sep}${l.userRole}${sep}${l.action}${sep}${l.entity}${sep}${l.details}${nl}`; });
-                          const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-                          const url = URL.createObjectURL(blob);
-                          const a = document.createElement('a');
-                          a.href = url;
-                          a.download = `CDMS_Export_${new Date().toISOString().split('T')[0]}.csv`;
-                          a.click();
+                          const columns = [t('Case ID'), t('Patient Name'), t('Age'), t('Barangay'), t('Disease'), t('Severity'), t('Status'), t('Date Reported')];
+                          const previewRows = cases.map(c => [c.case_id, c.patient_name||'', c.age||'', c.barangay_name||'', c.disease_name||'', c.severity||'', c.status||'', c.date_reported||'']);
+                          setPreview({
+                            title: t('Preview: CSV Export'),
+                            columns,
+                            rows: previewRows,
+                            actions: [{
+                              label: `⬇ ${t('Download CSV (.csv)')}`,
+                              primary: true,
+                              onClick: () => {
+                                downloadBlob(new Blob([content], { type: 'text/csv;charset=utf-8;' }), `CDMS_Export_${stamp}.csv`);
+                                setPreview(null);
+                              },
+                            }],
+                          });
                         }
                       } catch (err) {
                         setToastMsg(t('Export failed. Please try again.'));
@@ -2191,6 +2245,7 @@ if (security.newPassword !== security.confirmPassword) {
               </div>
             )}
           </div>
+      <ExportPreviewModal preview={preview} onClose={() => setPreview(null)} />
     </div>
   );
 }

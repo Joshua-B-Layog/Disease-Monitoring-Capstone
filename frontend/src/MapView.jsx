@@ -515,7 +515,7 @@ function CaseDotMarkers({ cases, zoom }) {
       const lat = parseFloat(c.latitude);
       const lng = parseFloat(c.longitude);
       const color = getDiseaseColor(c.disease_name);
-      const severityColor = c.severity === 'Severe' ? '#DC2626' : c.severity === 'Moderate' ? '#D97706' : '#3b82f6';
+      const severityColor = c.severity === 'Critical' ? '#7f1d1d' : c.severity === 'Severe' ? '#DC2626' : c.severity === 'Moderate' ? '#D97706' : '#3b82f6';
 
       const marker = L.circleMarker([lat, lng], {
         radius: isFullView ? 12 : 7,
@@ -1233,7 +1233,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
             </button>
             {severityOpen && (
               <div className="cdms-dropdown-panel" style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', zIndex: 100, overflow: 'hidden' }}>
-                {['All Severities', 'Mild', 'Moderate', 'Severe', 'Asymptomatic'].map(s => (
+                {['All Severities', 'Critical', 'Severe', 'Moderate', 'Mild', 'Asymptomatic'].map(s => (
                   <button key={s} type="button"
                     onClick={() => { setFilterSeverity(s); setSeverityOpen(false); }}
                     style={{ display: 'block', width: '100%', padding: '10px 14px', background: filterSeverity === s ? 'var(--input-bg)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: filterSeverity === s ? '600' : '400' }}

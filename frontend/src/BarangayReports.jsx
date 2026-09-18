@@ -5,6 +5,7 @@ import { API_URL } from './config';
 import { cacheCases, getCachedCases, cacheAuditLogs, getCachedAuditLogs, cacheGeneratedReports, getCachedGeneratedReports } from './offlineSync';
 import { formatDate, formatDateTime } from './formatDate';
 import DatePicker from './components/DatePicker';
+import ExportPreviewModal from './components/ExportPreview';
 import { useI18n } from './i18n';
 
 // ── CHO Unit → Barangay mapping ──
@@ -246,16 +247,47 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
 
   // ── Download helpers ──
   const [showDownloadMenu, setShowDownloadMenu] = useState(null);
+  const [preview, setPreview] = useState(false);
+
+  const downloadBlob = (blob, filename) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const openPrint = (html, filename) => {
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    if (filename) w.document.title = filename.replace(/\.pdf$/, '');
+    setTimeout(() => { try { w.focus(); w.print(); } catch (e) { /* ignore */ } }, 350);
+  };
 
   const handleDownloadCSV = (report) => {
-    const headers = [t('Timestamp'), t('User ID'), t('Name'), t('Action'), t('Entity'), t('Details')].join(',') + '\n';
-    const logRows = (report.snapshotLogs || []).map(l =>
-      `"${l.created_at ? formatDateTime(l.created_at, dateFormat) : ''}","${l.user_id || ''}","${l.user_name || ''}","${l.action}","${l.entity}","${l.details}"`
-    ).join('\n');
-    const blob = new Blob([headers + logRows], { type: 'text/csv;charset=utf-8;' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url; a.download = `${report.title.replace(/\s+/g, '_').replace(/—/g, '-')}.csv`; a.click();
+    const columns = [t('Timestamp'), t('User ID'), t('Name'), t('Action'), t('Entity'), t('Details')];
+    const logRows = (report.snapshotLogs || []).map(l => [
+      l.created_at ? formatDateTime(l.created_at, dateFormat) : '', l.user_id || '', l.user_name || '', l.action, l.entity, l.details || ''
+    ]);
+    const csv = columns.join(',') + '\n' + logRows.map(r => `"${r.join('","')}"`).join('\n');
+    const filename = `${report.title.replace(/\s+/g, '_').replace(/—/g, '-')}.csv`;
+    setPreview({
+      title: t('Preview: CSV Export'),
+      columns,
+      rows: logRows,
+      actions: [{
+        label: `⬇ ${t('Download CSV (.csv)')}`,
+        primary: true,
+        onClick: () => {
+          downloadBlob(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' }), filename);
+          setPreview(null);
+        },
+      }],
+    });
     setShowDownloadMenu(null);
   };
 
@@ -280,10 +312,26 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
     </table>
     ${footer}
     </body></html>`;
-    const blob = new Blob(['\ufeff' + html], { type: 'application/msword' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url; a.download = `${report.title.replace(/\s+/g, '_').replace(/—/g, '-')}.doc`; a.click();
+    const filename = `${report.title.replace(/\s+/g, '_').replace(/—/g, '-')}.doc`;
+    setPreview({
+      title: t('Preview: Word Document'),
+      html,
+      actions: [
+        {
+          label: `⬇ ${t('Download Word (.doc)')}`,
+          primary: true,
+          onClick: () => {
+            downloadBlob(new Blob(['\ufeff' + html], { type: 'application/msword' }), filename);
+            setPreview(null);
+          },
+        },
+        {
+          label: `🖨 ${t('Print / Save as PDF')}`,
+          primary: false,
+          onClick: () => openPrint(html),
+        },
+      ],
+    });
     setShowDownloadMenu(null);
   };
 
@@ -309,14 +357,15 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
     ${footer}
     </body></html>`;
     const filename = `${report.title.replace(/\s+/g, '_').replace(/—/g, '-')}.pdf`;
-    const printWin = window.open('', '_blank');
-    if (printWin) {
-      printWin.document.open();
-      printWin.document.write(htmlStr);
-      printWin.document.close();
-      printWin.document.title = filename.replace(/\.pdf$/, '');
-      setTimeout(() => { printWin.focus(); printWin.print(); }, 350);
-    }
+    setPreview({
+      title: t('Preview: PDF Report'),
+      html: htmlStr,
+      actions: [{
+        label: `🖨 ${t('Print / Save as PDF')}`,
+        primary: true,
+        onClick: () => openPrint(htmlStr, filename),
+      }],
+    });
     setShowDownloadMenu(null);
   };
 
@@ -341,7 +390,22 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
     }));
     const logSheet = XLSX.utils.json_to_sheet(logData);
     XLSX.utils.book_append_sheet(wb, logSheet, t('Logs'));
-    XLSX.writeFile(wb, `${report.title.replace(/\s+/g, '_').replace(/—/g, '-')}.xlsx`);
+    const columns = Object.keys(logData[0] || {});
+    const previewRows = logData.map(r => columns.map(k => r[k]));
+    const filename = `${report.title.replace(/\s+/g, '_').replace(/—/g, '-')}.xlsx`;
+    setPreview({
+      title: t('Preview: Excel Export'),
+      columns,
+      rows: previewRows,
+      actions: [{
+        label: `⬇ ${t('Download Excel (.xlsx)')}`,
+        primary: true,
+        onClick: () => {
+          XLSX.writeFile(wb, filename);
+          setPreview(null);
+        },
+      }],
+    });
     setShowDownloadMenu(null);
   };
 
@@ -357,20 +421,42 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
       [t('Details')]: (l.details || '').replace(/\s*\(User ID:\s*\d+\)/gi, '').replace(/\s*\(Case ID:\s*\d+\)/gi, ''),
     }));
     const stamp = new Date().toISOString().split('T')[0];
+    const columns = Object.keys(rows[0] || {});
+    const tableRows = rows.map(r => columns.map(k => r[k] ?? ''));
     if (format === 'csv') {
-      const header = Object.keys(rows[0] || {});
-      const body = rows.map(r => header.map(k => `"${String(r[k] ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
-      const blob = new Blob(['\ufeff' + header.join(',') + '\n' + body], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = `audit_logs_${stamp}.csv`; a.click();
+      const csv = columns.join(',') + '\n' + tableRows.map(r => `"${String(r.join('","')).replace(/"/g, '""')}"`).join('\n');
+      setPreview({
+        title: t('Preview: CSV Export'),
+        columns,
+        rows: tableRows,
+        actions: [{
+          label: `⬇ ${t('Download CSV (.csv)')}`,
+          primary: true,
+          onClick: () => {
+            downloadBlob(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' }), `audit_logs_${stamp}.csv`);
+            setPreview(null);
+          },
+        }],
+      });
     } else if (format === 'xlsx') {
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), t('Audit Logs'));
-      XLSX.writeFile(wb, `audit_logs_${stamp}.xlsx`);
+      setPreview({
+        title: t('Preview: Excel Export'),
+        columns,
+        rows: tableRows,
+        actions: [{
+          label: `⬇ ${t('Download Excel (.xlsx)')}`,
+          primary: true,
+          onClick: () => {
+            XLSX.writeFile(wb, `audit_logs_${stamp}.xlsx`);
+            setPreview(null);
+          },
+        }],
+      });
     } else {
-      const headRow = `<tr>${Object.keys(rows[0] || {}).map(k => `<th>${k}</th>`).join('')}</tr>`;
-      const bodyRows = rows.map(r => `<tr>${Object.values(r).map(v => `<td>${String(v ?? '')}</td>`).join('')}</tr>`).join('');
+      const headRow = `<tr>${columns.map(k => `<th>${k}</th>`).join('')}</tr>`;
+      const bodyRows = tableRows.map(r => `<tr>${r.map(v => `<td>${String(v ?? '')}</td>`).join('')}</tr>`).join('');
       const letterhead = buildReportLetterhead(t('Cabuyao CDMS - Audit Log Export'), `${rows.length}${t(' entries | Generated ')}${formatDateTime(new Date(), dateFormat)}`);
       const footer = buildReportFooter();
       const htmlStr = `<html><head><meta charset="utf-8"><title>Audit Logs</title>
@@ -379,15 +465,15 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
       <table><thead>${headRow}</thead><tbody>${bodyRows}</tbody></table>
       ${footer}
       </body></html>`;
-      const filename = `audit_logs_${stamp}.pdf`;
-      const printWin = window.open('', '_blank');
-      if (printWin) {
-        printWin.document.open();
-        printWin.document.write(htmlStr);
-        printWin.document.close();
-        printWin.document.title = filename.replace(/\.pdf$/, '');
-        setTimeout(() => { printWin.focus(); printWin.print(); }, 350);
-      }
+      setPreview({
+        title: t('Preview: PDF Report'),
+        html: htmlStr,
+        actions: [{
+          label: `🖨 ${t('Print / Save as PDF')}`,
+          primary: true,
+          onClick: () => openPrint(htmlStr, `audit_logs_${stamp}.pdf`),
+        }],
+      });
     }
     setShowExportDrop(false);
   };
@@ -1562,6 +1648,7 @@ onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
           </div>
         </div>
       )}
+      <ExportPreviewModal preview={preview} onClose={() => setPreview(null)} />
     </div>
   );
 }

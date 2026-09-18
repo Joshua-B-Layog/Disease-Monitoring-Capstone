@@ -5,10 +5,11 @@ import { cacheWeeklySummary, getCachedWeeklySummary } from './offlineSync';
 import { authHeaders } from './auth';
 import { formatDate, formatDateTime } from './formatDate';
 import DatePicker from './components/DatePicker';
+import ExportPreviewModal from './components/ExportPreview';
 import { useI18n } from './i18n';
 
 export default function WeeklySummary({ userId, loginRole, compactMode, fontScale, onBack, dateFormat = 'MM/DD/YY' }) {
-  const { t } = useI18n();
+  const { t, translateStatus } = useI18n();
   const defaultStart = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
   const defaultEnd = new Date().toISOString().slice(0, 10);
 
@@ -18,6 +19,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [offlineMode, setOfflineMode] = useState(false);
+  const [preview, setPreview] = useState(false);
 
   const fetchData = () => {
     setLoading(true);
@@ -49,6 +51,24 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
   const fmtDate = (d) => formatDate(d, dateFormat);
   const fmtDateTime = (d) => formatDateTime(d, dateFormat);
   const fmtShortDate = (d) => formatDate(d, dateFormat);
+
+  const downloadBlob = (blob, filename) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const openPrint = (html) => {
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    setTimeout(() => { try { w.focus(); w.print(); } catch (e) { /* ignore */ } }, 300);
+  };
 
   const getRiskColor = (count) => {
     if (count >= 20) return '#DC2626';
@@ -136,11 +156,12 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
         <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-size:12px">${c.disease_name || ''}</td>
         <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-size:12px">${c.barangay_name || ''}</td>
         <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-size:12px">${c.severity || 'N/A'}</td>
+        <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-size:12px">${c.case_type || ''}</td>
+        <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-size:12px">${c.disease_type || ''}</td>
         <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-size:12px">${translateStatus(c.status) || ''}</td>
       </tr>`).join('');
 
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`<!DOCTYPE html><html><head><title>Weekly Summary Report</title>
+    const html = `<!DOCTYPE html><html><head><title>Weekly Summary Report</title>
       <style>
         body { font-family: Arial, sans-serif; padding: 28px; font-size: 13px; color: #111; margin: 0; }
         h1 { color: #1e3a8a; font-size: 22px; margin: 0 0 4px 0; }
@@ -182,8 +203,12 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
 
       <div class="footer">${t('Cabuyao City Disease Monitoring System - Prepared by ')}${data.generatedBy} (${scopeLabel})</div>
       <br/><button class="no-print" onclick="window.print();" style="padding:10px 24px;background:#1e3a8a;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">${t('Print / Save as PDF')}</button>
-      </body></html>`);
-    printWindow.document.close();
+      </body></html>`;
+    setPreview({
+      title: t('Preview: Print Report'),
+      html,
+      actions: [{ label: `🖨 ${t('Print / Save as PDF')}`, primary: true, onClick: () => openPrint(html) }],
+    });
   };
 
   // ── Export: Word ──
@@ -214,23 +239,46 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
       <h2>${t('New Cases')} (${newCases.length})</h2><table><thead><tr><th>${t('ID')}</th><th>${t('Patient')}</th><th>${t('Age')}</th><th>${t('Disease')}</th><th>${t('Barangay')}</th><th>${t('Severity')}</th><th>${t('Status')}</th></tr></thead><tbody>${newCaseRows||`<tr><td colspan="7">${t('No new cases')}</td></tr>`}</tbody></table>
       <div class="footer">${t('Cabuyao City Disease Monitoring System')} - ${data.generatedBy} (${scopeLabel})</div>
       </body></html>`;
-    const blob = new Blob(['\ufeff' + html], { type: 'application/msword' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url;
-    a.download = `Weekly_Summary_${scopeLabel.replace(/[^a-zA-Z0-9]/g, '_')}_${startDate}.doc`; a.click();
+    setPreview({
+      title: t('Preview: Word Document'),
+      html,
+      actions: [
+        {
+          label: `⬇ ${t('Download Word (.doc)')}`,
+          primary: true,
+          onClick: () => {
+            downloadBlob(new Blob(['\ufeff' + html], { type: 'application/msword' }), `Weekly_Summary_${scopeLabel.replace(/[^a-zA-Z0-9]/g, '_')}_${startDate}.doc`);
+            setPreview(null);
+          },
+        },
+        {
+          label: `🖨 ${t('Print / Save as PDF')}`,
+          primary: false,
+          onClick: () => openPrint(html),
+        },
+      ],
+    });
   };
-
-  // ── Export: CSV ──
   const handleExportCSV = () => {
     if (!data) return;
-    const headers = [t('ID'), t('Patient Name'), t('Age'), t('Gender'), t('Disease'), t('Barangay'), t('Severity'), t('Status'), t('Date Reported')].join(',') + '\n';
-    const rows = data.newCases.map(c =>
-      `#${String(c.case_id).padStart(3,'0')},"${c.patient_name||''}",${c.age||''},"${c.gender||''}","${c.disease_name||''}","${c.barangay_name||''}","${c.severity||''}","${translateStatus(c.status)||''}","${c.date_reported||''}"`
-    ).join('\n');
-    const blob = new Blob([headers + rows], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url;
-    a.download = `Weekly_Summary_${startDate}.csv`; a.click();
+    const columns = [t('ID'), t('Patient Name'), t('Age'), t('Gender'), t('Disease'), t('Barangay'), t('Severity'), t('Status'), t('Date Reported')];
+    const rows = data.newCases.map(c => [
+      `#${String(c.case_id).padStart(3, '0')}`, c.patient_name || '', c.age || '', c.gender || '', c.disease_name || '', c.barangay_name || '', c.severity || '', translateStatus(c.status) || '', c.date_reported || ''
+    ]);
+    const csv = columns.join(',') + '\n' + rows.map(r => `"${r.join('","')}"`).join('\n');
+    setPreview({
+      title: t('Preview: CSV Export'),
+      columns,
+      rows,
+      actions: [{
+        label: `⬇ ${t('Download CSV (.csv)')}`,
+        primary: true,
+        onClick: () => {
+          downloadBlob(new Blob(['\ufeff' + csv], { type: 'text/csv' }), `Weekly_Summary_${startDate}.csv`);
+          setPreview(null);
+        },
+      }],
+    });
   };
 
   const cardStyle = { flex: '1 1 0', minWidth: '120px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px', textAlign: 'center' };
@@ -586,6 +634,8 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
       <div style={{ marginTop: '20px', padding: '16px', textAlign: 'center', borderTop: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '15px' }}>
         {t('Cabuyao City Disease Monitoring System')} - {t('Prepared by ')}{data.generatedBy} ({scopeLabel})
       </div>
+
+      <ExportPreviewModal preview={preview} onClose={() => setPreview(null)} />
     </div>
   );
 }
