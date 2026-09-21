@@ -590,7 +590,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
               fetchUsers(next);
             }}
             disabled={offlineMode}
-            style={{ ...inputStyle, width: '180px', minWidth: '236px', cursor: offlineMode ? 'not-allowed' : 'pointer', display: 'inline-flex', justifyContent: 'space-around', alignItems: 'center', gap: '8px', fontWeight: '600', fontSize: '15px', opacity: offlineMode ? 0.4 : 1, whiteSpace: 'nowrap', flexShrink: 0, flexGrow: 0, boxSizing: 'border-box', overflow: 'visible' }}>
+            style={{ ...inputStyle, width: '180px', minWidth: '236px', cursor: offlineMode ? 'not-allowed' : 'pointer', display: 'inline-flex', justifyContent: 'center', alignItems: 'center', gap: '8px', fontWeight: '600', fontSize: '15px', opacity: offlineMode ? 0.4 : 1, whiteSpace: 'nowrap', flexShrink: 0, flexGrow: 0, boxSizing: 'border-box', overflow: 'visible' }}>
             {showArchived ? t('← Back to Active Accounts') : t('🗄️ Show Archived Accounts')}
           </button>
           {selectedIds.length > 0 && (

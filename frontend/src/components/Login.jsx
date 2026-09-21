@@ -263,7 +263,7 @@ function AnimatedMapView({ setFade, active, onSequenceComplete }) {
     const [pendingUser, setPendingUser] = useState(null); // holds session data while waiting for OTP
     const { t } = useI18n();
     const BRANDING_FEATURES = [
-      { icon: '🛰️', title: t('Cabuyao Disease Monitoring and Mapping System'), subtitle: t('Early Monitoring & Early Detection'), color: '#3b82f6' },
+      { icon: '🛰️', title: t('Cabuyao Disease Monitoring and Mapping System'), subtitle: t('Early Monitoring & Detection'), color: '#3b82f6' },
       { icon: '🗺️', title: t('Barangay & Purok Mapping'), subtitle: t('Localized clusters across 18 barangays'), color: '#dc2626' },
       { icon: '🔔', title: t('Automated Alerts'), subtitle: t('Timely updates and outbreak warnings'), color: '#3b82f6' },
       { icon: '📊', title: t('Decision Support'), subtitle: t('Accurate reports for CHO health response'), color: '#dc2626' },

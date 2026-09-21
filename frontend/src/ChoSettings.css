@@ -39,8 +39,8 @@
   background-color: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: 12px;
-  padding: 22px 24px;
-  min-height: 96px;
+  padding: 24px 28px;
+  min-height: 124px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -588,6 +588,8 @@
    MOBILE RESPONSIVE — CHO Settings
    ========================================================= */
 @media (max-width: 900px) {
+  .menu-grid { grid-template-columns: 1fr !important; }
+  .nav-box { min-height: 0; }
   .settings-wrapper { padding: 14px; }
   .settings-container { padding: 16px; }
   .settings-title { font-size: 22px; }
@@ -608,7 +610,17 @@
   .settings-wrapper { padding: 10px; }
   .menu-grid { grid-template-columns: 1fr; }
   .utility-row-grid { grid-template-columns: 1fr; }
-  .nav-box { min-height: 0; }
+  .nav-box {
+    min-height: 0;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 16px 18px;
+    gap: 10px;
+  }
+  .nav-box .box-icon-wrapper { flex-shrink: 0; }
+  .nav-box .box-title-text { font-size: 16px; }
+  .nav-box .box-arrow-right { font-size: 16px; flex-shrink: 0; }
   .profile-avatar-wrapper { width: 72px; height: 72px; }
   .settings-nav-row, .breadcrumb-row { flex-wrap: wrap; gap: 8px; }
   .save-cancel-container { flex-direction: column; align-items: stretch; }
@@ -653,7 +665,6 @@
   .gamma-table { min-width: 640px; }
   .gamma-table-wrap { overflow-x: auto; }
 }
-
 /* =========================================================
    CHO Settings — mobile alignment (left labels, right buttons)
    ========================================================= */

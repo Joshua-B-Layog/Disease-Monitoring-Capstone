@@ -397,7 +397,7 @@ export default function CHOSettings({
   const [systemPrefs, setSystemPrefs] = useState({
     darkMode: false,
     fontSize: scaleToLabel(savedFontScale || '1'),
-    compactView: savedCompactMode === true || savedCompactMode === 'true' ? true : false,
+    compactView: (() => { try { return window.matchMedia('(max-width: 820px)').matches; } catch (_e) { return false; } })(),
     displayLanguage: localStorage.getItem('cdms_language') === 'fil' ? 'Filipino'
       : 'English',
     timeZone: localStorage.getItem('cdms_timeZone')?.split(' (')[0] || 'Asia/Manila',
