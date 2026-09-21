@@ -3759,7 +3759,9 @@ app.post('/api/sync', authenticate, (req, res) => {
             });
         } else if (type === 'message' && endpoint === '/api/contact-messages') {
             const p = payload || {};
+            const selectedSyncedBarangay = (p.targetBarangay || '').trim();
             const detectedBarangay = detectBarangayFromAddress(p.address);
+            const finalSyncedBarangay = selectedSyncedBarangay || detectedBarangay || p.barangay || null;
             db.query(
                 `INSERT INTO contact_messages (name, target_cho_unit, disease_name, message, age, gender, contact_no, address, barangay, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [p.name, p.targetCho || null, p.disease || p.disease_name || null, p.message, p.age || null, p.gender || null, p.contact || p.mobile || null, p.address || null, detectedBarangay || p.barangay || null, new Date(p._offlineTimestamp || Date.now())],
@@ -3784,7 +3786,10 @@ app.post('/api/sync', authenticate, (req, res) => {
               } else cb(null);
             };
             resolveBarangay((barangayName) => {
-              const detectedBarangay = detectBarangayFromAddress(p.address);
+            const selectedSyncedBarangay = (p.targetBarangay || '').trim();
+            const detectedBarangay = detectBarangayFromAddress(p.address);
+            const finalSyncedBarangay = selectedSyncedBarangay || detectedBarangay || p.barangay || null;
+            
               let targetChoUnit = p.submitter_cho_unit || null;
               if (detectedBarangay) targetChoUnit = getChoUnitForBarangayName(detectedBarangay) || targetChoUnit;
               if (barangayName) targetChoUnit = getChoUnitForBarangayName(barangayName) || targetChoUnit;
@@ -4789,17 +4794,19 @@ app.get('/api/backup', authenticate, (req, res) => {
 
 // POST /api/contact-messages — Resident contact form submission
 app.post('/api/contact-messages', (req, res) => {
-  const { name, targetCho, disease, message, age, gender, contact, address } = req.body;
+  const { name, targetCho, targetBarangay, disease, message, age, gender, contact, address } = req.body;
 
   if (!name || !message) {
     return res.status(400).json({ error: 'Name and message are required.' });
   }
 
+  const selectedBarangay = (targetBarangay || '').trim();
   const detectedBarangay = detectBarangayFromAddress(address);
+  const finalBarangay = selectedBarangay || detectedBarangay || null;
   db.query(
     `INSERT INTO contact_messages (name, target_cho_unit, disease_name, message, age, gender, contact_no, address, barangay)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [name, targetCho || null, disease || null, message, age || null, gender || null, contact || null, address || null, detectedBarangay],
+    [name, targetCho || null, disease || null, message, age || null, gender || null, contact || null, address || null, finalBarangay],
     (err, result) => {
       if (err) {
         console.error('Error saving contact message:', err.message);
@@ -4834,6 +4841,30 @@ app.post('/api/contact-messages', (req, res) => {
                   `INSERT INTO notifications (user_id, title, message, type, link_to)
                    VALUES (?, ?, ?, ?, ?)`,
                   [u.user_id, 'New Contact Message', `A resident sent a message regarding ${disease || 'general health'}.`, 'message', 'Manage Cases']
+                );
+              });
+            }
+          }
+        );
+      }
+
+      // Notify the BHW(s) of the target barangay — respects their push preference
+      // (inbox ALWAYS receives it regardless; this row only controls the bell alert)
+      if (finalBarangay) {
+        db.query(
+          `SELECT u.user_id FROM users u
+           INNER JOIN notification_preferences np ON u.user_id = np.user_id
+           WHERE u.role = 'BHW' AND np.push_notifications = 1 AND u.assigned_barangay_id IN (
+             SELECT id FROM barangays WHERE name = ?
+           )`,
+          [finalBarangay],
+          (err2, users) => {
+            if (!err2 && users.length > 0) {
+              users.forEach(u => {
+                db.query(
+                  `INSERT INTO notifications (user_id, title, message, type, link_to)
+                   VALUES (?, ?, ?, ?, ?)`,
+                  [u.user_id, 'New Resident Message', `A resident from ${finalBarangay} sent you a message.`, 'message', 'Manage Cases']
                 );
               });
             }
