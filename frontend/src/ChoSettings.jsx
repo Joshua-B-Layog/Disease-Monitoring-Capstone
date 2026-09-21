@@ -1077,7 +1077,7 @@ if (security.newPassword !== security.confirmPassword) {
                   </div>
                 )}
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '40px' }}>
+                <div className="cdms-profile-fields-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '40px' }}>
                   {[
                     { label: 'First Name', key: 'firstName', type: 'text' },
                     { label: 'Last Name', key: 'lastName', type: 'text' },
@@ -1959,7 +1959,7 @@ if (security.newPassword !== security.confirmPassword) {
                 <div style={{ width: '100%', height: '12px', background: 'var(--border-color)', borderRadius: '6px', overflow: 'hidden', marginBottom: '24px' }}>
                   <div style={{ width: `${storageStats ? storageStats.usedPercent : 0}%`, height: '100%', background: 'var(--text-main)', borderRadius: '6px' }} />
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+                <div className="cdms-storage-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
                   {[
                     { val: storageStats ? `${storageStats.caseDataMB} MB` : '—', lbl: 'Case Data', sub: `${storageStats ? storageStats.cases : '—'} records` },
                     { val: storageStats ? `${storageStats.userDataMB} MB` : '—', lbl: 'Reports', sub: `${storageStats ? storageStats.users : '—'} accounts` },

@@ -156,6 +156,55 @@ function getPolygonCentroid(geometry) {
   return [latSum / coords.length, lngSum / coords.length];
 }
 
+// Barangay label anchor point — same ring walker as getPolygonCentroid,
+// returns [lat, lng] so permanent labels pin to a stable spot per barangay.
+function getLabelPoint(geometry) {
+  if (!geometry) return null;
+  let coords = [];
+  if (geometry.type === 'Polygon') {
+    coords = geometry.coordinates[0];
+  } else if (geometry.type === 'MultiPolygon') {
+    let largest = geometry.coordinates[0][0];
+    geometry.coordinates.forEach(poly => {
+      if (poly[0].length > largest.length) largest = poly[0];
+    });
+    coords = largest;
+  }
+  if (!coords.length) return null;
+  let latSum = 0, lngSum = 0;
+  coords.forEach(([lng, lat]) => { latSum += lat; lngSum += lng; });
+  return [latSum / coords.length, lngSum / coords.length];
+}
+
+// Manual screen-space (x, y) offsets so the three interlocked Poblacion
+// polygons (nearly identical centroids) don't stack their labels on top of
+// each other. A general collision pass could be added later.
+const LABEL_OFFSETS = {
+  'Barangay Uno (Poblacion)': [0, -46],
+  'Barangay Dos (Poblacion)': [0, 0],
+  'Barangay Tres (Poblacion)': [0, 46],
+};
+
+// Single shared label HTML builder — used by both the initial bindTooltip
+// and the setTooltipContent refresh so the two can never drift apart.
+// Displays the DB name (e.g. "Barangay Uno (Poblacion)") via dbName.
+const getTop5 = (diseases) =>
+  Object.entries(diseases || {}).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+function buildLabelHtml({ dbName, match, risk, t }) {
+  const topDisease = match ? getTop5(match.diseases)[0] : null;
+  return `
+    <div class="brgy-label">
+      <div class="brgy-name">${dbName}</div>
+      <div class="brgy-disease">
+        ${match ? `${match.totalCases} case${match.totalCases !== 1 ? 's' : ''}` : (t ? t('0 cases') : '0 cases')}
+        ${topDisease ? ` | ${topDisease[0]} (${topDisease[1]})` : ''}
+      </div>
+      ${risk ? `<div class="brgy-risk" style="color:${risk.color}">● ${t ? t(risk.label) : risk.label}</div>` : ''}
+    </div>
+  `;
+}
+
 // Compute bounding box from GeoJSON polygon for a barangay
 const getBarangayBounds = (barangayName) => {
   if (!barangayName) return null;
@@ -485,6 +534,12 @@ if (!document.getElementById('cdms-barangay-labels')) {
     .leaflet-tooltip-right.brgy-tooltip-label::before {
       border: none !important;
     }
+    .brgy-label {
+      white-space: nowrap;
+    }
+    .brgy-labels-hidden .brgy-tooltip-label {
+      display: none !important;
+    }
   `;
   document.head.appendChild(ls);
 }
@@ -498,7 +553,7 @@ function CreateTopPane() {
   return null;
 }
 
-function CaseDotMarkers({ cases, zoom }) {
+function CaseDotMarkers({ cases, zoom, t = (s) => s, translateStatus = (s) => s }) {
   const map = useMap();
   const markersRef = useRef([]);
 
@@ -703,7 +758,9 @@ function ScopeEnforcer({ bounds }) {
       if (!bounds) return;
       const fitZoom = map.getBoundsZoom(bounds, false, [40, 40]);
       if (!Number.isFinite(fitZoom)) return;
-      map.setMinZoom(Math.max(12, Math.min(map.getMaxZoom(), Math.round(fitZoom))));
+      const mobile = window.matchMedia('(max-width: 820px)').matches;
+      const cap = mobile ? 13 : 16;
+      map.setMinZoom(Math.min(cap, Math.max(12, Math.round(fitZoom))));
     };
     applyMinZoom();
     map.on('resize', applyMinZoom);
@@ -769,24 +826,24 @@ function ChoroplethLayer({ barangayData, onHover, onLeave, onClick }) {
 }
 
 export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginBarangay, sessionContext, compactMode, dateFormat = 'MM/DD/YY' }) {
-  const { t } = useI18n();
-  const [allCases, setAllCases]         = useState([]);
+  const { t, translateStatus } = useI18n();
+  const [allCases, setAllCases] = useState([]);
   const [barangayData, setBarangayData] = useState([]);
-  const [purokData, setPurokData]       = useState([]);
-  const [mapZoom, setMapZoom]           = useState(14);
+  const [purokData, setPurokData] = useState([]);
+  const [mapZoom, setMapZoom] = useState(14);
   const [autoDetectedBrgy, setAutoDetectedBrgy] = useState(null);
-  const [hotspotData, setHotspotData]   = useState([]);
+  const [hotspotData, setHotspotData]  = useState([]);
   const [filterBarangay, setFilterBarangay] = useState('All Barangays');
-  const [filterStatus,   setFilterStatus]   = useState('All Status');
-  const [filterDate,     setFilterDate]     = useState('');
+  const [filterStatus, setFilterStatus]  = useState('All Status');
+  const [filterDate, setFilterDate]  = useState('');
   const [filterSeverity, setFilterSeverity] = useState('All Severities');
   const [filterPurok, setFilterPurok] = useState('All Puroks');
   const [tooltip, setTooltip] = useState(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const [popup,   setPopup]   = useState(null);
-  const [lastUpdated, setLastUpdated]   = useState(null);
-  const [now, setNow]                   = useState(Date.now());
-  const [offlineMode, setOfflineMode]   = useState(false);
+  const [popup, setPopup] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [now, setNow] = useState(Date.now());
+  const [offlineMode, setOfflineMode] = useState(false);
 
   const [barangayOpen, setBarangayOpen] = useState(false);
   const barangayRef = useRef(null);
@@ -797,6 +854,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const [severityOpen, setSeverityOpen] = useState(false);
   const severityRef = useRef(null);
   const [mapLayer, setMapLayer] = useState('HD'); // 'SD' = street map (OSM), 'HD' = satellite (Esri)
+  const [filtersOpen, setFiltersOpen] = useState(false); // mobile: filter sidebar as hamburger drawer
   const geoJsonLayerRef = useRef(null);
   const barangayDataRef = useRef(barangayData);
   useEffect(() => { barangayDataRef.current = barangayData; }, [barangayData]);
@@ -909,29 +967,35 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   useEffect(() => {
     if (!geoJsonLayerRef.current) return;
     geoJsonLayerRef.current.eachLayer((layer) => {
-      const rawName = layer.feature.properties.ADM4_EN;
-      const barangayName = getDbNameFromGeoJson(rawName);
-      const match = barangayData.find(b => b.barangayName === barangayName);
-      const topDisease = match ? getTop5(match.diseases)[0] : null;
+      const dbName = getDbNameFromGeoJson(layer.feature.properties.ADM4_EN);
+      const match = barangayData.find(b => b.barangayName === dbName);
       const risk = match ? getRisk(match.totalCases) : getRisk(0);
-
-      const html = `
-        <div class="brgy-label">
-          <div class="brgy-name">${rawName}</div>
-          <div class="brgy-disease">
-            ${match ? `${match.totalCases} case${match.totalCases !== 1 ? 's' : ''}` : t('0 cases')}
-            ${topDisease ? ` | ${topDisease[0]} (${topDisease[1]})` : ''}
-          </div>
-          <div class="brgy-risk" style="color:${risk.color}">● ${t(risk.label)}</div>
-        </div>
-      `;
+      const html = buildLabelHtml({ dbName, match, risk, t });
+      layer.setTooltipContent(html);
       if (layer.getTooltip()) {
-        layer.setTooltipContent(html);
-      } else {
-        layer.bindTooltip(html, { permanent: true, direction: 'center', className: 'brgy-tooltip-label' });
+        const anchor = getLabelPoint(layer.feature.geometry);
+        if (anchor) layer.getTooltip().setLatLng(anchor);
       }
     });
   }, [barangayData]);
+
+  // Hide permanent labels when zoomed out too far (labels would clutter).
+  // Restored immediately on window blur so returning via Tab re-shows them.
+  useEffect(() => {
+    const container = document.querySelector('.cdms-map-area .leaflet-container');
+    if (!container) return;
+    if (mapZoom < 13) container.classList.add('brgy-labels-hidden');
+    else container.classList.remove('brgy-labels-hidden');
+  }, [mapZoom]);
+
+  useEffect(() => {
+    const restoreLabels = () => {
+      const container = document.querySelector('.cdms-map-area .leaflet-container');
+      if (container) container.classList.remove('brgy-labels-hidden');
+    };
+    window.addEventListener('blur', restoreLabels);
+    return () => window.removeEventListener('blur', restoreLabels);
+  }, []);
 
   useEffect(() => {
     if (!allCases.length) return;
@@ -1003,9 +1067,6 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     }
   }, [allCases, filterBarangay, filterStatus, filterDate, filterSeverity, filterPurok, autoDetectedBrgy]);
 
-  const getTop5 = (diseases) =>
-    Object.entries(diseases).sort((a, b) => b[1] - a[1]).slice(0, 5);
-
   const goToDisease = (barangayName, diseaseName, purok) => {
     if (setCaseFilter) setCaseFilter({ disease: diseaseName.trim(), barangay: barangayName, purok: purok || '' });
     if (setActiveTab)  setActiveTab('Manage Cases');
@@ -1035,10 +1096,10 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const showAutoPurok = loginRole !== 'BHW' && filterBarangay === 'All Barangays' && mapZoom >= PUROK_ZOOM_THRESHOLD && autoDetectedBrgy;
 
   return (
-    <div style={{ display: 'flex', height: compactMode ? 'calc(100vh - 56px)' : 'calc(100vh - 70px)' }}>
+    <div className="cdms-map-wrap" style={{ display: 'flex', height: compactMode ? 'calc(100vh - 56px)' : 'calc(100vh - 70px)' }}>
 
-      {/* ── SIDEBAR — fixed 280px, never shrinks ── */}
-      <div style={{
+      {/* ── SIDEBAR — fixed 280px on desktop; slide-in hamburger drawer on mobile ── */}
+      <div className={filtersOpen ? 'cdms-map-sidebar cdms-map-sidebar-open' : 'cdms-map-sidebar'} style={{
         width: '280px', minWidth: '280px', flexShrink: 0,
         background: 'var(--bg-surface)', borderRight: '1px solid var(--border-color)',
         padding: '20px 16px', display: 'flex', flexDirection: 'column',
@@ -1323,12 +1384,29 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       </div>
 
       {/* ── MAP AREA ── */}
-      <div style={{ flex: 1, position: 'relative', minWidth: 0 }}
+      <div className="cdms-map-area" style={{ flex: 1, position: 'relative', minWidth: 0 }}
         onMouseMove={(e) => {
           const rect = e.currentTarget.getBoundingClientRect();
           setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
         }}
       >
+        {filtersOpen && (
+          <div className="cdms-map-backdrop" onClick={() => setFiltersOpen(false)} />
+        )}
+        <button
+          className="cdms-map-filter-btn"
+          onClick={() => setFiltersOpen(!filtersOpen)}
+          style={{
+            position: 'absolute', top: '12px', left: '12px', zIndex: 1000,
+            display: 'flex', alignItems: 'center', gap: '7px',
+            padding: '9px 14px', borderRadius: '8px', cursor: 'pointer',
+            background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+            fontSize: '14px', fontWeight: '600', color: 'var(--text-main)',
+          }}
+        >
+          ⚙ {t('Filters')}
+        </button>
         <MapContainer
           center={(loginRole === 'BHW' && loginBarangay && findCoords(loginBarangay)) 
             ? findCoords(loginBarangay) 
@@ -1354,7 +1432,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           <CreateTopPane key="create-top-pane" />
           <ZoomToBarangay key="zoom-barangay" barangay={filterBarangay} loginRole={loginRole} loginBarangay={loginBarangay} sessionContext={sessionContext} cases={allCases} />
           <ZoomListener key="zoom-listener" onZoom={setMapZoom} filterBarangay={filterBarangay} autoDetectedBrgy={autoDetectedBrgy} setAutoDetectedBrgy={setAutoDetectedBrgy} loginRole={loginRole} />
-          <CaseDotMarkers key="case-dot-markers" cases={allCases} zoom={mapZoom} />
+          <CaseDotMarkers key="case-dot-markers" cases={allCases} zoom={mapZoom} t={t} translateStatus={translateStatus} />
           {loginRole !== 'BHW' && (filterBarangay === 'All Barangays' && !showAutoPurok) && (
             <GeoJSON
               key="brgy-geojson"
@@ -1363,20 +1441,18 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               style={(feature) => getGeoJsonStyle(feature, barangayData)}
               onEachFeature={(feature, layer) => {
                 const barangayName = getDbNameFromGeoJson(feature.properties.ADM4_EN);
-                const rawName = feature.properties.ADM4_EN;
                 const match = barangayDataRef.current.find(b => b.barangayName === barangayName);
-                const topDisease = match ? getTop5(match.diseases)[0] : null;
                 const risk = match ? getRisk(match.totalCases) : getRisk(0);
-                layer.bindTooltip(`
-                  <div class="brgy-label">
-                    <div class="brgy-name">${rawName}</div>
-                    <div class="brgy-disease">
-                      ${match ? `${match.totalCases} case${match.totalCases !== 1 ? 's' : ''}` : '0 cases'}
-                      ${topDisease ? ` | ${topDisease[0]} (${topDisease[1]})` : ''}
-                    </div>
-                    <div class="brgy-risk" style="color:${risk.color}">● ${t(risk.label)}</div>
-                  </div>
-                `, { permanent: true, direction: 'center', className: 'brgy-tooltip-label' });
+                const html = buildLabelHtml({ dbName: barangayName, match, risk, t });
+                layer.bindTooltip(html, {
+                  permanent: true,
+                  direction: 'center',
+                  className: 'brgy-tooltip-label',
+                  offset: LABEL_OFFSETS[barangayName] || [0, 0],
+                  interactive: false,
+                });
+                const anchor = getLabelPoint(feature.geometry);
+                if (anchor) layer.getTooltip().setLatLng(anchor);
                 layer.on({
                   mouseover: function (e) {
                     e.target.setStyle({ fillOpacity: 0.75, weight: 2.5 });
@@ -1446,7 +1522,18 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               const mapContainer = document.querySelector('.leaflet-container');
               if (!mapContainer) return;
               import('html2canvas').then(({ default: html2canvas }) => {
-                html2canvas(mapContainer, { useCORS: true, allowTaint: true, scale: 2 }).then(canvas => {
+                const rect = mapContainer.getBoundingClientRect();
+                html2canvas(mapContainer, {
+                  useCORS: true,
+                  allowTaint: true,
+                  scale: 2,
+                  backgroundColor: null,
+                  scrollX: -window.scrollX,
+                  scrollY: -window.scrollY,
+                  windowWidth: Math.ceil(rect.right - rect.left),
+                  windowHeight: Math.ceil(rect.bottom - rect.top),
+                  logging: false,
+                }).then(canvas => {
                   const link = document.createElement('a');
                   link.download = 'CDMS_Map_Export.png';
                   link.href = canvas.toDataURL('image/png');

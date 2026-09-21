@@ -91,6 +91,15 @@ body {
   font-size: calc(18px * var(--app-font-scale));
 }
 
+@media (min-width: 901px) {
+  #root {
+    min-width: 1126px;
+  }
+  body {
+    overflow-x: auto;
+  }
+}
+
 h1,
 h2 {
   font-family: var(--heading);

@@ -425,8 +425,13 @@ function PulseMarkers({ barangayData, onHover, onLeave, onClick }) {
   const map = useMap();
   const markersRef = useRef([]);
 
+  const getRiskColor = (count) => {
+    if (count >= 20) return { color: '#DC2626', ring: 'rgba(220,38,38,0.3)' };
+    if (count >= 10) return { color: '#f59e0b', ring: 'rgba(245,158,11,0.3)' };
+    return { color: '#10b981', ring: 'rgba(16,185,129,0.3)' };
+  };
   const createPinIcon = (b, size) => {
-    const { color, ring } = getRisk(b.totalCases);
+    const { color, ring } = getRiskColor(b.totalCases);
     const w = size;
     const h = Math.round(size * 44 / 34);
     const totalH = h;
@@ -809,7 +814,7 @@ export default function ResidentMap() {
             {/* Barangay Risk Classification Table */}
             {sortedBarangays.length > 0 && (
               <div style={{ marginBottom: '20px' }}>
-                <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Barangay Risk Classification</div>
+                <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>{t('Pag-uuri ng Panganib ng Barangay')}</div>
                 <div className="resident-table-wrap" style={{ maxHeight: '200px', overflowY: 'auto', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '17px' }}>
                     <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
@@ -817,8 +822,8 @@ export default function ResidentMap() {
                         <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: '600', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>No.</th>
                         <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: '600', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>Barangay</th>
                         <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: '600', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>Cases</th>
-                        <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: '600', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>Risk Level</th>
-                        <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: '600', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>Top Disease</th>
+                        <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: '600', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>{t('Antas ng Panganib')}</th>
+                        <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: '600', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>{t('Nangungunang Sakit')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -869,7 +874,7 @@ export default function ResidentMap() {
             {/* Age Distribution */}
             {allCases.length > 0 && (
               <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
-                <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '8px' }}>Age Distribution</div>
+                <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '8px' }}>{t('Distribusyon ng Edad')}</div>
                 <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '100px' }}>
                   {Object.entries(ageGroups).map(([label, count]) => (
                     <div key={label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
@@ -885,7 +890,7 @@ export default function ResidentMap() {
             {/* Gender Distribution */}
             {genderEntries.length > 0 && (
               <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
-                <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '8px' }}>Gender Distribution</div>
+                <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '8px' }}>{t('Distribusyon ng Kasarian')}</div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   {genderEntries.map(([gender, count]) => {
                     const pct = totalCasesCount > 0 ? Math.round((count / totalCasesCount) * 100) : 0;
@@ -904,7 +909,7 @@ export default function ResidentMap() {
             {/* Barangay Health Advisories */}
             {brgyAdvisories.length > 0 && (
               <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
-                <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '8px' }}>Barangay Health Advisories</div>
+                <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '8px' }}>{t('Mga Paalala sa Kalusugan ng Barangay')}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {brgyAdvisories.map(b => (
                     <div key={b.name} style={{ padding: '10px 14px', background: 'var(--input-bg)', borderRadius: '8px', borderLeft: `3px solid ${b.count > 10 ? '#dc2626' : b.count > 5 ? '#d97706' : '#129968'}` }}>

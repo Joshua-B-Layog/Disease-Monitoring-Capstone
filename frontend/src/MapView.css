@@ -324,3 +324,30 @@
   font-size: 15px;
   color: var(--text-main);
 }
+
+/* =========================================================
+   MOBILE RESPONSIVE — Map View (CHO/BHW)
+   ========================================================= */
+@media (max-width: 900px) {
+  .map-view-container { padding: 14px; }
+  .map-view-panel-left, .map-view-panel-right { width: 100% !important; }
+  .map-view-filters-row, .map-view-filter-group { flex-wrap: wrap; }
+  .map-view-risk-card { width: auto; }
+  .map-floating-top-actions { flex-wrap: wrap; gap: 6px; }
+  .map-view-legend-items { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 600px) {
+  .map-view-container { padding: 10px; }
+  .map-view-filter-panel { padding: 12px; }
+  .map-view-panel-title { font-size: 16px; }
+  .map-vr-real-map-container { height: 380px !important; }
+  .map-view-color-dot { width: 12px; height: 12px; }
+  .legend-item, .map-view-legend-item { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .map-view-legend-items { grid-template-columns: 1fr; }
+  .map-view-apply-btn, .map-view-reset-btn { width: 100%; }
+  .map-view-action-buttons { flex-direction: column; }
+  .map-floating-risk-card { right: 10px; left: 10px; bottom: 10px; max-width: none; }
+  .map-view-sidebar-legend { max-height: 260px; overflow-y: auto; }
+  .map-view-input, .map-view-select { font-size: 14px; }
+}

@@ -32,16 +32,15 @@
 .menu-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
-  height: calc(100vh - 450px);
+  gap: 16px;
 }
 
 .nav-box {
   background-color: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: 12px;
-  padding: 24px;
-  min-height: 0;
+  padding: 22px 24px;
+  min-height: 96px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -457,6 +456,13 @@
   gap: 32px;
 }
 
+/* Cap Language & Region selects (esp. the long Time Zone list) so they stay
+   "short" and never push/overlap the row label. */
+.session-list-row select {
+  width: min(220px, 100%);
+  max-width: 100%;
+}
+
 .session-info-meta {
   flex: 1;
   text-align: left;
@@ -576,4 +582,146 @@
 
 .utility-row-action-card span:last-child {
   color: var(--text-muted);
+}
+
+/* =========================================================
+   MOBILE RESPONSIVE — CHO Settings
+   ========================================================= */
+@media (max-width: 900px) {
+  .settings-wrapper { padding: 14px; }
+  .settings-container { padding: 16px; }
+  .settings-title { font-size: 22px; }
+  .profile-header-container { flex-wrap: wrap; gap: 14px; }
+  .menu-grid { grid-template-columns: 1fr !important; gap: 12px; }
+  .form-split-grid, .form-row-inline { grid-template-columns: 1fr; gap: 12px; }
+  .settings-form-row-2col, .two-col-side-by-side { grid-template-columns: 1fr !important; }
+  .session-list-row, .session-row { flex-wrap: wrap; }
+  .settings-card { padding: 16px; }
+  .input-field-group input, .input-field-group select { font-size: 15px; }
+  .security-card { padding: 16px; }
+  .utility-row-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .backup-section, .restore-section { flex-direction: column; align-items: stretch; gap: 10px; }
+  .settings-action-bar { flex-wrap: wrap; }
+}
+
+@media (max-width: 560px) {
+  .settings-wrapper { padding: 10px; }
+  .menu-grid { grid-template-columns: 1fr; }
+  .utility-row-grid { grid-template-columns: 1fr; }
+  .nav-box { min-height: 0; }
+  .profile-avatar-wrapper { width: 72px; height: 72px; }
+  .settings-nav-row, .breadcrumb-row { flex-wrap: wrap; gap: 8px; }
+  .save-cancel-container { flex-direction: column; align-items: stretch; }
+  .save-cancel-container button { width: 100%; }
+  .security-action-buttons { flex-direction: column; align-items: stretch; }
+  .security-action-buttons button { width: 100%; }
+  .session-list-row { flex-direction: column; gap: 8px; }
+  .settings-page-heading { font-size: 22px; }
+}
+
+/* =========================================================
+   MOBILE RESPONSIVE — CHO Settings
+   ========================================================= */
+@media (max-width: 900px) {
+  .settings-wrapper { padding: 16px; }
+  .settings-container { padding: 16px; }
+  .menu-grid { grid-template-columns: 1fr !important; }
+  .form-split-grid { grid-template-columns: 1fr !important; }
+  .settings-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .sub-toolbar-row { flex-wrap: wrap; }
+  .security-sessions-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .session-list-row { min-width: 0; }
+  .security-password-wrapper { flex-direction: column; }
+  .notifications-action-container { flex-direction: column; align-items: stretch; gap: 8px; }
+  .utility-row-action-card { min-width: 160px; }
+}
+
+@media (max-width: 600px) {
+  .settings-container { padding: 12px; }
+  .menu-grid { grid-template-columns: 1fr !important; }
+  .settings-title { font-size: 20px; }
+  .settings-subtitle { font-size: 13px; }
+  .profile-header-container { flex-direction: column; align-items: center; text-align: center; }
+  .form-row { grid-template-columns: 1fr !important; }
+  .form-actions { flex-direction: column; width: 100%; }
+  .form-actions button, .form-actions .btn, .form-action-footer button { width: 100% !important; }
+  .save-option-row { flex-direction: column; }
+  .auth-remember-row { flex-direction: column; align-items: flex-start; }
+  .security-action-blue-btn, .security-manage-btn { width: 100%; }
+  .input-field-group input, .input-field-group select { font-size: 14px; }
+  .utility-row-action-card { flex: 1 1 46%; }
+  .gamma-table { min-width: 640px; }
+  .gamma-table-wrap { overflow-x: auto; }
+}
+
+/* =========================================================
+   CHO Settings — mobile alignment (left labels, right buttons)
+   ========================================================= */
+@media (max-width: 900px) {
+  .security-section-card,
+  .detail-view-container,
+  .security-view-view {
+    text-align: left !important;
+  }
+  .security-section-card h3,
+  .security-section-card p,
+  .detail-view-container h2,
+  .detail-view-container h3,
+  .detail-view-container h4,
+  .detail-view-container p {
+    text-align: left !important;
+  }
+  .session-list-row {
+    justify-content: space-between !important;
+    text-align: left !important;
+    flex-wrap: nowrap !important;
+    flex-direction: row !important;
+    gap: 12px !important;
+  }
+  .session-info-meta {
+    flex: 1 1 auto !important;
+    text-align: left !important;
+    min-width: 0 !important;
+  }
+  .session-list-row > label,
+  .session-list-row > button {
+    flex-shrink: 0 !important;
+    margin-left: 0 !important;
+  }
+  .session-list-row > div:last-child,
+  .session-list-row > select {
+    flex-shrink: 1 !important;
+    min-width: 0 !important;
+    margin-left: 0 !important;
+    max-width: 100% !important;
+  }
+  .session-list-row select {
+    width: min(220px, 100%) !important;
+  }
+  .notifications-action-container {
+    justify-content: flex-start !important;
+  }
+  .notifications-action-container button {
+    margin-left: 0 !important;
+  }
+}
+
+/* =========================================================
+   CHO Settings — Data Management tiles + menu cards
+   ========================================================= */
+@media (max-width: 900px) {
+  .menu-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .cdms-storage-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+@media (max-width: 560px) {
+  .menu-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .cdms-storage-grid {
+    grid-template-columns: 1fr !important;
+  }
 }

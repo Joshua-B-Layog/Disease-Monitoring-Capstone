@@ -1271,3 +1271,591 @@ button:active { transform: scale(0.97); }
   }
   button:active { transform: none; }
 }
+
+/* =========================================================
+   HAMBURGER + DRAWER — CHO/BHW SIDEBAR (mobile ≤ 900px)
+   Desktop default: hamburger hidden, sidebar static
+   ========================================================= */
+.mobile-menu-btn { display: none; }
+.mobile-menu-backdrop { display: none; }
+
+@media (max-width: 900px) {
+  .mobile-menu-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 1400;
+    width: 42px;
+    height: 42px;
+    font-size: 20px;
+    color: var(--text-main);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+  }
+
+  .sidebar {
+    position: fixed !important;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 250px !important;
+    min-width: 250px !important;
+    height: 100vh !important;
+    transform: translateX(-105%);
+    transition: transform 0.3s ease;
+    z-index: 1500;
+  }
+
+  .sidebar.mobile-open { transform: translateX(0); }
+
+  .mobile-menu-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1450;
+  }
+
+  .main-content,
+  .cdms-main-content-area,
+  .cdms-main-content { margin-left: 0 !important; }
+}
+
+/* =========================================================
+   MOBILE RESPONSIVE — APP SHELL (sidebar + dashboard)
+   ========================================================= */
+@media (max-width: 900px) {
+  .sidebar { width: 210px !important; min-width: 210px !important; }
+  .sidebar-logo h3 { font-size: 13px; letter-spacing: 0; }
+  .sidebar-logo { padding: 20px 16px; }
+  .dash-stats-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 12px; }
+  .dashboard-grid-main { grid-template-columns: 1fr !important; }
+  .dashboard-cards-row { flex-wrap: wrap; }
+  .dash-chart-card { padding: 14px; }
+  .dash-section-title { font-size: 16px; }
+  .content-scroller { padding: 18px; }
+  .main-content { margin-left: 220px; }
+  .sidebar-footer { display: none; }
+  .header-action-icons { gap: 8px; }
+  .weekly-summary-view-title { font-size: 22px; }
+  .contact-grid { grid-template-columns: 1fr; }
+  .home-stat-card { min-width: 120px; }
+  .chart-row { flex-direction: column; }
+  .chart-box { width: 100% !important; }
+  .barangay-select-wrapper { flex: 1 1 100%; }
+}
+
+@media (max-width: 680px) {
+  /* Drawer (max-width:900px) governs navigation on phones — the rail
+     collapse below is intentionally removed so the hamburger drawer
+     slides in correctly (sidebar stays fixed + full-height, NOT clipped). */
+  .main-content, .cdms-main-content-area { margin-left: 0 !important; }
+  .content-scroller { padding: 12px; }
+  .dash-stats-grid { grid-template-columns: 1fr 1fr !important; gap: 8px; }
+  .dash-stat-card { padding: 12px; }
+  .dash-stat-label { font-size: 12px; }
+  .dash-stat-value { font-size: 20px; }
+  .dashboard-page-title { font-size: 20px; text-align: center; }
+  .header-bar, .topbar { padding: 8px 10px; flex-wrap: wrap; gap: 8px; }
+  .globalheader-search, .header-search-box { display: none; }
+  .notifications-cio-bell, .bell-icon-button { font-size: 15px; }
+  .modal-overlay { align-items: flex-end; }
+  .modal-content, .cdms-modal-card { width: 100% !important; max-width: 100% !important; border-radius: 16px 16px 0 0 !important; max-height: 92vh; }
+  .quick-stats-grid { grid-template-columns: 1fr 1fr; }
+  .utility-row-action-card { flex: 1 1 46%; }
+  .form-split-row, .input-row { flex-direction: column; }
+  .form-title, .login-title { font-size: 20px; }
+}
+
+/* =========================================================
+   MOBILE RESPONSIVE — APP LAYOUT (sidebar + dashboard)
+   ========================================================= */
+@media (max-width: 900px) {
+  /* NOTE: the drawer system above (hamburger → slide-in) now governs the
+     sidebar on ≤900px. The legacy icon-only rail rules (width/menu zeroing)
+     were intentionally removed so menu labels remain visible in the drawer. */
+  .sidebar-footer { display: none; }
+  .dash-stats-grid { grid-template-columns: 1fr 1fr !important; }
+  .quick-stats-grid { grid-template-columns: 1fr 1fr !important; }
+  [data-compact="true"] .sidebar { width: 64px !important; }
+  [data-compact="true"] .main-content { margin-left: 64px !important; }
+  .quick-chart-flex-row { flex-direction: column; }
+  .chart-box { width: 100% !important; }
+  .home-summary-row { flex-direction: column; }
+  .role-summary-card { width: 100%; }
+}
+
+@media (max-width: 560px) {
+  .dash-stats-grid { grid-template-columns: 1fr !important; }
+  .main-content, .cdms-main-content-area { margin-left: 0 !important; }
+  .sidebar { position: fixed; z-index: 1200; height: 100vh; width: 56px !important; min-width: 56px !important; }
+  .cdms-main-wrap, .app-shell { padding: 0; }
+  .content-scroller { padding: 8px; }
+  .view-title { font-size: 20px; }
+  .dashboard-title-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .cdms-global-footer { flex-direction: column; gap: 8px; padding: 12px; }
+  .cdms-global-footer-left, .cdms-global-footer-right { width: 100%; text-align: center; }
+  .barangay-summary-ubre-footer-row { flex-direction: column; }
+  button { touch-action: manipulation; }
+}
+
+/* =========================================================
+   MOBILE DRAWER — Sidebar slides over content (≤900px)
+   (Appended LAST so the later rules win the cascade)
+   ========================================================= */
+@media (max-width: 900px) {
+  .mobile-menu-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 1150; /* below the open drawer (1200) */
+    width: 42px;
+    height: 42px;
+    font-size: 20px;
+    color: var(--text-main);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    cursor: pointer;
+  }
+  .mobile-menu-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 1140;
+    background: rgba(0, 0, 0, 0.45);
+  }
+  .sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    width: 250px !important;
+    min-width: 250px !important;
+    height: 100vh !important;
+    transform: translateX(-105%);
+    transition: transform 0.3s ease;
+    z-index: 1200;
+  }
+  .sidebar.mobile-open { transform: translateX(0); }
+  .main-content { margin-left: 0 !important; }
+  [data-compact="true"] .sidebar { width: 250px !important; min-width: 250px !important; }
+}
+
+/* =========================================================
+   MOBILE RESPONSIVE — LOGIN / AUTH SCREEN
+   Stack the two panels on tablet, hide branding on phone
+   ========================================================= */
+@media (max-width: 900px) {
+  .login-screen { flex-direction: column !important; height: auto !important; min-height: 100vh; }
+  .login-left,
+  .login-right { flex: 1 1 100% !important; width: 100% !important; max-width: 100% !important; }
+  .login-right { padding: 28px 20px 40px !important; }
+  .login-right > .login-column { max-width: 420px !important; margin: 0 auto !important; width: 100% !important; }
+  .login-left { padding: 40px 20px 24px !important; }
+  .login-branding-content { padding: 0 !important; }
+}
+
+@media (max-width: 560px) {
+  .login-left { display: none !important; }
+  .login-right { padding: 24px 14px 36px !important; }
+  .login-right > .login-column { max-width: 100% !important; }
+  .login-header h2 { font-size: 22px; }
+  .login-header p { font-size: 14px; }
+}
+
+/* =========================================================
+   DASHBOARD INLINE-GRID OVERRIDES (mobile)
+   Dashboard.jsx uses inline gridTemplateColumns which cannot
+   be overridden by normal CSS selectors — only !important.
+   ========================================================= */
+@media (max-width: 900px) {
+  .cdms-dash-grid-6 { grid-template-columns: repeat(3, 1fr) !important; }
+  .cdms-dash-grid-main { grid-template-columns: 1fr !important; }
+  .cdms-dash-grid-2 { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 560px) {
+  .cdms-dash-grid-6 { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+/* =========================================================
+   MOBILE TEXT COMPACTION — global (beats inline styles)
+   Shrinks the most common cramped rows/buttons/tables on
+   phones. Separate, safe, appended last so !important wins.
+   ========================================================= */
+@media (max-width: 900px) {
+  /* Toolbar buttons (User Management / inbox / settings) */
+  .cdms-export-btn {
+    padding: 6px 12px !important;
+    font-size: 13px !important;
+  }
+  /* Inbox + message rows */
+  .cdms-row-in, .cdms-inbox-row, .cdms-msg-row {
+    padding: 10px 14px !important;
+    font-size: 14px !important;
+  }
+  .cdms-row-in span, .cdms-inbox-row span, .cdms-msg-row span,
+  .cdms-row-in div, .cdms-inbox-row div, .cdms-msg-row div {
+    font-size: 14px !important;
+  }
+
+  /* Table headers — let them breathe */
+  thead th, .cdms-recent-th th {
+    padding: 8px 10px !important;
+    font-size: 13px !important;
+    white-space: normal !important;
+  }
+
+  @media (max-width: 560px) {
+  .cdms-case-form-card { padding: 14px !important; }
+  }
+}
+
+/* =========================================================
+   ADD/EDIT CASE FORM — keep editable dropdowns & grid columns
+   inside the card (labels wrap like the read-only BHW view)
+   ========================================================= */
+.cdms-case-form-grid,
+.cdms-case-form-pair {
+  min-width: 0;
+}
+.cdms-case-form-grid > *,
+.cdms-case-form-pair > * {
+  min-width: 0;
+}
+.cdms-cf-dropdown {
+  text-align: left;
+}
+.cdms-cf-dropdown > span:first-child {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+  min-width: 0;
+  flex: 1;
+}
+
+/* =========================================================
+   MAP VIEW — filter sidebar becomes a hamburger drawer ≤900px
+   ========================================================= */
+@media (min-width: 901px) {
+  .cdms-map-filter-btn { display: none !important; }
+  .cdms-map-backdrop { display: none !important; }
+}
+@media (max-width: 900px) {
+  .cdms-map-wrap { position: relative; }
+  .cdms-map-sidebar {
+    position: absolute !important;
+    top: 0; bottom: 0; left: 0;
+    z-index: 1100;
+    width: 286px !important; min-width: 286px !important;
+    transform: translateX(-102%);
+    transition: transform 0.28s ease;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+  }
+  .cdms-map-sidebar.cdms-map-sidebar-open { transform: translateX(0); }
+  .cdms-map-area { z-index: 1; }
+  .cdms-map-backdrop {
+    position: absolute; inset: 0; z-index: 1050;
+    background: rgba(0,0,0,0.45);
+  }
+  .cdms-map-filter-btn { display: flex !important; }
+}
+
+/* Zoom control -> top-right corner (Filters stay top-left, SD/HD stays
+   bottom-left) so it is never hidden behind the SD/HD toggle. */
+.cdms-map-area .leaflet-top.leaflet-left {
+  left: auto !important;
+  right: 12px !important;
+  top: 12px !important;
+}
+
+/* =========================================================
+   INBOX SUB-TABS — wrap into equal tabs on small screens so
+   the 5 CHO tabs never spill past the viewport width
+   ========================================================= */
+.cdms-inbox-tabs {
+  flex-wrap: wrap !important;
+}
+@media (max-width: 900px) {
+  .cdms-inbox-tabs > div {
+    flex: 1 1 45% !important;
+    min-width: 0 !important;
+    padding: 6px 8px !important;
+    font-size: 13px !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+}
+@media (max-width: 560px) {
+  .cdms-inbox-tabs > div {
+    flex-basis: 48% !important;
+    padding: 6px 4px !important;
+    font-size: 12px !important;
+  }
+}
+
+/* =========================================================
+   INBOX / MESSAGE ROWS — fix ellipsis truncation on phones
+   (rows are inline flex; force min-width:0 so the text span
+   can shrink and show ellipsis instead of overlapping text)
+   ========================================================= */
+@media (max-width: 900px) {
+  .cdms-row-in,
+  .cdms-inbox-row,
+  .cdms-msg-row {
+    min-width: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  .cdms-row-in > *:not(.inbox-avatar-circle),
+  .cdms-inbox-row > *,
+  .cdms-msg-row > * {
+    min-width: 0 !important;
+  }
+  .cdms-row-in span,
+  .cdms-inbox-row span,
+  .cdms-msg-row span,
+  .cdms-row-in div,
+  .cdms-inbox-row div,
+  .cdms-msg-row div {
+    flex-shrink: 1 !important;
+  }
+}
+
+/* =========================================================
+   USER ACCOUNTS (UserManagement.jsx) — mobile stacking
+   Header title + action buttons wrap; search toolbar fills
+   width; pagination text shrinks.
+   ========================================================= */
+@media (max-width: 900px) {
+  .cdms-um-header {
+    flex-wrap: wrap !important;
+  }
+  .cdms-um-actions {
+    width: 100% !important;
+    justify-content: flex-start !important;
+  }
+  .cdms-um-toolbar input[type="text"] {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  .cdms-um-toolbar > div {
+    flex: 1 1 auto !important;
+  }
+  .cdms-um-toolbar > button {
+    flex: 1 1 auto !important;
+    width: 100% !important;
+  }
+  .cdms-um-pagination {
+    flex-wrap: wrap !important;
+    gap: 10px !important;
+  }
+  .cdms-um-pageof {
+    font-size: 13px !important;
+  }
+}
+
+/* =========================================================
+   TOP NAV — user name + logout reachable on phones
+   (online pill, clock shrink; profile stays visible)
+   ========================================================= */
+@media (max-width: 900px) {
+  .top-nav {
+    height: auto !important;
+    min-height: 70px !important;
+    padding: 10px 16px !important;
+    gap: 8px !important;
+  }
+  .top-nav-clock {
+    display: none !important;
+  }
+  .top-nav .nav-title {
+    padding-left: 46px !important;
+  }
+  .nav-title h2 {
+    font-size: 17px !important;
+    line-height: 1.2 !important;
+  }
+  .nav-title small {
+    font-size: 13px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 190px !important;
+  }
+  .top-nav > div:last-child {
+    gap: 10px !important;
+    min-width: 0 !important;
+  }
+  .user-info {
+    max-width: 180px !important;
+  }
+  .user-name {
+    font-size: 12px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 180px !important;
+  }
+  .user-role {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 180px !important;
+    font-size: 12px !important;
+  }
+  .avatar {
+    width: 32px !important;
+    height: 32px !important;
+  }
+}
+@media (max-width: 560px) {
+  .top-nav > div:last-child > div:first-child {
+    padding: 3px 8px !important;
+    font-size: 13px !important;
+  }
+  .user-profile {
+    flex-shrink: 1 !important;
+    min-width: 0 !important;
+    gap: 8px !important;
+  }
+}
+
+/* =========================================================
+   MANAGE CASES — All Diseases & Categories, Add New Disease
+   ========================================================= */
+@media (max-width: 900px) {
+  .cdms-cat-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .cdms-disease-grid-inline {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+  .cdms-adddisease-pair {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .cdms-cat-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .cdms-disease-grid-inline {
+    grid-template-columns: 1fr !important;
+  }
+  .cdms-adddisease-pair {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+.cdms-carousel-arrow {
+  flex-shrink: 1 !important;
+}
+@media (max-width: 900px) {
+  .cdms-carousel-peek {
+    display: none !important;
+  }
+  .cdms-carousel-arrow {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    font-size: 16px !important;
+  }
+}
+
+/* =========================================================
+   MANAGE CASES toolbar header (title + export + shortcuts)
+   ========================================================= */
+@media (max-width: 900px) {
+  .cdms-cases-header {
+    flex-wrap: wrap !important;
+    gap: 12px !important;
+  }
+  .cdms-cases-header > div:last-child {
+    width: 100% !important;
+    justify-content: flex-start !important;
+    flex-wrap: wrap !important;
+  }
+  .cdms-cases-export-btn {
+    font-size: 13px !important;
+    padding: 6px 12px !important;
+  }
+  .cdms-box2-btns {
+    flex-direction: column !important;
+  }
+  .cdms-box2-btns button {
+    width: 100% !important;
+    border-radius: 6px !important;
+    border-right: none !important;
+    border-left: none !important;
+    font-size: 13px !important;
+    padding: 10px !important;
+  }
+}
+
+/* =========================================================
+   MANAGE CASES — cases table (disease view) + search input
+   on mobile
+   ========================================================= */
+@media (max-width: 900px) {
+  .cdms-cases-search {
+    width: 100% !important;
+    flex: 1 1 100% !important;
+  }
+  .cdms-case-form-pair {
+    grid-template-columns: 1fr !important;
+  }
+  .cdms-case-form-actions {
+    flex-direction: column !important;
+  }
+  .cdms-case-form-actions button,
+  .cdms-case-form-editrow button,
+  .cdms-case-form-editrow textarea {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .cdms-row-in { padding: 12px 14px !important; }
+  .cdms-row-in div { font-size: 13px !important; }
+}
+
+/* =========================================================
+   SETTINGS (ch-settings Profile) — collapse the 2-col profile
+   detail grid + shrink the profile header on phones
+   ========================================================= */
+@media (max-width: 720px) {
+  .cdms-profile-fields-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+}
+@media (max-width: 560px) {
+  .cdms-profile-fields-grid {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+}
+
+
+@media (max-width: 640px) {
+  .cdms-inbox-tabs {
+    row-gap: 6px !important;
+  }
+  .cdms-inbox-tabs > div {
+    flex: none !important;
+    flex-grow: 1 !important;
+  }
+}

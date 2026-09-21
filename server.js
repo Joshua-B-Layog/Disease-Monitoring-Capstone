@@ -885,6 +885,16 @@ db.query("SHOW COLUMNS FROM users LIKE 'status'", (e, r) => {
   }
 });
 
+// Migration: add created_at column to users table (registration date for pending list)
+db.query("SHOW COLUMNS FROM users LIKE 'created_at'", (e, r) => {
+  if (!e && r && r.length === 0) {
+    db.query("ALTER TABLE users ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP", (ae) => {
+      if (ae) console.error('Error adding created_at column to users:', ae.message);
+      else console.log('Added created_at column to users');
+    });
+  }
+});
+
 // Case status history table
 db.query(`CREATE TABLE IF NOT EXISTS case_status_history (
   id INT AUTO_INCREMENT PRIMARY KEY,

@@ -312,3 +312,89 @@ body.dark-mode select,
 .dark-mode table .text-blue-500 {
   color: #60a5fa !important; /* High-contrast bright blue */
 }
+
+/* =========================================================
+   MOBILE RESPONSIVE — Barangay Reports / Audit Logs
+   ========================================================= */
+@media (max-width: 900px) {
+  .reports-page-wrapper { padding: 14px; }
+  .top-filter-bar { flex-wrap: wrap; gap: 10px; }
+  .filter-dropdown, .filter-date-input { flex: 1 1 160px; min-width: 0; }
+  .generate-report-btn { width: auto; }
+  .middle-split-container { grid-template-columns: 1fr; gap: 14px; }
+  .left-reports-box, .right-stats-box { width: 100%; }
+  .quick-stats-2x2 { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .bottom-table-card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .audit-log-table { min-width: 560px; }
+  .sub-toolbar-row, .table-top-header { flex-wrap: wrap; gap: 10px; }
+  .report-item-actions { flex-wrap: wrap; }
+}
+
+@media (max-width: 560px) {
+  .reports-page-wrapper { padding: 10px; }
+  .reports-main-title { font-size: 20px; }
+  .quick-stats-2x2 { grid-template-columns: 1fr; }
+  .top-filter-bar { flex-direction: column; align-items: stretch; }
+  .generate-report-btn { width: 100%; }
+  .report-log-item { flex-wrap: wrap; }
+  .stat-square-card { min-width: 110px; }
+  .report-modal-card { width: 95vw; max-height: 90vh; }
+  .filter-toolbar-actions { flex-direction: column; align-items: stretch; gap: 8px; }
+  .filter-toolbar-actions button { width: 100%; }
+  .utility-buttons-group { flex-wrap: wrap; }
+  .generated-report-modal { width: 95vw; padding: 16px; }
+  .preview-report-area { height: 55vh; }
+}
+
+/* =========================================================
+   MOBILE RESPONSIVE — Barangay Reports / Audit Logs
+   ========================================================= */
+@media (max-width: 900px) {
+  .reports-page-wrapper { padding: 16px; }
+  .top-filter-bar { flex-wrap: wrap; gap: 8px; }
+  .filter-dropdown, .filter-date-input { flex: 1 1 150px; min-width: 0; }
+  .generate-report-btn { width: 100%; }
+  .middle-split-container { grid-template-columns: 1fr !important; }
+  .left-reports-box, .right-stats-box { width: 100%; }
+  .quick-stats-2x2 { grid-template-columns: 1fr 1fr; }
+  .bottom-table-card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .audit-log-table { min-width: 560px; }
+  .sub-toolbar-row { flex-wrap: wrap; }
+  .header-action-utilities { flex-wrap: wrap; gap: 6px; }
+}
+
+@media (max-width: 480px) {
+  .reports-page-wrapper { padding: 12px; }
+  .reports-main-title { font-size: 20px; }
+  .quick-stats-2x2 { grid-template-columns: 1fr; }
+  .table-search-input, .sm-toolbar-select { width: 100%; }
+  .stat-square-card { padding: 12px; }
+  .row-action-btn { flex: 1 1 auto; }
+  .report-action-collapse-btn, .report-action-download-btn, .report-action-status-toggle-btn { width: 100%; }
+  .report-log-item { flex-direction: column; align-items: flex-start; gap: 6px; }
+}
+
+/* =========================================================
+   REAL hooks (actual markup classes) — mobile
+   ========================================================= */
+@media (max-width: 900px) {
+  .cdms-reports-mid {
+    grid-template-columns: 1fr !important;
+  }
+  .cdms-quick-stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .cdms-log-pagination {
+    justify-content: flex-start !important;
+  }
+  .cdms-log-pagination button {
+    width: 30px !important;
+    height: 30px !important;
+  }
+}
+@media (max-width: 560px) {
+  .cdms-reports-quick > div:nth-child(3),
+  .cdms-reports-quick > div:nth-child(4) {
+    grid-template-columns: 1fr !important;
+  }
+}

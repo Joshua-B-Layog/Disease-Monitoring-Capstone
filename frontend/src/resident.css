@@ -103,6 +103,15 @@
   height: min(60vh, 520px);
 }
 
+/* Zoom +/− -> top-right corner (mirrors the CHO Map View so the
+   resident map zoom sits on the top-right, same as the map view). */
+.resident-map-area .leaflet-top.leaflet-left {
+  left: auto !important;
+  right: 12px !important;
+  top: 12px !important;
+  z-index: 1200;
+}
+
 /* Stat cards grid */
 .resident-stat-cards {
   display: flex;
@@ -234,4 +243,20 @@
 .mc-custom-dropdown-item:hover { background: var(--input-bg); }
 .mc-custom-dropdown-item--active {
   background: rgba(59,130,246,0.12); color: #60a5fa; font-weight: 600;
+}
+
+/* =========================================================
+   RESIDENT — phone tips grid (≤560px) — collapse to 1 col
+   inline minmax(320px,1fr) forces overflow; shrink the floor
+   ========================================================= */
+@media (max-width: 560px) {
+  .resident-page [style*="minmax(320px, 1fr)"] {
+    grid-template-columns: 1fr !important;
+  }
+  .resident-page [style*="display: grid"] {
+    min-width: 0 !important;
+  }
+  .resident-page {
+    overflow-x: hidden;
+  }
 }

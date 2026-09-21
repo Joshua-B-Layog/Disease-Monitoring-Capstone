@@ -4,6 +4,7 @@ import { API_URL } from './config';
 import { cacheUsers, getCachedUsers, getCachedBarangays, isOnline } from './offlineSync';
 import { formatDateTime } from './formatDate';
 import { useI18n } from './i18n';
+import ExportPreviewModal from './components/ExportPreview';
 
 const CHO_BARANGAYS = {
   'CHO Unit I': [
@@ -104,6 +105,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
   const [filterRoleOpen, setFilterRoleOpen] = useState(false);
   const filterRoleRef = useRef(null);
   const [roleOpen, setRoleOpen] = useState(false);
+  const [exportPreview, setExportPreview] = useState(null);
   const roleRef = useRef(null);
 
   const fetchUsers = (includeArchived = false) => {
@@ -210,15 +212,46 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
     else setSelectedIds(paginatedUsers.map(u => u.user_id));
   };
 
-  const handleExportUsers = () => {
+  const buildUsersCsv = () => {
     const headers = [t('User ID'), t('Full Name'), t('Username'), t('Barangay'), t('Role'), t('Status'), t('Email'), t('Mobile')].join(',') + '\n';
     const rows = filteredUsers.map(u =>
       `"U-${String(u.user_id).padStart(3, '0')}","${u.full_name || ''}","${u.username || ''}","${u.barangay_name || ''}","${u.role || ''}","${u.is_active ? t('Active') : t('Inactive')}","${u.email || ''}","${u.mobile_number || ''}"`
     ).join('\n');
-    const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
+    return headers + rows;
+  };
+
+  const handleExportUsers = () => {
+    const columns = [t('User ID'), t('Full Name'), t('Username'), t('Barangay'), t('Role'), t('Status'), t('Email'), t('Mobile')];
+    const rows = filteredUsers.map(u => [
+      `U-${String(u.user_id).padStart(3, '0')}`,
+      u.full_name || '',
+      u.username || '',
+      u.barangay_name || '',
+      u.role || '',
+      u.is_active ? t('Active') : t('Inactive'),
+      u.email || '',
+      u.mobile_number || '',
+    ]);
+    setExportPreview({
+      title: t('Preview: Accounts List Export'),
+      columns,
+      rows,
+      actions: [{
+        label: `⬇ ${t('Download CSV (.csv)')}`,
+        primary: true,
+        onClick: () => {
+          downloadBlob(new Blob(['\ufeff' + buildUsersCsv()], { type: 'text/csv;charset=utf-8;' }), 'Cabuyao_CDMS_User_Registry.csv');
+          setExportPreview(null);
+        },
+      }],
+    });
+  };
+
+  const downloadBlob = (blob, filename) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'Cabuyao_CDMS_User_Registry.csv'; a.click();
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
   };
 
   const openAdd = () => {
@@ -428,14 +461,14 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
   return (
     <div style={{ padding: compactMode ? '14px' : '24px', color: 'var(--text-main)' }}>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+      <div className="cdms-um-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h2 style={{ margin: 0, fontSize: '22px', color: 'var(--text-h)', fontWeight: '700' }}>{t('User Accounts')}</h2>
         {offlineMode && (
           <span style={{ fontSize: '15px', color: '#D97706', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '6px', padding: '4px 10px' }}>
             {t('Offline - showing cached data')}
           </span>
         )}
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="cdms-um-actions" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
           <button onClick={() => setActiveTab && setActiveTab('Roles & Permissions')}
             onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
             onMouseLeave={e => e.currentTarget.style.opacity = '1'}
@@ -457,7 +490,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
 
       <div style={{ background: 'var(--bg-surface)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', border: '1px solid var(--border-color)' }}>
 
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '18px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="cdms-um-toolbar" style={{ display: 'flex', gap: '10px', rowGap: '10px', marginBottom: '18px', flexWrap: 'wrap', alignItems: 'center' }}>
           <input type="text" placeholder={t('Search Accounts...')}
             value={searchQuery} onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
             style={{ ...inputStyle, width: '220px' }} />
@@ -508,9 +541,9 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
               </div>
             )}
           </div>
-          <div style={{ position: 'relative' }} ref={statusRef}>
+          <div style={{ position: 'relative', width: '180px' }} ref={statusRef}>
             <button type="button" onClick={() => setStatusOpen(!statusOpen)}
-              style={{ ...inputStyle, width: '140px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}>
+              style={{ ...inputStyle, width: '100%', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}>
               <span>{t(filterStatus)}</span>
               <span style={{ fontSize: '13px', opacity: 0.6, transition: 'transform 0.2s', transform: statusOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
             </button>
@@ -528,9 +561,9 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
               </div>
             )}
           </div>
-          <div style={{ position: 'relative' }} ref={filterRoleRef}>
+          <div style={{ position: 'relative', width: '180px' }} ref={filterRoleRef}>
             <button type="button" onClick={() => setFilterRoleOpen(!filterRoleOpen)}
-              style={{ ...inputStyle, width: '140px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}>
+              style={{ ...inputStyle, width: '100%', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}>
               <span>{filterRole === 'CHO' ? t('CHO') : filterRole === 'BHW' ? t('BHW') : t(filterRole)}</span>
               <span style={{ fontSize: '13px', opacity: 0.6, transition: 'transform 0.2s', transform: filterRoleOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
             </button>
@@ -557,7 +590,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
               fetchUsers(next);
             }}
             disabled={offlineMode}
-            style={{ padding: '8px 14px', background: showArchived ? '#121358' : 'transparent', border: `1px solid ${showArchived ? '#121358' : 'var(--border-color)'}`, color: showArchived ? '#fff' : 'var(--text-muted)', borderRadius: '6px', cursor: offlineMode ? 'not-allowed' : 'pointer', fontWeight: '600', fontSize: '15px', opacity: offlineMode ? 0.4 : 1, whiteSpace: 'nowrap' }}>
+            style={{ ...inputStyle, width: '180px', minWidth: '236px', cursor: offlineMode ? 'not-allowed' : 'pointer', display: 'inline-flex', justifyContent: 'space-around', alignItems: 'center', gap: '8px', fontWeight: '600', fontSize: '15px', opacity: offlineMode ? 0.4 : 1, whiteSpace: 'nowrap', flexShrink: 0, flexGrow: 0, boxSizing: 'border-box', overflow: 'visible' }}>
             {showArchived ? t('← Back to Active Accounts') : t('🗄️ Show Archived Accounts')}
           </button>
           {selectedIds.length > 0 && (
@@ -600,7 +633,8 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
         {loading ? (
           <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('Loading accounts from database...')}</div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', minWidth: '760px', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '15px' }}>
                 <th style={{ padding: compactMode ? '7px 6px' : '12px 10px' }}>
@@ -696,10 +730,11 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
               )}
             </tbody>
           </table>
+          </div>
         )}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '18px', paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
-          <span style={{ color: 'var(--text-muted)', fontSize: '15px' }}>
+      <div className="cdms-um-pagination" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '18px', paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
+          <span className="cdms-um-pageof" style={{ color: 'var(--text-muted)', fontSize: '15px' }}>
             {t('Showing ')}{filteredUsers.length === 0 ? 0 : (currentPage - 1) * USERS_PER_PAGE + 1}–{Math.min(currentPage * USERS_PER_PAGE, filteredUsers.length)}{t(' of ')}{filteredUsers.length}{t(' Accounts')}
           </span>
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -972,6 +1007,8 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
           </div>
         </div>
       )}
+
+      <ExportPreviewModal preview={exportPreview} onClose={() => setExportPreview(null)} />
     </div>
   );
 }

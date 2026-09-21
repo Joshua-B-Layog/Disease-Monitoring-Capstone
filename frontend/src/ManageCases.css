@@ -80,6 +80,20 @@
   gap: 6px; white-space: nowrap; box-sizing: border-box;
 }
 .mc-custom-dropdown-btn:hover { border-color: var(--text-muted); }
+
+/* Add New Disease Weekly/Probable + Category pairs:
+   let the label wrap like the Short Description textarea instead of
+   spilling the card ('white-space: nowrap' breaks the grid columns). */
+.cdms-adddisease-pair .mc-custom-dropdown-btn {
+  white-space: normal;
+  text-align: left;
+}
+.cdms-adddisease-pair .mc-custom-dropdown-btn > span:first-child {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+  min-width: 0;
+}
 .mc-custom-dropdown-panel {
   position: absolute; top: 100%; left: 0; z-index: 100;
   max-height: 250px; overflow-y: auto; margin-top: 4px; min-width: 100%;
@@ -116,3 +130,31 @@
 .cdms-carousel-peek { transition: opacity 0.25s ease; }
 .cdms-carousel-peek:first-child { animation: cdmsPeekNudge 3s ease-in-out infinite; }
 .cdms-carousel-peek:last-child { animation: cdmsPeekNudge 3s ease-in-out infinite reverse; }
+
+/* =========================================================
+   MOBILE RESPONSIVE — Manage Cases (CHO/BHW)
+   ========================================================= */
+@media (max-width: 900px) {
+  .manage-cases-container { padding: 16px; }
+  .cases-container { padding: 14px; }
+  .cases-header { flex-direction: column; align-items: stretch; gap: 12px; }
+  .cases-controls { flex-wrap: wrap; }
+  .mc-filter-row, .mc-filter-group, .mc-actions-row { flex-wrap: wrap; }
+  .disease-grid { grid-template-columns: 1fr !important; }
+  .form-row { grid-template-columns: 1fr !important; }
+  .form-actions { flex-direction: column; align-items: stretch; }
+  .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .case-table { min-width: 680px; }
+  .mc-custom-dropdown-panel { max-height: 200px; }
+}
+
+@media (max-width: 600px) {
+  .manage-cases-container { padding: 12px; }
+  .card-footer { flex-direction: column; gap: 6px; }
+  .table-card { padding: 12px; }
+  .form-card { padding: 20px; max-width: 100%; }
+  .filter-dropdown, .filter-date-input { width: 100%; }
+  .mc-content-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .header-action-utilities { flex-wrap: wrap; }
+  .table-top-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+}

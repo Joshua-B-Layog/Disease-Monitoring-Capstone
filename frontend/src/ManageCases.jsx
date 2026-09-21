@@ -2473,7 +2473,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     ];
 
     const category = selectedCategory
-      ? ([{ id: 'notif-immediate', name: t('🕐 Immediate Diseases'), icon: '🕐', color: '#DC2626', desc: t('Report within 24 hours (Level 1 IDSR)'), diseases: ALL_DISEASE_ENTRIES.filter(e => notifTypeForEntry(e, allDiseases) === 'immediate') },
+      ? ([{ id: 'notif-immediate', name: t('Immediate Diseases'), icon: '🕐', color: '#DC2626', desc: t('Report within 24 hours (Level 1 IDSR)'), diseases: ALL_DISEASE_ENTRIES.filter(e => notifTypeForEntry(e, allDiseases) === 'immediate') },
           { id: 'notif-weekly', name: t('🗓️ Weekly Diseases'), icon: '🗓️', color: '#129968', desc: t('Included in the consolidated weekly summary (Level 2 FHSIS)'), diseases: ALL_DISEASE_ENTRIES.filter(e => notifTypeForEntry(e, allDiseases) === 'weekly') }].find(c => c.id === selectedCategory)
         || DISEASE_CATEGORIES.find(c => c.id === selectedCategory))
       : null;
@@ -2728,7 +2728,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   <p style={{ margin: '0 0 14px 0', fontSize: '15px', color: 'var(--text-muted)' }}>
                     {t('Browse all disease categories below, or use the ◀ ▶ arrows for exclusive diseases and to add a new one.')}
                   </p>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: compactMode ? '12px' : '16px', textAlign: 'left', maxWidth: '900px', margin: '0 auto' }}>
+                  <div className="cdms-cat-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: compactMode ? '12px' : '16px', textAlign: 'left', maxWidth: '900px', margin: '0 auto' }}>
                     {currentCategories.map(cat => renderCategoryCard(cat))}
                   </div>
                   {showCategoryPagination && (
@@ -2799,7 +2799,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       {addDiseaseMsg}
                     </div>
                   )}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                  <div className="cdms-adddisease-pair" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                     <input type="text" placeholder={t('Disease name')} value={newDiseaseName}
                       onChange={e => {
                         setNewDiseaseName(e.target.value);
@@ -2841,7 +2841,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       );
                     })}
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                  <div className="cdms-adddisease-pair" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                     <div style={{ position: 'relative' }} ref={categoryRef}>
                       <button className="mc-custom-dropdown-btn" style={{ width: '100%' }} onClick={() => setCategoryOpen(!categoryOpen)}>
                         <span>
@@ -2881,7 +2881,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       onChange={e => setNewDiseaseDesc(e.target.value)}
                       style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px', boxSizing: 'border-box', resize: 'vertical' }} />
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                  <div className="cdms-adddisease-pair" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                     <div style={{ position: 'relative' }} ref={notifTypeRef}>
                       <button className="mc-custom-dropdown-btn" style={{ width: '100%' }} type="button" onClick={() => { setNotifTypeOpen(!notifTypeOpen); setCaseTypeOpen(false); }}>
                         <span>{newDiseaseNotifType === 'immediate' ? t('Immediate (report within 24h)') : t('Weekly (consolidated summary)')}</span>
@@ -2995,7 +2995,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px', outline: 'none' }} />
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '0', marginTop: '16px' }}>
+                    <div className="cdms-box2-btns" style={{ display: 'flex', gap: '0', marginTop: '16px' }}>
                       <button onClick={saveBox2Tips} disabled={box2Saving}
                         style={{ flex: 1, padding: '12px', background: '#129968', border: 'none', borderRight: '1px solid var(--bg-main)', cursor: box2Saving ? 'not-allowed' : 'pointer', fontSize: '15px', fontWeight: '600', color: '#fff', borderRadius: '8px 0 0 8px' }}>
                         {box2Saving ? t('Saving...') : t('💾 Save Prevention Tips')}
@@ -3070,7 +3070,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         )}
 
         {category && (
-          <div key={`disease-grid-${selectedCategory}`} className="cdms-view-in" style={{ display: 'grid', gridTemplateColumns: gridMode ? '1fr 1fr' : '1fr 1fr 1fr', gap: gridMode ? (compactMode ? '12px' : '16px') : '24px', marginTop: gridMode ? '16px' : '24px' }}>
+          <div key={`disease-grid-${selectedCategory}`} className="cdms-view-in cdms-disease-grid-inline" style={{ display: 'grid', gridTemplateColumns: gridMode ? '1fr 1fr' : '1fr 1fr 1fr', gap: gridMode ? (compactMode ? '12px' : '16px') : '24px', marginTop: gridMode ? '16px' : '24px' }}>
             {currentDiseases.map(entry => renderDiseaseCard(entry, !gridMode))}
           </div>
         )}
@@ -3198,7 +3198,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           <BackButton onClick={() => setView('categories')}>{t('Back')}</BackButton>
         </div>
         {/* Sub-tabs */}
-        <div style={{ display: 'flex', gap: '0', marginBottom: '12px', borderBottom: '1px solid var(--border-color)' }}>
+        <div className="cdms-inbox-tabs" style={{ display: 'flex', gap: '0', marginBottom: '12px', borderBottom: '1px solid var(--border-color)' }}>
           <div onClick={() => setInboxSubTab('referrals')}
             style={{
               padding: '8px 20px', cursor: 'pointer', fontSize: '15px', fontWeight: inboxSubTab === 'referrals' ? '700' : '500',
@@ -3698,7 +3698,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         )}
 
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <div className="cdms-cases-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <div>
             <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '4px' }}>
               {t('Dashboard / Manage Cases / ')}{selectedDisease?.name || t('All Cases')}
@@ -3728,7 +3728,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             )}
             {/* EXPORT DROPDOWN */}
             <div style={{ position: 'relative' }} ref={exportRef}>
-              <button onClick={() => setShowExportMenu(!showExportMenu)}
+              <button className="cdms-cases-export-btn" onClick={() => setShowExportMenu(!showExportMenu)}
                 style={{ padding: '8px 16px', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', cursor: 'pointer', fontSize: '15px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -3786,7 +3786,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             )}
 
             {/* Search */}
-            <input type="text" placeholder={t('Search Cases...')}
+            <input className="cdms-cases-search" type="text" placeholder={t('Search Cases...')}
               value={searchQuery} onChange={e => { setSearchQuery(e.target.value); setTablePage(1); }}
               style={{ padding: '8px 12px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)', fontSize: '15px', width: '180px' }} />
 
@@ -3869,8 +3869,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             </span>
           </div>
 
+          <div style={{ overflowX: 'auto' }}>
           {loadingCases ? (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse' }}>
               <tbody>
                 {[0, 1, 2, 3, 4].map(r => (
                   <tr key={r} style={{ borderBottom: '1px solid var(--border-color)' }}>
@@ -3884,7 +3885,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               </tbody>
             </table>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
                   {['Case ID', 'Patient Name', 'Age', 'Barangay', 'Date Reported', 'Severity', 'Status', 'Actions'].map(h => (
@@ -3979,6 +3980,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               </tbody>
             </table>
           )}
+          </div>
 
           {/* Pagination */}
           {totalTablePages > 1 && (
@@ -4053,7 +4055,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       <div style={{ padding: compactMode ? '14px' : '28px', fontSize: `calc(15px * ${fs})` }}>
         <BackButton onClick={() => { if (approvalRequest) { closeApprovalReview(); return; } setView('list'); setFilterPurok('All Puroks'); }} style={{ marginBottom: '20px' }}>{approvalRequest ? t('Back to Add Requests') : `${t('Back to ')}${selectedDisease?.name}${t(' Cases')}`}</BackButton>
 
-        <div style={{ background: 'var(--bg-surface)', borderRadius: '12px', padding: '40px', color: 'var(--text-main)', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', maxWidth: '900px', margin: '0 auto' }}>
+        <div className="cdms-case-form-card" style={{ background: 'var(--bg-surface)', borderRadius: '12px', padding: '40px', color: 'var(--text-main)', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', maxWidth: '900px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '32px' }}>
             <h2 style={{ margin: '0 0 6px 0', fontSize: '24px', color: 'var(--text-main)' }}>
               {approvalRequest ? t('Review Add Request') : (isEdit ? t('Edit Case Report') : t('New Case Report'))}
@@ -4074,7 +4076,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           )}
 
           <form onSubmit={(e) => handleSave(e, false)}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', marginBottom: '24px' }}>
+            <div className="cdms-case-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', marginBottom: '24px' }}>
 
               {/* LEFT: Patient Info */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -4168,7 +4170,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   )}
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="cdms-case-form-pair" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Age')} </label>
                     <input type="number" min="0" max="120" placeholder="25" style={{ ...inputStyle, border: formErrors.age ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.age ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
@@ -4583,6 +4585,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                   <div style={{ position: 'relative', outline: formErrors.diseaseType ? '2px solid #ef4444' : 'none', borderRadius: '6px' }} ref={diseaseFormRef}>
                     <button
                       type="button"
+                      className="cdms-cf-dropdown"
                       onClick={() => setDiseaseOpen(!diseaseOpen)}
                       style={{
                         ...inputStyle,
@@ -4643,7 +4646,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     </div>
                   ) : (
                   <div style={{ position: 'relative' }} ref={severityRef}>
-                    <button type="button" onClick={() => setSeverityOpen(!severityOpen)}
+                    <button type="button" className="cdms-cf-dropdown" onClick={() => setSeverityOpen(!severityOpen)}
                       style={{ ...inputStyle, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}>
                       <span>{formData.severity}</span>
                       <span style={{ fontSize: '15px', opacity: 0.6, transition: 'transform 0.2s', transform: severityOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
@@ -4672,7 +4675,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     </div>
                   ) : (
                   <div style={{ position: 'relative' }} ref={caseTypeRef}>
-                    <button type="button" onClick={() => setCaseTypeOpen(!caseTypeOpen)}
+                    <button type="button" className="cdms-cf-dropdown" onClick={() => setCaseTypeOpen(!caseTypeOpen)}
                       style={{ ...inputStyle, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}>
                       <span>{formData.caseType || 'Probable'}</span>
                       <span style={{ fontSize: '15px', opacity: 0.6, transition: 'transform 0.2s', transform: caseTypeOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
@@ -4721,7 +4724,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     </div>
                   ) : (
                   <div style={{ position: 'relative' }} ref={subtypeRef}>
-                    <button type="button" onClick={() => setSubtypeOpen(!subtypeOpen)}
+                    <button type="button" className="cdms-cf-dropdown" onClick={() => setSubtypeOpen(!subtypeOpen)}
                       style={{ ...inputStyle, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}>
                       <span style={{ color: formData.diseaseSubtype ? 'var(--text-main)' : 'var(--text-muted)' }}>{formData.diseaseSubtype || t('Not set (optional)')}</span>
                       <span style={{ fontSize: '15px', opacity: 0.6, transition: 'transform 0.2s', transform: subtypeOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
@@ -4769,7 +4772,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     </div>
                   ) : (
                   <div style={{ position: 'relative' }} ref={patientStatusRef}>
-                    <button type="button" onClick={() => setPatientStatusOpen(!patientStatusOpen)}
+                    <button type="button" className="cdms-cf-dropdown" onClick={() => setPatientStatusOpen(!patientStatusOpen)}
                       style={{ ...inputStyle, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}>
                       <span>{formData.status}</span>
                       <span style={{ fontSize: '15px', opacity: 0.6, transition: 'transform 0.2s', transform: patientStatusOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
@@ -4854,7 +4857,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 {t('Location & Coordinates')}
               </label>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', alignItems: 'start' }}>
+              <div className="cdms-case-form-pair" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', alignItems: 'start' }}>
                 <div>
                   {hasCoords && (
                     <div style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px 14px', marginBottom: '12px', fontSize: '15px', color: 'var(--text-main)', fontWeight: '500' }}>
@@ -4885,7 +4888,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             </div>
 
             {/* Action buttons */}
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '14px', paddingTop: '24px', borderTop: '1px solid var(--border-color)' }}>
+            <div className="cdms-case-form-actions" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: '14px', paddingTop: '24px', borderTop: '1px solid var(--border-color)' }}>
               <button type="button" onClick={() => { setView('list'); setFilterPurok('All Puroks'); setIsBhwReadOnly(false); }}
                 style={{ padding: '10px 32px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-muted)', cursor: 'pointer', fontWeight: '500' }}>
                 {t('Cancel')}
@@ -4898,13 +4901,13 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       {t('Edit Case to CHO')}
                     </button>
                   ) : (
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <div className="cdms-case-form-editrow" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', justifyContent: 'center' }}>
                       <textarea
                         placeholder={t('Describe what needs to be changed...')}
                         value={editRequestNote}
                         onChange={e => setEditRequestNote(e.target.value)}
                         rows={2}
-                        style={{ width: '300px', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px', resize: 'vertical' }}
+                        style={{ width: '300px', maxWidth: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px', resize: 'vertical' }}
                       />
                       <button type="button" onClick={() => handleSendEditRequest()}
                         disabled={!editRequestNote.trim()}

@@ -216,7 +216,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   if (loading) {
     return (
       <div style={{ color: 'var(--text-main)', padding: '28px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '16px', marginBottom: '16px' }}>
+        <div className="cdms-dash-grid-6" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '16px', marginBottom: '16px' }}>
           {[0, 1, 2, 3, 4, 5].map(i => (
             <div key={i} style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '20px' }}>
               <div className="cdms-skeleton" style={{ width: '70%', height: '12px', marginBottom: '12px' }} />
@@ -1147,6 +1147,9 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     return { background: '#374151', color: '#d1d5db' };
 };
 
+  const chartPlot = compactMode ? { top: 26, span: 144, height: 170 } : { top: 26, span: 184, height: 210 };
+  const diseaseRowMinW = compactMode ? 120 : 180;
+
   return (
         <div style={{ padding: compactMode ? '14px' : '24px', display: 'flex', flexDirection: 'column', gap: compactMode ? '12px' : '20px', fontSize: `calc(14px * ${fontScale || '1'})` }}>
 
@@ -1173,7 +1176,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       </div>
 
       {/* ── STAT CARDS ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: compactMode ? '10px' : '16px' }}>
+          <div className="cdms-dash-grid-6" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: compactMode ? '10px' : '16px' }}>
         {[
           { label: t('Total Cases'), value: totalCases, color: '#3B82F6', trend: trendDelta(totalCases, prevTotal), invertTrend: false },
           { label: t('Active'), value: activeCases, color: '#D97706', trend: trendDelta(activeCases, prevActive), invertTrend: true },
@@ -1216,7 +1219,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       )}
 
       {/* ── CHART + FILTER ROW ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '16px' }}>
+      <div className="cdms-dash-grid-main" style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '16px' }}>
 
         {/* BAR CHART */}
           <div key={`chart-${statSignature}`} className="cdms-view-in" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', display: 'flex', flexDirection: 'column' }}>
@@ -1226,21 +1229,21 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           {periodChart ? (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', height: '210px' }}>
-                  <div style={{ width: '26px', height: '210px', position: 'relative', fontSize: '13px', color: 'var(--text-muted)' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', height: `${chartPlot.height}px` }}>
+                  <div style={{ width: '26px', height: `${chartPlot.height}px`, position: 'relative', fontSize: '13px', color: 'var(--text-muted)' }}>
                     {gridLines.lines.map(l => {
-                      const topPx = 26 + (1 - l.frac) * 184;
-                      return <span key={l.value} style={{ position: 'absolute', right: 6, top: `${(topPx / 210) * 100}%`, transform: 'translateY(-50%)' }}>{l.value}</span>;
+                      const topPx = chartPlot.top + (1 - l.frac) * chartPlot.span;
+                      return <span key={l.value} style={{ position: 'absolute', right: 6, top: `${(topPx / chartPlot.height) * 100}%`, transform: 'translateY(-50%)' }}>{l.value}</span>;
                     })}
                   </div>
-                  <div style={{ flex: 1, position: 'relative', height: '210px' }}>
+                  <div style={{ flex: 1, position: 'relative', height: `${chartPlot.height}px` }}>
                     {gridLines.lines.map(l => {
-                      const topPx = 26 + (1 - l.frac) * 184;
-                      return <div key={l.value} style={{ position: 'absolute', left: 0, right: 0, top: `${(topPx / 210) * 100}%`, borderTop: '1px dashed var(--border-color)' }} />;
+                      const topPx = chartPlot.top + (1 - l.frac) * chartPlot.span;
+                      return <div key={l.value} style={{ position: 'absolute', left: 0, right: 0, top: `${(topPx / chartPlot.height) * 100}%`, borderTop: '1px dashed var(--border-color)' }} />;
                     })}
                     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'flex-end', gap: '12px' }}>
                       {monthBars.map((b, i) => {
-                        const h = chartMounted ? Math.max((b.count / gridLines.top) * 184, b.count > 0 ? 4 : 2) : 0;
+                        const h = chartMounted ? Math.max((b.count / gridLines.top) * chartPlot.span, b.count > 0 ? 4 : 2) : 0;
                         const barPct = chartTotal > 0 ? Math.round((b.count / chartTotal) * 100) : 0;
                         return (
                           <div key={b.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
@@ -1266,8 +1269,8 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                             if (i === 0) return null;
                             const xPct1 = ((movingAvgData[i - 1].idx + 0.5) / monthBars.length) * 100;
                             const xPct2 = ((pt.idx + 0.5) / monthBars.length) * 100;
-                            const y1 = 184 - (movingAvgData[i - 1].avg / gridLines.top) * 184;
-                            const y2 = 184 - (pt.avg / gridLines.top) * 184;
+                            const y1 = chartPlot.span - (movingAvgData[i - 1].avg / gridLines.top) * chartPlot.span;
+                            const y2 = chartPlot.span - (pt.avg / gridLines.top) * chartPlot.span;
                             return (
                               <line key={i} x1={`${xPct1}%`} y1={y1} x2={`${xPct2}%`} y2={y2}
                                 stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="6,3"
@@ -1277,7 +1280,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                           {/* Trend line dots */}
                           {movingAvgData.map((pt, i) => {
                             const xPct = ((pt.idx + 0.5) / monthBars.length) * 100;
-                            const y = 184 - (pt.avg / gridLines.top) * 184;
+                            const y = chartPlot.span - (pt.avg / gridLines.top) * chartPlot.span;
                             return (
                               <circle key={`dot-${i}`} cx={`${xPct}%`} cy={y} r="3.5"
                                 fill="#f59e0b" stroke="#f59e0b" strokeWidth="1.5"
@@ -1323,7 +1326,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                 const dHighest = diseaseBars.length > 0 ? diseaseBars[0].count : 1;
                 return (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                    <span style={{ minWidth: '180px', fontSize: '15px', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <span style={{ minWidth: `${diseaseRowMinW}px`, fontSize: '15px', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {bar.label}
                     </span>
                     <div style={{ flex: 1, background: 'var(--input-bg)', height: '24px', borderRadius: '6px', overflow: 'hidden', position: 'relative' }}>
@@ -1350,7 +1353,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             <div style={{ maxHeight: '240px', overflowY: 'auto', paddingRight: '4px' }}>
               {sortedBars.map((bar, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                  <span style={{ minWidth: '180px', fontSize: '15px', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <span style={{ minWidth: `${diseaseRowMinW}px`, fontSize: '15px', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {bar.label}
                   </span>
                   <div style={{ flex: 1, background: 'var(--input-bg)', height: '24px', borderRadius: '6px', overflow: 'hidden', position: 'relative' }}>
@@ -1372,7 +1375,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         </div>
 
         {/* FILTER & CONTROLS - FIX: date inputs no longer overflow */}
-          <div key={`filters-${statSignature}`} className="cdms-view-in" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div key={`filters-${statSignature}`} className="cdms-view-in" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', display: 'flex', flexDirection: 'column', gap: compactMode ? '10px' : '12px' }}>
           <h4 style={{ color: 'var(--text-main)', margin: '0', fontSize: '15px', fontWeight: '600' }}>{t('Filter & Controls')}</h4>
 
           {!isBhw && dashPeriod === 'weekly' && <div>
@@ -1637,11 +1640,11 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           return <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '22px', height: '22px', borderRadius: '50%', background: bg, color: '#fff', fontSize: '13px', fontWeight: '700', flexShrink: 0 }}>{list.indexOf(list.find(b => b.count === count)) + 1}</span>;
         };
         return (
-          <div style={{ display: 'grid', gridTemplateColumns: isBhw ? '1fr' : '1fr 1fr', gap: '16px' }}>
+          <div className="cdms-dash-grid-2" style={{ display: 'grid', gridTemplateColumns: isBhw ? '1fr' : '1fr 1fr', gap: '16px' }}>
             {/* Top Barangays — CHO only */}
             {!isBhw && (
               <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' }}>
-                <h4 style={{ color: 'var(--text-main)', margin: '0 0 16px 0', fontSize: '15px', fontWeight: '600' }}>
+<h4 style={{ color: 'var(--text-main)', margin: `0 0 ${compactMode ? '10px' : '16px'} 0`, fontSize: '15px', fontWeight: '600' }}>
                   {t('Top Barangays')}
                   <span style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: '400', marginLeft: '8px' }}>({formatDateStr(dateRange.start, dateFormat)} {t('to')} {formatDateStr(dateRange.end, dateFormat)})</span>
                 </h4>
@@ -1770,7 +1773,8 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         </div>
 
         {/* ── FIX: All headers centered, all cells centered ── */}
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', minWidth: '760px', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
               {[t('ID'), t('Patient Name'), t('Age'), t('Barangay'), t('Disease'), t('Date Reported'), t('Severity'), t('Status')].map(h => (
@@ -1803,6 +1807,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             ))}
           </tbody>
         </table>
+        </div>
 
         {/* Pagination */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}>

@@ -116,6 +116,17 @@ function App() {
   const [pendingInboxView, setPendingInboxView] = useState(null);
   const [pendingOpenCaseId, setPendingOpenCaseId] = useState(null);
   const [compactMode, setCompactMode] = useState(getSavedCompact);
+  // Auto-compact the app layout on small screens (phones/tablets) even when
+  // the manual Compact Mode toggle is OFF — the round-3 mobile fixes react to
+  // viewport width, the Settings switch still reflects the stored preference.
+  const queryMobile = window.matchMedia('(max-width: 820px)');
+  const [isMobileView, setIsMobileView] = useState(queryMobile.matches);
+  const effectiveCompact = isMobileView; // PC always keeps the old big layout; compact only on mobile
+  useEffect(() => {
+    const onChange = (e) => setIsMobileView(e.matches);
+    queryMobile.addEventListener('change', onChange);
+    return () => queryMobile.removeEventListener('change', onChange);
+  }, [queryMobile]);
   const [openProfileView, setOpenProfileView] = useState(false);
   const [openSecurityView, setOpenSecurityView] = useState(false);
 
@@ -472,16 +483,16 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             loggedUser={loggedUser}
             dateFormat={dateFormat}
             fontScale={fontScale}
-            compactMode={compactMode}
+            compactMode={effectiveCompact}
             loginRole={loginRole}
             loginBarangay={loggedUserBarangay}
             sessionContext={sessionContext}
           />
         );
       case 'Manage Cases':
-        return <ManageCases caseFilter={caseFilter} setCaseFilter={setCaseFilter} dateFormat={dateFormat} autoSave={autoSave} confirmDelete={confirmDelete} keyboardShortcuts={keyboardShortcuts} fontScale={fontScale} compactMode={compactMode} loggedUserId={loggedUserId} loggedUser={loggedUser} loginRole={loginRole} loginBarangay={loggedUserBarangay} sessionContext={sessionContext} initialView={pendingInboxView} onInitialViewConsumed={() => setPendingInboxView(null)} pendingOpenCaseId={pendingOpenCaseId} onPendingCaseConsumed={() => setPendingOpenCaseId(null)} />;
+        return <ManageCases caseFilter={caseFilter} setCaseFilter={setCaseFilter} dateFormat={dateFormat} autoSave={autoSave} confirmDelete={confirmDelete} keyboardShortcuts={keyboardShortcuts} fontScale={fontScale} compactMode={effectiveCompact} loggedUserId={loggedUserId} loggedUser={loggedUser} loginRole={loginRole} loginBarangay={loggedUserBarangay} sessionContext={sessionContext} initialView={pendingInboxView} onInitialViewConsumed={() => setPendingInboxView(null)} pendingOpenCaseId={pendingOpenCaseId} onPendingCaseConsumed={() => setPendingOpenCaseId(null)} />;
       case 'Map View':
-        return <MapView setActiveTab={setActiveTab} setCaseFilter={setCaseFilter} fontScale={fontScale} compactMode={compactMode} loginRole={loginRole} loginBarangay={loggedUserBarangay} sessionContext={sessionContext} dateFormat={dateFormat} />;
+        return <MapView setActiveTab={setActiveTab} setCaseFilter={setCaseFilter} fontScale={fontScale} compactMode={effectiveCompact} loginRole={loginRole} loginBarangay={loggedUserBarangay} sessionContext={sessionContext} dateFormat={dateFormat} />;
       case 'User Accounts': 
         if (loginRole !== 'CHO') {
           return (
@@ -493,9 +504,9 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             </div>
           );
         }
-        return <UserManagement dateFormat={dateFormat} confirmDelete={confirmDelete} fontScale={fontScale} compactMode={compactMode} loggedUserId={loggedUserId} loginRole={loginRole} sessionContext={sessionContext} setActiveTab={setActiveTab} />;
+        return <UserManagement dateFormat={dateFormat} confirmDelete={confirmDelete} fontScale={fontScale} compactMode={effectiveCompact} loggedUserId={loggedUserId} loginRole={loginRole} sessionContext={sessionContext} setActiveTab={setActiveTab} />;
       case 'Audit Reports':
-        return <BarangayReports dateFormat={dateFormat} activeUser={{ role: loginRole, context: sessionContext }} fontScale={fontScale} compactMode={compactMode} loggedUserId={loggedUserId} />;
+        return <BarangayReports dateFormat={dateFormat} activeUser={{ role: loginRole, context: sessionContext }} fontScale={fontScale} compactMode={effectiveCompact} loggedUserId={loggedUserId} />;
       case 'Settings':
         return (
           <ChoSettings
@@ -526,7 +537,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             savedDateFormat={dateFormat}
             savedConfirmDelete={confirmDelete}
             fontScale={fontScale}
-            compactMode={compactMode}
+            compactMode={effectiveCompact}
             openProfileView={openProfileView}
             onProfileViewOpened={() => setOpenProfileView(false)}
             openSecurityView={openSecurityView}
@@ -534,9 +545,9 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
           />
         );
       case 'Roles & Permissions':
-        return <RolesPermissions compactMode={compactMode} loginRole={loginRole} onBack={() => setActiveTab('User Accounts')} />;
+        return <RolesPermissions compactMode={effectiveCompact} loginRole={loginRole} onBack={() => setActiveTab('User Accounts')} />;
       case 'Weekly Summary':
-        return <WeeklySummary userId={loggedUserId} loginRole={loginRole} compactMode={compactMode} fontScale={fontScale} onBack={() => setActiveTab('Dashboard')} dateFormat={dateFormat} />;
+        return <WeeklySummary userId={loggedUserId} loginRole={loginRole} compactMode={effectiveCompact} fontScale={fontScale} onBack={() => setActiveTab('Dashboard')} dateFormat={dateFormat} />;
       default:
         return <div style={{ padding: '20px' }}>Content coming soon...</div>;
     }
@@ -1034,7 +1045,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             </div>
 
             {/* ── LIVE CLOCK ── */}
-            <div style={{
+            <div className="top-nav-clock" style={{
               fontSize: '15px', fontWeight: '500', color: 'rgba(255,255,255,0.7)',
               fontFamily: 'ui-monospace, Consolas, monospace', whiteSpace: 'nowrap',
             }}>

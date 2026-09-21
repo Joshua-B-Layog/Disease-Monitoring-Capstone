@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import './BarangayReports.css';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import { API_URL } from './config';
@@ -884,7 +885,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
               const totalItems = (viewReport.snapshotLogs || []).length;
               const modalTotalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
               return modalTotalPages > 1 ? (
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--border-color)', alignItems: 'center' }}>
+<div className="cdms-log-pagination" style={{ display: 'flex', justifyContent: 'flex-end', flexWrap: 'wrap', gap: '6px', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--border-color)', alignItems: 'center' }}>
                   <button onClick={() => setModalPage(1)} disabled={modalPage === 1}
                     style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: modalPage === 1 ? 'not-allowed' : 'pointer', color: modalPage === 1 ? '#cbd5e1' : 'var(--text-muted)', fontSize: '15px', fontWeight: '700', lineHeight: '1' }}>
                     {'<<'}
@@ -957,8 +958,8 @@ style={{ padding: '5px 8px', border: '1px solid #2563eb', borderRadius: '4px', b
               <button onClick={() => { setViewReport(null); setModalShowAll(false); setModalPage(1); }}
                 style={{ padding: '10px 28px', background: '#2563eb', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: '600', color: '#fff', cursor: 'pointer' }}
                 onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
-onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
-                {t('Generate Report')}
+                onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
+                {t('Ok')}
               </button>
             </div>
           </div>
@@ -1027,7 +1028,7 @@ onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
               <button onClick={handleGenerateReport}
                 disabled={offlineMode}
                 style={{ padding: '10px 28px', background: '#129968', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: '600', color: '#fff', cursor: offlineMode ? 'not-allowed' : 'pointer', opacity: offlineMode ? 0.4 : 1 }}>
-{t('Generate Report')}
+              {t('Generate Report')}
               </button>
             </div>
           </div>
@@ -1051,7 +1052,7 @@ onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
 
       {/* ── TOP FILTER BAR ── */}
       <div style={{ ...s.card, display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap' }}>
-        <div style={{ position: 'relative', width: '160px', flex: '0 0 auto' }} ref={periodRef}>
+        <div style={{ position: 'relative', flex: '1 1 160px', minWidth: '150px' }} ref={periodRef}>
           <button onClick={() => { setPeriodOpen(!periodOpen); setTypeOpen(false); }}
             style={{ ...s.dropBtn(reportPeriod !== ''), width: '100%', boxSizing: 'border-box', justifyContent: 'space-between' }}>
             {reportPeriod || t('Report Period')}
@@ -1077,9 +1078,9 @@ onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
           )}
         </div>
         <DatePicker value={reportDateStart} dateFormat={dateFormat} placeholder={t('Start date')}
-          onChange={v => setReportDateStart(v)} style={{ width: '165px', flex: '0 0 auto' }} />
+          onChange={v => setReportDateStart(v)} style={{ flex: '1 1 160px', minWidth: '150px' }} />
         <DatePicker value={reportDateEnd} dateFormat={dateFormat} placeholder={t('End date')}
-          onChange={v => setReportDateEnd(v)} style={{ width: '165px', flex: '0 0 auto' }} />
+          onChange={v => setReportDateEnd(v)} style={{ flex: '1 1 160px', minWidth: '150px' }} />
         <div style={{ position: 'relative', flex: 1, minWidth: '160px' }} ref={typeRef}>
           <button onClick={() => { setTypeOpen(!typeOpen); setPeriodOpen(false); }}
             style={{ ...s.dropBtn(reportType !== ''), width: '100%', boxSizing: 'border-box', justifyContent: 'space-between' }}>
@@ -1115,7 +1116,7 @@ onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
       </div>
 
       {/* ── MIDDLE ROW ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '20px', marginBottom: '20px', alignItems: 'start' }}>
+        <div className="cdms-reports-mid" style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '20px', marginBottom: '20px', alignItems: 'start' }}>
 
         {/* ── Generated Reports Logs ── */}
         <div style={s.card}>
@@ -1217,14 +1218,14 @@ onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
         </div>
 
         {/* ── Quick Stats ── */}
-        <div style={s.card}>
+        <div className="cdms-reports-quick" style={s.card}>
           <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', fontWeight: '700', color: 'var(--text-main)' }}>{t('Quick Stats')}</h3>
           <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: 'var(--text-muted)' }}>{isBHW ? `Brgy. ${myBarangayName}` : choUnit}</p>
 
           {statsLoading ? (
             <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '15px' }}>{t('Loading from database...')}</div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div className="cdms-quick-stats-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               {[
                 { label: t('Cases Added'),      value: casesAdded,      color: '#5b8def', bg: 'rgba(37,99,235,0.15)' },
                 { label: t('Cases Updated'),    value: casesUpdated,    color: '#38bdf8', bg: 'rgba(14,165,233,0.15)' },

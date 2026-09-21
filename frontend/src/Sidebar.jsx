@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useI18n } from './i18n';
 import ChoLogoIcon from './assets/ChoLogo';
 import ChoLogoIconII from './assets/ChoLogoII';
@@ -41,6 +41,10 @@ const SettingsIcon = ({ color = '#64748b', size = 18 }) => (
 
 const Sidebar = ({ role, activeTab, setActiveTab, choUnit }) => {
   const { t } = useI18n();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  // Mobile drawer state — only shows on screens ≤ 768px
+
+  const selectTab = (name) => { setActiveTab(name); setMobileOpen(false); };
   // Define menu configurations
   const menuConfig = {
     CHO: [
@@ -64,7 +68,10 @@ const Sidebar = ({ role, activeTab, setActiveTab, choUnit }) => {
   const menuItems = menuConfig[role] || [];
 
   return (
-    <div className="sidebar">
+    <>
+      {mobileOpen && <div className="mobile-menu-backdrop" onClick={() => setMobileOpen(false)} />}
+      <button className="mobile-menu-btn" onClick={() => setMobileOpen(true)} aria-label="Buksan ang menu">☰</button>
+      <div className={`sidebar ${mobileOpen ? 'mobile-open' : ''}`}>
       <div className="sidebar-logo" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
         {choUnit === 'CHO Unit II (Pulo)' ? <ChoLogoIconII size={28} /> : <ChoLogoIcon size={28} />}
         <h3 style={{ margin: 0 }}>{role === 'CHO' ?
@@ -72,18 +79,19 @@ const Sidebar = ({ role, activeTab, setActiveTab, choUnit }) => {
       </div>
       <div className="sidebar-menu">
         {menuItems.map((item) => (
-          <div 
-            key={item.name}
-            className={`menu-item ${activeTab === item.name ? 'active' : ''}`}
-            onClick={() => setActiveTab(item.name)}
-          >
-            {item.icon} {t(item.name)}
-          </div>
+        <div 
+          key={item.name}
+          className={`menu-item ${activeTab === item.name ? 'active' : ''}`}
+          onClick={() => { setActiveTab(item.name); setMobileOpen(false); }}
+        >
+          {item.icon} {t(item.name)}
+        </div>
         ))}
       </div>
       <div className="sidebar-footer" style={{ marginTop: 'auto', padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.45)' }}>
       </div>
     </div>
+    </>
   );
 };
 
