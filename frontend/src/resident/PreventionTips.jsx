@@ -876,6 +876,8 @@ export default function PreventionTips() {
             background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px',
             overflow: 'hidden',
             gridColumn: expanded === idx ? '1 / -1' : 'auto',
+            maxWidth: expanded === idx ? '640px' : 'auto',
+            justifySelf: expanded === idx ? 'center' : 'auto',
           }}>
             <div
               onClick={() => setExpanded(expanded === idx ? null : idx)}
@@ -901,9 +903,12 @@ export default function PreventionTips() {
             </div>
             {expanded === idx && (
               <div style={{ padding: '0 18px 16px', borderTop: '1px solid var(--border-color)' }}>
-                <ul style={{ margin: '12px 0', paddingLeft: '18px', fontSize: '17px', color: 'var(--text-main)', lineHeight: '1.8' }}>
+                <ul style={{ margin: '12px 0', padding: 0, listStyle: 'none', fontSize: '17px', color: 'var(--text-main)', lineHeight: '1.8' }}>
                   {disease.tips.map((tip, i) => (
-                    <li key={i}>{t(tip)}</li>
+                    <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                      <span style={{ color: '#0d9488', flexShrink: 0 }}>•</span>
+                      <span>{t(tip)}</span>
+                    </li>
                   ))}
                 </ul>
                 {disease.videoId && (

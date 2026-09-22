@@ -381,6 +381,14 @@ body.dark-mode select,
   .cdms-reports-mid {
     grid-template-columns: 1fr !important;
   }
+  .cdms-reports-mid > div {
+    min-width: 0;
+  }
+  .cdms-reports-mid > div:first-child > div:first-child {
+    flex-wrap: wrap;
+    gap: 8px;
+    row-gap: 6px;
+  }
   .cdms-quick-stats-grid {
     grid-template-columns: repeat(2, 1fr) !important;
   }

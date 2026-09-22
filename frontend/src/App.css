@@ -1678,12 +1678,18 @@ button:active { transform: scale(0.97); }
     min-height: 70px !important;
     padding: 10px 16px !important;
     gap: 8px !important;
+    flex-wrap: wrap !important;
+    row-gap: 6px !important;
   }
   .top-nav-clock {
     display: none !important;
   }
   .top-nav .nav-title {
-    padding-left: 46px !important;
+    order: 2 !important;
+    flex-basis: 100% !important;
+    max-width: 100% !important;
+    text-align: center !important;
+    align-items: center !important;
   }
   .nav-title h2 {
     font-size: 17px !important;
@@ -1699,6 +1705,10 @@ button:active { transform: scale(0.97); }
   .top-nav > div:last-child {
     gap: 10px !important;
     min-width: 0 !important;
+    flex-wrap: wrap !important;
+    justify-content: flex-end !important;
+    order: 1 !important;
+    margin-left: auto !important;
   }
   .user-info {
     max-width: 180px !important;
@@ -1731,6 +1741,25 @@ button:active { transform: scale(0.97); }
     flex-shrink: 1 !important;
     min-width: 0 !important;
     gap: 8px !important;
+  }
+}
+
+/* =========================================================
+   NOTIFICATION PANEL — center within the viewport on mobile
+   so the dropdown never overflows the screen edges
+   (the bell sits away from the right edge, so right-anchoring
+   pushed the 360px panel off-screen on phones)
+   ========================================================= */
+@media (max-width: 900px) {
+  .cdms-notif-panel {
+    position: fixed !important;
+    top: 60px !important;
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%) !important;
+    width: min(360px, calc(100vw - 24px)) !important;
+    max-height: calc(100vh - 80px) !important;
+    animation: none !important;
   }
 }
 

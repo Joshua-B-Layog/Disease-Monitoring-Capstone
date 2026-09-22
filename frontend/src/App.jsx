@@ -887,7 +887,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
 
               {/* DROPDOWN PANEL */}
               {showNotifications && (
-                <div className="cdms-dropdown-panel" style={{
+                <div className="cdms-dropdown-panel cdms-notif-panel" style={{
                   position: 'absolute', top: '44px', right: 0, width: '360px',
                   background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
                   borderRadius: '12px', boxShadow: '0 12px 32px rgba(0,0,0,0.3)',

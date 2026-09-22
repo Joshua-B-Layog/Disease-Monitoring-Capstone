@@ -1219,10 +1219,10 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       )}
 
       {/* ── CHART + FILTER ROW ── */}
-      <div className="cdms-dash-grid-main" style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '16px' }}>
+      <div className="cdms-dash-grid-main" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 280px)', gap: '16px' }}>
 
         {/* BAR CHART */}
-          <div key={`chart-${statSignature}`} className="cdms-view-in" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', display: 'flex', flexDirection: 'column' }}>
+          <div key={`chart-${statSignature}`} className="cdms-view-in" style={{ minWidth: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', display: 'flex', flexDirection: 'column' }}>
           <h4 style={{ color: 'var(--text-main)', margin: '0 0 16px 0', fontSize: '15px', fontWeight: '600' }}>
             {exportTitle}
           </h4>
@@ -1295,7 +1295,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                 <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
                   <div style={{ width: '26px' }} />
                   {monthBars.map(b => (
-                    <div key={b.label} style={{ flex: 1, textAlign: 'center', fontSize: '13px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{b.label}</div>
+                    <div key={b.label} style={{ flex: 1, minWidth: 0, textAlign: 'center', fontSize: '13px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.label}</div>
                   ))}
                 </div>
                 {hoveredBar && (
@@ -1375,7 +1375,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         </div>
 
         {/* FILTER & CONTROLS - FIX: date inputs no longer overflow */}
-          <div key={`filters-${statSignature}`} className="cdms-view-in" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', display: 'flex', flexDirection: 'column', gap: compactMode ? '10px' : '12px' }}>
+          <div key={`filters-${statSignature}`} className="cdms-view-in" style={{ minWidth: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', display: 'flex', flexDirection: 'column', gap: compactMode ? '10px' : '12px' }}>
           <h4 style={{ color: 'var(--text-main)', margin: '0', fontSize: '15px', fontWeight: '600' }}>{t('Filter & Controls')}</h4>
 
           {!isBhw && dashPeriod === 'weekly' && <div>
@@ -1446,14 +1446,14 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             {dashPeriod === 'quarterly' && (
               <>
                 <label style={{ color: 'var(--text-muted)', fontSize: '15px', display: 'block', marginBottom: '4px', marginTop: '10px' }}>{t('Quarter')}</label>
-                <div style={{ display: 'flex', gap: '6px' }}>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                   {[1, 2, 3, 4].map(q => (
                     <button
                       key={q}
                       onClick={() => { setDashQuarter(q); setDateRange(getPeriodRange('quarterly', q, dashYear)); }}
                       style={{
                         flex: 1, padding: '6px 4px', borderRadius: '6px', cursor: 'pointer',
-                        fontSize: '15px', fontWeight: '600',
+                        fontSize: '15px', fontWeight: '600', minWidth: '56px',
                         background: dashQuarter === q ? '#129968' : 'var(--input-bg)',
                         color: dashQuarter === q ? 'white' : 'var(--text-muted)',
                         border: '1px solid var(--border-color)',

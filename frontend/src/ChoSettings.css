@@ -590,6 +590,7 @@
 @media (max-width: 900px) {
   .menu-grid { grid-template-columns: 1fr !important; }
   .nav-box { min-height: 0; }
+  .nav-box.full-width { grid-column: span 1 !important; }
   .settings-wrapper { padding: 14px; }
   .settings-container { padding: 16px; }
   .settings-title { font-size: 22px; }

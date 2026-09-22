@@ -128,7 +128,7 @@ export default function ResidentApp() {
         const key = best.target.id.replace('section-', '');
         setActiveSection(key);
       }
-    }, { threshold: [0.2, 0.4, 0.6, 0.8], rootMargin: '-64px 0px -10% 0px' });
+    }, { threshold: [0, 0.2, 0.4, 0.6, 0.8], rootMargin: '-64px 0px -10% 0px' });
 
     els.forEach(el => observer.observe(el));
     return () => observer.disconnect();
