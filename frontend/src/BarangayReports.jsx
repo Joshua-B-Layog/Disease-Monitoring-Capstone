@@ -1585,7 +1585,7 @@ style={{ padding: '5px 8px', border: '1px solid #2563eb', borderRadius: '4px', b
 
         {/* Pagination */}
         {totalLogPages > 1 && (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--border-color)', alignItems: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px', rowGap: '6px', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--border-color)', alignItems: 'center', flexWrap: 'wrap' }}>
             <button onClick={() => setLogPage(1)} disabled={logPage === 1}
               style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: logPage === 1 ? 'not-allowed' : 'pointer', color: logPage === 1 ? '#cbd5e1' : 'var(--text-muted)', fontSize: '15px', fontWeight: '700', lineHeight: '1' }}>
               {'<<'}

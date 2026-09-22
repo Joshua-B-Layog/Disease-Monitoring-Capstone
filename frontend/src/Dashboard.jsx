@@ -1810,11 +1810,11 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         </div>
 
         {/* Pagination */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--border-color)', flexWrap: 'wrap', rowGap: '10px' }}>
           <span style={{ color: 'var(--text-muted)', fontSize: '15px' }}>
             {t('Showing')} {(currentPage - 1) * CASES_PER_PAGE + 1}–{Math.min(currentPage * CASES_PER_PAGE, displayCases.length)} {t('of')} {displayCases.length} {t('cases')}
           </span>
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '6px', rowGap: '6px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             <button
               onClick={() => setCurrentPage(1)}
               disabled={currentPage === 1}

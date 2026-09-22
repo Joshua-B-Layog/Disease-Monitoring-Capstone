@@ -737,7 +737,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
           <span className="cdms-um-pageof" style={{ color: 'var(--text-muted)', fontSize: '15px' }}>
             {t('Showing ')}{filteredUsers.length === 0 ? 0 : (currentPage - 1) * USERS_PER_PAGE + 1}–{Math.min(currentPage * USERS_PER_PAGE, filteredUsers.length)}{t(' of ')}{filteredUsers.length}{t(' Accounts')}
           </span>
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '6px', rowGap: '6px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1}
               style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)', borderRadius: '6px', background: 'var(--bg-surface)', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', color: currentPage === 1 ? 'var(--text-muted)' : 'var(--text-main)', fontSize: '15px', fontWeight: '700', lineHeight: '1' }}>{'<<'}</button>
             <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
