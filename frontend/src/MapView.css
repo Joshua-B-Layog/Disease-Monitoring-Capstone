@@ -326,7 +326,7 @@
 }
 
 /* =========================================================
-   MOBILE RESPONSIVE — Map View (CHO/BHW)
+   MOBILE RESPONSIVE - Map View (CHO/BHW)
    ========================================================= */
 @media (max-width: 900px) {
   .map-view-container { padding: 14px; }

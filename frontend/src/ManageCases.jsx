@@ -7,7 +7,7 @@ import './ManageCases.css';
 import cabuyaoBoundaries from './data/cabuyao_barangays.geojson.json';
 import { cacheCases, getCachedCases, cacheBarangays, cacheDiseases, getCachedBarangays, getCachedDiseases, isOnline, cacheInboxItems, getCachedInboxItems, cacheContactMessages, getCachedContactMessages, cacheEditRequests, getCachedEditRequests, cacheOutboxItems, getCachedOutboxItems, cachePendingRegistrations, getCachedPendingRegistrations, upsertCachedCase, removeCachedCase } from './offlineSync';
 import { enqueueOperation, removePendingCreatesByCaseId } from './syncEngine';
-import { getPointInBarangay } from './data/coordinates';
+import { getPointInBarangay, pointInFeature } from './data/coordinates';
 import { notify } from './components/Toast';
 import { DISEASES as DEFAULT_DISEASES } from './resident/PreventionTips';
 import { emitDiseasesChanged } from './diseaseSignal';
@@ -66,14 +66,18 @@ const SVG_ENTRY_TOKEN = {
   'Dengue Fever': 'svg:fever',
   'Influenza A': 'svg:flu-a',
   'Influenza': 'svg:flu-a',
+  'Covid-19': 'svg:flu-a',
+  'SARS': 'svg:flu-a',
   'Leptospirosis': 'svg:leptospirosis',
   'Tuberculosis': 'svg:tuberculosis',
   'Typhoid Fever': 'svg:typhoid',
   'Rabies': 'svg:rabies',
   'Diarrhea': 'svg:feces',
+  'Cholera': 'svg:waterborne',
   'Avian Influenza': 'svg:avian',
   'Chickenpox': 'svg:avian',
   'Sore Eyes': 'svg:soreeyes',
+  'Malaria': 'svg:vectorborne',
   'Hepatitis A': 'svg:hepatitis',
   'Hepatitis B': 'svg:hepatitis',
   'Hepatitis C': 'svg:hepatitis',
@@ -99,6 +103,16 @@ const resolveIcon = (token) => {
   return typeof token === 'string' ? token : '🦠';
 };
 
+// Editable keyboard-shortcut config (Phase 3) - per-user, saved by ChoSettings
+const DEFAULT_SHORTCUTS = { save: 's', saveCtrl: true, newCase: 'n', newCaseCtrl: false };
+const getShortcutConfig = (uid) => {
+  try {
+    const raw = localStorage.getItem(`cdms_shortcuts_${uid || ''}`);
+    if (raw) { const p = JSON.parse(raw) || {}; return { ...DEFAULT_SHORTCUTS, ...p }; }
+  } catch (e) {}
+  return { ...DEFAULT_SHORTCUTS };
+};
+
 const BARANGAY_COORDS = {
   'Baclaran': [14.2450, 121.1630],
   'Banay-Banay': [14.2550, 121.1300],
@@ -118,6 +132,28 @@ const BARANGAY_COORDS = {
   'Pulo': [14.2480, 121.1390],
   'Sala': [14.2690, 121.1350],
   'San Isidro': [14.2490, 121.1430],
+};
+
+// Force coordinates inside the selected barangay's actual polygon geometry.
+// Returns the input when already inside; otherwise a deterministic in-polygon
+// point (same shapes/determinism that the map and server use).
+const findFeatureByDbName = (barangayName) =>
+  (cabuyaoBoundaries?.features || []).find(f => {
+    const mapped = GEOJSON_TO_DB_NAME[f.properties.ADM4_EN] || f.properties.ADM4_EN;
+    return norm(mapped) === norm(barangayName);
+  }) || null;
+
+const snapCoordsToBarangay = (lat, lng, targetB, unit) => {
+  const fa = parseFloat(lat);
+  const fn = parseFloat(lng);
+  const feature = targetB ? findFeatureByDbName(targetB.name) : null;
+  if (feature && !isNaN(fa) && !isNaN(fn) && pointInFeature(fn, fa, feature.geometry)) return [fa, fn];
+  if (feature) {
+    const p = getPointInBarangay(feature, `${targetB.name}|${unit || 'C'}`);
+    if (p) return p;
+  }
+  if (targetB && BARANGAY_COORDS[targetB.name]) return BARANGAY_COORDS[targetB.name];
+  return [isNaN(fa) ? 0 : fa, isNaN(fn) ? 0 : fn];
 };
 
 const CHO_UNIT_BARANGAYS = {
@@ -147,37 +183,37 @@ const CHO_UNIT_BARANGAYS = {
 
 // ── All 28 disease entries with name, dbName (prefix match), icon, color, desc ──
 const ALL_DISEASE_ENTRIES = [
-  { id: 1,  name: 'Acute Respiratory Infection',   dbName: 'Acute Respiratory Infection', icon: '🫁', color: '#60A5FA', desc: 'Highly contagious respiratory infection affecting the upper and lower respiratory tract.' },
+  { id: 1,  name: 'Acute Respiratory Infection',   dbName: 'Acute Respiratory Infection', icon: <InfluenzaAIcon color="#60A5FA" />, color: '#60A5FA', desc: 'Highly contagious respiratory infection affecting the upper and lower respiratory tract.' },
   { id: 2,  name: 'Avian Influenza',               dbName: 'Avian Influenza', icon: <AvianIcon color="#F97316" />, color: '#F97316', desc: 'A viral influenza subtype transmitted from birds to humans, causing severe respiratory illness.' },
   { id: 3,  name: 'Chickenpox',                    dbName: 'Chickenpox', icon: <AvianIcon color="#FB923C" />, color: '#FB923C', desc: 'A highly contagious viral infection causing an itchy, blister-like rash and fever.' },
-  { id: 4,  name: 'Cholera',                       dbName: 'Cholera', icon: '🌊', color: '#0EA5E9', desc: 'An acute diarrheal infection caused by ingestion of food or water contaminated with Vibrio cholerae.' },
-  { id: 5,  name: 'Covid-19',                      dbName: 'Covid-19', icon: '🛡️', color: '#3B82F6', desc: 'An infectious respiratory disease caused by the SARS-CoV-2 virus, requiring close contact tracing.' },
+  { id: 4,  name: 'Cholera',                       dbName: 'Cholera', icon: <WaterborneIcon color="#0EA5E9" />, color: '#0EA5E9', desc: 'An acute diarrheal infection caused by ingestion of food or water contaminated with Vibrio cholerae.' },
+  { id: 5,  name: 'Covid-19',                      dbName: 'Covid-19', icon: <InfluenzaAIcon color="#3B82F6" />, color: '#3B82F6', desc: 'An infectious respiratory disease caused by the SARS-CoV-2 virus, requiring close contact tracing.' },
   { id: 6,  name: 'Dengue Fever',                  dbName: 'Dengue', icon: <FeverIcon color="#ef4444" />, color: '#ef4444', desc: 'A viral infection transmitted by Aedes mosquitoes, causing high fever and severe body aches.' },
   { id: 7,  name: 'Diarrhea',                      dbName: 'Diarrhea', icon: <FecesIcon color="#D97706" />, color: '#D97706', desc: 'A gastrointestinal infection causing loose, watery stools, often leading to dehydration.' },
-  { id: 8,  name: 'Diphtheria',                    dbName: 'Diphtheria', icon: '🫁', color: '#A78BFA', desc: 'A serious bacterial infection affecting the mucous membranes of the nose and throat.' },
-  { id: 9,  name: 'Ebola',                         dbName: 'Ebola', icon: '🦠', color: '#DC2626', desc: 'A severe, often fatal viral hemorrhagic fever with high transmission risk.' },
-  { id: 10, name: 'Hand Foot and Mouth Disease',   dbName: 'Hand Foot and Mouth Disease', icon: '🖐️', color: '#F472B6', desc: 'A mild viral illness common in children, causing sores in the mouth and rash on hands and feet.' },
+  { id: 8,  name: 'Diphtheria',                    dbName: 'Diphtheria', icon: <FeverIcon color="#A78BFA" />, color: '#A78BFA', desc: 'A serious bacterial infection affecting the mucous membranes of the nose and throat.' },
+  { id: 9,  name: 'Ebola',                         dbName: 'Ebola', icon: <InfluenzaAIcon color="#129968" />, color: '#129968', desc: 'A severe, often fatal viral hemorrhagic fever with high transmission risk.' },
+  { id: 10, name: 'Hand Foot and Mouth Disease',   dbName: 'Hand Foot and Mouth Disease', icon: <FeverIcon color="#F472B6" />, color: '#F472B6', desc: 'A mild viral illness common in children, causing sores in the mouth and rash on hands and feet.' },
   { id: 11, name: 'Hepatitis A',                   dbName: 'Hepatitis A', icon: <ContactBloodborneIcon color="#CA8A04" />, color: '#CA8A04', desc: 'A viral liver infection spread through contaminated food and water or close contact.' },
   { id: 12, name: 'Hepatitis B',                   dbName: 'Hepatitis B', icon: <ContactBloodborneIcon color="#B45309" />, color: '#B45309', desc: 'A serious liver infection caused by the hepatitis B virus, transmitted through blood and bodily fluids.' },
   { id: 13, name: 'Hepatitis C',                   dbName: 'Hepatitis C', icon: <ContactBloodborneIcon color="#92400E" />, color: '#92400E', desc: 'A viral liver infection transmitted through blood contact, often becoming chronic.' },
-  { id: 14, name: 'HIV/AIDS',                      dbName: 'HIV/AIDS', icon: '🔴', color: '#DC2626', desc: 'A chronic viral infection attacking the immune system, requiring lifelong management.' },
+  { id: 14, name: 'HIV/AIDS',                      dbName: 'HIV/AIDS', icon: <ContactBloodborneIcon color="#DC2626" />, color: '#DC2626', desc: 'A chronic viral infection attacking the immune system, requiring lifelong management.' },
   { id: 15, name: 'Influenza',                     dbName: 'Influenza', icon: <InfluenzaAIcon color="#F59E0B" />, color: '#F59E0B', desc: 'A common contagious respiratory viral infection causing fever, cough, and body aches.' },
   { id: 16, name: 'Influenza A',                   dbName: 'Influenza A', icon: <InfluenzaAIcon color="#D97706" />, color: '#D97706', desc: 'A highly contagious respiratory illness caused by influenza viruses, leading to seasonal outbreaks.' },
-  { id: 17, name: 'Leprosy',                       dbName: 'Leprosy', icon: '🧬', color: '#A1A1AA', desc: 'A chronic infectious disease affecting the skin and nerves, curable with multidrug therapy.' },
+  { id: 17, name: 'Leprosy',                       dbName: 'Leprosy', icon: <ContactBloodborneIcon color="#A1A1AA" />, color: '#A1A1AA', desc: 'A chronic infectious disease affecting the skin and nerves, curable with multidrug therapy.' },
   { id: 18, name: 'Leptospirosis',                 dbName: 'Leptospirosis', icon: <LeptospirosisIcon color="#129968" />, color: '#129968', desc: 'A bacterial disease spread through contaminated water, posing a high risk during flood seasons.' },
-  { id: 19, name: 'Malaria',                       dbName: 'Malaria', icon: '🦟', color: '#84CC16', desc: 'A life-threatening mosquito-borne disease causing fever, chills, and flu-like symptoms.' },
-  { id: 20, name: 'Measles',                       dbName: 'Measles', icon: '🔴', color: '#DC2626', desc: 'A highly contagious viral disease causing fever and rash, preventable through vaccination.' },
-  { id: 21, name: 'Meningococcemia',               dbName: 'Meningococcemia', icon: '🧠', color: '#8B5CF6', desc: 'A serious bacterial bloodstream infection that can lead to meningitis and sepsis.' },
-  { id: 22, name: 'Pertussis',                     dbName: 'Pertussis', icon: '🤒', color: '#F472B6', desc: 'A highly contagious respiratory infection known as whooping cough, severe in infants.' },
-  { id: 23, name: 'Poliomyelitis',                 dbName: 'Poliomyelitis', icon: '🦽', color: '#FCA5A5', desc: 'A viral disease that can cause permanent paralysis, preventable through vaccination.' },
+  { id: 19, name: 'Malaria',                       dbName: 'Malaria', icon: <VectorborneIcon color="#84CC16" />, color: '#84CC16', desc: 'A life-threatening mosquito-borne disease causing fever, chills, and flu-like symptoms.' },
+  { id: 20, name: 'Measles',                       dbName: 'Measles', icon: <FeverIcon color="#DC2626" />, color: '#DC2626', desc: 'A highly contagious viral disease causing fever and rash, preventable through vaccination.' },
+  { id: 21, name: 'Meningococcemia',               dbName: 'Meningococcemia', icon: <ContactBloodborneIcon color="#8B5CF6" />, color: '#8B5CF6', desc: 'A serious bacterial bloodstream infection that can lead to meningitis and sepsis.' },
+  { id: 22, name: 'Pertussis',                     dbName: 'Pertussis', icon: <InfluenzaAIcon color="#F472B6" />, color: '#F472B6', desc: 'A highly contagious respiratory infection known as whooping cough, severe in infants.' },
+  { id: 23, name: 'Poliomyelitis',                 dbName: 'Poliomyelitis', icon: <VaccineIcon color="#FCA5A5" />, color: '#FCA5A5', desc: 'A viral disease that can cause permanent paralysis, preventable through vaccination.' },
   { id: 24, name: 'Rabies',                        dbName: 'Rabies', icon: <RabiesIcon color="#DC2626" />, color: '#DC2626', desc: 'A fatal viral disease transmitted through the bite of an infected animal, requiring immediate treatment.' },
-  { id: 25, name: 'SARS',                          dbName: 'SARS', icon: '😷', color: '#6366F1', desc: 'A severe respiratory illness caused by a coronavirus, with high fever and respiratory distress.' },
+  { id: 25, name: 'SARS',                          dbName: 'SARS', icon: <InfluenzaAIcon color="#DC2626" />, color: '#DC2626', desc: 'A severe respiratory illness caused by a coronavirus, with high fever and respiratory distress.' },
   { id: 26, name: 'Sore Eyes',                     dbName: 'Sore Eyes', icon: <SoreEyesIcon color="#EAB308" />, color: '#EAB308', desc: 'A contagious eye infection causing redness, itching, and discharge, common in children.' },
   { id: 27, name: 'Tuberculosis',                  dbName: 'Tuberculosis', icon: <TuberculosisIcon color="#F97316" />, color: '#F97316', desc: 'An infectious bacterial disease that primarily affects the lungs, requiring long-term treatment.' },
   { id: 28, name: 'Typhoid Fever',                 dbName: 'Typhoid Fever', icon: <TyphoidIcon color="#8B5CF6" />, color: '#8B5CF6', desc: 'A systemic infection caused by Salmonella Typhi, spread through contaminated food and water.' },
 ];
 
-// Diseases flagged as "Immediate" (report within 24h / Level 1 IDSR) — fallback for the
+// Diseases flagged as "Immediate" (report within 24h / Level 1 IDSR) - fallback for the
 // Immediate/Weekly grouping when a disease row's notif_type hasn't been persisted yet.
 const IMMEDIATE_DISEASE_NAMES = new Set([
   'Avian Influenza', 'Cholera', 'Covid-19', 'Dengue', 'Diphtheria', 'Ebola', 'HIV/AIDS',
@@ -211,16 +247,6 @@ const DISEASE_ICON_CHOICES = (() => {
     out.push({ key: def.token, label: def.name, icon: def.render() });
   }
   return out;
-})();
-
-// Extra emoji choices for the "Add New Disease" icon picker,
-// minus any emoji already covered by the disease icons above
-const EXTRA_ICON_CHOICES = (() => {
-  const covered = new Set(
-    DISEASE_ICON_CHOICES.filter(c => typeof c.key === 'string' && !c.key.startsWith('svg:')).map(c => c.key)
-  );
-  return ['🦠','🦟','🫁','🩺','💊','🧪','🧫','👁️','🩹','🦻','🧠','🫀','🩸','🦾','🐾','😷','🤒','🏥','🧬','💧','🫧','🌡️','🩼']
-    .filter(ic => !covered.has(ic));
 })();
 
 // Card dbNames sorted by length descending (longest-first for prefix matching)
@@ -423,13 +449,13 @@ const EMPTY_FORM = {
   patientName: '', diseaseType: '', age: '', severity: 'Mild', caseType: 'Probable', diseaseSubtype: '',
   gender: 'Male', status: 'Active', contact: '', onsetDate: '',
   address: '', purok: '', barangayId: '', symptoms: '', physician: '',
-  lat: '', lng: ''
+  lat: '', lng: '', vaccinationStatus: '', vaccineExpiryDate: ''
 };
 
 const CATEGORIES_PER_PAGE = 8;
 const DISEASES_PER_PAGE = 12;
 
-export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, autoSave, confirmDelete, keyboardShortcuts, fontScale, compactMode, loggedUserId, loggedUser, loginRole, loginBarangay, sessionContext, initialView, onInitialViewConsumed, pendingOpenCaseId, onPendingCaseConsumed }) {
+export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, autoSave, confirmDelete, keyboardShortcuts, fontScale, compactMode, loggedUserId, loggedUser, loginRole, loginBarangay, sessionContext, initialView, onInitialViewConsumed, pendingOpenCaseId, onPendingCaseConsumed, pendingOpenAdd, onPendingOpenAddConsumed, pendingMcLanding, onMcLandingConsumed }) {
   const { t, translateStatus } = useI18n();
   const [view, setView] = useState('categories');
   const [inboxItems, setInboxItems] = useState([]);
@@ -471,9 +497,11 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const [routingTargetType, setRoutingTargetType] = useState(null);
   const [routingTargetBarangay, setRoutingTargetBarangay] = useState('');
   const [crossUnit, setCrossUnit] = useState(null);
-  const [carouselIndex, setCarouselIndex] = useState(0); // 0 = categories grid, 1 = exclusive diseases, 2 = add disease form
+  const [carouselIndex, setCarouselIndex] = useState(0); // 0 = trello board, 1 = exclusive diseases, 2 = add disease form
+  const [boardOpen, setBoardOpen] = useState({});
+  const shortcutConfig = getShortcutConfig(loggedUserId);
   const [newDiseaseName, setNewDiseaseName] = useState('');
-  const [newDiseaseIcon, setNewDiseaseIcon] = useState('🦠');
+  const [newDiseaseIcon, setNewDiseaseIcon] = useState('svg:flu-a');
   const [newDiseaseColor, setNewDiseaseColor] = useState('#3B82F6');
   const [newDiseaseDesc, setNewDiseaseDesc] = useState('');
   const [newDiseaseCategory, setNewDiseaseCategory] = useState('all');
@@ -648,6 +676,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const [filterBarangay, setFilterBarangay] = useState('All Barangays');
   const [filterStatus, setFilterStatus] = useState('All Status');
   const [filterPurok, setFilterPurok] = useState('All Puroks');
+  const [filterDisease, setFilterDisease] = useState('All Diseases');
   const [showArchived, setShowArchived] = useState(false);
   const showArchivedRef = useRef(false);
   const [tablePage, setTablePage] = useState(1);
@@ -674,6 +703,15 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   // Barangay filter dropdown
   const [barangayOpen, setBarangayOpen] = useState(false);
   const barangayRef = useRef(null);
+
+  // Disease filter dropdown
+  const [filterDiseaseOpen, setFilterDiseaseOpen] = useState(false);
+  const filterDiseaseRef = useRef(null);
+  const diseaseOptions = React.useMemo(() => {
+    const s = new Set();
+    allCases.forEach(c => { if (c.disease_name) s.add(c.disease_name); });
+    return ['All Diseases', ...Array.from(s).sort()];
+  }, [allCases]);
 
   // Dynamic purok options - merge PUROK_OPTIONS with values already in this BHW's barangay
   const dynamicPurokOptions = React.useMemo(() => {
@@ -729,6 +767,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const [subtypeCustomText, setSubtypeCustomText] = useState('');
   const [patientStatusOpen, setPatientStatusOpen] = useState(false);
   const patientStatusRef = useRef(null);
+  const [vaccinationStatusOpen, setVaccinationStatusOpen] = useState(false);
+  const vaccinationStatusRef = useRef(null);
 
   // Delete modal
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -789,6 +829,22 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       if (onInitialViewConsumed) onInitialViewConsumed();
     }
   }, [initialView]);
+
+  // ── Open the Add Case form on arrival (onboarding tour step) ──
+  useEffect(() => {
+    if (!pendingOpenAdd) return;
+    openAdd();
+    if (onPendingOpenAddConsumed) onPendingOpenAddConsumed();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingOpenAdd]);
+
+  // ── Return to the categories landing (onboarding tour step) ──
+  useEffect(() => {
+    if (!pendingMcLanding) return;
+    setView('categories');
+    if (onMcLandingConsumed) onMcLandingConsumed();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingMcLanding]);
 
   // ── Auto-open a specific case when arriving from a notification ("View →") ──
   useEffect(() => {
@@ -1215,6 +1271,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         physician: formData.physician,
         latitude: formData.lat,
         longitude: formData.lng,
+        vaccination_status: formData.vaccinationStatus || null,
+        vaccine_expiry_date: formData.vaccineExpiryDate || null,
       },
     };
     if (!isOnline()) {
@@ -1501,6 +1559,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       if (statusRef.current && !statusRef.current.contains(e.target)) {
         setStatusOpen(false);
       }
+      if (filterDiseaseRef.current && !filterDiseaseRef.current.contains(e.target)) {
+        setFilterDiseaseOpen(false);
+      }
       if (genderRef.current && !genderRef.current.contains(e.target)) {
         setGenderOpen(false);
       }
@@ -1515,6 +1576,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       }
       if (patientStatusRef.current && !patientStatusRef.current.contains(e.target)) {
         setPatientStatusOpen(false);
+      }
+      if (vaccinationStatusRef.current && !vaccinationStatusRef.current.contains(e.target)) {
+        setVaccinationStatusOpen(false);
       }
       if (lookupDropdownRef.current && !lookupDropdownRef.current.contains(e.target)) {
         setShowLookupDropdown(false);
@@ -1563,13 +1627,17 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         if (view === 'add' || view === 'edit') { setApprovalRequest(null); setView('list'); setFilterPurok('All Puroks'); }
       }
 
-      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+      const cfg = getShortcutConfig(loggedUserId);
+      const key = String(e.key || '').toLowerCase();
+      const saveHeld = cfg.saveCtrl ? (e.ctrlKey || e.metaKey) : !e.ctrlKey && !e.metaKey;
+      if (saveHeld && key === String(cfg.save || 's').toLowerCase()) {
         e.preventDefault();
         const form = document.querySelector('#case-form');
         if (form) form.requestSubmit();
       }
 
-      if ((view === 'list' || view === 'categories') && (e.key === 'n' || e.key === 'N') && !e.ctrlKey && !e.metaKey) {
+      const newHeld = cfg.newCaseCtrl ? (e.ctrlKey || e.metaKey) : !e.ctrlKey && !e.metaKey;
+      if ((view === 'list' || view === 'categories') && newHeld && key === String(cfg.newCase || 'n').toLowerCase()) {
         setView('add');
       }
     };
@@ -1702,6 +1770,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     }
     if (filterStatus !== 'All Status') {
       result = result.filter(c => c.status === filterStatus);
+    }
+    if (filterDisease !== 'All Diseases') {
+      result = result.filter(c => (c.disease_name || '') === filterDisease);
     }
     if (filterPurok !== 'All Puroks') {
       const normalize = (s) => (s || '').toUpperCase().replace(/[.\-\s]/g, '');
@@ -1938,6 +2009,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       physician: caseItem.physician || '',
       lat: caseItem.latitude || '',
       lng: caseItem.longitude || '',
+      vaccinationStatus: caseItem.vaccination_status || '',
+      vaccineExpiryDate: caseItem.vaccine_expiry_date ? caseItem.vaccine_expiry_date.split('T')[0] : '',
     };
     setFormData(filledForm);
     setEditingCase(caseItem);
@@ -2019,7 +2092,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     try {
       const res = await axios.post(API_URL + '/api/diseases', {
         name: newDiseaseName.trim(),
-        icon: newDiseaseIcon || '🦠',
+        icon: newDiseaseIcon || 'svg:flu-a',
         color: newDiseaseColor,
         description: newDiseaseDesc,
         notif_type: newDiseaseNotifType,
@@ -2066,7 +2139,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       const addedName = newDiseaseName.trim();
       setNewDiseaseName('');
       setNewDiseaseDesc('');
-      setNewDiseaseIcon('🦠');
+      setNewDiseaseIcon('svg:flu-a');
       setNewDiseaseColor('#3B82F6');
       setNewDiseaseCategory('all');
       setNewCategoryName('');
@@ -2186,7 +2259,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       if (Object.keys(errors).length > 0) {
         setFormErrors(errors);
         const msgs = [];
-        if (errors.age) msgs.push(t('Age must be 0–130'));
+        if (errors.age) msgs.push(t('Age must be 0-130'));
         if (errors.contact) msgs.push(t('Use valid PH phone (e.g., 09123456789)'));
         if (errors.onsetDate) msgs.push(t('Onset date cannot be in the future'));
         const errText = msgs.length > 0 ? msgs.join('. ') + '.' : t('Please fill in all required fields highlighted in red.');
@@ -2223,6 +2296,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       physician: formData.physician,
       latitude: formData.lat || null,
       longitude: formData.lng || null,
+      vaccination_status: formData.vaccinationStatus || null,
+      vaccine_expiry_date: formData.vaccineExpiryDate || null,
       user_id: loggedUserId || null,
     };
 
@@ -2463,14 +2538,6 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   // ═══════════════════════════════════
   if (view === 'categories') {
     const gridCategories = DISEASE_CATEGORIES.filter(c => c.id !== 'exclusive');
-    const builtinCategories = gridCategories.filter(c => !String(c.id).startsWith('custom-'));
-    const totalCategoryPages = Math.ceil(builtinCategories.length / CATEGORIES_PER_PAGE);
-    const currentCategories = [
-      ...builtinCategories.filter(c => c.id === 'all'),
-      { id: 'notif-immediate', name: t('🕐 Immediate Diseases'), icon: '🕐', color: '#DC2626', desc: t('Report within 24 hours (Level 1 IDSR)'), diseases: ALL_DISEASE_ENTRIES.filter(e => notifTypeForEntry(e, allDiseases) === 'immediate') },
-      { id: 'notif-weekly', name: t('🗓️ Weekly Diseases'), icon: '🗓️', color: '#129968', desc: t('Included in the consolidated weekly summary (Level 2 FHSIS)'), diseases: ALL_DISEASE_ENTRIES.filter(e => notifTypeForEntry(e, allDiseases) === 'weekly') },
-      ...builtinCategories.filter(c => c.id !== 'all').slice(categoryPage * CATEGORIES_PER_PAGE, (categoryPage + 1) * CATEGORIES_PER_PAGE),
-    ];
 
     const category = selectedCategory
       ? ([{ id: 'notif-immediate', name: t('Immediate Diseases'), icon: '🕐', color: '#DC2626', desc: t('Report within 24 hours (Level 1 IDSR)'), diseases: ALL_DISEASE_ENTRIES.filter(e => notifTypeForEntry(e, allDiseases) === 'immediate') },
@@ -2481,7 +2548,6 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     const totalDiseasePages = Math.ceil(diseaseEntries.length / DISEASES_PER_PAGE);
     const currentDiseases = diseaseEntries.slice(diseasePage * DISEASES_PER_PAGE, (diseasePage + 1) * DISEASES_PER_PAGE);
 
-    const showCategoryPagination = totalCategoryPages > 1;
     const showDiseasePagination = diseaseEntries.length > 6;
     const gridMode = diseaseEntries.length <= 6;
 
@@ -2525,6 +2591,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               setSearchQuery('');
               setFilterBarangay('All Barangays');
               setFilterStatus('All Status');
+              setFilterDisease('All Diseases');
               setView('list');
               setBrowseAllCategories(false);
               setBrowseAllExclusive(false);
@@ -2550,6 +2617,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             setSearchQuery('');
             setFilterBarangay('All Barangays');
             setFilterStatus('All Status');
+            setFilterDisease('All Diseases');
             setView('list');
             setBrowseAllCategories(false);
             setBrowseAllExclusive(false);
@@ -2571,6 +2639,66 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#3B82F6', fontSize: '15px', fontWeight: '600' }}>
             View Cases <span style={{ fontSize: '16px' }}>›</span>
           </div>
+        </div>
+      );
+    };
+
+    const boardNav = (entry) => {
+      setSelectedDisease(entry);
+      setFilterPurok('All Puroks');
+      setTablePage(1);
+      setSearchQuery('');
+      setFilterBarangay('All Barangays');
+      setFilterStatus('All Status');
+      setFilterDisease('All Diseases');
+      setView('list');
+      setBrowseAllCategories(false);
+      setBrowseAllExclusive(false);
+      setBoardOpen({});
+    };
+
+    const renderBoardDiseaseRow = (entry) => {
+      const count = getCaseCount(entry);
+      return (
+        <div key={entry.dbName || entry.name}
+          onClick={() => boardNav(entry)}
+          style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', cursor: 'pointer', transition: 'box-shadow 0.12s' }}
+          onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.12)'; }}
+          onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; }}>
+          <span style={{ fontSize: '17px', lineHeight: 1, flexShrink: 0 }}>{entry.icon}</span>
+          <span style={{ flex: 1, fontSize: '14px', fontWeight: '600', color: 'var(--text-main)', lineHeight: '1.25', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.name}</span>
+          <span style={{ background: entry.color, color: '#fff', borderRadius: '50%', minWidth: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', padding: '0 5px', flexShrink: 0, boxSizing: 'border-box' }}>{count}</span>
+        </div>
+      );
+    };
+
+    const trelloColumns = (id, list, accentLabel, accentIcon, badgeColor, hint) => {
+      const open = !!boardOpen[id];
+      const activeCount = list.reduce((s, d) => s + (getCaseCount(d) || 0), 0);
+      return (
+        <div key={id} style={{ flex: '1 1 0', minWidth: '240px', maxWidth: '340px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden', textAlign: 'left' }}>
+          <div onClick={() => setBoardOpen(o => ({ ...o, [id]: !o[id] }))}
+            style={{ padding: '12px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', background: open ? 'var(--input-bg)' : 'transparent', transition: 'background 0.15s' }}
+            onMouseEnter={e => { if (!open) e.currentTarget.style.background = 'var(--input-bg)'; }}
+            onMouseLeave={e => { if (!open) e.currentTarget.style.background = 'transparent'; }}>
+            <span style={{ fontSize: '18px', lineHeight: 1, flexShrink: 0 }}>{accentIcon}</span>
+            <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+              <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{accentLabel}</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: '1.3', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{list.length} disease{list.length !== 1 ? 's' : ''}</div>
+            </div>
+            <span style={{ background: badgeColor, color: '#fff', borderRadius: '50%', minWidth: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', padding: '0 6px', flexShrink: 0, boxSizing: 'border-box' }}>{activeCount}</span>
+            <span style={{ fontSize: '13px', color: 'var(--text-muted)', flexShrink: 0, transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+          </div>
+          {open ? (
+            <div data-scroll-y style={{ maxHeight: '300px', overflowY: 'auto', padding: '8px', display: 'flex', flexDirection: 'column', gap: '4px', borderTop: '1px solid var(--border-color)' }}>
+              {list.length === 0 && <div style={{ padding: '10px 12px', fontSize: '13px', color: 'var(--text-muted)' }}>{t('No diseases')}</div>}
+              {list.map(d => renderBoardDiseaseRow(d))}
+            </div>
+          ) : (
+            <div style={{ padding: '10px 14px', borderTop: '1px solid var(--border-color)', fontSize: '13px', color: 'var(--text-muted)' }}>
+              {hint || t('Click to view')}
+            </div>
+          )}
         </div>
       );
     };
@@ -2655,7 +2783,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start', marginBottom: '24px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <div onClick={() => { setView('inbox'); setInboxSubTab('referrals'); }}
+              <div data-tour="mc-inbox" onClick={() => { setView('inbox'); setInboxSubTab('referrals'); }}
                 style={{ padding: '6px 14px', borderRadius: '20px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '15px', fontWeight: '500', color: 'var(--text-main)', whiteSpace: 'nowrap', textAlign: 'center', minWidth: '70px' }}>
                 {t('Inbox')}
               </div>
@@ -2693,7 +2821,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 <div style={{ fontWeight: '700', marginBottom: '10px', color: 'var(--text-main)' }}>{t('Keyboard Shortcuts')}</div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>{t('New Case')}</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '15px', border: '1px solid var(--border-color)' }}>N</kbd></div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>{t('Save Form')}</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '15px', border: '1px solid var(--border-color)' }}>Ctrl+S</kbd></div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>{t('Save Form')}</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '15px', border: '1px solid var(--border-color)' }}>{shortcutConfig.saveCtrl ? 'Ctrl+' : ''}{String(shortcutConfig.save || 'S').toUpperCase()}</kbd></div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>{t('Close / Back')}</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '15px', border: '1px solid var(--border-color)' }}>Esc</kbd></div>
                         </div>
                       </div>
@@ -2706,7 +2834,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         </div>
 
         {!category && (
-        <div style={{ position: 'relative', marginBottom: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0px', minHeight: '220px' }}>
+        <div data-tour="mc-carousel" style={{ position: 'relative', marginBottom: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0px', minHeight: '220px' }}>
           {/* LEFT faded peek */}
           <div className="cdms-carousel-peek" style={{
             width: '80px', height: '180px', background: 'var(--bg-surface)',
@@ -2726,27 +2854,31 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                 <div>
                   <h3 style={{ margin: '0 0 6px 0', fontSize: '17px', color: 'var(--text-main)' }}>{t('📋 All Diseases & Categories')}</h3>
                   <p style={{ margin: '0 0 14px 0', fontSize: '15px', color: 'var(--text-muted)' }}>
-                    {t('Browse all disease categories below, or use the ◀ ▶ arrows for exclusive diseases and to add a new one.')}
+                    {t('Click any column header to expand that disease list. Use your mouse wheel to scroll sideways across the categories.')}
                   </p>
-                  <div className="cdms-cat-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: compactMode ? '12px' : '16px', textAlign: 'left', maxWidth: '900px', margin: '0 auto' }}>
-                    {currentCategories.map(cat => renderCategoryCard(cat))}
+
+                  <div onWheel={e => {
+                    if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && !e.target.closest('[data-scroll-y]')) {
+                      const el = e.currentTarget;
+                      if (el.scrollWidth - el.clientWidth > 0) {
+                        e.preventDefault();
+                        el.scrollLeft += e.deltaY;
+                      }
+                    }
+                  }} style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', textAlign: 'left', overflowX: 'auto', padding: '2px 2px 10px' }}>
+                    {trelloColumns('all', ALL_DISEASE_ENTRIES, t('All Diseases'), resolveIcon('svg:alldiseases'), '#121358', t('Click to view all 28 diseases'))}
+                    {(() => {
+                      const list = ALL_DISEASE_ENTRIES.filter(e => notifTypeForEntry(e, allDiseases) === 'immediate');
+                      return trelloColumns('imm', list, t('Immediate Diseases'), '🕐', '#DC2626', t('Click to view immediate-report diseases'));
+                    })()}
+                    {(() => {
+                      const list = ALL_DISEASE_ENTRIES.filter(e => notifTypeForEntry(e, allDiseases) === 'weekly');
+                      return trelloColumns('wk', list, t('Weekly Diseases'), '🗓️', '#129968', t('Click to view weekly-report diseases'));
+                    })()}
+                    {gridCategories.filter(c => c.id !== 'all' && c.id !== 'immediate' && c.id !== 'weekly').map(cat =>
+                      trelloColumns(cat.id, cat.diseases || [], cat.name, cat.icon, cat.color || '#121358', t('Click to view category diseases'))
+                    )}
                   </div>
-                  {showCategoryPagination && (
-                    <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '16px' }}>
-                      {Array.from({ length: totalCategoryPages }).map((_, i) => (
-                        <div key={i} onClick={() => setCategoryPage(i)}
-                          style={{ width: '10px', height: '10px', borderRadius: '50%', background: categoryPage === i ? '#121358' : 'var(--border-color)', transition: 'background 0.2s', cursor: 'pointer' }} />
-                      ))}
-                    </div>
-                  )}
-                  {builtinCategories.length >= 6 && (
-                    <div style={{ textAlign: 'center', marginTop: '16px' }}>
-                      <button onClick={() => setBrowseAllCategories(true)}
-                        style={{ padding: '10px 20px', background: '#121358', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
-                        {t('More Categories')}
-                      </button>
-                    </div>
-                  )}
                 </div>
               )}
               {carouselIndex === 1 && (() => {
@@ -2828,15 +2960,6 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         <div key={'d_' + c.key} title={c.label} onClick={() => setNewDiseaseIcon(c.key)}
                           style={{ width: '34px', height: '34px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', cursor: 'pointer', fontSize: '17px', border: active ? '2px solid #3B82F6' : '1px solid var(--border-color)', background: active ? 'rgba(59,130,246,0.12)' : 'var(--bg-surface)' }}>
                           {c.icon}
-                        </div>
-                      );
-                    })}
-                    {EXTRA_ICON_CHOICES.map(ic => {
-                      const active = newDiseaseIcon === ic;
-                      return (
-                        <div key={'x_' + ic} title={ic} onClick={() => setNewDiseaseIcon(ic)}
-                          style={{ width: '34px', height: '34px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', cursor: 'pointer', fontSize: '17px', border: active ? '2px solid #3B82F6' : '1px solid var(--border-color)', background: active ? 'rgba(59,130,246,0.12)' : 'var(--bg-surface)' }}>
-                          {ic}
                         </div>
                       );
                     })}
@@ -3107,7 +3230,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       />
                     </div>
                     <div>
-                      <label style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '6px' }}>{t('Disease Subtypes')} <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>{t('(one per line — shown as dropdown options on the case form)')}</span></label>
+                      <label style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', display: 'block', marginBottom: '6px' }}>{t('Disease Subtypes')} <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>{t('(one per line - shown as dropdown options on the case form)')}</span></label>
                       <textarea
                         value={tipsEditor.subtypes || ''}
                         onChange={e => setTipsEditor({ ...tipsEditor, subtypes: e.target.value })}
@@ -3676,7 +3799,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     Case ID: D-{String(deleteTarget.case_id).padStart(4, '0')}
                   </div>
                   <div style={{ color: 'var(--text-muted)', fontSize: '15px' }}>
-                    {deleteTarget.patient_name || 'Unknown'} – {deleteTarget.barangay_name || 'Unknown Barangay'}.
+                    {deleteTarget.patient_name || 'Unknown'} - {deleteTarget.barangay_name || 'Unknown Barangay'}.
                   </div>
                 </div>
                 <p style={{ color: 'var(--text-muted)', fontSize: '15px', margin: '0 0 28px 0' }}>
@@ -3719,7 +3842,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     <div style={{ fontWeight: '700', marginBottom: '10px', color: 'var(--text-main)' }}>{t('Keyboard Shortcuts')}</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>{t('New Case')}</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '15px', border: '1px solid var(--border-color)' }}>N</kbd></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>{t('Save Form')}</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '15px', border: '1px solid var(--border-color)' }}>Ctrl+S</kbd></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>{t('Save Form')}</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '15px', border: '1px solid var(--border-color)' }}>{shortcutConfig.saveCtrl ? 'Ctrl+' : ''}{String(shortcutConfig.save || 'S').toUpperCase()}</kbd></div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>{t('Close / Back')}</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '15px', border: '1px solid var(--border-color)' }}>Esc</kbd></div>
                     </div>
                   </div>
@@ -3755,12 +3878,10 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             </div>
 
             <BackButton onClick={() => { setView('categories'); setSelectedDisease(null); setSearchQuery(''); }}>{t('Back')}</BackButton>
-            {loginRole !== 'CHO' && (
-              <button onClick={openAdd}
-                style={{ padding: '8px 18px', background: '#129968', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
-                {t('+ Add Case')}
-              </button>
-            )}
+            <button onClick={openAdd}
+              style={{ padding: '8px 18px', background: '#129968', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
+              {t('+ Add Case')}
+            </button>
           </div>
         </div>
 
@@ -3888,19 +4009,19 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             <table style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  {['Case ID', 'Patient Name', 'Age', 'Barangay', 'Date Reported', 'Severity', 'Status', 'Actions'].map(h => (
+                  {['Case ID', 'Patient Name', 'Age', 'Barangay', 'Date Reported', 'Severity', 'Status', 'Actions'].filter(h => !(loginRole === 'BHW' && h === 'Barangay')).map(h => (
                     <th key={h} style={{ textAlign: 'center', padding: compactMode ? '6px 8px' : '10px 12px', color: 'var(--text-muted)', fontSize: '15px', fontWeight: '600', borderBottom: '1px solid var(--border-color)', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
                       {t(h)}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody key={`rows-${selectedDisease?.dbName || 'all'}-${tablePage}-${searchQuery}-${filterBarangay}-${filterStatus}-${filterPurok}`}>
+              <tbody key={`rows-${selectedDisease?.dbName || 'all'}-${tablePage}-${searchQuery}-${filterBarangay}-${filterStatus}-${filterPurok}-${filterDisease}`}>
                 {paginatedCases.length === 0 ? (
                   <tr>
-                    <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '15px' }}>
+                    <td colSpan={loginRole === 'BHW' ? 7 : 8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '15px' }}>
                       {t('No cases found for ')}<strong>{selectedDisease?.name}</strong>
-                      {(searchQuery || filterBarangay !== 'All Barangays' || filterStatus !== 'All Status')
+                      {(searchQuery || filterBarangay !== 'All Barangays' || filterStatus !== 'All Status' || filterDisease !== 'All Diseases' || filterPurok !== 'All Puroks')
                         ? t(' with current filters.') : t('.')}
                     </td>
                   </tr>
@@ -3921,9 +4042,11 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       <td style={{ padding: compactMode ? '7px 8px' : '12px', fontSize: '15px', color: 'var(--text-main)', textAlign: 'center' }}>
                         {c.age || '--'}
                       </td>
-                      <td style={{ padding: compactMode ? '7px 8px' : '12px', fontSize: '15px', color: 'var(--text-main)', textAlign: 'center' }}>
-                        {c.barangay_name || '--'}
-                      </td>
+                      {loginRole !== 'BHW' && (
+                        <td style={{ padding: compactMode ? '7px 8px' : '12px', fontSize: '15px', color: 'var(--text-main)', textAlign: 'center' }}>
+                          {c.barangay_name || '--'}
+                        </td>
+                      )}
                       <td style={{ padding: compactMode ? '7px 8px' : '12px', fontSize: '15px', color: 'var(--text-main)', textAlign: 'center', whiteSpace: 'nowrap' }}>
                         {formatDateStr(c.date_reported, dateFormat)}
                       </td>
@@ -3954,6 +4077,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                             style={{ padding: '5px 10px', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer', color: 'var(--text-main)', fontSize: '15px' }}>
                             ✏️
                           </button>
+                          {loginRole !== 'BHW' && (
                           <button onClick={() => {
                               if (confirmDelete) {
                                 setDeleteTarget(c);
@@ -3970,6 +4094,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                             style={{ padding: '5px 10px', background: 'transparent', border: '1px solid #ef4444', borderRadius: '4px', cursor: 'pointer', fontSize: '15px' }}>
                             🗑️
                           </button>
+                          )}
                         </>
                         )}
                       </div>
@@ -3986,7 +4111,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           {totalTablePages > 1 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}>
               <span style={{ color: 'var(--text-muted)', fontSize: '15px' }}>
-                {t('Showing ')}{(tablePage - 1) * CASES_PER_PAGE + 1}–{Math.min(tablePage * CASES_PER_PAGE, filteredCases.length)} {t('of ')}{filteredCases.length}
+                {t('Showing ')}{(tablePage - 1) * CASES_PER_PAGE + 1}-{Math.min(tablePage * CASES_PER_PAGE, filteredCases.length)} {t('of ')}{filteredCases.length}
               </span>
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 <button onClick={() => setTablePage(1)} disabled={tablePage === 1}
@@ -4004,7 +4129,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         style={{ padding: '5px 8px', background: tableEllipsisOpen ? 'rgba(18,19,88,0.15)' : 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '15px', fontWeight: '700', letterSpacing: '2px' }}>...</button>
                       {tableEllipsisOpen && (
                         <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px', width: '160px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 100 }}>
-                          <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>{t('Go to page (1–')}{totalTablePages}{t(')')}</div>
+                          <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>{t('Go to page (1-')}{totalTablePages}{t(')')}</div>
                           <div style={{ display: 'flex', gap: '4px' }}>
                             <input type="number" min="1" max={totalTablePages} value={tableEllipsisInput} placeholder="#"
                               onChange={e => setTableEllipsisInput(e.target.value)}
@@ -4055,7 +4180,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       <div style={{ padding: compactMode ? '14px' : '28px', fontSize: `calc(15px * ${fs})` }}>
         <BackButton onClick={() => { if (approvalRequest) { closeApprovalReview(); return; } setView('list'); setFilterPurok('All Puroks'); }} style={{ marginBottom: '20px' }}>{approvalRequest ? t('Back to Add Requests') : `${t('Back to ')}${selectedDisease?.name}${t(' Cases')}`}</BackButton>
 
-        <div className="cdms-case-form-card" style={{ background: 'var(--bg-surface)', borderRadius: '12px', padding: '40px', color: 'var(--text-main)', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', maxWidth: '900px', margin: '0 auto' }}>
+        <div data-tour="mc-form" className="cdms-case-form-card" style={{ background: 'var(--bg-surface)', borderRadius: '12px', padding: '40px', color: 'var(--text-main)', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', maxWidth: '900px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '32px' }}>
             <h2 style={{ margin: '0 0 6px 0', fontSize: '24px', color: 'var(--text-main)' }}>
               {approvalRequest ? t('Review Add Request') : (isEdit ? t('Edit Case Report') : t('New Case Report'))}
@@ -4272,46 +4397,46 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           lng: String(purokCoords[1]),
                         }));
                       } else {
+                        const targetB2 = matchedBarangay || (formData.barangayId
+                          ? barangayList.find(b => String(b.id) === String(formData.barangayId))
+                          : null);
                         const fullQuery = [addr, barangayName, 'Cabuyao', 'Laguna', 'Philippines'].filter(Boolean).join(', ');
 
                         try {
                           const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(fullQuery)}&format=json&limit=1`);
                           const data = await res.json();
                           if (data && data.length > 0) {
+                            const snappedC = snapCoordsToBarangay(data[0].lat, data[0].lon, targetB2, unit);
                             setFormData(prev => ({
                               ...prev,
                               barangayId: matchedBarangay ? String(matchedBarangay.id) : prev.barangayId,
-                              lat: parseFloat(data[0].lat).toFixed(6),
-                              lng: parseFloat(data[0].lon).toFixed(6),
+                              lat: String(snappedC[0]),
+                              lng: String(snappedC[1]),
                             }));
                           } else {
-                            const targetB = matchedBarangay || (formData.barangayId
-                              ? barangayList.find(b => String(b.id) === String(formData.barangayId))
-                              : null);
-                            if (targetB) {
-                              const fallbackCoords = BARANGAY_COORDS[targetB.name];
+                            if (targetB2) {
+                              const fallbackCoords = BARANGAY_COORDS[targetB2.name];
                               if (fallbackCoords) {
+                                const snappedF = snapCoordsToBarangay(fallbackCoords[0], fallbackCoords[1], targetB2, unit);
                                 setFormData(prev => ({
                                   ...prev,
-                                  barangayId: String(targetB.id),
-                                  lat: String(fallbackCoords[0]),
-                                  lng: String(fallbackCoords[1]),
+                                  barangayId: String(targetB2.id),
+                                  lat: String(snappedF[0]),
+                                  lng: String(snappedF[1]),
                                 }));
                               }
                             }
                           }
                         } catch (_) {
-                          const targetB = matchedBarangay || (formData.barangayId
-                            ? barangayList.find(b => String(b.id) === String(formData.barangayId))
-                            : null);
-                          if (targetB) {
-                            const fallbackCoords = BARANGAY_COORDS[targetB.name];
+                          if (targetB2) {
+                            const fallbackCoords = BARANGAY_COORDS[targetB2.name];
                             if (fallbackCoords) {
+                              const snappedF = snapCoordsToBarangay(fallbackCoords[0], fallbackCoords[1], targetB2, unit);
                               setFormData(prev => ({
                                 ...prev,
-                                barangayId: String(targetB.id),
-                                lat: String(fallbackCoords[0]),
-                                lng: String(fallbackCoords[1]),
+                                barangayId: String(targetB2.id),
+                                lat: String(snappedF[0]),
+                                lng: String(snappedF[1]),
                               }));
                             }
                           }
@@ -4372,46 +4497,46 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           lng: String(purokCoords[1]),
                         }));
                       } else {
+                        const targetB2 = matchedBarangay || (formData.barangayId
+                          ? barangayList.find(b => String(b.id) === String(formData.barangayId))
+                          : null);
                         const fullQuery = [addr, barangayName, 'Cabuyao', 'Laguna', 'Philippines'].filter(Boolean).join(', ');
 
                         try {
                           const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(fullQuery)}&format=json&limit=1`);
                           const data = await res.json();
                           if (data && data.length > 0) {
+                            const snappedC = snapCoordsToBarangay(data[0].lat, data[0].lon, targetB2, unit);
                             setFormData(prev => ({
                               ...prev,
                               barangayId: matchedBarangay ? String(matchedBarangay.id) : prev.barangayId,
-                              lat: parseFloat(data[0].lat).toFixed(6),
-                              lng: parseFloat(data[0].lon).toFixed(6),
+                              lat: String(snappedC[0]),
+                              lng: String(snappedC[1]),
                             }));
                           } else {
-                            const targetB = matchedBarangay || (formData.barangayId
-                              ? barangayList.find(b => String(b.id) === String(formData.barangayId))
-                              : null);
-                            if (targetB) {
-                              const fallbackCoords = BARANGAY_COORDS[targetB.name];
+                            if (targetB2) {
+                              const fallbackCoords = BARANGAY_COORDS[targetB2.name];
                               if (fallbackCoords) {
+                                const snappedF = snapCoordsToBarangay(fallbackCoords[0], fallbackCoords[1], targetB2, unit);
                                 setFormData(prev => ({
                                   ...prev,
-                                  barangayId: String(targetB.id),
-                                  lat: String(fallbackCoords[0]),
-                                  lng: String(fallbackCoords[1]),
+                                  barangayId: String(targetB2.id),
+                                  lat: String(snappedF[0]),
+                                  lng: String(snappedF[1]),
                                 }));
                               }
                             }
                           }
                         } catch (_) {
-                          const targetB = matchedBarangay || (formData.barangayId
-                            ? barangayList.find(b => String(b.id) === String(formData.barangayId))
-                            : null);
-                          if (targetB) {
-                            const fallbackCoords = BARANGAY_COORDS[targetB.name];
+                          if (targetB2) {
+                            const fallbackCoords = BARANGAY_COORDS[targetB2.name];
                             if (fallbackCoords) {
+                              const snappedF = snapCoordsToBarangay(fallbackCoords[0], fallbackCoords[1], targetB2, unit);
                               setFormData(prev => ({
                                 ...prev,
-                                barangayId: String(targetB.id),
-                                lat: String(fallbackCoords[0]),
-                                lng: String(fallbackCoords[1]),
+                                barangayId: String(targetB2.id),
+                                lat: String(snappedF[0]),
+                                lng: String(snappedF[1]),
                               }));
                             }
                           }
@@ -4568,6 +4693,25 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     )}
                   </div>
                 )}
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Date of Onset')}</label>
+                  <DatePicker value={formData.onsetDate} dateFormat={dateFormat} clearable={false}
+                    placeholder={t('Select date')} disabled={isBhwReadOnly} error={!!formErrors.onsetDate}
+                    style={{ width: '100%' }}
+                    onChange={v => {
+                      if (isBhwReadOnly) return;
+                      setFormData({ ...formData, onsetDate: v });
+                      setFormErrors(prev => ({ ...prev, onsetDate: false }));
+                    }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Attending Physician')}</label>
+                  <input type="text" placeholder={t('Dr. Jose Reyes, MD')} style={{ ...inputStyle, border: formErrors.physician ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.physician ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
+                    value={formData.physician} onChange={e => setFormData({ ...formData, physician: e.target.value })}
+                    readOnly={isBhwReadOnly} />
+                </div>
+
               </div>
 
               {/* RIGHT: Clinical Info */}
@@ -4735,7 +4879,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                       return (
                         <div style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 100, overflow: 'hidden' }}>
                           {subtypeOptions.length === 0 && (
-                            <div style={{ padding: '10px 14px', fontSize: '14px', color: 'var(--text-muted)' }}>{t('No preset subtypes for this disease — use the custom option below.')}</div>
+                            <div style={{ padding: '10px 14px', fontSize: '14px', color: 'var(--text-muted)' }}>{t('No preset subtypes for this disease - use the custom option below.')}</div>
                           )}
                           {subtypeOptions.map(s => (
                             <button key={s} type="button"
@@ -4821,24 +4965,46 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Date of Onset')}</label>
-                  <DatePicker value={formData.onsetDate} dateFormat={dateFormat} clearable={false}
-                    placeholder={t('Select date')} disabled={isBhwReadOnly} error={!!formErrors.onsetDate}
-                    style={{ width: '100%' }}
-                    onChange={v => {
-                      if (isBhwReadOnly) return;
-                      setFormData({ ...formData, onsetDate: v });
-                      setFormErrors(prev => ({ ...prev, onsetDate: false }));
-                    }} />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Attending Physician')}</label>
-                  <input type="text" placeholder={t('Dr. Jose Reyes, MD')} style={{ ...inputStyle, border: formErrors.physician ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.physician ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
-                    value={formData.physician} onChange={e => setFormData({ ...formData, physician: e.target.value })}
-                    readOnly={isBhwReadOnly} />
-                </div>
+            {/* Vaccination Status + Vaccine Expiry Date aligned pair */}
+            <div className="cdms-case-form-pair" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', alignItems: 'start', marginBottom: '20px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Vaccination Status')}</label>
+                {isBhwReadOnly ? (
+                  <div style={{ padding: '8px 12px', background: 'var(--input-bg, #f1f5f9)', borderRadius: '6px', fontSize: '15px', color: 'var(--text-main)' }}>
+                    {formData.vaccinationStatus || t('Not specified')}
+                  </div>
+                ) : (
+                  <div style={{ position: 'relative' }} ref={vaccinationStatusRef}>
+                    <button type="button" className="cdms-cf-dropdown" onClick={() => setVaccinationStatusOpen(!vaccinationStatusOpen)}
+                      style={{ ...inputStyle, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}>
+                      <span>{formData.vaccinationStatus || t('Not specified')}</span>
+                      <span style={{ fontSize: '15px', opacity: 0.6, transition: 'transform 0.2s', transform: vaccinationStatusOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                    </button>
+                    {vaccinationStatusOpen && (
+                      <div style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 100, overflow: 'hidden' }}>
+                        {[['', t('Not specified')], ['Not Vaccinated', t('Not Vaccinated')], ['Partially Vaccinated', t('Partially Vaccinated')], ['Complete', t('Complete')], ['Unknown', t('Unknown')]].map(([val, label]) => (
+                          <button key={val || 'ns'} type="button"
+                            onClick={() => { setFormData({ ...formData, vaccinationStatus: val }); setVaccinationStatusOpen(false); }}
+                            style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.vaccinationStatus === val ? 'rgba(18,153,104,0.12)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: formData.vaccinationStatus === val ? '600' : '400' }}
+                            onMouseEnter={e => { if (formData.vaccinationStatus !== val) e.target.style.background = 'var(--input-bg)'; }}
+                            onMouseLeave={e => { if (formData.vaccinationStatus !== val) e.target.style.background = 'transparent'; }}>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Vaccine Expiry Date')}</label>
+                <DatePicker value={formData.vaccineExpiryDate} dateFormat={dateFormat}
+                  placeholder={t('Date')} disabled={isBhwReadOnly}
+                  style={{ width: '100%' }}
+                  onChange={v => setFormData({ ...formData, vaccineExpiryDate: v })} />
               </div>
             </div>
 

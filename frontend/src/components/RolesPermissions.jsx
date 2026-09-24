@@ -1,16 +1,18 @@
 const PERMISSION_ROWS = [
   { feature: 'View Dashboard & Stats', cho: true, bhw: true },
-  { feature: 'View Disease Map', cho: true, bhw: true },
+  { feature: 'View Disease Map (area of responsibility)', cho: true, bhw: true },
   { feature: 'View Audit Reports', cho: true, bhw: true },
-  { feature: 'Add Disease Cases', cho: true, bhw: true },
-  { feature: 'Add Case → Submit to CHO (approval required)', cho: false, bhw: true },
+  { feature: 'Add Disease Cases Directly', cho: true, bhw: false },
+  { feature: 'Submit New Case → CHO Approval', cho: false, bhw: true },
   { feature: 'Approve / Reject Add Requests', cho: true, bhw: false },
+  { feature: 'Approve / Reject Case Edit Requests', cho: true, bhw: false },
   { feature: 'Edit All Cases Directly', cho: true, bhw: false },
-  { feature: 'Review Own Cases & Request CHO Edit', cho: true, bhw: true },
+  { feature: 'Request Case Edit to CHO (own cases)', cho: false, bhw: true },
+  { feature: 'Archive / Delete Case Records', cho: true, bhw: false },
   { feature: 'Cross-Unit Referrals & Handle Inbox', cho: true, bhw: false },
   { feature: 'Manage User Accounts (approve/reject BHW)', cho: true, bhw: false },
   { feature: 'Generate Program Reports (PDF/Excel/CSV)', cho: true, bhw: true },
-  { feature: 'Weekly Summary Report Cron (auto)', cho: true, bhw: true },
+  { feature: 'Generate & Send Weekly Summary', cho: true, bhw: false },
   { feature: 'Settings & Profile Management', cho: true, bhw: true },
   { feature: 'Offline Mode & Sync Queue', cho: true, bhw: true },
 ];
@@ -29,7 +31,7 @@ const NoIcon = () => (
   </svg>
 );
 
-export default function RolesPermissions({ compactMode, loginRole = 'CHO', onBack }) {
+export default function RolesPermissions({ compactMode, loginRole = 'CHO', onBack, onShowTour }) {
   const isCho = loginRole === 'CHO';
   const roleLabel = isCho ? 'CHO Admin' : 'BHW Health Worker';
   const s = {
@@ -65,16 +67,25 @@ export default function RolesPermissions({ compactMode, loginRole = 'CHO', onBac
               : 'Your account is a BHW account. Listed below are the permissions granted to the BHW role. BHWs add cases and submit them through the CHO inbox workflow for approval; CHO permissions are not visible to BHW accounts.'}
           </p>
 
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '20px', alignItems: 'center' }}>
             <span style={{
               padding: '4px 14px', borderRadius: '12px', fontSize: '15px', fontWeight: '700',
               background: isCho ? 'rgba(37,99,235,0.15)' : 'rgba(18,153,104,0.15)',
               color: isCho ? '#2563eb' : '#129968',
               border: `1px solid ${isCho ? 'rgba(37,99,235,0.4)' : 'rgba(18,153,104,0.4)'}`,
             }}>{roleLabel}</span>
+            <button onClick={() => onShowTour && onShowTour()}
+              title="Show Guide"
+              style={{
+                padding: '6px 16px', borderRadius: '12px', fontSize: '15px', fontWeight: '700',
+                background: 'rgba(13,148,136,0.12)', color: 'var(--text-main)',
+                border: '1px solid rgba(13,148,136,0.5)', cursor: 'pointer', whiteSpace: 'nowrap',
+              }}>
+              ❓ Show Guide
+            </button>
           </div>
 
-          <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+          <div data-tour="roles-table" style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '15px' }}>
               <thead>
                 <tr style={{ background: 'var(--input-bg)' }}>
@@ -97,7 +108,7 @@ export default function RolesPermissions({ compactMode, loginRole = 'CHO', onBac
           </div>
 
           <p style={{ margin: '16px 0 0 0', fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-            Enforced server-side on every API route and reflected in the UI ({'Add Case'}, inbox tabs, approval actions, and user management are hidden or replaced for BHW accounts). Case data access is scoped per CHO unit or BHW barangay.
+            Enforced server-side on every API route and reflected in the UI ({'Add Case'}, inbox tabs, approval actions, archive/delete, and user management are hidden or replaced for BHW accounts). Case data access is scoped per CHO unit or BHW barangay.
           </p>
         </div>
       </div>

@@ -246,7 +246,7 @@
 }
 
 /* =========================================================
-   RESIDENT — phone tips grid (≤560px) — collapse to 1 col
+   RESIDENT - phone tips grid (≤560px) - collapse to 1 col
    inline minmax(320px,1fr) forces overflow; shrink the floor
    ========================================================= */
 @media (max-width: 560px) {

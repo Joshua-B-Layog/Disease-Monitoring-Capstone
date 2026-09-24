@@ -11,6 +11,10 @@ const axios = require('axios');
 const cron = require('node-cron');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const fs = require('fs');
+const path = require('path');
+const geoSnap = require('./geoSnap');
+geoSnap.loadPolygons();
 
 async function sendBrevoEmail(to, subject, htmlContent) {
   try {
@@ -29,6 +33,38 @@ async function sendBrevoEmail(to, subject, htmlContent) {
   } catch (err) {
     console.error('Brevo API error:', err.response?.data || err.message);
     throw err;
+  }
+}
+
+// Normalize a Philippine phone number to international +63 format for Brevo SMS.
+function toPhMobile(number) {
+  if (!number) return null;
+  const digits = String(number).replace(/\D/g, '');
+  if (digits.length === 10 && digits[0] === '9') return '+63' + digits;
+  if (digits.length === 11 && digits[0] === '0') return '+63' + digits.slice(1);
+  if (digits.length === 12 && digits.startsWith('63')) return '+63' + digits.slice(2);
+  return null;
+}
+
+// Staff-only emergency SMS via Brevo Transactional SMS (sender name 'Cabuyao').
+async function sendBrevoSms(to, content) {
+  const fullContent = 'Cabuyao CDMS: ' + content;
+  const sms = fullContent.length > 160 ? fullContent.slice(0, 157) + '...' : fullContent;
+  try {
+    await axios.post('https://api.brevo.com/v3/transactionalSMS/sms', {
+      type: 'transactional',
+      sender: 'Cabuyao',
+      recipient: to,
+      content: sms,
+    }, {
+      headers: {
+        'api-key': process.env.BREVO_API_KEY,
+        'Content-Type': 'application/json',
+      }
+    });
+    console.log(`SMS sent to: ${to}`);
+  } catch (err) {
+    console.error('Brevo SMS API error:', err.response?.data || err.message);
   }
 }
 
@@ -83,7 +119,7 @@ function isSameBarangay(name1, name2) {
   return norm(name1) === norm(name2);
 }
 
-// ── Case payload validation (minimize encoding errors — mirrors frontend checks) ──
+// ── Case payload validation (minimize encoding errors - mirrors frontend checks) ──
 const PH_MOBILE_RE = /^(?:\+?63|0)9\d{9}$/;
 const PH_LANDLINE_RE = /^(?:\+?632|02)\d{7,8}$/;
 const VALID_GENDERS = ['Male', 'Female', 'Other'];
@@ -248,7 +284,7 @@ function resolveFrontendUrl(req) {
     if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
       return parsed.origin.replace(/\/$/, '');
     }
-  } catch (e) { /* not a valid URL — fall through */ }
+  } catch (e) { /* not a valid URL - fall through */ }
   return 'http://localhost:3000';
 }
 
@@ -307,6 +343,31 @@ const db = mysql.createPool({
 db.on('error', (err) => {
     console.error('MySQL pool error:', err.message);
 });
+
+// -- Transaction helper (ACID) --
+// withTransaction(work, onError): work(t) runs with t.q() on a dedicated connection;
+// t.commit(cb) commits (releasing the connection), t.rollback() aborts. DB writes inside
+// work() are atomic � any failure aborts the whole batch.
+function withTransaction(work, onError) {
+    pool.getConnection((connErr, conn) => {
+        if (connErr) return onError(connErr);
+        conn.beginTransaction((beginErr) => {
+            if (beginErr) { conn.release(); return onError(beginErr); }
+            const t = {
+                conn,
+                q: (sql, params, cb) => conn.query(sql, params, cb),
+                commit: (cb) => conn.commit((cErr) => {
+                    conn.release();
+                    if (cErr) { cb && cb(cErr); } else { cb && cb(null); }
+                }),
+                rollback: () => {
+                    try { conn.rollback(() => conn.release()); } catch (e) { conn.release(); }
+                },
+            };
+            work(t);
+        });
+    });
+}
 
 db.query('SELECT 1', (err) => {
     if (err) {
@@ -422,6 +483,58 @@ db.query("SHOW COLUMNS FROM disease_cases LIKE 'case_type'", (err, rows) => {
     }
 });
 
+// Migration: vaccine tracking columns on disease_cases (IT Expert: vaccine expiration follow-up)
+db.query("SHOW COLUMNS FROM disease_cases LIKE 'vaccination_status'", (err, rows) => {
+    if (!err && rows.length === 0) {
+        db.query("ALTER TABLE disease_cases ADD COLUMN vaccination_status VARCHAR(30) NULL, ADD COLUMN vaccine_expiry_date DATE NULL", (alterErr) => {
+            if (alterErr) console.error('Migration error adding vaccine tracking columns:', alterErr.message);
+            else console.log('Migration: added vaccination_status/vaccine_expiry_date columns to disease_cases table');
+        });
+    }
+});
+
+// -- Read-path index migration (Phase 9): speed up the heaviest filtered queries
+// Self-migrates at boot: any listed index that is missing gets created exactly once.
+const REQUIRED_INDEXES = [
+  ['disease_cases', 'idx_cases_barangay_status',   'barangay_id, status'],
+  ['disease_cases', 'idx_cases_disease',           'disease_id'],
+  ['disease_cases', 'idx_cases_onset',             'onset_date'],
+  ['disease_cases', 'idx_cases_reported',          'date_reported'],
+  ['disease_cases', 'idx_cases_createdby_status',  'created_by, status'],
+  ['disease_cases', 'idx_cases_patient',           'patient_name'],
+  ['notifications', 'idx_notif_user_read',         'user_id, is_read'],
+  ['notifications', 'idx_notif_user_created',      'user_id, created_at'],
+  ['audit_logs',    'idx_audit_user_created',      'user_id, created_at'],
+  ['case_status_history', 'idx_status_case',       'case_id'],
+  ['case_inbox',    'idx_inbox_status_unit',       'status, to_cho_unit'],
+  ['case_add_requests', 'idx_addreq_status_unit',  'status, target_cho_unit'],
+  ['case_edit_requests','idx_editreq_status_unit', 'status, target_cho_unit'],
+  ['users',         'idx_users_email',             'email'],
+  ['users',         'idx_users_username',          'username'],
+];
+
+function ensureIndexes(index, created, skipped) {
+  if (index >= REQUIRED_INDEXES.length) {
+    if (created > 0) console.log(`Index migration: created ${created} index(es), ${skipped} already present.`);
+    else console.log(`Index check: all ${REQUIRED_INDEXES.length} read-path index(es) present.`);
+    applyLocationMigrations();
+    return;
+  }
+  const [table, name, cols] = REQUIRED_INDEXES[index];
+  db.query("SHOW INDEX FROM " + table + " WHERE Key_name = ?", [name], (err, rows) => {
+    if (err && err.code === 'ER_NO_SUCH_TABLE') { ensureIndexes(index + 1, created, skipped); return; }
+    if (err) { console.error('Index check error on ' + table + '.' + name + ':', err.message); ensureIndexes(index + 1, created, skipped); return; }
+    if (rows && rows.length > 0) { ensureIndexes(index + 1, created, skipped + 1); return; }
+    db.query("CREATE INDEX " + name + " ON " + table + " (" + cols + ")",
+      (cErr) => {
+        if (cErr) console.error('Index migration error on ' + name + ':', cErr.message);
+        else { created++; console.log('Index migration: created ' + name + ' on ' + table); }
+        ensureIndexes(index + 1, created, skipped);
+      });
+  });
+}
+ensureIndexes(0, 0, 0);
+
 // Migration: pending add requests carry the same classification columns so approval prefill + insert stay in sync
 db.query("SHOW COLUMNS FROM case_add_requests LIKE 'case_type'", (err, rows) => {
     if (!err && rows.length === 0) {
@@ -432,7 +545,7 @@ db.query("SHOW COLUMNS FROM case_add_requests LIKE 'case_type'", (err, rows) => 
     }
 });
 
-// Migration: disease subtype options (JSON array of strings) on diseases — powers the case-form subtype dropdown
+// Migration: disease subtype options (JSON array of strings) on diseases - powers the case-form subtype dropdown
 db.query("SHOW COLUMNS FROM diseases LIKE 'subtypes'", (err, rows) => {
     if (!err && rows.length === 0) {
         db.query("ALTER TABLE diseases ADD COLUMN subtypes JSON NULL", (alterErr) => {
@@ -578,7 +691,48 @@ db.query(`CREATE TABLE IF NOT EXISTS notification_preferences (
                 });
             }
         });
+        db.query("SHOW COLUMNS FROM notification_preferences LIKE 'vaccine_advisories'", (e2, r2) => {
+            if (!e2 && r2 && r2.length === 0) {
+                db.query('ALTER TABLE notification_preferences ADD COLUMN vaccine_advisories BOOLEAN DEFAULT FALSE', (ae2) => {
+                    if (ae2) console.error('Error adding vaccine_advisories column:', ae2.message);
+                    else console.log('Added vaccine_advisories column to notification_preferences');
+                });
+            }
+        });
     }
+});
+
+db.query(`CREATE TABLE IF NOT EXISTS vaccine_advisories (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    season_key VARCHAR(20) NOT NULL,
+    season_label VARCHAR(80) NOT NULL,
+    month_start INT NOT NULL,
+    month_end INT NOT NULL,
+    title VARCHAR(150) NOT NULL,
+    message TEXT,
+    vaccine_recommendations TEXT,
+    active BOOLEAN DEFAULT TRUE,
+    created_by INT,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)`, (err) => {
+    if (err) { console.error('Error creating vaccine_advisories table:', err.message); return; }
+    db.query('SELECT COUNT(*) AS c FROM vaccine_advisories', (e2, rows) => {
+        if (e2) return;
+        if (rows[0].c === 0) {
+            const seed = [
+                ['rainy', 'Rainy Season (June - October)', 6, 10, 'Rainy Season: Prioritized Vaccines',
+                 'The rainy season raises the risk of leptospirosis, typhoid, influenza and cholera. Keep these vaccines ready and rotate stock so no doses expire before use.',
+                 'Anti-Leptospirosis (doxycycline prophylaxis)\nTyphoid\nInfluenza\nCholera'],
+                ['dry', 'Dry Season (November - May)', 11, 5, 'Dry Season: Routine & Catch-Up Vaccines',
+                 'Use the dry season for routine and catch-up immunization. Schedule outreach and use soon-to-expire stock first so vaccines do not expire unused.',
+                 'Routine EPI (DPT, OPV/IPV, MMR, Hepatitis B)\nMeasles / MMR catch-up\nDeworming support\nCOVID-19 boosters']
+            ];
+            seed.forEach(s => {
+                db.query('INSERT INTO vaccine_advisories (season_key, season_label, month_start, month_end, title, message, vaccine_recommendations) VALUES (?, ?, ?, ?, ?, ?, ?)', s);
+            });
+            console.log('Seeded vaccine_advisories (Rainy + Dry seasons)');
+        }
+    });
 });
 
 db.query(`CREATE TABLE IF NOT EXISTS audit_logs (
@@ -759,7 +913,7 @@ db.query(`CREATE TABLE IF NOT EXISTS case_add_requests (
   else {
     console.log('Case add requests table created/verified');
     // Migration: ensure new columns exist on existing case_add_requests
-    ['patient_name','disease_name','age','severity','gender','case_status','contact','onset_date','address','barangay_id','symptoms','physician','latitude','longitude'].forEach(col => {
+    ['patient_name','disease_name','age','severity','gender','case_status','contact','onset_date','address','barangay_id','symptoms','physician','latitude','longitude','vaccination_status','vaccine_expiry_date'].forEach(col => {
       db.query("SHOW COLUMNS FROM case_add_requests LIKE ?", [col], (e, r) => {
         if (!e && r && r.length === 0) {
           const colDef =
@@ -775,6 +929,8 @@ db.query(`CREATE TABLE IF NOT EXISTS case_add_requests (
             col === 'physician' ? 'VARCHAR(255)' :
             col === 'latitude' ? 'DECIMAL(10,8) NULL' :
             col === 'longitude' ? 'DECIMAL(11,8) NULL' :
+            col === 'vaccination_status' ? 'VARCHAR(30) NULL' :
+            col === 'vaccine_expiry_date' ? 'DATE NULL' :
             col === 'disease_name' ? 'VARCHAR(100)' : 'VARCHAR(255)';
           db.query(`ALTER TABLE case_add_requests ADD COLUMN ${col} ${colDef}`, (ae) => {
             if (ae) console.error(`Error adding ${col} column to case_add_requests:`, ae.message);
@@ -929,12 +1085,68 @@ db.query(`CREATE TABLE IF NOT EXISTS user_sessions (
   else console.log('User sessions table created/verified');
 });
 
-function createAuditLog(userId, userName, userRole, choUnit, barangay, action, entity, details) {
-  db.query(
-    'INSERT INTO audit_logs (user_id, user_name, user_role, cho_unit, barangay, action, entity, details) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [userId || null, userName || 'System', userRole || 'System', choUnit || null, barangay || null, action, entity, details],
-    (err) => { if (err) console.error('Audit log insert error:', err.message); }
-  );
+// ═════════════════════════════════════════════════════════════
+// ARCHIVE VAULT + ERROR LOG (Phase 1b / Phase 3)
+// ═════════════════════════════════════════════════════════════
+
+// Retention archive: JSON snapshots of records that were archived or deleted,
+// browsable/restorable from the BarangayReports "Archive Vault" tab (CHO-only).
+db.query(`CREATE TABLE IF NOT EXISTS archive_records (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  entity VARCHAR(50) NOT NULL,
+  entity_id INT NULL,
+  snapshot_name VARCHAR(255),
+  data JSON NOT NULL,
+  actor_id INT NULL,
+  actor_name VARCHAR(255),
+  actor_role VARCHAR(20),
+  action VARCHAR(50) NOT NULL,
+  restored_at DATETIME NULL,
+  restored_by VARCHAR(255),
+  archived_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_arch_entity (entity, archived_at)
+)`, (err) => {
+  if (err) console.error('Error creating archive_records table:', err.message);
+  else console.log('Archive records table created/verified');
+});
+
+// Durable error log captured by the process-level handlers + global error middleware
+db.query(`CREATE TABLE IF NOT EXISTS error_logs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  level VARCHAR(20) DEFAULT 'error',
+  source VARCHAR(100),
+  message TEXT,
+  stack TEXT,
+  context JSON NULL,
+  logged_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_err_at (logged_at)
+)`, (err) => {
+  if (err) console.error('Error creating error_logs table:', err.message);
+  else console.log('Error logs table created/verified');
+});
+
+function logAppError(level, source, message, stack, context) {
+  db.query('INSERT INTO error_logs (level, source, message, stack, context) VALUES (?, ?, ?, ?, ?)',
+    [level || 'error', source || null, message || null, stack || null, context ? JSON.stringify(context) : null],
+    (e) => { if (e) console.error('Error writing to error_logs:', e.message); });
+}
+
+// Snapshot any record into the retention archive.
+function archiveRecord(entity, entityId, snapshotName, data, actor, action, t) {
+  if (!data) return;
+  const sql = 'INSERT INTO archive_records (entity, entity_id, snapshot_name, data, actor_id, actor_name, actor_role, action) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
+  const params = [entity, entityId || null, snapshotName || null, JSON.stringify(data),
+     (actor && actor.id) || null, (actor && actor.name) || 'System', (actor && actor.role) || null, action || 'Archived'];
+  if (t) { t.q(sql, params, (e) => { if (e) console.error('Archive record insert error:', e.message); }); return; }
+  db.query(sql, params, (e) => { if (e) console.error('Archive record insert error:', e.message); });
+}
+
+function createAuditLog(userId, userName, userRole, choUnit, barangay, action, entity, details, t) {
+  const sql = 'INSERT INTO audit_logs (user_id, user_name, user_role, cho_unit, barangay, action, entity, details) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
+  const params = [userId || null, userName || 'System', userRole || 'System', choUnit || null, barangay || null, action, entity, details];
+  const cb = (err) => { if (err) console.error('Audit log insert error:', err.message); };
+  if (t) { t.q(sql, params, cb); return; }
+  db.query(sql, params, cb);
 }
 
 function phTimestamp(date) {
@@ -980,6 +1192,195 @@ function backfillLegacyAuditDetails() {
       });
     }
   );
+}
+
+// One-time (idempotent) location repair: every disease case whose stored
+// longitude/latitude falls OUTSIDE its assigned barangay polygon is re-snapped
+// to an in-polygon point (same GeoJSON the maps render). Safe to re-run -
+// corrected points pass the inside check on the next startup.
+function resnapMisplacedCaseLocations() {
+  if (!geoSnap.getGeometryForBarangay('Sala')) {
+    console.log('geoSnap: polygon data unavailable - skipped case location re-snap.');
+    return;
+  }
+  db.query(
+    `SELECT dc.case_id, dc.latitude, dc.longitude, dc.address, b.name AS barangay_name
+     FROM disease_cases dc
+     LEFT JOIN barangays b ON dc.barangay_id = b.id
+     WHERE dc.latitude IS NOT NULL AND dc.longitude IS NOT NULL AND dc.latitude <> '' AND dc.longitude <> ''`,
+    (err, rows) => {
+      if (err) { console.error('Re-snap select error:', err.message); return; }
+      if (!rows || rows.length === 0) { console.log('geoSnap: 0 cases to re-snap.'); return; }
+      const updates = [];
+      rows.forEach((r) => {
+        if (!r.barangay_name) return;
+        const geometry = geoSnap.getGeometryForBarangay(r.barangay_name);
+        if (!geometry) return;
+        const pLat = geoSnap.parseCoord(r.latitude);
+        const pLng = geoSnap.parseCoord(r.longitude);
+        if (pLat !== null && pLng !== null && geoSnap.pointInFeature(pLng, pLat, geometry)) return;
+        const unit = geoSnap.extractLocationUnit(r.address) || 'C';
+        const clamped = geoSnap.snapToBarangay(r.longitude, r.latitude, r.barangay_name, `${r.barangay_name}|${unit}`);
+        if (!clamped) return;
+        updates.push({ id: r.case_id, lat: clamped[0], lng: clamped[1] });
+      });
+      if (updates.length === 0) { console.log(`geoSnap: all ${rows.length} case location(s) already inside their barangay.`); return; }
+      let done = 0;
+      updates.forEach((u) => {
+        db.query('UPDATE disease_cases SET latitude = ?, longitude = ? WHERE case_id = ?', [String(u.lat), String(u.lng), u.id], (uErr) => {
+          if (uErr) console.error('Re-snap update error (case ' + u.id + '):', uErr.message);
+          if (++done === updates.length) {
+            console.log(`geoSnap: re-snapped ${updates.length}/${rows.length} case location(s) into their barangay polygons.`);
+            createAuditLog(null, 'System', 'System', null, null, 'Re-snapped', 'Case Locations',
+              `${updates.length} case(s) had coordinates outside their assigned barangay; snapped into polygon.`);
+          }
+        });
+      });
+    }
+  );
+}
+
+// Conductor for the location migrations:
+//   1) enrich plain seed addresses ("Brgy. X, Cabuyao City, Laguna") with a
+//      deterministic unit (Purok / Blk+Lot / Phase / Mabitac / Southville) so
+//      the purok grouping and per-unit clustering actually have data to chew on;
+//   2) spread stacked coordinates into per-unit scatter (fresh run, because the
+//      addresses just gained units);
+//   3) on later startups everything is gated: enrichment + spread are skipped
+//      and the re-snap stays as a fallback for stragglers.
+function applyLocationMigrations() {
+  const checkSpreadGate = () => {
+    db.query("SELECT COUNT(*) AS c FROM audit_logs WHERE action = 'Spread' AND entity = 'Case Locations'", (err, res) => {
+      if (err) { console.error('Spread gate error:', err.message); return resnapMisplacedCaseLocations(); }
+      if (res && res[0] && Number(res[0].c) > 0) {
+        console.log('geoSnap: coordinate spread already applied - skipping.');
+        return resnapMisplacedCaseLocations();
+      }
+      spreadStackedCaseLocations();
+    });
+  };
+  db.query("SELECT COUNT(*) AS c FROM audit_logs WHERE action = 'Address Enrichment' AND entity = 'Case Locations'", (err, res) => {
+    if (err) { console.error('Address enrichment gate error:', err.message); return checkSpreadGate(); }
+    if (res && res[0] && Number(res[0].c) > 0) { console.log('geoSnap: address enrichment already applied - skipping.'); return checkSpreadGate(); }
+    fleshOutSeedAddresses((updated) => {
+      if (updated === 0) return checkSpreadGate();
+      db.query("DELETE FROM audit_logs WHERE action = 'Spread' AND entity = 'Case Locations'", (delErr) => {
+        if (delErr) console.error('Spread gate reset error:', delErr.message);
+        checkSpreadGate();
+      });
+    });
+  });
+}
+
+// Deterministic 0..1 value per case_id - stable across re-runs on any machine.
+function enrichmentSeed(caseId) {
+  const h = crypto.createHash('sha1').update('enrich:' + caseId).digest('hex').slice(0, 8);
+  return parseInt(h, 16) / 0xffffffff;
+}
+
+// Pick a realistic unit for a seed case. Puroks dominate (~56%); Blk+Lot ~18%;
+// Phase ~10%; the barangay's landmark development (Niugan=Mabitac Phase,
+// Marinig=Southville, San Isidro=Southville 3) ~16%.
+function buildEnrichmentUnit(num, barangayName) {
+  const r = num;
+  if (barangayName === 'Niugan') {
+    if (r < 0.16) return `Mabitac Phase ${1 + Math.floor((r / 0.16) * 3)}`;
+  } else if (barangayName === 'Marinig') {
+    if (r < 0.16) {
+      const pool = ['Southville 1A', 'Southville 1B', 'Southville 2', 'Southville 3'];
+      return pool[Math.floor((r / 0.16) * pool.length)];
+    }
+  } else if (barangayName === 'San Isidro') {
+    if (r < 0.16) return 'Southville 3';
+  }
+  if (r >= 0.16 && r < 0.34) {
+    const blk = 1 + Math.floor(((r - 0.16) / 0.18) * 12);
+    const lot = 1 + Math.floor(((r - 0.16) / 0.18) * 14);
+    return `Blk ${blk} Lot ${lot}`;
+  }
+  if (r >= 0.34 && r < 0.44) return `Phase ${1 + Math.floor(((r - 0.34) / 0.10) * 3)}`;
+  const p = 1 + Math.floor(((r - 0.44) / 0.56) * 6);
+  return `Purok ${Math.min(p, 6)}`;
+}
+
+// One-time text enrichment: the seed/demo import stored bare "Brgy. X, Cabuyao
+// City, Laguna" addresses with no unit, so nothing could ever cluster past the
+// barangay. Rewrites them to "<Unit> Brgy. X, Cabuyao City, Laguna" using a
+// per-case_id deterministic unit. Skips rows that already carry a unit and rows
+// with no barangay. Writes a single 'Address Enrichment' audit row.
+function fleshOutSeedAddresses(cb) {
+  db.query(
+    `SELECT dc.case_id, dc.address, b.name AS barangay_name
+     FROM disease_cases dc
+     LEFT JOIN barangays b ON dc.barangay_id = b.id
+     WHERE dc.address IS NOT NULL AND dc.address <> '' AND dc.address LIKE '%Cabuyao%'`,
+    (qErr, rows) => {
+      if (qErr) { console.error('Address enrichment select error:', qErr.message); return cb(0); }
+      if (!rows || rows.length === 0) { console.log('geoSnap: 0 addresses to enrich.'); return cb(0); }
+      const hasUnit = /Purok|Prk\.?\s|Blk\.?\s|Block|Lot|Phase|Ph\.?|Mabitac|Southville|Subd/i;
+      const updates = [];
+      rows.forEach((r) => {
+        if (!r.barangay_name) return;
+        if (hasUnit.test(r.address)) return;
+        updates.push({ id: r.case_id, address: `${buildEnrichmentUnit(enrichmentSeed(r.case_id), r.barangay_name)} ${r.address}` });
+      });
+      if (updates.length === 0) { console.log('geoSnap: no plain addresses to enrich.'); return cb(0); }
+      let done = 0;
+      updates.forEach((u) => {
+        db.query('UPDATE disease_cases SET address = ? WHERE case_id = ?', [u.address, u.id], (uErr) => {
+          if (uErr) console.error('Address enrichment update error (case ' + u.id + '):', uErr.message);
+          if (++done === updates.length) {
+            console.log(`geoSnap: enriched ${updates.length} seed address(es) with deterministic units.`);
+            createAuditLog(null, 'System', 'System', null, null, 'Address Enrichment', 'Case Locations',
+              `Seed addresses were bare ("Brgy. X, Cabuyao City, Laguna"); ${updates.length} got a deterministic Purok/Blk+Lot/Phase/Mabitac/Southville unit.`);
+            cb(updates.length);
+          }
+        });
+      });
+    }
+  );
+}
+
+// One-time coordinate spread: the seed/demo import stacked every case in a
+// barangay onto the same coordinate; this gives each case its own deterministic,
+// distinct in-polygon point (clustered by purok/blk/lot/phase when the address
+// carries one). Deterministic seeds make re-runs stable no-ops, and the audit
+// gate runs it once.
+function spreadStackedCaseLocations() {
+  db.query(
+    `SELECT dc.case_id, dc.address, b.name AS barangay_name
+     FROM disease_cases dc
+     LEFT JOIN barangays b ON dc.barangay_id = b.id
+     WHERE dc.latitude IS NOT NULL AND dc.longitude IS NOT NULL AND dc.latitude <> '' AND dc.longitude <> ''`,
+        (qErr, rows) => {
+          if (qErr) { console.error('Spread select error:', qErr.message); return; }
+          if (!rows || rows.length === 0) { console.log('geoSnap: 0 cases to spread.'); return; }
+          const updates = [];
+          rows.forEach((r) => {
+            if (!r.barangay_name) return;
+            const geometry = geoSnap.getGeometryForBarangay(r.barangay_name);
+            if (!geometry) return;
+            const unit = geoSnap.extractLocationUnit(r.address) || 'C';
+            const unitSeed = `${r.barangay_name}|${unit}`;
+            const jitterSeed = `${unitSeed}|${r.case_id}`;
+            const p = geoSnap.spreadPointInBarangay(geometry, unitSeed, jitterSeed);
+            if (!p) return;
+            updates.push({ id: r.case_id, lat: p[0], lng: p[1] });
+          });
+          if (updates.length === 0) { console.log('geoSnap: nothing to spread.'); return; }
+          let done = 0;
+          updates.forEach((u) => {
+            db.query('UPDATE disease_cases SET latitude = ?, longitude = ? WHERE case_id = ?', [String(u.lat), String(u.lng), u.id], (uErr) => {
+              if (uErr) console.error('Spread update error (case ' + u.id + '):', uErr.message);
+              if (++done === updates.length) {
+                console.log(`geoSnap: spread ${updates.length} case location(s) across their barangays (deterministic, in-polygon).`);
+                createAuditLog(null, 'System', 'System', null, null, 'Spread', 'Case Locations',
+                  `${updates.length} case(s) were stacked on shared coordinates; each got its own in-polygon point.`);
+              }
+            });
+          });
+        }
+      );
 }
 
 function signToken(user, jti) {
@@ -1122,7 +1523,14 @@ app.get('/api/disease_cases', (req, res) => {
     const requesterId = req.query.user_id ? Number(req.query.user_id) : null;
     const includeArchived = req.query.include_archived === '1';
     const archiveFilter = includeArchived ? '' : ' AND dc.is_archived = 0';
-    const sql = `
+    // Optional pagination (additive): pass ?limit=&offset= to cap the page size.
+    // Without limit the endpoint returns the full array exactly as before.
+    const rawLimit = req.query.limit !== undefined ? Number(req.query.limit) : NaN;
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 1000) : null;
+    const rawOffset = req.query.offset !== undefined ? Number(req.query.offset) : NaN;
+    const offset = Number.isFinite(rawOffset) && rawOffset >= 0 ? Math.floor(rawOffset) : 0;
+    const paging = limit ? ` LIMIT ${limit} OFFSET ${offset}` : '';
+    const baseSql = `
         SELECT 
             dc.case_id, 
 
@@ -1142,6 +1550,8 @@ app.get('/api/disease_cases', (req, res) => {
             dc.status, 
             dc.date_reported,
             dc.is_archived,
+            dc.vaccination_status,
+            dc.vaccine_expiry_date,
             d.name AS disease_name, 
             b.name AS barangay_name,
             dc.barangay_id
@@ -1149,14 +1559,148 @@ app.get('/api/disease_cases', (req, res) => {
         LEFT JOIN diseases d ON dc.disease_id = d.id
         LEFT JOIN barangays b ON dc.barangay_id = b.id
         WHERE (dc.status != 'Draft' OR dc.created_by = ?)${archiveFilter}
-        ORDER BY dc.case_id DESC
-    `;
-    db.query(sql, [requesterId], (err, results) => {
+        ORDER BY dc.case_id DESC`;
+    db.query(baseSql + paging, [requesterId], (err, results) => {
         if (err) {
             console.error("MySQL Query Error (/api/disease_cases):", err.message);
             return res.status(500).json({ error: 'Something went wrong. Please try again.' });
         }
-        res.json(results);
+        if (!limit) return res.json(results);
+        db.query('SELECT COUNT(*) AS total FROM disease_cases dc WHERE (dc.status != \'Draft\' OR dc.created_by = ?)' + archiveFilter, [requesterId], (cErr, cRes) => {
+            if (cErr) return res.json(results);
+            res.json({ rows: results, total: (cRes && cRes[0] && cRes[0].total) || 0, limit, offset });
+        });
+    });
+});
+
+// ROUTE: Create a draft case (author-private autosave; no notifications/duplicate guard/audit)
+app.post('/api/disease_cases', authenticate, (req, res) => {
+    const b = req.body || {};
+    const pick = (...keys) => {
+        for (const k of keys) if (b[k] !== undefined && b[k] !== null) return b[k];
+        return undefined;
+    };
+    const patient_name0 = pick('patient_name', 'patientName');
+    if (!patient_name0 || !String(patient_name0).trim()) {
+        return res.status(400).json({ error: 'Patient name is required.' });
+    }
+    const draft = {
+        patient_name: String(patient_name0).trim(),
+        disease_name: pick('disease_name', 'diseaseType') || null,
+        age: b.age || 0,
+        severity: b.severity || 'Mild',
+        gender: b.gender || 'Male',
+        status: 'Draft',
+        contact: b.contact || null,
+        onset_date: pick('onset_date', 'onsetDate') || null,
+        address: b.address || null,
+        barangay_id: pick('barangay_id', 'barangayId') || null,
+        symptoms: b.symptoms || null,
+        physician: b.physician || null,
+        latitude: pick('latitude', 'lat') || null,
+        longitude: pick('longitude', 'lng') || null,
+        case_type: pick('case_type', 'caseType') || null,
+        disease_type: pick('disease_type', 'diseaseSubtype') || null,
+        vaccination_status: pick('vaccination_status', 'vaccinationStatus') || null,
+        vaccine_expiry_date: pick('vaccine_expiry_date', 'vaccineExpiryDate') || null,
+    };
+    const resolveDisease = (done) => {
+        if (!draft.disease_name) return done(null, null);
+        db.query('SELECT id FROM diseases WHERE LOWER(name) = LOWER(?)', [draft.disease_name], (e, rows) => {
+            if (e) return done(null, e);
+            done(rows && rows.length > 0 ? rows[0].id : null, null);
+        });
+    };
+    resolveDisease((diseaseId, errCtx) => {
+        if (errCtx) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+        const insertQuery = `
+            INSERT INTO disease_cases
+            (patient_name, disease_id, age, severity, case_type, disease_type, gender, status, contact,
+             onset_date, address, barangay_id, symptoms, physician, latitude, longitude, created_by,
+             vaccination_status, vaccine_expiry_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'Draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+        const vals = [
+            draft.patient_name, diseaseId, draft.age, draft.severity, draft.case_type, draft.disease_type,
+            draft.gender, draft.contact, draft.onset_date, draft.address, draft.barangay_id,
+            draft.symptoms, draft.physician, draft.latitude, draft.longitude,
+            req.user.user_id || req.body.user_id || null,
+            draft.vaccination_status, draft.vaccine_expiry_date,
+        ];
+        db.query(insertQuery, vals, (err, result) => {
+            if (err) {
+                console.error('Draft create error:', err.message);
+                return res.status(500).json({ error: 'Failed to save draft. Please try again.' });
+            }
+            res.status(201).json({ message: 'Draft saved', case_id: result.insertId });
+        });
+    });
+});
+
+// ROUTE: Update an author's own draft case (autosave)
+app.put('/api/disease_cases/:id', authenticate, (req, res) => {
+    const caseId = req.params.id;
+    const b = req.body || {};
+    const pick = (...keys) => {
+        for (const k of keys) if (b[k] !== undefined && b[k] !== null) return b[k];
+        return undefined;
+    };
+    db.query('SELECT case_id, status, created_by FROM disease_cases WHERE case_id = ?', [caseId], (err, rows) => {
+        if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+        if (!rows || rows.length === 0) return res.status(404).json({ error: 'Case not found.' });
+        const row = rows[0];
+        const ownerId = req.user.user_id;
+        if (row.status !== 'Draft') {
+            return res.status(403).json({ error: 'Only drafts can be edited this way.' });
+        }
+        if (row.created_by && ownerId && row.created_by !== ownerId) {
+            return res.status(403).json({ error: 'You can only edit your own drafts.' });
+        }
+        const cols = {
+            patientName: 'patient_name', disease_name: 'disease_id', patient_name: 'patient_name',
+            age: 'age', severity: 'severity', gender: 'gender', contact: 'contact',
+            onsetDate: 'onset_date', onset_date: 'onset_date', address: 'address',
+            barangayId: 'barangay_id', barangay_id: 'barangay_id', symptoms: 'symptoms',
+            physician: 'physician', lat: 'latitude', latitude: 'latitude', lng: 'longitude',
+            longitude: 'longitude', caseType: 'case_type', case_type: 'case_type',
+            diseaseSubtype: 'disease_type', disease_type: 'disease_type',
+            vaccinationStatus: 'vaccination_status', vaccination_status: 'vaccination_status',
+            vaccineExpiryDate: 'vaccine_expiry_date', vaccine_expiry_date: 'vaccine_expiry_date',
+        };
+        const sets = [];
+        const vals = [];
+        const seen = new Set();
+        let hasDiseaseName = false;
+        for (const [key, col] of Object.entries(cols)) {
+            if (seen.has(col)) continue;
+            seen.add(col);
+            const v = pick(key);
+            if (v === undefined) continue;
+            if (key === 'age') { sets.push(`${col} = ?`); vals.push(Number(v) || 0); }
+            else if (v === null && (col === 'case_type' || col === 'disease_type')) { sets.push(`${col} = NULL`); }
+            else { sets.push(`${col} = ?`); vals.push(v); }
+        }
+        const diseaseName = pick('disease_name', 'diseaseType');
+        if (diseaseName) hasDiseaseName = true;
+        const finishUpdate = (diseaseId) => {
+            if (diseaseId) { sets.push('disease_id = ?'); vals.push(diseaseId); }
+            if (sets.length === 0) return res.json({ message: 'Draft unchanged' });
+            db.query(`UPDATE disease_cases SET ${sets.join(', ')} WHERE case_id = ?`, [...vals, caseId], (uErr) => {
+                if (uErr) {
+                    console.error('Draft update error:', uErr.message);
+                    return res.status(500).json({ error: 'Failed to save draft. Please try again.' });
+                }
+                res.json({ message: 'Draft saved' });
+            });
+        };
+        if (hasDiseaseName) {
+            db.query('SELECT id FROM diseases WHERE LOWER(name) = LOWER(?)', [diseaseName], (e, rowD) => {
+                if (e) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+                finishUpdate(rowD && rowD.length > 0 ? rowD[0].id : null);
+            });
+        } else {
+            finishUpdate(null);
+        }
     });
 });
 
@@ -1229,7 +1773,7 @@ app.post('/api/diseases', authenticate, (req, res) => {
     });
 });
 
-// ROUTE: Update a disease (prevention tips / symptoms / video) — CHO only
+// ROUTE: Update a disease (prevention tips / symptoms / video) - CHO only
 app.put('/api/diseases/:id', authenticate, requireRole('CHO'), (req, res) => {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: 'Invalid disease id.' });
@@ -1261,7 +1805,7 @@ app.put('/api/diseases/:id', authenticate, requireRole('CHO'), (req, res) => {
     );
 });
 
-// ROUTE: Hide/unhide a disease (soft delete) — CHO only. Affects Resident portal only.
+// ROUTE: Hide/unhide a disease (soft delete) - CHO only. Affects Resident portal only.
 app.patch('/api/diseases/:id/visibility', authenticate, requireRole('CHO'), (req, res) => {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: 'Invalid disease id.' });
@@ -1284,7 +1828,7 @@ app.get('/api/disease_categories', authenticate, (req, res) => {
     db.query('SELECT * FROM disease_categories ORDER BY id', (err, categories) => {
         if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
         db.query('SELECT category_id, disease_id FROM disease_category_items', (err2, items) => {
-            if (err2) return res.status(500).json({ error: err2.message });
+            if (err2) return res.status(500).json({ error: 'Internal database error. Please try again.' });
             const byCat = {};
             items.forEach(it => {
                 if (!byCat[it.category_id]) byCat[it.category_id] = [];
@@ -1312,7 +1856,7 @@ app.post('/api/disease_categories', authenticate, (req, res) => {
         if (diseaseIds.length === 0) return res.status(201).json({ message: 'Category added successfully.', id: catId });
         const values = diseaseIds.map(did => [catId, did]);
         db.query('INSERT IGNORE INTO disease_category_items (category_id, disease_id) VALUES ?', [values], (err2) => {
-            if (err2) return res.status(500).json({ error: err2.message });
+            if (err2) return res.status(500).json({ error: 'Internal database error. Please try again.' });
             res.status(201).json({ message: 'Category added successfully.', id: catId });
         });
     });
@@ -1493,7 +2037,7 @@ app.post('/api/cases', authenticate, (req, res) => {
         patient_name, disease_name, age, severity, gender,
         status, contact, onset_date, address, barangay_id,
         symptoms, physician, latitude, longitude, case_type,
-        disease_type,
+        disease_type, vaccination_status, vaccine_expiry_date,
     } = req.body;
 
     console.log("--- Add Case ---", { patient_name, disease_name, barangay_id });
@@ -1514,7 +2058,7 @@ app.post('/api/cases', authenticate, (req, res) => {
             (dupErr, dupResults) => {
                 if (dupErr) {
                     console.error("Duplicate check error:", dupErr.message);
-                    return res.status(500).json({ error: dupErr.message });
+                    return res.status(500).json({ error: 'Internal database error. Please try again.' });
                 }
                 if (dupResults && dupResults.length > 0) {
                     return res.status(409).json({
@@ -1576,7 +2120,7 @@ app.post('/api/cases', authenticate, (req, res) => {
 
     if (barangay_id) {
       db.query('SELECT name FROM barangays WHERE id = ?', [barangay_id], (bErr, bRes) => {
-        if (bErr) return res.status(500).json({ error: bErr.message });
+        if (bErr) return res.status(500).json({ error: 'Internal database error. Please try again.' });
         const selectedName = bRes.length > 0 ? bRes[0].name : null;
         routeOrProceed(selectedName);
       });
@@ -1589,10 +2133,12 @@ app.post('/api/cases', authenticate, (req, res) => {
       proceedToCheck();
     }
 
-    function proceedToCheck() {
+function proceedToCheck() {
     checkDuplicate(() => {
+        withTransaction((t) => {
         const findDiseaseQuery = 'SELECT id FROM diseases WHERE LOWER(name) = LOWER(?)';
-        db.query(findDiseaseQuery, [disease_name], (err, diseaseResults) => {
+        t.q(findDiseaseQuery, [disease_name], (err, diseaseResults) => {
+            if (err) { console.error("Find disease error:", err.message); t.rollback(); return res.status(500).json({ error: 'Internal database error. Please try again.' }); }
             let diseaseId = diseaseResults && diseaseResults.length > 0 ? diseaseResults[0].id : null;
 
             const doInsert = (dId) => {
@@ -1603,80 +2149,95 @@ app.post('/api/cases', authenticate, (req, res) => {
             const insertQuery = `
                 INSERT INTO disease_cases 
                 (patient_name, disease_id, age, severity, case_type, disease_type, gender, status, contact, 
-                 onset_date, address, barangay_id, symptoms, physician, latitude, longitude, date_reported, created_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, NOW()), ?)
+                 onset_date, address, barangay_id, symptoms, physician, latitude, longitude, date_reported, created_by,
+                 vaccination_status, vaccine_expiry_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, NOW()), ?, ?, ?)
             `;
             const vals = [
                 patient_name, dId, age || 0, severity, resolvedCaseType, resolvedDiseaseType, gender || 'Male',
                 status || 'Active', contact || null, onset_date || null, address || null,
                 barangay_id || null, symptoms || null, physician || null,
-                latitude || null, longitude || null, reportTs, req.body.user_id || null
+                latitude || null, longitude || null, reportTs, req.body.user_id || null,
+                vaccination_status || null, vaccine_expiry_date || null
             ];
 
-            db.query(insertQuery, vals, (insertErr, result) => {
+            t.q(insertQuery, vals, (insertErr, result) => {
                 if (insertErr) {
                     console.error("Insert case error:", insertErr.message);
-                    return res.status(500).json({ error: insertErr.message });
+                    t.rollback();
+                    return res.status(500).json({ error: 'Internal database error. Please try again.' });
                 }
                 console.log("Case inserted, ID:", result.insertId);
 
-                // Write audit log entry
+                // ── Audit log is written INSIDE the transaction ──
                 const isOfflineCreate = !!(req.body && req.body._offlineTimestamp);
                 const auditUserId = (req.body && (req.body.user_id || req.body._offlineUserId)) || null;
                 const auditAction = isOfflineCreate ? 'Synced Case (Offline)' : 'Created';
                 const auditDisease = disease_name || 'Unknown Disease';
                 const auditPatient = patient_name || 'Unknown Patient';
+                const finalizeCommit = () => {
+                    t.commit(() => {
+                        // Trigger auto-notifications after the data writes commit
+                        db.query(`
+                            SELECT dc.patient_name, d.name AS disease_name, b.name AS barangay_name, dc.barangay_id, dc.severity
+                            FROM disease_cases dc
+                            LEFT JOIN diseases d ON dc.disease_id = d.id
+                            LEFT JOIN barangays b ON dc.barangay_id = b.id
+                            WHERE dc.case_id = ?
+                        `, [result.insertId], (nErr, caseResults) => {
+                            if (!nErr && caseResults && caseResults.length > 0) {
+                                const caseInfo = caseResults[0];
+                                const title = 'New Case Reported';
+                                const message = `A new case of ${caseInfo.disease_name} (${caseInfo.severity}) has been reported for ${caseInfo.patient_name} in Barangay ${caseInfo.barangay_name || 'N/A'}.`;
+                                createNotificationForUsers(title, message, 'info', 'ManageCases', caseInfo.barangay_id, 'new_case_reported', null, result.insertId);
+                                
+                                // Check for high risk
+                                checkAndAlertHighRisk(caseInfo.barangay_id, caseInfo.barangay_name);
+                            }
+                        });
+                        return res.status(200).json({ message: 'Case added successfully', case_id: result.insertId });
+                    });
+                };
+
                 if (auditUserId) {
-                  db.query('SELECT full_name, role, assigned_barangay_id FROM users WHERE user_id = ?', [auditUserId], (uErr, uRes) => {
+                  t.q('SELECT full_name, role, assigned_barangay_id FROM users WHERE user_id = ?', [auditUserId], (uErr, uRes) => {
                     if (!uErr && uRes.length > 0) {
                       const u = uRes[0];
-                      db.query('SELECT name FROM barangays WHERE id = ?', [u.assigned_barangay_id], (bErr, bRes) => {
+                      t.q('SELECT name FROM barangays WHERE id = ?', [u.assigned_barangay_id], (bErr, bRes) => {
                         const brgy = (!bErr && bRes.length > 0) ? bRes[0].name : null;
                         const choUnit = u.role === 'CHO' ? getChoUnitForBarangay(brgy) : null;
                         createAuditLog(auditUserId, u.full_name, u.role, choUnit, brgy, auditAction, 'Case Record',
-                         `Added new ${auditDisease} case for ${auditPatient} (Case ID: ${result.insertId})`);
+                         `Added new ${auditDisease} case for ${auditPatient} (Case ID: ${result.insertId})`, t);
+                        finalizeCommit();
                       });
+                    } else {
+                      finalizeCommit();
                     }
                   });
+                } else {
+                  finalizeCommit();
                 }
-
-                // Trigger auto-notifications
-                db.query(`
-                    SELECT dc.patient_name, d.name AS disease_name, b.name AS barangay_name, dc.barangay_id, dc.severity
-                    FROM disease_cases dc
-                    LEFT JOIN diseases d ON dc.disease_id = d.id
-                    LEFT JOIN barangays b ON dc.barangay_id = b.id
-                    WHERE dc.case_id = ?
-                `, [result.insertId], (err, caseResults) => {
-                    if (!err && caseResults && caseResults.length > 0) {
-                        const caseInfo = caseResults[0];
-                        const title = 'New Case Reported';
-                        const message = `A new case of ${caseInfo.disease_name} (${caseInfo.severity}) has been reported for ${caseInfo.patient_name} in Barangay ${caseInfo.barangay_name || 'N/A'}.`;
-                        createNotificationForUsers(title, message, 'info', 'ManageCases', caseInfo.barangay_id, 'new_case_reported', null, result.insertId);
-                        
-                        // Check for high risk
-                        checkAndAlertHighRisk(caseInfo.barangay_id, caseInfo.barangay_name);
-                    }
-                });
-
-                return res.status(200).json({ message: 'Case added successfully', case_id: result.insertId });
             });
         };
 
         if (!diseaseId && disease_name) {
-            db.query('INSERT IGNORE INTO diseases (name) VALUES (?)', [disease_name], (dErr, dResult) => {
+            t.q('INSERT IGNORE INTO diseases (name) VALUES (?)', [disease_name], (dErr, dResult) => {
                 const newId = dResult && dResult.insertId ? dResult.insertId : null;
                 doInsert(newId);
             });
         } else {
             doInsert(diseaseId);
         }
+        }); // end find disease query
+        }, (txErr) => {
+            console.error('Create case transaction failed:', txErr && txErr.message);
+            res.status(500).json({ error: 'Add failed. No changes were saved.' });
+        });
     });
-    });
-}
+    }
 });
 
-// ROUTE: Route case to inbox (cross-unit) — stores all case data in case_inbox, no disease_cases entry yet
+// ROUTE: Route case to inbox (cross-unit) - stores all case data in case_inbox, no disease_cases entry yet
 app.post('/api/cases/route-to-inbox', authenticate, (req, res) => {
     const {
         patient_name, disease_name, age, severity, gender, status, contact,
@@ -1699,7 +2260,7 @@ app.post('/api/cases/route-to-inbox', authenticate, (req, res) => {
         (inboxErr, inboxResult) => {
             if (inboxErr) {
                 console.error('route-to-inbox insert error:', inboxErr.message);
-                return res.status(500).json({ error: inboxErr.message });
+                return res.status(500).json({ error: 'Internal database error. Please try again.' });
             }
             // Detect target barangay from address for scoped notification
             const detectedBrgy = detectBarangayFromAddress(address || '');
@@ -1727,11 +2288,11 @@ app.post('/api/cases/route-to-barangay-inbox', authenticate, (req, res) => {
         patient_name, disease_name, age, severity, gender, status, contact,
         onset_date, address, symptoms, physician, latitude, longitude,
         submitter_user_id, submitter_name, from_cho_unit, target_barangay_name, notes,
-        case_type, disease_type,
+        case_type, disease_type, vaccination_status, vaccine_expiry_date,
     } = req.body;
 
     db.query('SELECT id FROM barangays WHERE LOWER(name) = LOWER(?)', [target_barangay_name], (bErr, bResults) => {
-        if (bErr) return res.status(500).json({ error: bErr.message });
+        if (bErr) return res.status(500).json({ error: 'Internal database error. Please try again.' });
         if (!bResults || bResults.length === 0) {
             return res.status(400).json({ error: 'Target barangay not found.' });
         }
@@ -1746,15 +2307,17 @@ app.post('/api/cases/route-to-barangay-inbox', authenticate, (req, res) => {
             db.query(
                 `INSERT INTO disease_cases
                 (patient_name, disease_id, age, severity, case_type, disease_type, gender, status, contact,
-                 onset_date, address, barangay_id, symptoms, physician, latitude, longitude, date_reported)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, NOW())`,
+                 onset_date, address, barangay_id, symptoms, physician, latitude, longitude, date_reported,
+                 vaccination_status, vaccine_expiry_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, NOW(), ?, ?)`,
                 [patient_name, diseaseId, age || 0, severity, resolvedCaseType, resolvedDiseaseType, gender || 'Male', status || 'Pending',
                  contact || null, onset_date || null, address || null, symptoms || null,
-                 physician || null, latitude || null, longitude || null],
+                 physician || null, latitude || null, longitude || null,
+                 vaccination_status || null, vaccine_expiry_date || null],
                 (insertErr, result) => {
                     if (insertErr) {
                         console.error('route-to-barangay-inbox insert error:', insertErr.message);
-                        return res.status(500).json({ error: insertErr.message });
+                        return res.status(500).json({ error: 'Internal database error. Please try again.' });
                     }
                     const caseId = result.insertId;
                     db.query(
@@ -1763,7 +2326,7 @@ app.post('/api/cases/route-to-barangay-inbox', authenticate, (req, res) => {
                         (inboxErr, inboxResult) => {
                             if (inboxErr) {
                                 console.error('case_inbox insert error:', inboxErr.message);
-                                return res.status(500).json({ error: inboxErr.message });
+                                return res.status(500).json({ error: 'Internal database error. Please try again.' });
                             }
                             const msg = notes
                                 ? `${submitter_name || 'A BHW'} sent you a case needing your review: ${patient_name} (${disease_name}). Note: "${notes}"`
@@ -1839,7 +2402,7 @@ app.get('/api/case-inbox', authenticate, (req, res) => {
     });
 });
 
-// GET unified outbox — merges referrals + resident messages + edit requests
+// GET unified outbox - merges referrals + resident messages + edit requests
 app.get('/api/case-outbox', authenticate, (req, res) => {
   const { cho_unit, barangay, user_id } = req.query;
   if (!cho_unit) return res.status(400).json({ error: 'cho_unit is required.' });
@@ -1995,33 +2558,35 @@ app.put('/api/case-inbox/:id/accept', authenticate, (req, res) => {
             const findDiseaseQuery = 'SELECT id FROM diseases WHERE LOWER(name) = LOWER(?)';
             db.query(findDiseaseQuery, [item.disease_name], (dErr, dRes) => {
                 const diseaseId = dRes && dRes.length > 0 ? dRes[0].id : null;
-                db.query(
-                    `INSERT INTO disease_cases
-                    (patient_name, disease_id, age, severity, gender, status, contact,
-                     onset_date, address, symptoms, physician, latitude, longitude, date_reported)
-                    VALUES (?, ?, ?, ?, ?, 'Active', ?, ?, ?, ?, ?, ?, ?, NOW())`,
-                    [item.patient_name, diseaseId, item.age || 0, item.severity, item.gender || 'Male',
-                     item.contact || null, item.onset_date || null, item.address || null,
-                     item.symptoms || null, item.physician || null, item.latitude || null, item.longitude || null],
-                    (insertErr, result) => {
-                        if (insertErr) {
-                            console.error('Accept insert error:', insertErr.message);
-                            return res.status(500).json({ error: insertErr.message });
-                        }
-                        const caseId = result.insertId;
-                        db.query(
-                            "UPDATE case_inbox SET case_id = ?, status = 'accepted', resolved_at = NOW() WHERE id = ?",
-                            [caseId, id],
-                            (updateErr) => {
-                                if (updateErr) {
-                                    console.error('Accept update error:', updateErr.message);
-                                    return res.status(500).json({ error: updateErr.message });
+                withTransaction((t) => {
+                    t.q(
+                        `INSERT INTO disease_cases
+                        (patient_name, disease_id, age, severity, gender, status, contact,
+                         onset_date, address, symptoms, physician, latitude, longitude, date_reported,
+                         vaccination_status, vaccine_expiry_date)
+                        VALUES (?, ?, ?, ?, ?, 'Active', ?, ?, ?, ?, ?, ?, ?, NOW(), NULL, NULL)`,
+                        [item.patient_name, diseaseId, item.age || 0, item.severity, item.gender || 'Male',
+                         item.contact || null, item.onset_date || null, item.address || null,
+                         item.symptoms || null, item.physician || null, item.latitude || null, item.longitude || null],
+                        (insertErr, result) => {
+                            if (insertErr) { t.rollback(); return console.error('Accept insert error:', insertErr.message); }
+                            const caseId = result.insertId;
+                            t.q(
+                                "UPDATE case_inbox SET case_id = ?, status = 'accepted', resolved_at = NOW() WHERE id = ?",
+                                [caseId, id],
+                                (updateErr) => {
+                                    if (updateErr) { t.rollback(); return console.error('Accept update error:', updateErr.message); }
+                                    t.commit(() => {
+                                        res.json({ message: 'Case accepted.', case_id: caseId });
+                                    });
                                 }
-                                res.json({ message: 'Case accepted.', case_id: caseId });
-                            }
-                        );
-                    }
-                );
+                            );
+                        }
+                    );
+                }, (txErr) => {
+                    console.error('Inbox accept transaction failed:', txErr && txErr.message);
+                    res.status(500).json({ error: 'Accept failed. No changes were saved.' });
+                });
             });
         }
     );
@@ -2043,7 +2608,7 @@ app.put('/api/case-inbox/:id/reject', authenticate, (req, res) => {
 
 // ── CASE EDIT REQUESTS (BHW → CHO) ──
 
-// POST /api/cases/:id/request-edit — BHW requests CHO to edit a case
+// POST /api/cases/:id/request-edit - BHW requests CHO to edit a case
 app.post('/api/cases/:id/request-edit', authenticate, (req, res) => {
   const caseId = req.params.id;
   const { requested_by, requested_by_name, from_barangay_name, target_cho_unit, note, proposed_data } = req.body;
@@ -2051,33 +2616,46 @@ app.post('/api/cases/:id/request-edit', authenticate, (req, res) => {
     return res.status(400).json({ error: 'requested_by and note are required.' });
   }
   const proposedJson = (proposed_data && Object.keys(proposed_data).length > 0) ? JSON.stringify(proposed_data) : null;
-  db.query(
-    'INSERT INTO case_edit_requests (case_id, requested_by, requested_by_name, from_barangay_name, target_cho_unit, note, proposed_data) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [caseId, requested_by, requested_by_name || 'Unknown', from_barangay_name || null, target_cho_unit || null, note, proposedJson],
-    (err, result) => {
-      if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
-
-      // Audit log: BHW submitted an edit request
-      db.query('SELECT full_name, role, assigned_barangay_id FROM users WHERE user_id = ?', [requested_by], (aErr, aRes) => {
-        if (!aErr && aRes.length > 0) {
-          const actor = aRes[0];
-          createAuditLog(requested_by, actor.full_name, actor.role, null, from_barangay_name || null,
-            'Requested Edit', 'Case Record',
-            `Submitted edit request for Case ID ${caseId} — Note: "${note.length > 60 ? note.slice(0, 57) + '...' : note}"`);
+  withTransaction((t) => {
+    t.q(
+      'INSERT INTO case_edit_requests (case_id, requested_by, requested_by_name, from_barangay_name, target_cho_unit, note, proposed_data) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [caseId, requested_by, requested_by_name || 'Unknown', from_barangay_name || null, target_cho_unit || null, note, proposedJson],
+      (err, result) => {
+        if (err) {
+          console.error('Edit request insert error:', err.message);
+          t.rollback();
+          return res.status(500).json({ error: 'Something went wrong. Please try again.' });
         }
-      });
 
-      // Notify CHOs in the target unit (direct BHW→CHO request, bypasses user preferences)
-      if (target_cho_unit) {
-        const msg = `${requested_by_name || 'A BHW'} from ${from_barangay_name || 'your area'} requested an update for this case. Note: "${note}"`;
-        notifyTargetUnitCho(target_cho_unit, 'A BHW needs your help', msg);
+        // Audit log: BHW submitted an edit request (inside the transaction)
+        const finalizeCommit = () => {
+          t.commit(() => {
+            // Notify CHOs in the target unit (direct BHW→CHO request, bypasses user preferences)
+            if (target_cho_unit) {
+              const msg = `${requested_by_name || 'A BHW'} from ${from_barangay_name || 'your area'} requested an update for this case. Note: "${note}"`;
+              notifyTargetUnitCho(target_cho_unit, 'A BHW needs your help', msg);
+            }
+            res.json({ message: 'Edit request sent to your CHO.', request_id: result.insertId });
+          });
+        };
+        t.q('SELECT full_name, role, assigned_barangay_id FROM users WHERE user_id = ?', [requested_by], (aErr, aRes) => {
+          if (!aErr && aRes.length > 0) {
+            const actor = aRes[0];
+            createAuditLog(requested_by, actor.full_name, actor.role, null, from_barangay_name || null,
+              'Requested Edit', 'Case Record',
+              `Submitted edit request for Case ID ${caseId} - Note: "${note.length > 60 ? note.slice(0, 57) + '...' : note}"`, t);
+          }
+          finalizeCommit();
+        });
       }
-      res.json({ message: 'Edit request sent to your CHO.', request_id: result.insertId });
-    }
-  );
+    );
+  }, (txErr) => {
+    console.error('Edit request transaction failed:', txErr && txErr.message);
+    res.status(500).json({ error: 'Edit request failed. No changes were saved.' });
+  });
 });
 
-// GET /api/case-edit-requests — Fetch edit requests (CHO: pending by unit, BHW: all by user)
+// GET /api/case-edit-requests - Fetch edit requests (CHO: pending by unit, BHW: all by user)
 app.get('/api/case-edit-requests', authenticate, (req, res) => {
   const { cho_unit, requested_by, unread_only } = req.query;
   let sql = `SELECT cer.*, dc.patient_name, d.name AS disease_name, d.name AS disease_name_full
@@ -2107,7 +2685,7 @@ app.get('/api/case-edit-requests', authenticate, (req, res) => {
   });
 });
 
-// PUT /api/case-edit-requests/:id/accept — CHO accepts edit request
+// PUT /api/case-edit-requests/:id/accept - CHO accepts edit request
 app.put('/api/case-edit-requests/:id/accept', authenticate, (req, res) => {
   const { id } = req.params;
   db.query(
@@ -2127,7 +2705,7 @@ app.put('/api/case-edit-requests/:id/accept', authenticate, (req, res) => {
   );
 });
 
-// PUT /api/case-edit-requests/:id/reject — CHO rejects edit request
+// PUT /api/case-edit-requests/:id/reject - CHO rejects edit request
 app.put('/api/case-edit-requests/:id/reject', authenticate, (req, res) => {
   const { id } = req.params;
   db.query(
@@ -2141,7 +2719,7 @@ app.put('/api/case-edit-requests/:id/reject', authenticate, (req, res) => {
   );
 });
 
-// PUT /api/case-edit-requests/:id/read — BHW marks edit request as read
+// PUT /api/case-edit-requests/:id/read - BHW marks edit request as read
 app.put('/api/case-edit-requests/:id/read', authenticate, (req, res) => {
   const { id } = req.params;
   db.query(
@@ -2159,13 +2737,13 @@ app.put('/api/case-edit-requests/:id/read', authenticate, (req, res) => {
 // CASE ADD REQUESTS (BHW → CHO "Submit Case for Approval")
 // ══════════════════════════════════════════════════════════════
 
-// POST /api/cases/request-add — BHW submits a new case for CHO approval (no disease_cases insert yet)
+// POST /api/cases/request-add - BHW submits a new case for CHO approval (no disease_cases insert yet)
 app.post('/api/cases/request-add', authenticate, (req, res) => {
   const {
     patient_name, disease_name, age, severity, gender, case_status, contact,
     onset_date, address, barangay_id, symptoms, physician, latitude, longitude,
     requested_by, requested_by_name, from_barangay_name, submitter_cho_unit, note,
-    case_type, disease_type,
+    case_type, disease_type, vaccination_status, vaccine_expiry_date,
   } = req.body;
 
   if (!requested_by || !patient_name || !disease_name) {
@@ -2196,39 +2774,61 @@ app.post('/api/cases/request-add', authenticate, (req, res) => {
     const resolvedCaseType = ['Suspected', 'Probable', 'Confirmed'].includes(case_type) ? case_type : autoCls.case_type;
     const resolvedDiseaseType = disease_type != null && String(disease_type).trim() !== '' ? String(disease_type).trim().slice(0, 100) : null;
 
-    db.query(
-      `INSERT INTO case_add_requests
-        (patient_name, disease_name, age, severity, case_type, disease_type, gender, case_status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude,
-         requested_by, requested_by_name, from_barangay_name, target_cho_unit, note)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [patient_name, disease_name, age || 0, severity, resolvedCaseType, resolvedDiseaseType, gender || 'Male', case_status || 'Active', contact || null, onset_date || null, address || null,
-        barangay_id || null, symptoms || null, physician || null, latitude || null, longitude || null,
-        requested_by, requested_by_name || 'Unknown', from_barangay_name || null, targetChoUnit || null, note || null],
-      (err, result) => {
-        if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+    let finalLat = latitude || null;
+    let finalLng = longitude || null;
+    if (barangayName) {
+      const clamped = geoSnap.snapToBarangay(longitude, latitude, barangayName, `${barangayName}|${address ? address.replace(/[^0-9a-zA-Z ]/g, ' ') : 'C'}`);
+      if (clamped) { finalLat = String(clamped[0]); finalLng = String(clamped[1]); }
+    }
 
-        // Audit log: BHW submitted an add request
-        db.query('SELECT full_name, role, assigned_barangay_id FROM users WHERE user_id = ?', [requested_by], (aErr, aRes) => {
-          if (!aErr && aRes.length > 0) {
-            const actor = aRes[0];
-            createAuditLog(requested_by, actor.full_name, actor.role, null, from_barangay_name || null,
-              'Requested Add', 'Case Record',
-              `Submitted new case for approval: ${patient_name} - ${disease_name}`);
+    withTransaction((t) => {
+      t.q(
+        `INSERT INTO case_add_requests
+          (patient_name, disease_name, age, severity, case_type, disease_type, gender, case_status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude,
+           requested_by, requested_by_name, from_barangay_name, target_cho_unit, note,
+           vaccination_status, vaccine_expiry_date)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [patient_name, disease_name, age || 0, severity, resolvedCaseType, resolvedDiseaseType, gender || 'Male', case_status || 'Active', contact || null, onset_date || null, address || null,
+          barangay_id || null, symptoms || null, physician || null, finalLat, finalLng,
+          requested_by, requested_by_name || 'Unknown', from_barangay_name || null, targetChoUnit || null, note || null,
+          vaccination_status || null, vaccine_expiry_date || null],
+        (err, result) => {
+          if (err) {
+            console.error('Add request insert error:', err.message);
+            t.rollback();
+            return res.status(500).json({ error: 'Something went wrong. Please try again.' });
           }
-        });
 
-        // Notify CHOs in the target unit (direct BHW→CHO request, bypasses preferences)
-        if (targetChoUnit) {
-          const msg = `${requested_by_name || 'A BHW'} from ${from_barangay_name || 'your area'} submitted a new ${disease_name} case for approval. Note: "${note || '(no note)'}"`;
-          notifyTargetUnitCho(targetChoUnit, 'New case awaiting approval', msg);
+          // Audit log: BHW submitted an add request (inside the transaction)
+          const finalizeCommit = () => {
+            t.commit(() => {
+              // Notify CHOs in the target unit (direct BHW→CHO request, bypasses preferences)
+              if (targetChoUnit) {
+                const msg = `${requested_by_name || 'A BHW'} from ${from_barangay_name || 'your area'} submitted a new ${disease_name} case for approval. Note: "${note || '(no note)'}"`;
+                notifyTargetUnitCho(targetChoUnit, 'New case awaiting approval', msg);
+              }
+              res.json({ message: 'Case submitted to your CHO for approval.', request_id: result.insertId });
+            });
+          };
+          t.q('SELECT full_name, role, assigned_barangay_id FROM users WHERE user_id = ?', [requested_by], (aErr, aRes) => {
+            if (!aErr && aRes.length > 0) {
+              const actor = aRes[0];
+              createAuditLog(requested_by, actor.full_name, actor.role, null, from_barangay_name || null,
+                'Requested Add', 'Case Record',
+                `Submitted new case for approval: ${patient_name} - ${disease_name}`, t);
+            }
+            finalizeCommit();
+          });
         }
-        res.json({ message: 'Case submitted to your CHO for approval.', request_id: result.insertId });
-      }
-    );
+      );
+    }, (txErr) => {
+      console.error('Add request transaction failed:', txErr && txErr.message);
+      res.status(500).json({ error: 'Submission failed. No changes were saved.' });
+    });
   });
 });
 
-// GET /api/case-add-requests — Fetch add requests (CHO: pending by unit, BHW: all by user)
+// GET /api/case-add-requests - Fetch add requests (CHO: pending by unit, BHW: all by user)
 app.get('/api/case-add-requests', authenticate, (req, res) => {
   const { cho_unit, requested_by, unread_only } = req.query;
   let sql = `SELECT car.*, b.name AS barangay_name
@@ -2257,18 +2857,18 @@ app.get('/api/case-add-requests', authenticate, (req, res) => {
   });
 });
 
-// PUT /api/case-add-requests/:id/approve — CHO approves (may edit details first) → inserts into disease_cases
+// PUT /api/case-add-requests/:id/approve - CHO approves (may edit details first) → inserts into disease_cases
 app.put('/api/case-add-requests/:id/approve', authenticate, (req, res) => {
   const { id } = req.params;
   const body = req.body || {};
   const {
     patient_name, disease_name, age, severity, gender, case_status, contact,
     onset_date, address, barangay_id, symptoms, physician, latitude, longitude,
-    case_type, disease_type,
+    case_type, disease_type, vaccination_status, vaccine_expiry_date,
   } = body;
 
   db.query('SELECT * FROM case_add_requests WHERE id = ? AND status = ?', [id, 'pending'], (qErr, rows) => {
-    if (qErr) return res.status(500).json({ error: qErr.message });
+    if (qErr) return res.status(500).json({ error: 'Internal database error. Please try again.' });
     if (rows.length === 0) return res.status(404).json({ error: 'Add request not found or already resolved.' });
     const reqRow = rows[0];
     const final = {
@@ -2288,6 +2888,8 @@ app.put('/api/case-add-requests/:id/approve', authenticate, (req, res) => {
       longitude: longitude || reqRow.longitude,
       case_type: ['Suspected', 'Probable', 'Confirmed'].includes(case_type) ? case_type : (reqRow.case_type || diseaseClassification(reqRow.disease_name).case_type),
       disease_type: (disease_type !== undefined && disease_type !== null && String(disease_type).trim() !== '') ? String(disease_type).trim().slice(0, 100) : reqRow.disease_type,
+      vaccination_status: vaccination_status || reqRow.vaccination_status || null,
+      vaccine_expiry_date: vaccine_expiry_date || reqRow.vaccine_expiry_date || null,
     };
 
     // ── Server-side validation mirror (2.4) ──
@@ -2302,7 +2904,7 @@ app.put('/api/case-add-requests/:id/approve', authenticate, (req, res) => {
         'SELECT case_id, status FROM disease_cases WHERE patient_name LIKE ? AND status IN (?, ?, ?) LIMIT 1',
         [final.patient_name, 'Active', 'Under Treatment', 'Pending'],
         (dupErr, dupRes) => {
-          if (dupErr) return res.status(500).json({ error: dupErr.message });
+          if (dupErr) return res.status(500).json({ error: 'Internal database error. Please try again.' });
           if (dupRes && dupRes.length > 0) {
             return res.status(409).json({
               error: `Patient "${final.patient_name}" already has an active case (Status: ${dupRes[0].status}). Please resolve the existing case before adding a new one.`
@@ -2318,111 +2920,151 @@ app.put('/api/case-add-requests/:id/approve', authenticate, (req, res) => {
       db.query(findDiseaseQuery, [final.disease_name], (dErr, dRes) => {
         const dId = (dRes && dRes.length > 0) ? dRes[0].id : null;
         const doInsert = (finalId) => {
-          db.query(
-            `INSERT INTO disease_cases
-                (patient_name, disease_id, age, severity, case_type, disease_type, gender, status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude, created_by)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [final.patient_name, finalId, final.age || 0, final.severity, final.case_type, final.disease_type || null, final.gender, final.case_status,
-              final.contact || null, final.onset_date || null, final.address || null, final.barangay_id,
-              final.symptoms || null, final.physician || null, final.latitude || null, final.longitude || null, reqRow.requested_by || null],
-            (insErr, insResult) => {
-                if (insErr) return res.status(500).json({ error: insErr.message });
+          const insertWithCoords = (lat, lng) => {
+            withTransaction((t) => {
+              t.q(
+                `INSERT INTO disease_cases
+                    (patient_name, disease_id, age, severity, case_type, disease_type, gender, status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude, created_by, vaccination_status, vaccine_expiry_date)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [final.patient_name, finalId, final.age || 0, final.severity, final.case_type, final.disease_type || null, final.gender, final.case_status,
+                  final.contact || null, final.onset_date || null, final.address || null, final.barangay_id,
+                  final.symptoms || null, final.physician || null, lat, lng, reqRow.requested_by || null,
+                  final.vaccination_status, final.vaccine_expiry_date],
+              (insErr, insResult) => {
+                if (insErr) { t.rollback(); return console.error('Approve insert case error:', insErr.message); }
                 const newCaseId = insResult.insertId;
                 const resolverId = body.actor_id || null;
-
-                // Seed the status history with the approval transition so every case has a full timeline
-                db.query(
+                t.q(
                   'INSERT INTO case_status_history (case_id, old_status, new_status, changed_by, changed_by_name, changed_by_role, notes) VALUES (?, ?, ?, ?, ?, ?, ?)',
                   [newCaseId, reqRow.case_status || 'Pending', final.case_status, resolverId, body.actor_name || 'CHO', body.actor_role || 'CHO', 'Add request approved by CHO'],
-                  (hErr) => { if (hErr) console.error('Status history on approval error:', hErr.message); }
-                );
-                db.query(
-                  "UPDATE case_add_requests SET status = 'accepted', resolved_at = NOW(), resolved_by = ?, case_id = ? WHERE id = ? AND status = 'pending'",
-                  [resolverId, newCaseId, id],
-                  (uErr) => { if (uErr) console.error('Update add request status error:', uErr.message); }
-                );
-
-                // Notify + email the requesting BHW
-                db.query('SELECT user_id, full_name, email FROM users WHERE user_id = ?', [reqRow.requested_by], (bErr, bRes) => {
-                  if (!bErr && bRes.length > 0) {
-                    const bhw = bRes[0];
-                    if (bhw.email) {
-                      const html = `
-                        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f0fdf4;border-radius:12px">
-                          <h2 style="color:#16a34a;margin:0 0 8px 0">Case Approved</h2>
-                          <p style="color:#334155;font-size:14px">Hello ${bhw.full_name},</p>
-                          <p style="color:#334155;font-size:14px">Your submitted case for <strong>${final.patient_name}</strong> (<strong>${final.disease_name}</strong>) was approved and is now on record.</p>
-                          <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0" />
-                          <p style="color:#94a3b8;font-size:11px">Cabuyao City Disease Monitoring System</p>
-                        </div>`;
-                      sendBrevoEmail(bhw.email, 'Case Approved - Cabuyao CDMS', html)
-                        .catch(err => console.error('Add-approval email failed:', err.message));
-                    }
-                    db.query('INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
-                      [bhw.user_id, 'Case approved', `Your case for ${final.patient_name} (${final.disease_name}) was approved by the CHO. (Case ID: ${newCaseId})`, 'success', 'ManageCases']);
+                  (hErr) => {
+                    if (hErr) { t.rollback(); return console.error('Approve status history error:', hErr.message); }
+                    t.q(
+                      "UPDATE case_add_requests SET status = 'accepted', resolved_at = NOW(), resolved_by = ?, case_id = ? WHERE id = ? AND status = 'pending'",
+                      [resolverId, newCaseId, id],
+                      (uErr) => {
+                        if (uErr) { t.rollback(); return console.error('Approve request status error:', uErr.message); }
+                        t.commit(() => {
+                          // -- Side effects after the database writes commit --
+                          db.query('SELECT user_id, full_name, email FROM users WHERE user_id = ?', [reqRow.requested_by], (bErr, bRes) => {
+                            if (!bErr && bRes.length > 0) {
+                              const bhw = bRes[0];
+                              if (bhw.email) {
+                                const html = `
+                                  <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f0fdf4;border-radius:12px">
+                                    <h2 style="color:#16a34a;margin:0 0 8px 0">Case Approved</h2>
+                                    <p style="color:#334155;font-size:14px">Hello ${bhw.full_name},</p>
+                                    <p style="color:#334155;font-size:14px">Your submitted case for <strong>${final.patient_name}</strong> (<strong>${final.disease_name}</strong>) was approved and is now on record.</p>
+                                    <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0" />
+                                    <p style="color:#94a3b8;font-size:11px">Cabuyao City Disease Monitoring System</p>
+                                  </div>`;
+                                sendBrevoEmail(bhw.email, 'Case Approved - Cabuyao CDMS', html)
+                                  .catch(err => console.error('Add-approval email failed:', err.message));
+                              }
+                              db.query('INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
+                                [bhw.user_id, 'Case approved', `Your case for ${final.patient_name} (${final.disease_name}) was approved by the CHO. (Case ID: ${newCaseId})`, 'success', 'ManageCases']);
+                            }
+                          });
+                          createAuditLog(resolverId || null, body.actor_name || 'CHO', body.actor_role || 'CHO', null, reqRow.from_barangay_name || null,
+                            'Approved Add', 'Case Record', `Approved new case for ${final.patient_name} - ${final.disease_name} (from ${reqRow.requested_by_name || 'BHW'})`);
+                          res.json({ message: 'Case approved and added to records.', case_id: newCaseId });
+                        });
+                      }
+                    );
                   }
-                });
-
-                // Audit log: approved add
-                createAuditLog(resolverId || null, body.actor_name || 'CHO', body.actor_role || 'CHO', null, reqRow.from_barangay_name || null,
-                  'Approved Add', 'Case Record', `Approved new case for ${final.patient_name} - ${final.disease_name} (from ${reqRow.requested_by_name || 'BHW'})`);
-                res.json({ message: 'Case approved and added to records.', case_id: newCaseId });
+                );
               }
             );
-          };
-          if (!dId && final.disease_name) {
-            db.query('INSERT IGNORE INTO diseases (name) VALUES (?)', [final.disease_name], (iErr, iRes) => {
-              doInsert(iRes && iRes.insertId ? iRes.insertId : null);
-            });
-          } else doInsert(dId);
+          }, (txErr) => {
+            console.error('Approve add transaction failed:', txErr && txErr.message);
+            res.status(500).json({ error: 'Approval failed. No changes were saved.' });
+          });
+        };
+        db.query('SELECT name FROM barangays WHERE id = ?', [final.barangay_id], (snapErr, snapRows) => {
+          const bName = (!snapErr && snapRows.length > 0) ? snapRows[0].name : null;
+          let lat = final.latitude || null;
+          let lng = final.longitude || null;
+          if (bName) {
+            const clamped = geoSnap.snapToBarangay(final.longitude, final.latitude, bName, `${bName}|${final.address ? final.address.replace(/[^0-9a-zA-Z ]/g, ' ') : 'C'}`);
+            if (clamped) { lat = String(clamped[0]); lng = String(clamped[1]); }
+          }
+          insertWithCoords(lat, lng);
         });
+      };
+        if (!dId && final.disease_name) {
+          db.query('INSERT IGNORE INTO diseases (name) VALUES (?)', [final.disease_name], (iErr, iRes) => {
+            doInsert(iRes && iRes.insertId ? iRes.insertId : null);
+          });
+        } else doInsert(dId);
+      });
     });
   });
 });
 
-// PUT /api/case-add-requests/:id/reject — CHO rejects (with optional reason)
+// PUT /api/case-add-requests/:id/reject - CHO rejects (with optional reason)
 app.put('/api/case-add-requests/:id/reject', authenticate, (req, res) => {
   const { id } = req.params;
   const { reason, actor_id, actor_name, actor_role } = req.body || {};
-  db.query(
-    "UPDATE case_add_requests SET status = 'rejected', resolved_at = NOW(), resolved_by = ?, reject_reason = ? WHERE id = ? AND status = 'pending'",
-    [actor_id || null, reason || null, id],
-    (err, result) => {
-      if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
-      if (result.affectedRows === 0) return res.status(404).json({ error: 'Add request not found or already resolved.' });
-      db.query('SELECT * FROM case_add_requests WHERE id = ?', [id], (sErr, rows) => {
-        if (sErr || rows.length === 0) return res.json({ message: 'Add request rejected.' });
-        const reqRow = rows[0];
-        db.query('SELECT user_id, full_name, email FROM users WHERE user_id = ?', [reqRow.requested_by], (bErr, bRes) => {
-          if (!bErr && bRes.length > 0) {
-            const bhw = bRes[0];
-            if (bhw.email) {
-              const reasonHtml = reason ? `<p style="color:#334155;font-size:14px"><strong>Reason:</strong> ${reason}</p>` : '';
-              const html = `
-                <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#fef2f2;border-radius:12px">
-                  <h2 style="color:#dc2626;margin:0 0 8px 0">Case Not Approved</h2>
-                  <p style="color:#334155;font-size:14px">Hello ${bhw.full_name},</p>
-                  <p style="color:#334155;font-size:14px">Your submitted case for <strong>${reqRow.patient_name}</strong> (<strong>${reqRow.disease_name}</strong>) was not approved.</p>
-                  ${reasonHtml}
-                  <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0" />
-                  <p style="color:#94a3b8;font-size:11px">Cabuyao City Disease Monitoring System</p>
-                </div>`;
-              sendBrevoEmail(bhw.email, 'Case Not Approved - Cabuyao CDMS', html)
-                .catch(err => console.error('Add-rejection email failed:', err.message));
-            }
-            db.query('INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
-              [bhw.user_id, 'Case not approved', `Your case for ${reqRow.patient_name} (${reqRow.disease_name}) was not approved${reason ? `: ${reason}` : '.'}`, 'info', 'ManageCases']);
+  withTransaction((t) => {
+    t.q(
+      "UPDATE case_add_requests SET status = 'rejected', resolved_at = NOW(), resolved_by = ?, reject_reason = ? WHERE id = ? AND status = 'pending'",
+      [actor_id || null, reason || null, id],
+      (err, result) => {
+        if (err) {
+          console.error('Reject add update error:', err.message);
+          t.rollback();
+          return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+        }
+        if (result.affectedRows === 0) {
+          t.rollback();
+          return res.status(404).json({ error: 'Add request not found or already resolved.' });
+        }
+        t.q('SELECT * FROM case_add_requests WHERE id = ?', [id], (sErr, rows) => {
+          if (sErr || rows.length === 0) {
+            t.rollback();
+            return res.json({ message: 'Add request rejected.' });
           }
+          const reqRow = rows[0];
+          // Audit log is written inside the transaction
+          const finalizeCommit = () => {
+            t.commit(() => {
+              db.query('SELECT user_id, full_name, email FROM users WHERE user_id = ?', [reqRow.requested_by], (bErr, bRes) => {
+                if (!bErr && bRes.length > 0) {
+                  const bhw = bRes[0];
+                  if (bhw.email) {
+                    const reasonHtml = reason ? `<p style="color:#334155;font-size:14px"><strong>Reason:</strong> ${reason}</p>` : '';
+                    const html = `
+                      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#fef2f2;border-radius:12px">
+                        <h2 style="color:#dc2626;margin:0 0 8px 0">Case Not Approved</h2>
+                        <p style="color:#334155;font-size:14px">Hello ${bhw.full_name},</p>
+                        <p style="color:#334155;font-size:14px">Your submitted case for <strong>${reqRow.patient_name}</strong> (<strong>${reqRow.disease_name}</strong>) was not approved.</p>
+                        ${reasonHtml}
+                        <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0" />
+                        <p style="color:#94a3b8;font-size:11px">Cabuyao City Disease Monitoring System</p>
+                      </div>`;
+                    sendBrevoEmail(bhw.email, 'Case Not Approved - Cabuyao CDMS', html)
+                      .catch(err => console.error('Add-rejection email failed:', err.message));
+                  }
+                  db.query('INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
+                    [bhw.user_id, 'Case not approved', `Your case for ${reqRow.patient_name} (${reqRow.disease_name}) was not approved${reason ? `: ${reason}` : '.'}`, 'info', 'ManageCases']);
+                }
+              });
+              res.json({ message: 'Add request rejected.' });
+            });
+          };
+          createAuditLog(actor_id || null, actor_name || 'CHO', actor_role || 'CHO', null, reqRow.from_barangay_name || null,
+            'Rejected Add', 'Case Record', `Rejected new case for ${reqRow.patient_name} - ${reqRow.disease_name}${reason ? ` (Reason: ${reason})` : ''}`, t);
+          finalizeCommit();
         });
-        createAuditLog(actor_id || null, actor_name || 'CHO', actor_role || 'CHO', null, reqRow.from_barangay_name || null,
-          'Rejected Add', 'Case Record', `Rejected new case for ${reqRow.patient_name} - ${reqRow.disease_name}${reason ? ` (Reason: ${reason})` : ''}`);
-        res.json({ message: 'Add request rejected.' });
-      });
-    }
-  );
+      }
+    );
+  }, (txErr) => {
+    console.error('Reject add transaction failed:', txErr && txErr.message);
+    res.status(500).json({ error: 'Rejection failed. No changes were saved.' });
+  });
 });
 
-// PUT /api/case-add-requests/:id/read — BHW marks add request as read
+// PUT /api/case-add-requests/:id/read - BHW marks add request as read
 app.put('/api/case-add-requests/:id/read', authenticate, (req, res) => {
   const { id } = req.params;
   db.query(
@@ -2440,7 +3082,7 @@ app.put('/api/case-add-requests/:id/read', authenticate, (req, res) => {
 // PASSWORD CHANGE REQUESTS (BHW → CHO)
 // ══════════════════════════════════════════════════════════════
 
-// POST /api/password-change-request — BHW requests password change
+// POST /api/password-change-request - BHW requests password change
 app.post('/api/password-change-request', authenticate, (req, res) => {
   const { user_id, user_name, reason } = req.body;
   if (!user_id) return res.status(400).json({ error: 'user_id is required.' });
@@ -2450,7 +3092,7 @@ app.post('/api/password-change-request', authenticate, (req, res) => {
     "SELECT id FROM password_change_requests WHERE user_id = ? AND status = 'pending'",
     [user_id],
     (checkErr, existing) => {
-      if (checkErr) return res.status(500).json({ error: checkErr.message });
+      if (checkErr) return res.status(500).json({ error: 'Internal database error. Please try again.' });
       if (existing && existing.length > 0) {
         return res.status(409).json({ error: 'You already have a pending password change request.' });
       }
@@ -2461,7 +3103,7 @@ app.post('/api/password-change-request', authenticate, (req, res) => {
         (err, result) => {
           if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
 
-          // Notify all active CHO users (bypass preferences — same as case edit requests)
+          // Notify all active CHO users (bypass preferences - same as case edit requests)
           db.query(
             `SELECT user_id FROM users WHERE role = 'CHO' AND is_active = 1`,
             [],
@@ -2487,7 +3129,7 @@ app.post('/api/password-change-request', authenticate, (req, res) => {
   );
 });
 
-// GET /api/password-change-requests — Fetch password change requests
+// GET /api/password-change-requests - Fetch password change requests
 app.get('/api/password-change-requests', authenticate, (req, res) => {
   const { user_id, pending_only } = req.query;
   let sql = 'SELECT * FROM password_change_requests WHERE 1=1';
@@ -2506,7 +3148,7 @@ app.get('/api/password-change-requests', authenticate, (req, res) => {
   });
 });
 
-// PUT /api/password-change-requests/:id/accept — CHO accepts
+// PUT /api/password-change-requests/:id/accept - CHO accepts
 app.put('/api/password-change-requests/:id/accept', authenticate, (req, res) => {
   const { id } = req.params;
   db.query(
@@ -2532,7 +3174,7 @@ app.put('/api/password-change-requests/:id/accept', authenticate, (req, res) => 
   );
 });
 
-// PUT /api/password-change-requests/:id/reject — CHO rejects
+// PUT /api/password-change-requests/:id/reject - CHO rejects
 app.put('/api/password-change-requests/:id/reject', authenticate, (req, res) => {
   const { id } = req.params;
   db.query(
@@ -2557,7 +3199,7 @@ app.put('/api/password-change-requests/:id/reject', authenticate, (req, res) => 
   );
 });
 
-// PUT /api/password-change-requests/:id/read — BHW marks as read
+// PUT /api/password-change-requests/:id/read - BHW marks as read
 app.put('/api/password-change-requests/:id/read', authenticate, (req, res) => {
   const { id } = req.params;
   db.query('UPDATE password_change_requests SET is_read = 1 WHERE id = ?', [id], (err, result) => {
@@ -2567,7 +3209,7 @@ app.put('/api/password-change-requests/:id/read', authenticate, (req, res) => {
   });
 });
 
-// PUT /api/users/:id/set-password — BHW sets new password after approval (no current password check)
+// PUT /api/users/:id/set-password - BHW sets new password after approval (no current password check)
 app.put('/api/users/:id/set-password', authenticate, (req, res) => {
   const { id } = req.params;
   const { newPassword } = req.body;
@@ -2591,7 +3233,7 @@ app.put('/api/users/:id/set-password', authenticate, (req, res) => {
 
       const hashed = bcrypt.hashSync(newPassword, 10);
       db.query('UPDATE users SET password = ?, must_change_password = 0, initial_password = NULL WHERE user_id = ?', [hashed, id], (err2, result) => {
-        if (err2) return res.status(500).json({ error: err2.message });
+        if (err2) return res.status(500).json({ error: 'Internal database error. Please try again.' });
         if (result.affectedRows === 0) return res.status(404).json({ error: 'User not found.' });
 
         // Mark the accepted request as fully resolved
@@ -2610,7 +3252,7 @@ app.put('/api/cases/:id', authenticate, (req, res) => {
         patient_name, disease_name, age, severity, gender,
         status, contact, onset_date, address, barangay_id,
         symptoms, physician, latitude, longitude, case_type,
-        disease_type,
+        disease_type, vaccination_status, vaccine_expiry_date,
     } = req.body;
 
     console.log("--- Update Case ---", { id, patient_name });
@@ -2634,67 +3276,13 @@ app.put('/api/cases/:id', authenticate, (req, res) => {
               const oldRow = (!oldErr && oldRows && oldRows.length > 0) ? oldRows[0] : null;
               const oldStatus = oldRow ? oldRow.status : null;
 
-              // ── Field-level change tracking: build "field: old → new" diff list ──
-              const FIELD_LABELS = {
-                patient_name: 'Patient Name', age: 'Age', severity: 'Severity', gender: 'Gender',
-                status: 'Status', contact: 'Contact', onset_date: 'Date of Onset', address: 'Address',
-                symptoms: 'Symptoms', physician: 'Physician', latitude: 'Latitude', longitude: 'Longitude',
-                case_type: 'Case Type', disease_type: 'Disease Type',
-              };
-              const normalize = (v) => (v === null || v === undefined || v === '') ? '' : String(v).trim();
-              const fmtDateVal = (v) => {
-                if (v instanceof Date && !isNaN(v)) {
-                  const p = (n) => String(n).padStart(2, '0');
-                  return `${v.getFullYear()}-${p(v.getMonth() + 1)}-${p(v.getDate())}`;
-                }
-                if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10);
-                return normalize(v);
-              };
-              const canonicalVal = (payloadKey, v) => (payloadKey === 'onset_date' ? fmtDateVal(v) : normalize(v));
-              const buildChangeSummary = () => {
-                if (!oldRow) return '';
-                const FIELD_MAP = { patient_name: 'patient_name', age: 'age', severity: 'severity', gender: 'gender', status: 'status', contact: 'contact', onset_date: 'onset_date', address: 'address', symptoms: 'symptoms', physician: 'physician', latitude: 'latitude', longitude: 'longitude', case_type: 'case_type', disease_type: 'disease_type' };
-                const changes = [];
-                for (const [payloadKey, label] of Object.entries(FIELD_LABELS)) {
-                  let newVal;
-                  if (payloadKey === 'age') newVal = age || 0;
-                  else if (payloadKey === 'gender') newVal = gender || 'Male';
-                  else if (payloadKey === 'contact') newVal = contact || null;
-                  else if (payloadKey === 'onset_date') newVal = onset_date || null;
-                  else if (payloadKey === 'address') newVal = address || null;
-                  else if (payloadKey === 'symptoms') newVal = symptoms || null;
-                  else if (payloadKey === 'physician') newVal = physician || null;
-                  else if (payloadKey === 'latitude') newVal = latitude || null;
-                  else if (payloadKey === 'longitude') newVal = longitude || null;
-                  else newVal = req.body[payloadKey];
-                  const oldVal = oldRow[payloadKey];
-                  const ov = canonicalVal(payloadKey, oldVal);
-                  const nv = canonicalVal(payloadKey, newVal);
-                  // Compare canonical values; skip empty→empty
-                  if (ov !== nv) {
-                    const dispOv = ov || '(empty)';
-                    const dispNv = nv || '(empty)';
-                    // Truncate long values (symptoms/address)
-                    const fmtOv = dispOv.length > 60 ? dispOv.slice(0, 57) + '...' : dispOv;
-                    const fmtNv = dispNv.length > 60 ? dispNv.slice(0, 57) + '...' : dispNv;
-                    changes.push(`${label}: ${fmtOv} → ${fmtNv}`);
-                  }
-                }
-                // Disease name change (disease_id compared via dId)
-                if (oldRow.disease_id !== undefined && Number(oldRow.disease_id) !== Number(dId)) {
-                  const oldDiseaseName = req.body._oldDiseaseName || 'Previous Disease';
-                  changes.push(`Disease Type: ${oldDiseaseName} → ${disease_name || '(empty)'}`);
-                }
-                return changes.join(', ');
-              };
-
             const applyUpdate = () => {
             const updateQuery = `
                 UPDATE disease_cases SET
                     patient_name = ?, disease_id = ?, age = ?, severity = ?, case_type = ?, disease_type = ?, gender = ?,
                     status = ?, contact = ?, onset_date = ?, address = ?,
                     barangay_id = ?, symptoms = ?, physician = ?,
-                    latitude = ?, longitude = ?
+                    latitude = ?, longitude = ?, vaccination_status = ?, vaccine_expiry_date = ?
                 WHERE case_id = ?
             `;
             const resolvedCaseType = ['Suspected', 'Probable', 'Confirmed'].includes(case_type)
@@ -2705,106 +3293,127 @@ app.put('/api/cases/:id', authenticate, (req, res) => {
                 patient_name, dId, age || 0, severity, resolvedCaseType, resolvedDiseaseType, gender || 'Male',
                 status, contact || null, onset_date || null, address || null,
                 barangay_id || null, symptoms || null, physician || null,
-                latitude || null, longitude || null, id
+                latitude || null, longitude || null,
+                vaccination_status || null, vaccine_expiry_date || null, id
             ];
 
-            db.query(updateQuery, vals, (updateErr, result) => {
+            withTransaction((t) => {
+            t.q(updateQuery, vals, (updateErr, result) => {
                 if (updateErr) {
                     console.error("Update case error:", updateErr.message);
-                    return res.status(500).json({ error: updateErr.message });
+                    t.rollback();
+                    return res.status(500).json({ error: 'Internal database error. Please try again.' });
                 }
                 if (result.affectedRows === 0) {
+                    t.rollback();
                     return res.status(404).json({ error: 'Case not found.' });
                 }
                 console.log("Case updated:", id);
 
-                // Write audit log entry (with field-level change tracking)
+                // ── Audit log + status history are written INSIDE the transaction ──
                 const isOfflineEdit = !!(req.body && req.body._offlineTimestamp);
                 const auditUserId = (req.body && (req.body.user_id || req.body._offlineUserId)) || null;
                 const auditAction = isOfflineEdit ? 'Synced Edit (Offline)' : 'Updated';
                 const auditDisease = disease_name || 'Unknown Disease';
                 const auditPatient = patient_name || 'Unknown Patient';
-                const changeSummary = buildChangeSummary();
-                const auditDetails = `Updated ${auditDisease} case for ${auditPatient}${changeSummary ? ` [Changed: ${changeSummary}]` : ' (no field changes)'} (Case ID: ${id})`;
-                if (auditUserId) {
-                  db.query('SELECT full_name, role, assigned_barangay_id FROM users WHERE user_id = ?', [auditUserId], (uErr, uRes) => {
-                    if (!uErr && uRes.length > 0) {
-                      const u = uRes[0];
-                      db.query('SELECT name FROM barangays WHERE id = ?', [u.assigned_barangay_id], (bErr, bRes) => {
-                        const brgy = (!bErr && bRes.length > 0) ? bRes[0].name : null;
-                        const choUnit = u.role === 'CHO' ? getChoUnitForBarangay(brgy) : null;
-                        createAuditLog(auditUserId, u.full_name, u.role, choUnit, brgy, auditAction, 'Case Record', auditDetails);
+                const auditDetails = `Updated ${auditDisease} case for ${auditPatient}`;
+
+                const finalizeCommit = () => {
+                    t.commit(() => {
+                        // Trigger status updated notification (after commit)
+                        db.query(`
+                            SELECT dc.patient_name, d.name AS disease_name, b.name AS barangay_name, dc.barangay_id, dc.status
+                            FROM disease_cases dc
+                            LEFT JOIN diseases d ON dc.disease_id = d.id
+                            LEFT JOIN barangays b ON dc.barangay_id = b.id
+                            WHERE dc.case_id = ?
+                        `, [id], (err, caseResults) => {
+                            if (!err && caseResults && caseResults.length > 0) {
+                                const caseInfo = caseResults[0];
+                                const title = 'Case Status Updated';
+                                const message = `The case status for ${caseInfo.patient_name} (${caseInfo.disease_name}) in Barangay ${caseInfo.barangay_name || 'N/A'} has been changed to ${caseInfo.status}.`;
+                                createNotificationForUsers(title, message, 'info', 'ManageCases', caseInfo.barangay_id, 'case_status_updated', null, id);
+                                
+                                // Check for high risk
+                                checkAndAlertHighRisk(caseInfo.barangay_id, caseInfo.barangay_name);
+
+                                // Notify BHW if this edit was from an accepted edit request
+                                db.query(
+                                  `SELECT cer.requested_by, cer.requested_by_name, cer.from_barangay_name
+                                   FROM case_edit_requests cer
+                                   WHERE cer.case_id = ? AND cer.status = 'accepted'
+                                   ORDER BY cer.resolved_at DESC LIMIT 1`,
+                                  [id],
+                                  (erErr, erRows) => {
+                                    if (!erErr && erRows && erRows.length > 0) {
+                                      const er = erRows[0];
+                                      const erTitle = 'Updated Case Reported';
+                                      const erMsg = `A CHO has updated the case of ${caseInfo.patient_name} (${caseInfo.disease_name}).`;
+                                      db.query(
+                                        `SELECT np.push_notifications, np.updated_case_reported
+                                         FROM notification_preferences np WHERE np.user_id = ?`,
+                                        [er.requested_by],
+                                        (pErr, pRows) => {
+                                          const prefs = (!pErr && pRows.length > 0) ? pRows[0] : {};
+                                          if (prefs.push_notifications && prefs.updated_case_reported) {
+                                            db.query(
+                                              'INSERT INTO notifications (user_id, title, message, type, link_to, reference_id) VALUES (?, ?, ?, ?, ?, ?)',
+                                              [er.requested_by, erTitle, erMsg, 'info', 'ManageCases', id]
+                                            );
+                                          }
+                                        }
+                                      );
+                                    }
+                                  }
+                                );
+                            }
+                        });
+
+                        return res.status(200).json({ message: 'Case updated successfully' });
+                    });
+                };
+
+                const afterStatusHistory = () => {
+                    if (auditUserId) {
+                      t.q('SELECT full_name, role, assigned_barangay_id FROM users WHERE user_id = ?', [auditUserId], (uErr, uRes) => {
+                        if (!uErr && uRes.length > 0) {
+                          const u = uRes[0];
+                          t.q('SELECT name FROM barangays WHERE id = ?', [u.assigned_barangay_id], (bErr, bRes) => {
+                            const brgy = (!bErr && bRes.length > 0) ? bRes[0].name : null;
+                            const choUnit = u.role === 'CHO' ? getChoUnitForBarangay(brgy) : null;
+                            createAuditLog(auditUserId, u.full_name, u.role, choUnit, brgy, auditAction, 'Case Record', auditDetails, t);
+                            finalizeCommit();
+                          });
+                        } else {
+                          finalizeCommit();
+                        }
                       });
+                    } else {
+                      finalizeCommit();
                     }
-                  });
-                }
+                };
 
                 // Record status transition if status changed
                 if (oldStatus && oldStatus !== status) {
                   const historyUserId = (req.body && (req.body.user_id || req.body._offlineUserId)) || null;
                   const historyUserName = (req.body && (req.body.user_name || req.body._offlineUserName)) || null;
-                  db.query(
+                  t.q(
                     'INSERT INTO case_status_history (case_id, old_status, new_status, changed_by, changed_by_name, changed_by_role) VALUES (?, ?, ?, ?, ?, ?)',
                     [id, oldStatus, status, historyUserId, historyUserName, req.body?.user_role || null],
-                    (hErr) => { if (hErr) console.error('Status history error:', hErr.message); }
+                    (hErr) => { if (hErr) console.error('Status history error:', hErr.message); afterStatusHistory(); }
                   );
+                } else {
+                  afterStatusHistory();
                 }
-
-                // Trigger status updated notification
-                db.query(`
-                    SELECT dc.patient_name, d.name AS disease_name, b.name AS barangay_name, dc.barangay_id, dc.status
-                    FROM disease_cases dc
-                    LEFT JOIN diseases d ON dc.disease_id = d.id
-                    LEFT JOIN barangays b ON dc.barangay_id = b.id
-                    WHERE dc.case_id = ?
-                `, [id], (err, caseResults) => {
-                    if (!err && caseResults && caseResults.length > 0) {
-                        const caseInfo = caseResults[0];
-                        const title = 'Case Status Updated';
-                        const message = `The case status for ${caseInfo.patient_name} (${caseInfo.disease_name}) in Barangay ${caseInfo.barangay_name || 'N/A'} has been changed to ${caseInfo.status}.`;
-                        createNotificationForUsers(title, message, 'info', 'ManageCases', caseInfo.barangay_id, 'case_status_updated', null, id);
-                        
-                        // Check for high risk
-                        checkAndAlertHighRisk(caseInfo.barangay_id, caseInfo.barangay_name);
-
-                        // Notify BHW if this edit was from an accepted edit request
-                        db.query(
-                          `SELECT cer.requested_by, cer.requested_by_name, cer.from_barangay_name
-                           FROM case_edit_requests cer
-                           WHERE cer.case_id = ? AND cer.status = 'accepted'
-                           ORDER BY cer.resolved_at DESC LIMIT 1`,
-                          [id],
-                          (erErr, erRows) => {
-                            if (!erErr && erRows && erRows.length > 0) {
-                              const er = erRows[0];
-                              const erTitle = 'Updated Case Reported';
-                              const erMsg = `A CHO has updated the case of ${caseInfo.patient_name} (${caseInfo.disease_name}).`;
-                              db.query(
-                                `SELECT np.push_notifications, np.updated_case_reported
-                                 FROM notification_preferences np WHERE np.user_id = ?`,
-                                [er.requested_by],
-                                (pErr, pRows) => {
-                                  const prefs = (!pErr && pRows.length > 0) ? pRows[0] : {};
-                                  if (prefs.push_notifications && prefs.updated_case_reported) {
-                                    db.query(
-                                      'INSERT INTO notifications (user_id, title, message, type, link_to, reference_id) VALUES (?, ?, ?, ?, ?, ?)',
-                                      [er.requested_by, erTitle, erMsg, 'info', 'ManageCases', id]
-                                    );
-                                  }
-                                }
-                              );
-                            }
-                          }
-                        );
-                    }
-                });
-
-                return res.status(200).json({ message: 'Case updated successfully' });
+            });
+            }, (txErr) => {
+                console.error('Update case transaction failed:', txErr && txErr.message);
+                res.status(500).json({ error: 'Update failed. No changes were saved.' });
             });
             };
             if (offlineTs) {
                 db.query('SELECT updated_at FROM disease_cases WHERE case_id = ?', [id], (cErr, cRows) => {
-                    if (cErr) return res.status(500).json({ error: cErr.message });
+                    if (cErr) return res.status(500).json({ error: 'Internal database error. Please try again.' });
                     const serverTs = cRows[0] && cRows[0].updated_at ? new Date(cRows[0].updated_at).getTime() : 0;
                     if (serverTs > offlineTs && serverTs > 0) {
                         return res.status(409).json({ error: 'Conflict detected: this case was updated by someone else while you were offline.', _conflict: { caseId: id, serverUpdated: new Date(serverTs).toISOString(), offlineTimestamp: new Date(offlineTs).toISOString() } });
@@ -3004,7 +3613,7 @@ app.put('/api/users/:id/change-password', authenticate, (req, res) => {
 
         const hashedNew = bcrypt.hashSync(newPassword, 10);
         db.query('UPDATE users SET password = ?, must_change_password = 0, initial_password = NULL, two_fa_token = NULL, two_fa_token_expiry = NULL WHERE user_id = ?', [hashedNew, id], (updateErr) => {
-            if (updateErr) return res.status(500).json({ error: updateErr.message });
+            if (updateErr) return res.status(500).json({ error: 'Internal database error. Please try again.' });
             return res.status(200).json({ message: 'Password updated successfully.' });
         });
     });
@@ -3014,12 +3623,12 @@ app.put('/api/users/:id/change-password', authenticate, (req, res) => {
 
 
 // ROUTE: Delete disease case
-app.delete('/api/cases/:id', authenticate, (req, res) => {
+app.delete('/api/cases/:id', authenticate, requireRole('CHO'), (req, res) => {
     const { id } = req.params;
     console.log("--- Archive Case ---", { id });
 
     const fetchCaseQuery = `
-        SELECT dc.patient_name, d.name AS disease_name, b.name AS barangay_name, dc.barangay_id
+        SELECT dc.*, d.name AS disease_name, b.name AS barangay_name, dc.barangay_id
         FROM disease_cases dc
         LEFT JOIN diseases d ON dc.disease_id = d.id
         LEFT JOIN barangays b ON dc.barangay_id = b.id
@@ -3039,47 +3648,78 @@ app.delete('/api/cases/:id', authenticate, (req, res) => {
         const caseInfo = caseResults[0];
         const { patient_name, disease_name, barangay_name, barangay_id } = caseInfo;
 
-        // Soft archive instead of permanent delete — the record stays in the DB
+        // Soft archive instead of permanent delete - the record stays in the DB
         // so the patient can be found again if they resurface in the future.
         const archiveQuery = 'UPDATE disease_cases SET is_archived = 1 WHERE case_id = ?';
         
-        db.query(archiveQuery, [id], (delErr, delResult) => {
+withTransaction((t) => {
+    t.q(archiveQuery, [id], (delErr, delResult) => {
             if (delErr) {
                 console.error("Archive case error:", delErr.message);
-                return res.status(500).json({ error: delErr.message });
+                t.rollback();
+                return res.status(500).json({ error: 'Internal database error. Please try again.' });
             }
             if ((!delResult || delResult.affectedRows === 0) && (delResult && delResult.changedRows === 0)) {
+                t.rollback();
                 return res.status(404).json({ error: 'Case not found.' });
             }
-            
-            // Write audit log entry
+
+            // Phase 1b: snapshot the full case into the retention archive (inside the same transaction)
+            archiveRecord('case', id, `${disease_name || 'Case'} - ${patient_name || 'Unknown'}`, caseInfo, {
+                id: (req.body && (req.body.user_id || req.body._offlineUserId)) || (req.user && req.user.user_id) || null,
+                name: (req.body && req.body.user_name) || (req.user && req.user.name) || 'CHO',
+                role: (req.user && req.user.role) || null,
+            }, (req.body && req.body._offlineTimestamp) ? 'Synced Archive (Offline)' : 'Archived', t);
+
+            // Write audit log entry (inside the same transaction)
             const isOfflineDelete = !!(req.body && req.body._offlineTimestamp);
             const auditUserId = (req.body && (req.body.user_id || req.body._offlineUserId)) || null;
             const auditAction = isOfflineDelete ? 'Synced Archive (Offline)' : 'Archived';
             const auditDisease = disease_name || 'Unknown Disease';
             const auditPatient = patient_name || 'Unknown Patient';
             if (auditUserId) {
-              db.query('SELECT full_name, role, assigned_barangay_id FROM users WHERE user_id = ?', [auditUserId], (uErr, uRes) => {
+              t.q('SELECT full_name, role, assigned_barangay_id FROM users WHERE user_id = ?', [auditUserId], (uErr, uRes) => {
                 if (!uErr && uRes.length > 0) {
                   const u = uRes[0];
-                  db.query('SELECT name FROM barangays WHERE id = ?', [u.assigned_barangay_id], (bErr, bRes) => {
+                  t.q('SELECT name FROM barangays WHERE id = ?', [u.assigned_barangay_id], (bErr, bRes) => {
                     const brgy = (!bErr && bRes.length > 0) ? bRes[0].name : null;
                     const choUnit = u.role === 'CHO' ? getChoUnitForBarangay(brgy) : null;
                     createAuditLog(auditUserId, u.full_name, u.role, choUnit, brgy, auditAction, 'Case Record',
-                     `Archived case for ${auditPatient} (${auditDisease}) in Barangay ${barangay_name || 'N/A'} (Case ID: ${id})`);
+                     `Archived case for ${auditPatient} (${auditDisease}) in Barangay ${barangay_name || 'N/A'} (Case ID: ${id})`, t);
+                    t.commit(() => {
+                        const title = 'Case Archived';
+                        const message = `Case for ${patient_name} (${disease_name}) in Barangay ${barangay_name || 'N/A'} has been archived.`;
+                        createNotificationForUsers(title, message, 'delete', 'ManageCases', barangay_id, 'delete');
+                        console.log(`Case ${id} archived (soft delete).`);
+                        return res.status(200).json({ message: 'Case archived successfully.' });
+                    });
                   });
+                } else {
+                  t.commit(() => {
+                        const title = 'Case Archived';
+                        const message = `Case for ${patient_name} (${disease_name}) in Barangay ${barangay_name || 'N/A'} has been archived.`;
+                        createNotificationForUsers(title, message, 'delete', 'ManageCases', barangay_id, 'delete');
+                        console.log(`Case ${id} archived (soft delete).`);
+                        return res.status(200).json({ message: 'Case archived successfully.' });
+                    });
                 }
               });
+            } else {
+              t.commit(() => {
+                        const title = 'Case Archived';
+                        const message = `Case for ${patient_name} (${disease_name}) in Barangay ${barangay_name || 'N/A'} has been archived.`;
+                        createNotificationForUsers(title, message, 'delete', 'ManageCases', barangay_id, 'delete');
+                        console.log(`Case ${id} archived (soft delete).`);
+                        return res.status(200).json({ message: 'Case archived successfully.' });
+                    });
             }
-
-            const title = 'Case Archived';
-            const message = `Case for ${patient_name} (${disease_name}) in Barangay ${barangay_name || 'N/A'} has been archived.`;
-            createNotificationForUsers(title, message, 'delete', 'ManageCases', barangay_id, 'delete');
-
-            console.log(`Case ${id} archived (soft delete).`);
-            return res.status(200).json({ message: 'Case archived successfully.' });
         });
+}, (txErr) => {
+        console.error("Archive case transaction error:", txErr.message);
+        logAppError('error', 'archive-case', txErr.message, txErr.stack);
+        return res.status(500).json({ error: 'Internal database error. Please try again.' });
     });
+});
 });
 
 // ROUTE: Restore an archived case
@@ -3091,12 +3731,12 @@ app.post('/api/cases/:id/restore', authenticate, requireRole('CHO'), (req, res) 
         'SELECT patient_name, is_archived, barangay_id FROM disease_cases WHERE case_id = ?',
         [id],
         (err, results) => {
-            if (err) return res.status(500).json({ error: err.message });
+            if (err) return res.status(500).json({ error: 'Internal database error. Please try again.' });
             if (!results || results.length === 0) return res.status(404).json({ error: 'Case not found.' });
             if (results[0].is_archived !== 1) return res.status(400).json({ error: 'Case is not archived.' });
 
             db.query('UPDATE disease_cases SET is_archived = 0 WHERE case_id = ?', [id], (uErr, uResult) => {
-                if (uErr) return res.status(500).json({ error: uErr.message });
+                if (uErr) return res.status(500).json({ error: 'Internal database error. Please try again.' });
                 const rid = req.user ? req.user.user_id : (req.body.user_id || null);
                 const rname = req.user ? req.user.name : (req.body.user_name || 'CHO');
                 const brgy = req.user ? req.user.barangay : (req.body.barangay || null);
@@ -3115,7 +3755,9 @@ app.delete('/api/users/:id', authenticate, requireRole('CHO'), (req, res) => {
     if (callerId && Number(id) === Number(callerId)) {
         return res.status(400).json({ error: 'You cannot archive your own account.' });
     }
-    // Soft archive instead of permanent delete — the account stays in the DB
+    // Soft archive instead of permanent delete - the account stays in the DB
+    db.query('SELECT * FROM users WHERE user_id = ?', [id], (selErr, selRows) => {
+      const userSnapshot = (!selErr && selRows && selRows.length > 0) ? selRows[0] : null;
     db.query('UPDATE users SET is_archived = 1 WHERE user_id = ?', [id], (err, result) => {
         if (err) {
             console.error("Archive user error:", err.message);
@@ -3123,6 +3765,10 @@ app.delete('/api/users/:id', authenticate, requireRole('CHO'), (req, res) => {
         }
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: 'User not found.' });
+        }
+        // Phase 1b: snapshot the account into the retention archive
+        if (userSnapshot) {
+          archiveRecord('user', id, userSnapshot.full_name || `User ID ${id}`, userSnapshot, { id: callerId }, 'Archived');
         }
         const writeAudit = (admin) => {
             const adminName = admin ? admin.full_name : 'CHO Admin';
@@ -3139,6 +3785,7 @@ app.delete('/api/users/:id', authenticate, requireRole('CHO'), (req, res) => {
             });
         console.log(`User ${id} archived.`);
         res.status(200).json({ message: 'User account archived successfully.' });
+    });
     });
 });
 
@@ -3165,9 +3812,16 @@ app.put('/api/users/:id/restore', authenticate, requireRole('CHO'), (req, res) =
 
 // GET all audit logs (newest first)
 app.get('/api/audit-logs', authenticate, (req, res) => {
-  db.query('SELECT * FROM audit_logs ORDER BY created_at DESC', (err, results) => {
+  const limit = req.query.limit ? Math.min(Math.max(parseInt(req.query.limit, 10) || 200, 1), 1000) : null;
+  const offset = req.query.offset ? Math.max(parseInt(req.query.offset, 10) || 0, 0) : 0;
+  const pagination = limit ? ` LIMIT ${limit} OFFSET ${offset}` : '';
+  db.query(`SELECT * FROM audit_logs ORDER BY created_at DESC${pagination}`, (err, results) => {
     if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
-    res.json(results);
+    if (!limit) return res.json(results);
+    db.query('SELECT COUNT(*) AS total FROM audit_logs', (cErr, cnt) => {
+      if (cErr) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+      res.json({ rows: results, total: cnt && cnt[0] ? cnt[0].total : results.length, limit, offset });
+    });
   });
 });
 
@@ -3249,12 +3903,136 @@ app.post('/api/generated-reports', authenticate, (req, res) => {
 // DELETE a generated report
 app.delete('/api/generated-reports/:id', authenticate, (req, res) => {
   const { id } = req.params;
+  db.query('SELECT * FROM generated_reports WHERE id = ?', [id], (selErr, selRows) => {
+    const rep = (!selErr && selRows && selRows.length > 0) ? selRows[0] : null;
   db.query('DELETE FROM generated_reports WHERE id = ?', [id], (err, result) => {
     if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Report not found.' });
     }
+    // Phase 1b: snapshot the deleted report into the retention archive
+    if (rep) archiveRecord('generated_report', id, rep.title || `Report #${id}`, rep, {
+      id: req.user ? req.user.user_id : null,
+      name: req.user ? req.user.name : 'CHO',
+      role: req.user ? req.user.role : null,
+    }, 'Deleted');
     res.json({ message: 'Report deleted successfully' });
+  });
+  });
+});
+
+// ═════════════════════════════════════════════════════════════
+// ARCHIVE VAULT ROUTES (Phase 1b) - CHO-only retention archive
+// ═════════════════════════════════════════════════════════════
+
+// GET archive records - optional filters: entity, search, limit/offset
+app.get('/api/archive-records', authenticate, requireRole('CHO'), (req, res) => {
+  const entity = req.query.entity || '';
+  const search = req.query.search || '';
+  const limit = req.query.limit ? Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 500) : 50;
+  const offset = req.query.offset ? Math.max(parseInt(req.query.offset, 10) || 0, 0) : 0;
+  let sql = 'SELECT * FROM archive_records WHERE 1=1';
+  const params = [];
+  if (entity) { sql += ' AND entity = ?'; params.push(entity); }
+  if (search) { sql += ' AND (snapshot_name LIKE ? OR entity_id LIKE ?)'; params.push(`%${search}%`, `%${search}%`); }
+  sql += ' ORDER BY archived_at DESC LIMIT ? OFFSET ?';
+  params.push(limit, offset);
+  db.query(sql, params, (err, results) => {
+    if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+    const parsed = results.map(r => ({ ...r, data: typeof r.data === 'string' ? JSON.parse(r.data) : (r.data || {}) }));
+    db.query('SELECT COUNT(*) AS total FROM archive_records', (cErr, cnt) => {
+      res.json({ records: parsed, total: cErr ? 0 : cnt[0].total });
+    });
+  });
+});
+
+// GET archive record totals per entity (for the Vault summary chips)
+app.get('/api/archive-records/totals', authenticate, requireRole('CHO'), (req, res) => {
+  db.query('SELECT entity, COUNT(*) AS count FROM archive_records GROUP BY entity', (err, rows) => {
+    if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+    const totals = { case: 0, user: 0, generated_report: 0, contact_message: 0 };
+    (rows || []).forEach(r => { if (r.entity in totals) totals[r.entity] = r.count; });
+    res.json(totals);
+  });
+});
+
+// GET archive records as JSON for export (CHO-only)
+app.get('/api/archive-records/export', authenticate, requireRole('CHO'), (req, res) => {
+  const entity = req.query.entity || '';
+  let sql = 'SELECT * FROM archive_records WHERE 1=1';
+  const params = [];
+  if (entity) { sql += ' AND entity = ?'; params.push(entity); }
+  sql += ' ORDER BY archived_at DESC';
+  db.query(sql, params, (err, results) => {
+    if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+    res.setHeader('Content-Disposition', `attachment; filename=archive-vault-${entity || 'all'}-${Date.now()}.json`);
+    res.setHeader('Content-Type', 'application/json');
+    res.json(results.map(r => ({ ...r, data: typeof r.data === 'string' ? JSON.parse(r.data) : (r.data || {}) })));
+  });
+});
+
+// POST restore an archived record (re-actives cases/users; re-inserts reports/messages)
+app.post('/api/archive-records/:id/restore', authenticate, requireRole('CHO'), (req, res) => {
+  const { id } = req.params;
+  db.query('SELECT * FROM archive_records WHERE id = ?', [id], (err, rows) => {
+    if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+    if (!rows || rows.length === 0) return res.status(404).json({ error: 'Archive record not found.' });
+    const rec = rows[0];
+    const data = typeof rec.data === 'string' ? JSON.parse(rec.data) : (rec.data || {});
+    const actor = { id: req.user.user_id, name: req.user.name, role: req.user.role };
+    const finish = (restoredNote) => {
+      db.query('UPDATE archive_records SET restored_at = NOW(), restored_by = ? WHERE id = ?', [req.user.name, id], (uErr) => {
+        if (uErr) console.error('Archive restore mark error:', uErr.message);
+        createAuditLog(req.user.user_id, req.user.name, req.user.role, null, req.user.barangay || null, 'Restored', 'Archive Vault', `${restoredNote} (from archive #${id})`);
+        res.json({ message: 'Record restored successfully.' });
+      });
+    };
+    if (rec.entity === 'case') {
+      const caseId = rec.entity_id || data.case_id;
+      db.query('UPDATE disease_cases SET is_archived = 0 WHERE case_id = ?', [caseId], (uErr, uRes) => {
+        if (uErr) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+        if (!uRes || uRes.affectedRows === 0) return res.status(404).json({ error: 'Original case not found in disease_cases.' });
+        finish(`Restored archived case #${caseId} for ${data.patient_name || 'Unknown Patient'}`);
+      });
+    } else if (rec.entity === 'user') {
+      const userId = rec.entity_id || data.user_id;
+      db.query('UPDATE users SET is_archived = 0 WHERE user_id = ?', [userId], (uErr, uRes) => {
+        if (uErr) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+        if (!uRes || uRes.affectedRows === 0) return res.status(404).json({ error: 'Original user not found in users.' });
+        finish(`Restored archived user #${userId} (${data.full_name || 'Unknown'})`);
+      });
+    } else if (rec.entity === 'generated_report') {
+      db.query(`INSERT INTO generated_reports (title, period, entity, details, cho_unit, snapshot_logs, created_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [data.title, data.period || null, data.entity || null, data.details || null, data.cho_unit || null,
+         JSON.stringify(typeof data.snapshot_logs === 'string' ? JSON.parse(data.snapshot_logs) : (data.snapshot_logs || [])), data.created_by || req.user.user_id],
+        (iErr, iRes) => {
+          if (iErr) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+          finish(`Restored generated report "${data.title || '(untitled)'}" (new ID ${iRes.insertId})`);
+        });
+    } else if (rec.entity === 'contact_message') {
+      db.query(`INSERT INTO contact_messages (name, target_cho_unit, disease_name, message, age, gender, contact_no, address, barangay, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [data.name, data.target_cho_unit || null, data.disease_name || null, data.message || '', data.age || null, data.gender || null,
+         data.contact_no || null, data.address || null, data.barangay || null, new Date(data.created_at || Date.now())],
+        (iErr, iRes) => {
+          if (iErr) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+          finish(`Restored contact message from ${data.name || 'Unknown'} (new ID ${iRes.insertId})`);
+        });
+    } else {
+      finish(`Restored ${rec.entity} #${rec.entity_id || ''}`);
+    }
+  });
+});
+
+// DELETE permanently remove an archive record from the vault
+app.delete('/api/archive-records/:id', authenticate, requireRole('CHO'), (req, res) => {
+  const { id } = req.params;
+  db.query('DELETE FROM archive_records WHERE id = ?', [id], (err, result) => {
+    if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+    if (result.affectedRows === 0) return res.status(404).json({ error: 'Archive record not found.' });
+    createAuditLog(req.user.user_id, req.user.name, req.user.role, null, req.user.barangay || null, 'Deleted', 'Archive Vault', `Permanently removed archive record #${id}`);
+    res.json({ message: 'Archive record removed successfully.' });
   });
 });
 
@@ -3336,7 +4114,7 @@ app.post('/api/login', (req, res) => {
           return;
         }
 
-        // Successful login — clear failed-attempt counters
+        // Successful login - clear failed-attempt counters
         db.query('UPDATE users SET login_attempts = 0, login_locked_until = NULL WHERE user_id = ?', [user.user_id]);
 
         // Auto-upgrade plaintext password to bcrypt on first login after hashing was added
@@ -3443,7 +4221,7 @@ app.post('/api/login', (req, res) => {
     });
 });
 
-// ROUTE: Log out (audit trail) — identity derived from the JWT, not client-supplied body
+// ROUTE: Log out (audit trail) - identity derived from the JWT, not client-supplied body
 app.post('/api/logout', authenticate, (req, res) => {
     const userId = req.user ? req.user.user_id : null;
     const userName = req.user ? req.user.name : 'Unknown';
@@ -3455,25 +4233,6 @@ app.post('/api/logout', authenticate, (req, res) => {
             if (rErr) console.error('[SESSION] logout revoke error:', rErr.message);
         });
     }
-    const writeLogoutAudit = (choUnit) => {
-        createAuditLog(userId, userName, userRole, choUnit, barangay, 'Logged Out', 'System', `Logout at ${phTimestamp()}`);
-    };
-    if (userId) {
-        db.query('SELECT cho_unit FROM users WHERE user_id = ?', [userId], (err, rows) => {
-            writeLogoutAudit((!err && rows && rows[0]) ? rows[0].cho_unit : null);
-        });
-    } else {
-        writeLogoutAudit(null);
-    }
-    res.json({ ok: true });
-});
-
-// ROUTE: Log out (audit trail) — identity derived from the JWT, not client-supplied body
-app.post('/api/logout', authenticate, (req, res) => {
-    const userId = req.user ? req.user.user_id : null;
-    const userName = req.user ? req.user.name : 'Unknown';
-    const userRole = req.user ? req.user.role : 'System';
-    const barangay = req.user ? req.user.barangay : null;
     const writeLogoutAudit = (choUnit) => {
         createAuditLog(userId, userName, userRole, choUnit, barangay, 'Logged Out', 'System', `Logout at ${phTimestamp()}`);
     };
@@ -3604,25 +4363,31 @@ app.post('/api/sync', authenticate, (req, res) => {
                 const autoCls = diseaseClassification(p.disease_name);
                 const resolvedCaseType = ['Suspected', 'Probable', 'Confirmed'].includes(p.case_type) ? p.case_type : autoCls.case_type;
                 const resolvedDiseaseType = p.disease_type != null && String(p.disease_type).trim() !== '' ? String(p.disease_type).trim().slice(0, 100) : null;
-                db.query(
+                withTransaction((t) => {
+                t.q(
                     `INSERT INTO disease_cases
-                        (patient_name, disease_id, age, severity, case_type, disease_type, gender, status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude, date_reported, created_by)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        (patient_name, disease_id, age, severity, case_type, disease_type, gender, status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude, date_reported, created_by, vaccination_status, vaccine_expiry_date)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `, [
                     p.patient_name, dId, p.age, p.severity || 'Moderate', resolvedCaseType, resolvedDiseaseType,
                     p.gender || 'Other', p.status || 'Active', p.contact,
                     p.onset_date, p.address, p.barangay_id, p.symptoms,
-                    p.physician, p.latitude, p.longitude, ts, p._offlineUserId || null
+                    p.physician, p.latitude, p.longitude, ts, p._offlineUserId || null,
+                    p.vaccination_status || null, p.vaccine_expiry_date || null
                 ], (err, result) => {
                     if (err) {
                         console.error('[Sync] Create failed:', err.message);
-                        results.push({ type, error: err.message });
-                    } else {
+                        t.rollback();
+                        results.push({ type, error: 'Internal database error. Please try again.' });
+                        return processNext(index + 1);
+                    }
+                    // Audit log is written inside the transaction
+                    if (p._offlineUserId) {
+                        createAuditLog(p._offlineUserId, p._offlineUserName || 'Offline User', null, null, null, 'Synced Case (Offline)', 'Disease Case', `Offline case synced: ${p.patient_name} - ${p.disease_name}`, t);
+                    }
+                    t.commit(() => {
                         processed++;
                         results.push({ type, newCaseId: result.insertId });
-                        if (p._offlineUserId) {
-                            createAuditLog(p._offlineUserId, p._offlineUserName || 'Offline User', null, null, null, 'Synced Case (Offline)', 'Disease Case', `Offline case synced: ${p.patient_name} — ${p.disease_name}`);
-                        }
                         // Mirror the online POST /api/cases notifications for synced offline creates
                         db.query(`
                             SELECT dc.patient_name, d.name AS disease_name, b.name AS barangay_name, dc.barangay_id, dc.severity, dc.status
@@ -3639,7 +4404,12 @@ app.post('/api/sync', authenticate, (req, res) => {
                                 checkAndAlertHighRisk(info.barangay_id, info.barangay_name);
                             }
                         });
-                    }
+                        processNext(index + 1);
+                    });
+                });
+                }, (txErr) => {
+                    console.error('[Sync] Create transaction failed:', txErr && txErr.message);
+                    results.push({ type, error: 'Sync create failed. No changes were saved.' });
                     processNext(index + 1);
                 });
             };
@@ -3666,15 +4436,16 @@ app.post('/api/sync', authenticate, (req, res) => {
                     `UPDATE disease_cases SET
                         patient_name=?, disease_id=?, age=?, severity=?, case_type=?, disease_type=?, gender=?, status=?,
                         contact=?, onset_date=?, address=?, barangay_id=?, symptoms=?,
-                        physician=?, latitude=?, longitude=?, updated_at=NOW()
+                        physician=?, latitude=?, longitude=?, vaccination_status=?, vaccine_expiry_date=?, updated_at=NOW()
                     WHERE case_id=?
                 `, [
                     p.patient_name, dId, p.age, p.severity, resolvedCaseType, resolvedDiseaseType,
                     p.gender, p.status, p.contact, p.onset_date, p.address,
-                    p.barangay_id, p.symptoms, p.physician, p.latitude, p.longitude, caseId
+                    p.barangay_id, p.symptoms, p.physician, p.latitude, p.longitude,
+                    p.vaccination_status || null, p.vaccine_expiry_date || null, caseId
                 ], (err) => {
                     if (err) {
-                        results.push({ type, error: err.message });
+                        results.push({ type, error: 'Internal database error. Please try again.' });
                     } else {
                         processed++;
                         results.push({ type, caseId });
@@ -3731,7 +4502,7 @@ app.post('/api/sync', authenticate, (req, res) => {
             );
         } else if (type === 'delete' && endpoint && endpoint.startsWith('/api/cases/')) {
             const caseId = endpoint.split('/').pop();
-            // Soft archive instead of permanent delete — the record stays in the DB
+            // Soft archive instead of permanent delete - the record stays in the DB
             // so the patient can be found again if they resurface in the future.
             db.query(`SELECT dc.patient_name, d.name AS disease_name, b.name AS barangay_name, dc.barangay_id
                       FROM disease_cases dc
@@ -3741,10 +4512,16 @@ app.post('/api/sync', authenticate, (req, res) => {
                 const cInfo = (!cErr && cRows && cRows.length > 0) ? cRows[0] : null;
                 db.query('UPDATE disease_cases SET is_archived = 1 WHERE case_id = ?', [caseId], (err) => {
                     if (err) {
-                        results.push({ type, error: err.message });
+                        results.push({ type, error: 'Internal database error. Please try again.' });
                     } else {
                         processed++;
                         results.push({ type, caseId });
+                        // Phase 1b: snapshot the offline-archived case into the retention archive
+                        if (cInfo) {
+                          archiveRecord('case', caseId, `${cInfo.disease_name || 'Case'} - ${cInfo.patient_name || 'Unknown'}`, cInfo, {
+                            id: payload && payload._offlineUserId, name: (payload && payload._offlineUserName) || 'Offline User', role: null,
+                          }, 'Synced Archive (Offline)');
+                        }
                         if (payload && payload._offlineUserId) {
                             createAuditLog(payload._offlineUserId, payload._offlineUserName || 'Offline User', null, null, null, 'Synced Archive (Offline)', 'Disease Case', `Offline archive synced for case #${caseId}`);
                         }
@@ -3764,13 +4541,22 @@ app.post('/api/sync', authenticate, (req, res) => {
             const finalSyncedBarangay = selectedSyncedBarangay || detectedBarangay || p.barangay || null;
             db.query(
                 `INSERT INTO contact_messages (name, target_cho_unit, disease_name, message, age, gender, contact_no, address, barangay, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [p.name, p.targetCho || null, p.disease || p.disease_name || null, p.message, p.age || null, p.gender || null, p.contact || p.mobile || null, p.address || null, detectedBarangay || p.barangay || null, new Date(p._offlineTimestamp || Date.now())],
-                (err) => {
+                [p.name, p.targetCho || null, p.disease || p.disease_name || null, p.message, p.age || null, p.gender || null, p.contact || p.mobile || null, p.address || null, finalSyncedBarangay || null, new Date(p._offlineTimestamp || Date.now())],
+                (err, insRes) => {
                     if (err) {
-                        results.push({ type, error: err.message });
+                        results.push({ type, error: 'Internal database error. Please try again.' });
                     } else {
                         processed++;
                         results.push({ type, success: true });
+                        // Phase 1b: snapshot the offline resident message into the retention archive
+                        if (!payload._offlineUserId) {
+                            archiveRecord('contact_message', (insRes && insRes.insertId) || null, p.name || 'Resident Message', {
+                                id: (insRes && insRes.insertId) || null, name: p.name, target_cho_unit: p.targetCho || null,
+                                disease_name: p.disease || p.disease_name || null, message: p.message,
+                                age: p.age || null, gender: p.gender || null, contact_no: p.contact || p.mobile || null,
+                                address: p.address || null, barangay: finalSyncedBarangay || null,
+                            }, null, 'Received (Offline)');
+                        }
                     }
                     processNext(index + 1);
                 }
@@ -3796,17 +4582,25 @@ app.post('/api/sync', authenticate, (req, res) => {
               const autoCls = diseaseClassification(p.disease_name);
               const resolvedCaseType = ['Suspected', 'Probable', 'Confirmed'].includes(p.case_type) ? p.case_type : autoCls.case_type;
               const resolvedDiseaseType = p.disease_type != null && String(p.disease_type).trim() !== '' ? String(p.disease_type).trim().slice(0, 100) : null;
+              let finalLat = p.latitude || null;
+              let finalLng = p.longitude || null;
+              if (barangayName) {
+                const clamped = geoSnap.snapToBarangay(p.longitude, p.latitude, barangayName, `${barangayName}|${p.address ? String(p.address).replace(/[^0-9a-zA-Z ]/g, ' ') : 'C'}`);
+                if (clamped) { finalLat = String(clamped[0]); finalLng = String(clamped[1]); }
+              }
               db.query(
                 `INSERT INTO case_add_requests
                   (patient_name, disease_name, age, severity, case_type, disease_type, gender, case_status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude,
-                   requested_by, requested_by_name, from_barangay_name, target_cho_unit, note)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                   requested_by, requested_by_name, from_barangay_name, target_cho_unit, note,
+                   vaccination_status, vaccine_expiry_date)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [p.patient_name, p.disease_name, p.age || 0, p.severity || 'Moderate', resolvedCaseType, resolvedDiseaseType, p.gender || 'Male', p.status || 'Active', p.contact || null, p.onset_date || null, p.address || null,
-                  p.barangay_id || null, p.symptoms || null, p.physician || null, p.latitude || null, p.longitude || null,
-                  p._offlineUserId || null, p._offlineUserName || 'Offline BHW', p.from_barangay_name || null, targetChoUnit || null, p.note || null],
+                  p.barangay_id || null, p.symptoms || null, p.physician || null, finalLat, finalLng,
+                  p._offlineUserId || null, p._offlineUserName || 'Offline BHW', p.from_barangay_name || null, targetChoUnit || null, p.note || null,
+                  p.vaccination_status || null, p.vaccine_expiry_date || null],
                 (err, result) => {
                   if (err) {
-                    results.push({ type, error: err.message });
+                    results.push({ type, error: 'Internal database error. Please try again.' });
                   } else {
                     processed++;
                     results.push({ type, requestId: result.insertId });
@@ -3829,7 +4623,7 @@ app.post('/api/sync', authenticate, (req, res) => {
               [caseId, p._offlineUserId || null, p._offlineUserName || 'Offline BHW', p.from_barangay_name || null, p.target_cho_unit || null, p.note || '(offline edit)', proposedJson],
               (err, result) => {
                 if (err) {
-                  results.push({ type, error: err.message });
+                  results.push({ type, error: 'Internal database error. Please try again.' });
                 } else {
                   processed++;
                   results.push({ type, requestId: result.insertId });
@@ -3893,7 +4687,7 @@ app.put('/api/pending-registrations/:id/approve', authenticate, (req, res) => {
                 `UPDATE users SET is_active = 1, status = 'approved' WHERE user_id = ?`,
                 [id],
                 (err2) => {
-                    if (err2) return res.status(500).json({ error: err2.message });
+                    if (err2) return res.status(500).json({ error: 'Internal database error. Please try again.' });
 
                     // Send approval email
                     if (user.email) {
@@ -3948,7 +4742,7 @@ app.put('/api/pending-registrations/:id/reject', authenticate, (req, res) => {
                 `UPDATE users SET is_active = 0, status = 'rejected' WHERE user_id = ?`,
                 [id],
                 (err2) => {
-                    if (err2) return res.status(500).json({ error: err2.message });
+                    if (err2) return res.status(500).json({ error: 'Internal database error. Please try again.' });
 
                     // Send rejection email
                     if (user.email) {
@@ -3977,7 +4771,7 @@ app.put('/api/pending-registrations/:id/reject', authenticate, (req, res) => {
                             const actorBrgy = (!bErr2 && bRes2.length > 0) ? bRes2[0].name : null;
                             createAuditLog(actorId, actor.full_name, actor.role, getChoUnitForBarangay(actorBrgy), actorBrgy,
                               'Rejected', 'User Registration',
-                              `Rejected BHW registration for ${user.full_name}${reason ? ` — Reason: ${reason}` : ''} (User ID: ${user.user_id})`);
+                              `Rejected BHW registration for ${user.full_name}${reason ? ` - Reason: ${reason}` : ''} (User ID: ${user.user_id})`);
                           });
                         }
                       });
@@ -4183,7 +4977,7 @@ app.post('/api/users', authenticate, requireRole('CHO'), async (req, res) => {
     });
 });
 
-// ROUTE: Send 2FA verification email — generates a real token now. Self-service only (uses JWT identity).
+// ROUTE: Send 2FA verification email - generates a real token now. Self-service only (uses JWT identity).
 app.post('/api/send-2fa-email', authenticate, (req, res) => {
     const userId = req.user ? req.user.user_id : null;
     if (!userId) return res.status(401).json({ error: 'Not authenticated.' });
@@ -4267,7 +5061,7 @@ app.post('/api/verify-2fa-token', (req, res) => {
     });
 });
 
-// ROUTE: Disable 2FA — operates on the authenticated user's own account (IDOR-safe)
+// ROUTE: Disable 2FA - operates on the authenticated user's own account (IDOR-safe)
 app.post('/api/disable-2fa', authenticate, (req, res) => {
     const userId = req.user ? req.user.user_id : null;
     if (!userId) return res.status(401).json({ error: 'Not authenticated.' });
@@ -4296,7 +5090,7 @@ app.post('/api/send-login-otp', (req, res) => {
         const otp = crypto.randomInt(100000, 1000000).toString();
         const expiry = new Date(Date.now() + 600000); // 10 minutes
 
-        // Do NOT reset login_otp_attempts here — the attempt guard must persist across resends
+        // Do NOT reset login_otp_attempts here - the attempt guard must persist across resends
         db.query('UPDATE users SET login_otp = ?, login_otp_expiry = ? WHERE user_id = ?',
             [otp, expiry, userId], async (updateErr) => {
             if (updateErr) return res.status(500).json({ error: 'Failed to generate code.' });
@@ -4323,7 +5117,7 @@ app.post('/api/send-login-otp', (req, res) => {
     });
 });
 
-// ROUTE: Verify login OTP — completes the 2FA login step
+// ROUTE: Verify login OTP - completes the 2FA login step
 app.post('/api/verify-login-otp', (req, res) => {
     const { userId, otp, device, location } = req.body;
 
@@ -4390,7 +5184,7 @@ function createNotificationForUsers(title, message, type, link_to, barangayId = 
     // Pre-fetch the CHO unit for the case barangay (for unit-level CHO matching)
     const proceed = (caseBarangayUnit) => {
         db.query(
-            `SELECT u.user_id, u.role, u.assigned_barangay_id, u.email, b.name AS barangay_name
+            `SELECT u.user_id, u.role, u.assigned_barangay_id, u.email, u.mobile_number, b.name AS barangay_name
              FROM users u
              LEFT JOIN barangays b ON u.assigned_barangay_id = b.id
              WHERE u.is_active = 1`,
@@ -4420,7 +5214,7 @@ function createNotificationForUsers(title, message, type, link_to, barangayId = 
                 let isCho = false;
                 if (user.role === 'CHO') {
                     if (barangayId === null) {
-                        isCho = true; // broadcast — all CHOs see it
+                        isCho = true; // broadcast - all CHOs see it
                     } else {
                         const exactMatch = Number(user.assigned_barangay_id) === Number(barangayId);
                         const userUnit = getChoUnitForBarangay(user.barangay_name);
@@ -4446,7 +5240,7 @@ function createNotificationForUsers(title, message, type, link_to, barangayId = 
                     // 'high_risk_alert' is always delivered (automatic) within the user's assigned scope
                     const eventAllowed = !eventType || eventType === 'delete' || eventType === 'high_risk_alert' || prefs[eventType] == true;
 
-                    // 1. In-app notification (Push) — only if push_notifications is ON
+                    // 1. In-app notification (Push) - only if push_notifications is ON
                     if (prefs.push_notifications && eventAllowed) {
                         db.query(
                             'INSERT INTO notifications (user_id, title, message, type, link_to, reference_id) VALUES (?, ?, ?, ?, ?, ?)',
@@ -4478,6 +5272,17 @@ function createNotificationForUsers(title, message, type, link_to, barangayId = 
                                 <p style="color:#94a3b8;font-size:12px">Cabuyao City Disease Monitoring System</p>
                             </div>`
                         ).catch(err => console.error(`Email notification failed for user ${user.user_id}:`, err.message));
+                    }
+
+                    // 3. SMS notification - staff-only (recipients are CHO/BHW accounts; residents are never in this query)
+                    const clearSmsMessage = message.replace(/[^\x20-\x7E]/g, '').trim();
+                    if (eventAllowed && prefs.sms_notifications && user.mobile_number) {
+                        const phNumber = toPhMobile(user.mobile_number);
+                        if (phNumber) {
+                            sendBrevoSms(phNumber, clearSmsMessage || title).catch(err =>
+                                console.error(`SMS notification failed for user ${user.user_id}:`, err.message)
+                            );
+                        }
                     }
                 });
             });
@@ -4533,12 +5338,18 @@ app.get('/api/notifications', authenticate, (req, res) => {
     if (!userId) {
         return res.status(400).json({ error: 'userId is required' });
     }
+    const limit = req.query.limit ? Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 500) : null;
+    const offset = req.query.offset ? Math.max(parseInt(req.query.offset, 10) || 0, 0) : 0;
     db.query(
-        'SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC',
-        [userId],
+        'SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC' + (limit ? ` LIMIT ${limit} OFFSET ${offset}` : ''),
+        limit ? [userId] : [userId],
         (err, results) => {
             if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
-            return res.json(results);
+            if (!limit) return res.json(results);
+            db.query('SELECT COUNT(*) AS total FROM notifications WHERE user_id = ?', [userId], (cErr, cnt) => {
+                if (cErr) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+                return res.json({ rows: results, total: cnt && cnt[0] ? cnt[0].total : results.length, limit, offset });
+            });
         }
     );
 });
@@ -4554,6 +5365,22 @@ app.post('/api/notifications', authenticate, (req, res) => {
             return res.status(201).json({ message: 'Notification created', id: result.insertId });
         }
     );
+});
+
+// POST /api/sms/test - CHO-only, sends a staff emergency SMS to a single PH mobile (self-test of Brevo SMS path)
+app.post('/api/sms/test', authenticate, (req, res) => {
+    if (!req.user || req.user.role !== 'CHO') {
+        return res.status(403).json({ error: 'CHO access only' });
+    }
+    const { to, message } = req.body;
+    if (!to || !message) return res.status(400).json({ error: 'to and message are required' });
+    const phNumber = toPhMobile(to);
+    if (!phNumber) return res.status(400).json({ error: 'Invalid Philippine mobile number' });
+    sendBrevoSms(phNumber, String(message)).then(() => {
+        return res.json({ message: 'SMS queued to Brevo', recipient: phNumber });
+    }).catch(() => {
+        return res.status(500).json({ error: 'SMS send failed' });
+    });
 });
 
 // PUT: Mark notification as read
@@ -4622,14 +5449,15 @@ app.put('/api/notification-preferences/:userId', authenticate, (req, res) => {
         push_notifications, email_notifications, sms_notifications,
         new_case_reported, case_status_updated, high_risk_alert,
         weekly_summary, system_maintenance, updated_case_reported,
+        vaccine_advisories,
     } = req.body;
 
     db.query(
         `INSERT INTO notification_preferences 
         (user_id, push_notifications, email_notifications, sms_notifications, 
          new_case_reported, case_status_updated, high_risk_alert, 
-         weekly_summary, system_maintenance, updated_case_reported)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         weekly_summary, system_maintenance, updated_case_reported, vaccine_advisories)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
         push_notifications = VALUES(push_notifications),
         email_notifications = VALUES(email_notifications),
@@ -4639,11 +5467,13 @@ app.put('/api/notification-preferences/:userId', authenticate, (req, res) => {
         high_risk_alert = VALUES(high_risk_alert),
         weekly_summary = VALUES(weekly_summary),
         system_maintenance = VALUES(system_maintenance),
-        updated_case_reported = VALUES(updated_case_reported)`,
+        updated_case_reported = VALUES(updated_case_reported),
+        vaccine_advisories = VALUES(vaccine_advisories)`,
         [userId,
          push_notifications ? 1 : 0, email_notifications ? 1 : 0, sms_notifications ? 1 : 0,
          new_case_reported ? 1 : 0, case_status_updated ? 1 : 0, high_risk_alert ? 1 : 0,
-         weekly_summary ? 1 : 0, system_maintenance ? 1 : 0, updated_case_reported ? 1 : 0],
+         weekly_summary ? 1 : 0, system_maintenance ? 1 : 0, updated_case_reported ? 1 : 0,
+         vaccine_advisories ? 1 : 0],
         (err, result) => {
             if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
             return res.json({ message: 'Preferences saved successfully' });
@@ -4655,7 +5485,7 @@ app.put('/api/notification-preferences/:userId', authenticate, (req, res) => {
 // 5. STORAGE AND EXPORT ROUTES
 // ==========================================
 
-// GET /api/storage-stats — real counts and estimated storage usage
+// GET /api/storage-stats - real counts and estimated storage usage
 app.get('/api/storage-stats', authenticate, (req, res) => {
   const queries = {
     cases: 'SELECT COUNT(*) AS count FROM disease_cases',
@@ -4693,7 +5523,7 @@ app.get('/api/storage-stats', authenticate, (req, res) => {
   .catch(err => res.status(500).json({ error: 'Something went wrong. Please try again.' }));
 });
 
-// GET /api/export-all — export all cases as JSON or CSV
+// GET /api/export-all - export all cases as JSON or CSV
 app.get('/api/export-all', authenticate, (req, res) => {
   const { format } = req.query;
 
@@ -4701,7 +5531,7 @@ app.get('/api/export-all', authenticate, (req, res) => {
     SELECT dc.case_id, dc.patient_name, dc.age, dc.gender, dc.contact,
            dc.address, dc.symptoms, dc.physician, dc.onset_date,
            dc.severity, dc.case_type, dc.disease_type, dc.status, dc.date_reported,
-           dc.latitude, dc.longitude,
+           dc.latitude, dc.longitude, dc.vaccination_status, dc.vaccine_expiry_date,
            d.name AS disease_name,
            b.name AS barangay_name
     FROM disease_cases dc
@@ -4737,7 +5567,7 @@ app.get('/api/export-all', authenticate, (req, res) => {
 // 6. BACKUP AND DATA CLEAR ROUTES
 // ==========================================
 
-// GET /api/backup — full data export as JSON download
+// GET /api/backup - full data export as JSON download
 app.get('/api/backup', authenticate, (req, res) => {
   if (req.user.role !== 'CHO') {
     return res.status(403).json({ error: 'Only CHO accounts may export system backups.' });
@@ -4792,7 +5622,7 @@ app.get('/api/backup', authenticate, (req, res) => {
 // RESIDENT PORTAL ROUTES
 // ==========================================
 
-// POST /api/contact-messages — Resident contact form submission
+// POST /api/contact-messages - Resident contact form submission
 app.post('/api/contact-messages', (req, res) => {
   const { name, targetCho, targetBarangay, disease, message, age, gender, contact, address } = req.body;
 
@@ -4812,6 +5642,13 @@ app.post('/api/contact-messages', (req, res) => {
         console.error('Error saving contact message:', err.message);
         return res.status(500).json({ error: 'Failed to save message.' });
       }
+
+      // Phase 1b: snapshot the resident message into the retention archive
+      archiveRecord('contact_message', result.insertId, name, {
+        id: result.insertId, name, target_cho_unit: targetCho || null, disease_name: disease || null,
+        message, age: age || null, gender: gender || null, contact_no: contact || null,
+        address: address || null, barangay: finalBarangay,
+      }, null, 'Received');
 
       // Create notification for users in the target CHO unit (only if push_notifications is ON)
       if (targetCho) {
@@ -4848,7 +5685,7 @@ app.post('/api/contact-messages', (req, res) => {
         );
       }
 
-      // Notify the BHW(s) of the target barangay — respects their push preference
+      // Notify the BHW(s) of the target barangay - respects their push preference
       // (inbox ALWAYS receives it regardless; this row only controls the bell alert)
       if (finalBarangay) {
         db.query(
@@ -4878,7 +5715,7 @@ app.post('/api/contact-messages', (req, res) => {
   );
 });
 
-// GET /api/contact-messages — Retrieve contact messages (for CHO/BHW inbox)
+// GET /api/contact-messages - Retrieve contact messages (for CHO/BHW inbox)
 app.get('/api/contact-messages', authenticate, (req, res) => {
   const { choUnit, barangay, limit } = req.query;
   let sql = 'SELECT * FROM contact_messages';
@@ -4912,7 +5749,7 @@ app.get('/api/contact-messages', authenticate, (req, res) => {
   });
 });
 
-// PUT /api/contact-messages/:id/read — Mark message as read
+// PUT /api/contact-messages/:id/read - Mark message as read
 app.put('/api/contact-messages/:id/read', authenticate, (req, res) => {
   db.query('UPDATE contact_messages SET is_read = 1 WHERE id = ?', [req.params.id], (err) => {
     if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
@@ -4920,7 +5757,7 @@ app.put('/api/contact-messages/:id/read', authenticate, (req, res) => {
   });
 });
 
-// PUT /api/contact-messages/:id/pending — Mark message as pending (BHW reviewing)
+// PUT /api/contact-messages/:id/pending - Mark message as pending (BHW reviewing)
 app.put('/api/contact-messages/:id/pending', authenticate, (req, res) => {
   db.query("UPDATE contact_messages SET status = 'pending' WHERE id = ?", [req.params.id], (err) => {
     if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
@@ -4928,7 +5765,7 @@ app.put('/api/contact-messages/:id/pending', authenticate, (req, res) => {
   });
 });
 
-// PUT /api/contact-messages/:id/reject — Reject a resident message
+// PUT /api/contact-messages/:id/reject - Reject a resident message
 app.put('/api/contact-messages/:id/reject', authenticate, (req, res) => {
   db.query("UPDATE contact_messages SET status = 'rejected', is_read = 1 WHERE id = ?", [req.params.id], (err) => {
     if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
@@ -4936,7 +5773,7 @@ app.put('/api/contact-messages/:id/reject', authenticate, (req, res) => {
   });
 });
 
-// PUT /api/contact-messages/:id/accept — Convert contact message to a disease case
+// PUT /api/contact-messages/:id/accept - Convert contact message to a disease case
 app.put('/api/contact-messages/:id/accept', authenticate, (req, res) => {
   const { id } = req.params;
   db.query('SELECT * FROM contact_messages WHERE id = ?', [id], (err, rows) => {
@@ -4948,19 +5785,20 @@ app.put('/api/contact-messages/:id/accept', authenticate, (req, res) => {
       const diseaseId = dRes && dRes.length > 0 ? dRes[0].id : null;
       db.query(
         `INSERT INTO disease_cases
-         (patient_name, disease_id, age, severity, gender, status, contact, onset_date, address, symptoms, date_reported)
-         VALUES (?, ?, ?, 'Mild', ?, 'Active', ?, NULL, ?, ?, NOW())`,
+         (patient_name, disease_id, age, severity, gender, status, contact, onset_date, address, symptoms, date_reported,
+          vaccination_status, vaccine_expiry_date)
+         VALUES (?, ?, ?, 'Mild', ?, 'Active', ?, NULL, ?, ?, NOW(), NULL, NULL)`,
         [msg.name, diseaseId, msg.age || 0, msg.gender || 'Male', msg.contact_no || null, msg.address || null, msg.message || ''],
         (insertErr, result) => {
           if (insertErr) {
             console.error('Contact message accept insert error:', insertErr.message);
-            return res.status(500).json({ error: insertErr.message });
+            return res.status(500).json({ error: 'Internal database error. Please try again.' });
           }
           const caseId = result.insertId;
           db.query("UPDATE contact_messages SET status = 'accepted', is_read = 1 WHERE id = ?", [id], (updateErr) => {
             if (updateErr) {
               console.error('Contact message accept update error:', updateErr.message);
-              return res.status(500).json({ error: updateErr.message });
+              return res.status(500).json({ error: 'Internal database error. Please try again.' });
             }
             res.json({ message: 'Message accepted as case.', case_id: caseId });
           });
@@ -4970,7 +5808,7 @@ app.put('/api/contact-messages/:id/accept', authenticate, (req, res) => {
   });
 });
 
-// GET /api/disease_cases/public-summary — Public case counts per barangay
+// GET /api/disease_cases/public-summary - Public case counts per barangay
 app.get('/api/disease_cases/public-summary', (req, res) => {
   const sql = `
     SELECT b.name AS barangay_name, COUNT(dc.case_id) AS case_count
@@ -4985,7 +5823,7 @@ app.get('/api/disease_cases/public-summary', (req, res) => {
   });
 });
 
-// GET /api/disease_cases/public-disease-counts — Per-disease case counts for a barangay
+// GET /api/disease_cases/public-disease-counts - Per-disease case counts for a barangay
 app.get('/api/disease_cases/public-disease-counts', (req, res) => {
   const { barangay } = req.query;
   let sql, params;
@@ -5200,7 +6038,7 @@ function buildWeeklyHtmlAndPlain(summary, barangays, diseases, severities, scope
         `<tr><td>${s.severity}</td><td style="text-align:right;font-weight:600">${s.count}</td></tr>`
     ).join('') : '<tr><td colspan="2">No data</td></tr>';
 
-    const scopeTitle = scopeLabel ? ` — ${scopeLabel}` : '';
+    const scopeTitle = scopeLabel ? ` - ${scopeLabel}` : '';
     const totalAll = total || 0;
     const recoveryRate = totalAll > 0 ? Math.round((recovered / totalAll) * 1000) / 10 : 0;
     const mortalityRate = totalAll > 0 ? Math.round((deceased / totalAll) * 1000) / 10 : 0;
@@ -5257,7 +6095,7 @@ function buildWeeklyHtmlAndPlain(summary, barangays, diseases, severities, scope
     return { html, plain };
 }
 
-// Weekly Summary — Friday 5PM cron (scoped per user / CHO unit / BHW barangay)
+// Weekly Summary - Friday 5PM cron (scoped per user / CHO unit / BHW barangay)
 function runWeeklySummary() {
     console.log('⏰ Running weekly summary delivery...');
 
@@ -5402,11 +6240,265 @@ app.post('/api/weekly-summary/run', authenticate, (req, res) => {
     return res.json({ message: 'Weekly summary run started. Notifications and emails will be sent to subscribed users.' });
 });
 
+// ═════════════════════════════════════════════════════════
+// RETENTION PURGE + SCHEDULED DB MIRROR (Phase 2)
+// ═════════════════════════════════════════════════════════
+// Retention windows (days) for high-volume operational rows. The archive_records vault
+// (archiveRecord) already keeps permanent snapshots of archived cases/users/reports/
+// messages, and audit_logs are the CHO reports source of truth - neither is purged.
+const RETENTION_WINDOWS = {
+  error_logs: 90,            // logged_at
+  notifications: 365,        // created_at
+  contact_messages: 1095,    // created_at - 3 years
+  case_inbox: 1095,          // created_at - referrals + inbox rows, 3 years
+  case_status_history: 1095, // changed_at - 3 years, only for cases no longer active
+};
+const MIRROR_DIR = path.join(__dirname, 'backups', 'mirror');
+const MIRROR_KEEP = parseInt(process.env.MIRROR_KEEP, 10) || 30;
+
+function runRetentionPurge(cb) {
+  const summary = {};
+  const labels = ['error_logs', 'notifications', 'contact_messages', 'case_inbox', 'case_status_history'];
+  let pending = labels.length;
+  const finish = () => {
+    if (--pending > 0) return;
+    const parts = Object.entries(summary).map(([k, v]) => `${k}: ${v}`).join(', ') || 'nothing purged';
+    console.log(`🗄️ Retention purge complete - ${parts}`);
+    db.query('INSERT INTO audit_logs (user_name, user_role, action, entity, details) VALUES (?, ?, ?, ?, ?)',
+      ['System', 'System', 'Retention Purge', 'System Data', `Purged ${parts} of operational data older than retention windows`],
+      (err) => { if (cb) cb(summary); });
+  };
+  const del = (label, sql, params) => {
+    db.query(sql, params, (err, result) => {
+      if (err) { console.error('Retention purge failed for ' + label + ':', err.message); summary[label] = 0; }
+      else summary[label] = result.affectedRows;
+      finish();
+    });
+  };
+  del('error_logs',
+    'DELETE FROM error_logs WHERE logged_at < DATE_SUB(NOW(), INTERVAL ? DAY)',
+    [RETENTION_WINDOWS.error_logs]);
+  del('notifications',
+    'DELETE FROM notifications WHERE created_at < DATE_SUB(NOW(), INTERVAL ? DAY)',
+    [RETENTION_WINDOWS.notifications]);
+  del('contact_messages',
+    'DELETE FROM contact_messages WHERE created_at < DATE_SUB(NOW(), INTERVAL ? DAY)',
+    [RETENTION_WINDOWS.contact_messages]);
+  del('case_inbox',
+    'DELETE FROM case_inbox WHERE created_at < DATE_SUB(NOW(), INTERVAL ? DAY)',
+    [RETENTION_WINDOWS.case_inbox]);
+  del('case_status_history',
+    `DELETE FROM case_status_history WHERE changed_at < DATE_SUB(NOW(), INTERVAL ? DAY)
+       AND case_id NOT IN (SELECT case_id FROM disease_cases WHERE status IN ('Active','Pending','Under Treatment'))`,
+    [RETENTION_WINDOWS.case_status_history]);
+}
+
+// Full-DB mirror: snapshot the 6 core tables to a dated JSON file in backups/mirror.
+function snapshotCoreTables(cb) {
+  const tables = ['disease_cases', 'users', 'barangays', 'diseases', 'disease_categories', 'disease_category_items'];
+  const data = {};
+  let i = 0;
+  const next = () => {
+    if (i >= tables.length) return cb(null, data);
+    const tb = tables[i++];
+    db.query(`SELECT * FROM ${tb}`, (err, rows) => {
+      if (err) return cb(err);
+      data[tb] = rows || [];
+      next();
+    });
+  };
+  next();
+}
+
+function runMirrorExport(cb) {
+  snapshotCoreTables((err, data) => {
+    if (err) {
+      console.error('Mirror export failed:', err.message);
+      return cb && cb({ error: err.message });
+    }
+    try {
+      fs.mkdirSync(MIRROR_DIR, { recursive: true });
+      const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
+      const file = path.join(MIRROR_DIR, `cdms-mirror-${stamp}.json`);
+      const snapshot = {
+        system: 'Cabuyao CDMS', version: '2.0', backup_date: new Date().toISOString(), mirror: true,
+        ...data,
+      };
+      fs.writeFileSync(file, JSON.stringify(snapshot, null, 2));
+      const all = fs.readdirSync(MIRROR_DIR).filter(f => /^cdms-mirror-.*\.json$/.test(f));
+      if (all.length > MIRROR_KEEP) {
+        all.sort().slice(0, all.length - MIRROR_KEEP).forEach(f => {
+          try { fs.unlinkSync(path.join(MIRROR_DIR, f)); } catch (e) { /* ignore */ }
+        });
+      }
+      const size = fs.statSync(file).size;
+      console.log(`🪞 DB mirror exported: ${file} (${(size / 1024).toFixed(1)} KB)`);
+      db.query('INSERT INTO audit_logs (user_name, user_role, action, entity, details) VALUES (?, ?, ?, ?, ?)',
+        ['System', 'System', 'DB Mirror', 'System Data', `Scheduled full-DB mirror exported to ${path.basename(file)} (${(size / 1024).toFixed(1)} KB)`],
+        () => {});
+      if (cb) cb({ file, size });
+    } catch (e) {
+      console.error('Mirror export write failed:', e.message);
+      if (cb) cb({ error: e.message });
+    }
+  });
+}
+
+// NOTE (Railway): the app filesystem is ephemeral - mirror JSON files vanish on redeploy.
+// For a durable DR mirror on Railway, enable real MySQL binlog replication to a second
+// database (see AGENTS.md "Railway binlog replication" note) or map MIRROR_DIR to a
+// persistent volume. The JSON mirror below is an on-disk snapshot for local/on-prem use.
+
+// Monday 3AM: retention purge. Daily 2AM: full-DB mirror. Both write audit-log entries.
+cron.schedule('0 3 * * 1', () => { console.log('🗄️ Running retention purge...'); runRetentionPurge(); });
+cron.schedule('0 2 * * *', () => { console.log('🪞 Running scheduled DB mirror export...'); runMirrorExport(); });
+
+// Manual CHO triggers (mirror the "Run Weekly Now" pattern in ChoSettings)
+app.post('/api/maintenance/retention-run', authenticate, (req, res) => {
+  if (req.user.role !== 'CHO') {
+    return res.status(403).json({ error: 'Only CHO can run retention purge.' });
+  }
+  runRetentionPurge((summary) => res.json({ message: 'Retention purge complete.', summary }));
+});
+
+app.post('/api/maintenance/mirror-run', authenticate, (req, res) => {
+  if (req.user.role !== 'CHO') {
+    return res.status(403).json({ error: 'Only CHO can run mirror export.' });
+  }
+  runMirrorExport((info) => {
+    if (info && info.error) return res.status(500).json({ error: info.error });
+    res.json({ message: `DB mirror exported to ${path.basename(info.file)}.`, file: info.file, size: info.size });
+  });
+});
+
+// ==========================================
+// SEASONAL VACCINE ADVISORIES
+// ==========================================
+
+// Determine which advisory is active today (handles the Nov-May year wrap)
+function currentSeasonAdvisory(cb) {
+    const month = new Date().getMonth() + 1;
+    db.query('SELECT * FROM vaccine_advisories WHERE active = 1', (err, rows) => {
+        if (err) return cb(err, null);
+        const found = (rows || []).find(r => {
+            if (r.month_start <= r.month_end) return month >= r.month_start && month <= r.month_end;
+            return month >= r.month_start || month <= r.month_end;
+        });
+        cb(null, found || (rows && rows[0]) || null);
+    });
+}
+
+// GET all advisories (for editing/management)
+app.get('/api/vaccine-advisories', (req, res) => {
+    db.query('SELECT * FROM vaccine_advisories ORDER BY month_start', (err, rows) => {
+        if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+        res.json(rows);
+    });
+});
+
+// GET the advisory active for today's season
+app.get('/api/vaccine-advisories/current', (req, res) => {
+    currentSeasonAdvisory((err, row) => {
+        if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+        if (!row) return res.json(null);
+        res.json(row);
+    });
+});
+
+// PUT update advisory content (CHO only)
+app.put('/api/vaccine-advisories/:id', authenticate, requireRole('CHO'), (req, res) => {
+    const { season_key, season_label, month_start, month_end, title, message, vaccine_recommendations, active } = req.body;
+    if (!title || !season_label) {
+        return res.status(400).json({ error: 'Season label and title are required.' });
+    }
+    db.query(
+        `UPDATE vaccine_advisories SET season_key = ?, season_label = ?, month_start = ?, month_end = ?, title = ?, message = ?, vaccine_recommendations = ?, active = ? WHERE id = ?`,
+        [season_key || null, season_label, parseInt(month_start) || null, parseInt(month_end) || null, title, message || null, vaccine_recommendations || null, active === false ? 0 : 1, req.params.id],
+        (err, result) => {
+            if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+            if (result.affectedRows === 0) return res.status(404).json({ error: 'Advisory not found.' });
+            createAuditLog(req.user.user_id, req.user.name, req.user.role, null, req.user.barangay || null, 'Vaccine Advisory', 'System', `Updated ${season_label} advisory`);
+            res.json({ message: 'Vaccine advisory updated.' });
+        }
+    );
+});
+
+// POST send the active advisory to subscribed staff (CHO only)
+app.post('/api/vaccine-advisories/send', authenticate, (req, res) => {
+    if (req.user.role !== 'CHO') {
+        return res.status(403).json({ error: 'Only CHO can send a vaccine advisory.' });
+    }
+    currentSeasonAdvisory((err, advisory) => {
+        if (err) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+        if (!advisory) return res.status(404).json({ error: 'No active vaccine advisory.' });
+        const list = (advisory.vaccine_recommendations || '').split('\n').filter(Boolean).map(x => x.trim()).filter(Boolean);
+        const plain = `🌦️ ${advisory.season_label}: ${advisory.title}\n\n${list.map(v => `• ${v}`).join('\n')}\n\n${advisory.message || ''}`;
+        db.query(
+            `SELECT u.user_id, u.email, u.full_name
+             FROM users u
+             INNER JOIN notification_preferences np ON u.user_id = np.user_id
+             WHERE u.is_active = 1 AND np.vaccine_advisories = 1`,
+            (err2, users) => {
+                if (err2) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+                let sent = 0;
+                users.forEach(user => {
+                    db.query(
+                        'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
+                        [user.user_id, `🌦️ ${advisory.title}`, plain, 'vaccine_advisory', null]
+                    );
+                    if (user.email) {
+                        const html = `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:12px">
+                            <h2 style="color:#1e293b;margin:0 0 8px 0">🌦️ ${advisory.title}</h2>
+                            <p style="color:#475569;font-size:15px;line-height:1.5">${advisory.season_label}</p>
+                            <ul style="color:#0f172a;font-size:15px;line-height:1.7">${list.map(v => `<li>${v}</li>`).join('')}</ul>
+                            <p style="color:#64748b;font-size:14px;line-height:1.5">${advisory.message || ''}</p>
+                            <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0" />
+                            <p style="color:#94a3b8;font-size:12px">Cabuyao City Disease Monitoring System</p>
+                        </div>`;
+                        sendBrevoEmail(user.email, `🌦️ ${advisory.title} - Cabuyao CDMS`, html).catch(() => {});
+                    }
+                    sent++;
+                });
+                createAuditLog(req.user.user_id, req.user.name, req.user.role, null, req.user.barangay || null, 'Vaccine Advisory', 'System', `Sent ${advisory.season_label} advisory to ${sent} staff`);
+                res.json({ message: `Vaccine advisory sent to ${sent} staff member(s).` });
+            }
+        );
+    });
+});
+
+// Monthly cron: auto-send the active advisory to subscribed staff (1st of month, 9AM)
+cron.schedule('0 9 1 * *', () => {
+    console.log('🌦️ Running seasonal vaccine advisory cron (1st of month 9AM)...');
+    currentSeasonAdvisory((err, advisory) => {
+        if (err || !advisory) return;
+        const list = (advisory.vaccine_recommendations || '').split('\n').filter(Boolean).map(x => x.trim()).filter(Boolean);
+        const plain = `🌦️ ${advisory.season_label}: ${advisory.title}\n\n${list.map(v => `• ${v}`).join('\n')}\n\n${advisory.message || ''}`;
+        db.query(
+            `SELECT u.user_id, u.email FROM users u
+             INNER JOIN notification_preferences np ON u.user_id = np.user_id
+             WHERE u.is_active = 1 AND np.vaccine_advisories = 1`,
+            (err2, users) => {
+                if (err2 || !users.length) return;
+                users.forEach(user => {
+                    db.query(
+                        'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
+                        [user.user_id, `🌦️ ${advisory.title}`, plain, 'vaccine_advisory', null]
+                    );
+                    if (user.email) {
+                        sendBrevoEmail(user.email, `🌦️ ${advisory.title} - Cabuyao CDMS`, plain).catch(() => {});
+                    }
+                });
+                console.log(`🌦️ Vaccine advisory sent to ${users.length} user(s).`);
+            }
+        );
+    });
+});
+
 // ==========================================
 // 8. SYSTEM MAINTENANCE ENDPOINT
 // ==========================================
 
-// POST /api/notifications/system-maintenance — broadcast to all users with preference
+// POST /api/notifications/system-maintenance - broadcast to all users with preference
 app.post('/api/notifications/system-maintenance', authenticate, (req, res) => {
     const { title, message } = req.body;
     if (!title || !message) {
@@ -5449,7 +6541,7 @@ app.post('/api/notifications/system-maintenance', authenticate, (req, res) => {
 // 9. RESTORE ENDPOINT
 // ==========================================
 
-// POST /api/restore — restore from a backup JSON
+// POST /api/restore - restore from a backup JSON
 app.post('/api/restore', authenticate, (req, res) => {
     if (req.user.role !== 'CHO') {
         return res.status(403).json({ error: 'Only CHO accounts may restore system backups.' });
@@ -5550,7 +6642,7 @@ app.post('/api/restore', authenticate, (req, res) => {
     });
 });
 
-// POST /api/restore/preview — preview what will be restored before committing
+// POST /api/restore/preview - preview what will be restored before committing
 app.post('/api/restore/preview', authenticate, (req, res) => {
     if (req.user.role !== 'CHO') {
         return res.status(403).json({ error: 'Only CHO accounts may preview system restores.' });
@@ -5581,9 +6673,10 @@ app.post('/api/restore/preview', authenticate, (req, res) => {
 // ==========================================
 const PORT = process.env.PORT || 5000;
 
-// Global error handler — masks internal details from clients
+// Global error handler - masks internal details from clients
 app.use((err, req, res, next) => {
     console.error('Unhandled error:', err.message);
+    logAppError('error', 'http', err.message, err.stack);
     if (res.headersSent) return next(err);
     res.status(err.status || 500).json({ error: 'Something went wrong. Please try again.' });
 });
@@ -5597,4 +6690,20 @@ server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
         console.error(`Port ${PORT} is already in use.`);
     }
+});
+
+// -- Process-level robustness: never die silently; write errors to the error_logs table --
+process.on('unhandledRejection', (reason) => {
+    const msg = reason instanceof Error ? reason.stack || reason.message : String(reason);
+    console.error('Unhandled promise rejection:', msg);
+    logAppError('error', 'unhandledRejection', reason instanceof Error ? reason.message : String(reason), reason instanceof Error ? reason.stack : null);
+});
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught exception:', err.stack || err.message);
+    logAppError('error', 'uncaughtException', err.message, err.stack);
+});
+process.on('warning', (warning) => {
+    if (warning && warning.name === 'MaxListenersExceededWarning') return;
+    console.error('Process warning:', warning.message);
+    logAppError('warn', 'process-warning', warning.message, warning.stack);
 });

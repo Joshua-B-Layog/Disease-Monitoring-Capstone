@@ -42,7 +42,7 @@ const SettingsIcon = ({ color = '#64748b', size = 18 }) => (
 const Sidebar = ({ role, activeTab, setActiveTab, choUnit }) => {
   const { t } = useI18n();
   const [mobileOpen, setMobileOpen] = useState(false);
-  // Mobile drawer state — only shows on screens ≤ 768px
+  // Mobile drawer state - only shows on screens ≤ 768px
 
   const selectTab = (name) => { setActiveTab(name); setMobileOpen(false); };
   // Define menu configurations
@@ -84,7 +84,7 @@ const Sidebar = ({ role, activeTab, setActiveTab, choUnit }) => {
           className={`menu-item ${activeTab === item.name ? 'active' : ''}`}
           onClick={() => { setActiveTab(item.name); setMobileOpen(false); }}
         >
-          {item.icon} {t(item.name)}
+          {item.icon} {t(item.name)} Module
         </div>
         ))}
       </div>

@@ -12,6 +12,9 @@ import RolesPermissions from './components/RolesPermissions';
 import MapView from './MapView';
 import WeeklySummary from './WeeklySummary';
 import { ToastHost } from './components/Toast';
+import ErrorBoundary from './components/ErrorBoundary';
+import TourGuide, { TOUR_STEPS } from './components/TourGuide';
+import { readSession, persistSession, updateSession, clearSession } from './sessionStore';
 
 import { API_URL } from './config';
 import { getPendingCount, processSyncQueue } from './syncEngine';
@@ -54,7 +57,7 @@ const extractDiseaseFromMessage = (message) => {
 
 function App() {
   const { t, setLang } = useI18n();
-  const savedSession = (() => { try { return JSON.parse(localStorage.getItem('cdms_session')); } catch { return null; } })();
+  const savedSession = readSession();
   const [isLoggedIn, setIsLoggedIn]       = useState(!!savedSession);
   const [loginRole, setLoginRole]         = useState(savedSession?.role || 'CHO');
   const [sessionContext, setSessionContext] = useState(savedSession?.context || ''); 
@@ -64,6 +67,7 @@ function App() {
   const [mustChangePassword, setMustChangePassword] = useState(!!savedSession?.mustChangePassword);
   const [isGeneratorPassword, setIsGeneratorPassword] = useState(!!savedSession?.isGeneratorPassword);
   const [pwRequestPending, setPwRequestPending] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
 
   const CHO_UNIT_BARANGAYS = {
     'CHO Unit I (Sala)': ['Barangay Uno (Poblacion)', 'Barangay Dos (Poblacion)', 'Barangay Tres (Poblacion)', 'Sala', 'Bigaa', 'Butong', 'Marinig', 'Gulod', 'Niugan', 'Baclaran'],
@@ -115,9 +119,11 @@ function App() {
   const [fontScale, setFontScale] = useState(getSavedFontScale);
   const [pendingInboxView, setPendingInboxView] = useState(null);
   const [pendingOpenCaseId, setPendingOpenCaseId] = useState(null);
+  const [pendingOpenAdd, setPendingOpenAdd] = useState(false);
+  const [pendingMcLanding, setPendingMcLanding] = useState(false);
   const [compactMode, setCompactMode] = useState(getSavedCompact);
   // Auto-compact the app layout on small screens (phones/tablets) even when
-  // the manual Compact Mode toggle is OFF — the round-3 mobile fixes react to
+  // the manual Compact Mode toggle is OFF - the round-3 mobile fixes react to
   // viewport width, the Settings switch still reflects the stored preference.
   const queryMobile = window.matchMedia('(max-width: 820px)');
   const [isMobileView, setIsMobileView] = useState(queryMobile.matches);
@@ -468,6 +474,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
     switch (activeTab) {
       case 'Dashboard':
         return (
+          <ErrorBoundary moduleName="Dashboard" onBack={() => setActiveTab('Dashboard')}>
           <Dashboard
             selectedDisease={selectedDisease}
             setSelectedDisease={setSelectedDisease}
@@ -488,11 +495,12 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             loginBarangay={loggedUserBarangay}
             sessionContext={sessionContext}
           />
+          </ErrorBoundary>
         );
       case 'Manage Cases':
-        return <ManageCases caseFilter={caseFilter} setCaseFilter={setCaseFilter} dateFormat={dateFormat} autoSave={autoSave} confirmDelete={confirmDelete} keyboardShortcuts={keyboardShortcuts} fontScale={fontScale} compactMode={effectiveCompact} loggedUserId={loggedUserId} loggedUser={loggedUser} loginRole={loginRole} loginBarangay={loggedUserBarangay} sessionContext={sessionContext} initialView={pendingInboxView} onInitialViewConsumed={() => setPendingInboxView(null)} pendingOpenCaseId={pendingOpenCaseId} onPendingCaseConsumed={() => setPendingOpenCaseId(null)} />;
+        return <ErrorBoundary moduleName="ManageCases" onBack={() => setActiveTab('Dashboard')}><ManageCases caseFilter={caseFilter} setCaseFilter={setCaseFilter} dateFormat={dateFormat} autoSave={autoSave} confirmDelete={confirmDelete} keyboardShortcuts={keyboardShortcuts} fontScale={fontScale} compactMode={effectiveCompact} loggedUserId={loggedUserId} loggedUser={loggedUser} loginRole={loginRole} loginBarangay={loggedUserBarangay} sessionContext={sessionContext} initialView={pendingInboxView} onInitialViewConsumed={() => setPendingInboxView(null)} pendingOpenCaseId={pendingOpenCaseId} onPendingCaseConsumed={() => setPendingOpenCaseId(null)} pendingOpenAdd={pendingOpenAdd} onPendingOpenAddConsumed={() => setPendingOpenAdd(false)} pendingMcLanding={pendingMcLanding} onMcLandingConsumed={() => setPendingMcLanding(false)} /></ErrorBoundary>;
       case 'Map View':
-        return <MapView setActiveTab={setActiveTab} setCaseFilter={setCaseFilter} fontScale={fontScale} compactMode={effectiveCompact} loginRole={loginRole} loginBarangay={loggedUserBarangay} sessionContext={sessionContext} dateFormat={dateFormat} />;
+        return <ErrorBoundary moduleName="MapView" onBack={() => setActiveTab('Dashboard')}><MapView setActiveTab={setActiveTab} setCaseFilter={setCaseFilter} fontScale={fontScale} compactMode={effectiveCompact} loginRole={loginRole} loginBarangay={loggedUserBarangay} sessionContext={sessionContext} dateFormat={dateFormat} /></ErrorBoundary>;
       case 'User Accounts': 
         if (loginRole !== 'CHO') {
           return (
@@ -504,11 +512,12 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             </div>
           );
         }
-        return <UserManagement dateFormat={dateFormat} confirmDelete={confirmDelete} fontScale={fontScale} compactMode={effectiveCompact} loggedUserId={loggedUserId} loginRole={loginRole} sessionContext={sessionContext} setActiveTab={setActiveTab} />;
+        return <ErrorBoundary moduleName="UserManagement" onBack={() => setActiveTab('Dashboard')}><UserManagement dateFormat={dateFormat} confirmDelete={confirmDelete} fontScale={fontScale} compactMode={effectiveCompact} loggedUserId={loggedUserId} loginRole={loginRole} sessionContext={sessionContext} setActiveTab={setActiveTab} onShowTour={() => setTourOpen(true)} /></ErrorBoundary>;
       case 'Audit Reports':
-        return <BarangayReports dateFormat={dateFormat} activeUser={{ role: loginRole, context: sessionContext }} fontScale={fontScale} compactMode={effectiveCompact} loggedUserId={loggedUserId} />;
+        return <ErrorBoundary moduleName="BarangayReports" onBack={() => setActiveTab('Dashboard')}><BarangayReports dateFormat={dateFormat} activeUser={{ role: loginRole, context: sessionContext }} fontScale={fontScale} compactMode={effectiveCompact} loggedUserId={loggedUserId} /></ErrorBoundary>;
       case 'Settings':
         return (
+          <ErrorBoundary moduleName="ChoSettings" onBack={() => setActiveTab('Dashboard')}>
           <ChoSettings
             activeUser={{ role: loginRole, context: sessionContext }}
             userId={loggedUserId}
@@ -543,11 +552,12 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             openSecurityView={openSecurityView}
             onSecurityViewOpened={() => setOpenSecurityView(false)}
           />
+          </ErrorBoundary>
         );
       case 'Roles & Permissions':
-        return <RolesPermissions compactMode={effectiveCompact} loginRole={loginRole} onBack={() => setActiveTab('User Accounts')} />;
+        return <ErrorBoundary moduleName="RolesPermissions" onBack={() => setActiveTab('User Accounts')}><RolesPermissions compactMode={effectiveCompact} loginRole={loginRole} onBack={() => setActiveTab('User Accounts')} onShowTour={() => setTourOpen(true)} /></ErrorBoundary>;
       case 'Weekly Summary':
-        return <WeeklySummary userId={loggedUserId} loginRole={loginRole} compactMode={effectiveCompact} fontScale={fontScale} onBack={() => setActiveTab('Dashboard')} dateFormat={dateFormat} />;
+        return <ErrorBoundary moduleName="WeeklySummary" onBack={() => setActiveTab('Dashboard')}><WeeklySummary userId={loggedUserId} loginRole={loginRole} compactMode={effectiveCompact} fontScale={fontScale} onBack={() => setActiveTab('Dashboard')} dateFormat={dateFormat} /></ErrorBoundary>;
       default:
         return <div style={{ padding: '20px' }}>Content coming soon...</div>;
     }
@@ -565,7 +575,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
     setAuthToken(sessionData.token || null);
     setMustChangePassword(!!sessionData.mustChangePassword);
     setIsGeneratorPassword(!!sessionData.isGeneratorPassword);
-    localStorage.setItem('cdms_session', JSON.stringify({
+    persistSession({
       id: sessionData.id,
       name: sessionData.name || sessionData.username,
       role: sessionData.role,
@@ -574,18 +584,31 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
       token: sessionData.token || null,
       mustChangePassword: !!sessionData.mustChangePassword,
       isGeneratorPassword: !!sessionData.isGeneratorPassword,
-    }));
+      persist: !!sessionData.persist && !!sessionData.token,
+    });
+    // First-login onboarding tour: auto-runs once per account (replay via the
+    // Show Guide buttons in User Accounts / Roles & Permissions).
+    if (sessionData.id && !sessionData.mustChangePassword && localStorage.getItem(`cdms_tour_done_${sessionData.id}`) !== '1') {
+      setTimeout(() => setTourOpen(true), 700);
+    }
   };
+
+  const handleTourDone = () => {
+    if (loggedUserId) localStorage.setItem(`cdms_tour_done_${loggedUserId}`, '1');
+    setTourOpen(false);
+  };
+
+  const tourStepCtx = { setActiveTab, setPendingInboxView, setPendingOpenAdd, setPendingMcLanding };
 
   // ── Silent re-auth: restore a live token for offline-created sessions ──
   const silentReauthRef = useRef(false);
   const silentReauth = async () => {
     if (silentReauthRef.current) return;
     if (getAuthToken()) return;
-    const raw = localStorage.getItem('cdms_session');
+    const raw = readSession();
     if (!raw || !navigator.onLine) return;
     let saved;
-    try { saved = JSON.parse(raw); } catch { return; }
+    try { saved = raw; } catch { return; }
     if (!saved || !saved.id) return;
     silentReauthRef.current = true;
     try {
@@ -609,11 +632,11 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
           const next = { ...saved, token: data.token, mustChangePassword: !!data.mustChangePassword, isGeneratorPassword: !!data.isGeneratorPassword };
           setMustChangePassword(!!data.mustChangePassword);
           setIsGeneratorPassword(!!data.isGeneratorPassword);
-          localStorage.setItem('cdms_session', JSON.stringify(next));
+          updateSession(next);
         }
       }
     } catch {
-      /* silent re-auth failed — user can log in again later */
+      /* silent re-auth failed - user can log in again later */
     } finally {
       silentReauthRef.current = false;
     }
@@ -626,7 +649,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
   const handleLogout = () => { 
     const teardown = () => {
       setAuthToken(null);
-      localStorage.removeItem('cdms_session');
+      clearSession();
       localStorage.removeItem('cdms_active_tab');
       if (loggedUserId) localStorage.setItem('cdms_last_user', String(loggedUserId));
       setMustChangePassword(false);
@@ -681,10 +704,8 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
       setIsGeneratorPassword(false);
       setPwRequestPending(false);
       setForcePw({ current: '', next: '', confirm: '' });
-      const raw = localStorage.getItem('cdms_session');
-      if (raw) {
-        const s = JSON.parse(raw);
-        localStorage.setItem('cdms_session', JSON.stringify({ ...s, mustChangePassword: false, isGeneratorPassword: false }));
+      if (readSession()) {
+        updateSession({ mustChangePassword: false, isGeneratorPassword: false });
       }
     } catch (err) {
       setForcePwMsg('❌ ' + err.message);
@@ -734,10 +755,8 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
   const dismissFirstLoginPrompt = () => {
     setMustChangePassword(false);
     setFirstLoginReqState('idle');
-    const raw = localStorage.getItem('cdms_session');
-    if (raw) {
-      const s = JSON.parse(raw);
-      localStorage.setItem('cdms_session', JSON.stringify({ ...s, mustChangePassword: false }));
+    if (readSession()) {
+      updateSession({ mustChangePassword: false });
     }
   };
 
@@ -1276,6 +1295,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
       )}
 
       <ToastHost />
+      {tourOpen && <TourGuide steps={TOUR_STEPS[loginRole] || []} stepCtx={tourStepCtx} onDone={handleTourDone} />}
     </div>
   );
 }

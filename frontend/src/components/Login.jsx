@@ -472,7 +472,8 @@ function AnimatedMapView({ setFade, active, onSequenceComplete }) {
                 barangay: data.user.barangay,
                 token: data.token || null,
                 device: device,
-                location: location
+                location: location,
+                persist: rememberMe && !!data.token
             };
 
             // Cache user credentials for offline login
@@ -847,7 +848,7 @@ const handleLoginOtpSubmit = async (e) => {
 
                   <button type="button" className="portal-card portal-card-cho" onClick={() => handleChoSelection('CHO Unit II (Pulo)')} aria-label="Select CHO Unit II">
                     <div className="portal-card-body">
-                      <span className="portal-card-title">{t('CHO Unit II (Extension)')}</span>
+                      <span className="portal-card-title">{t('CHO Unit II (Main)')}</span>
                       <span className="portal-card-sub">Pulo Health Center, Brgy. Pulo Cabuyao, Laguna</span>
                     </div>
                     <span className="portal-card-arrow">→</span>
@@ -945,7 +946,7 @@ const handleLoginOtpSubmit = async (e) => {
                         onChange={(e) => setRememberMe(e.target.checked)}
                         style={{ accentColor: '#129968', width: '16px', height: '16px' }} 
                       /> 
-                      Remember me
+                      {t('Stay signed in')}
                     </label>
                     <button type="button" 
                       onClick={() => setStep('forgot_password')}
@@ -1149,7 +1150,7 @@ const handleLoginOtpSubmit = async (e) => {
                             <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Full Name</label>
                             <input
                                 type="text"
-                                className="form-input cdms-field-icon cdms-field-user"
+                                className="form-input"
                                 placeholder="Juan Dela Cruz"
                                 value={signupName}
                                 onChange={(e) => setSignupName(e.target.value)}
@@ -1175,7 +1176,7 @@ const handleLoginOtpSubmit = async (e) => {
                             <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Email Address</label>
                             <input
                                 type="email"
-                                className="form-input cdms-field-icon cdms-field-mail"
+                                className="form-input"
                                 placeholder="juan@example.com"
                                 value={signupEmail}
                                 onChange={(e) => setSignupEmail(e.target.value)}
@@ -1188,7 +1189,7 @@ const handleLoginOtpSubmit = async (e) => {
                             <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Mobile Number</label>
                             <input
                                 type="text"
-                                className="form-input cdms-field-icon cdms-field-phone"
+                                className="form-input"
                                 placeholder="09123456789"
                                 value={signupMobile}
                                 onChange={(e) => setSignupMobile(e.target.value.replace(/\D/g, '').slice(0, 11))}

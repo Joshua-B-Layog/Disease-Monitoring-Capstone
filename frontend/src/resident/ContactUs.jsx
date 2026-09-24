@@ -68,7 +68,7 @@ export default function ContactUs() {
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
       const msgs = [];
-      if (errors.age) msgs.push(t('Age must be 0–150'));
+      if (errors.age) msgs.push(t('Age must be 0-150'));
       if (errors.contact) msgs.push(t('Use valid PH phone (e.g., 09123456789)'));
       setError(msgs.length > 0 ? msgs.join('. ') + '.' : t('Please fill in all required fields highlighted in red.'));
       return;

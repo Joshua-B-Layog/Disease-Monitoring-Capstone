@@ -132,7 +132,7 @@
 .cdms-carousel-peek:last-child { animation: cdmsPeekNudge 3s ease-in-out infinite reverse; }
 
 /* =========================================================
-   MOBILE RESPONSIVE — Manage Cases (CHO/BHW)
+   MOBILE RESPONSIVE - Manage Cases (CHO/BHW)
    ========================================================= */
 @media (max-width: 900px) {
   .manage-cases-container { padding: 16px; }

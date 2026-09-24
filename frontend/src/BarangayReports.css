@@ -314,7 +314,7 @@ body.dark-mode select,
 }
 
 /* =========================================================
-   MOBILE RESPONSIVE — Barangay Reports / Audit Logs
+   MOBILE RESPONSIVE - Barangay Reports / Audit Logs
    ========================================================= */
 @media (max-width: 900px) {
   .reports-page-wrapper { padding: 14px; }
@@ -347,7 +347,7 @@ body.dark-mode select,
 }
 
 /* =========================================================
-   MOBILE RESPONSIVE — Barangay Reports / Audit Logs
+   MOBILE RESPONSIVE - Barangay Reports / Audit Logs
    ========================================================= */
 @media (max-width: 900px) {
   .reports-page-wrapper { padding: 16px; }
@@ -375,7 +375,7 @@ body.dark-mode select,
 }
 
 /* =========================================================
-   REAL hooks (actual markup classes) — mobile
+   REAL hooks (actual markup classes) - mobile
    ========================================================= */
 @media (max-width: 900px) {
   .cdms-reports-mid {

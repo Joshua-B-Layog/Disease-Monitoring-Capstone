@@ -7,6 +7,7 @@ import ContactUs from './resident/ContactUs';
 import Help from './resident/Help';
 import PreventionTips from './resident/PreventionTips';
 import ChoLogoIcon from './assets/ChoLogo';
+import TourGuide, { TOUR_STEPS } from './components/TourGuide';
 import { API_URL } from './config';
 import { getPendingCount, processSyncQueue } from './syncEngine';
 import './resident.css';
@@ -18,6 +19,7 @@ export default function ResidentApp() {
   const { t, lang, setLang } = useI18n();
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('map');
+  const [tourOpen, setTourOpen] = useState(false);
 
   const scrollRef = useRef(null);
   const isScrollingRef = useRef(false);
@@ -38,6 +40,19 @@ export default function ResidentApp() {
   }, [theme]);
 
   const toggleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark');
+
+  // ── Onboarding guide: auto-runs once, replays via the ❓ button beside language ──
+  useEffect(() => {
+    if (localStorage.getItem('cdms_resident_tour_done') !== '1') {
+      const timer = setTimeout(() => setTourOpen(true), 900);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  const handleTourDone = () => {
+    localStorage.setItem('cdms_resident_tour_done', '1');
+    setTourOpen(false);
+  };
 
   // ── Online/Offline status + auto-sync queued messages ──
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -207,7 +222,7 @@ export default function ResidentApp() {
               </button>
             ))}
             {/* Language switcher */}
-            <div style={{ position: 'relative', marginLeft: '8px' }}>
+            <div data-tour="resident-lang" style={{ display: 'flex', gap: '8px', alignItems: 'center', marginLeft: '8px' }}>
               <button onClick={() => setLang(lang === 'en' ? 'fil' : 'en')}
                 style={{
                   padding: '8px 12px',
@@ -219,6 +234,20 @@ export default function ResidentApp() {
                   cursor: 'pointer',
                 }}>
                 {getLangName(lang === 'en' ? 'fil' : 'en')}
+              </button>
+              <button onClick={() => setTourOpen(true)}
+                title="Show Guide"
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(255,255,255,0.3)',
+                  background: 'rgba(13,148,136,0.35)',
+                  color: '#fff',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}>
+                ❓ {t('Show Guide')}
               </button>
             </div>
             {/* Theme toggle */}
@@ -276,6 +305,15 @@ export default function ResidentApp() {
                 color: 'rgba(255,255,255,0.8)', fontSize: '15px', cursor: 'pointer',
               }}>
               🌐 {getLangName(lang === 'en' ? 'fil' : 'en')}
+            </button>
+            <button onClick={() => setTourOpen(true)}
+              style={{
+                display: 'block', width: '100%', textAlign: 'left',
+                padding: '10px 16px',
+                background: 'rgba(13,148,136,0.25)', border: 'none',
+                color: '#fff', fontSize: '15px', cursor: 'pointer',
+              }}>
+              ❓ {t('Show Guide')}
             </button>
             <button onClick={toggleTheme}
               style={{
@@ -367,9 +405,11 @@ export default function ResidentApp() {
           display: 'flex', alignItems: 'center', gap: '8px',
         }}>
           <span style={{ color: '#D97706', fontWeight: '700' }}>↻</span>
-          {pendingSyncCount} {pendingSyncCount === 1 ? t('message') : t('messages')} {t('pending — will send when back online')}
+          {pendingSyncCount} {pendingSyncCount === 1 ? t('message') : t('messages')} {t('pending - will send when back online')}
         </div>
       )}
+
+      {tourOpen && <TourGuide steps={TOUR_STEPS.RESIDENT} onDone={handleTourDone} />}
     </div>
   );
 }

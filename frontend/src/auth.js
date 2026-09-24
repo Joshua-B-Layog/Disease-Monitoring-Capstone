@@ -1,15 +1,9 @@
 import axios from 'axios';
-
-const SESSION_KEY = 'cdms_session';
+import { readSession, clearSession } from './sessionStore';
 
 function readStoredToken() {
-  try {
-    const raw = localStorage.getItem(SESSION_KEY);
-    const parsed = raw ? JSON.parse(raw) : null;
-    return (parsed && parsed.token) || null;
-  } catch {
-    return null;
-  }
+  const parsed = readSession();
+  return (parsed && parsed.token) || null;
 }
 
 let authToken = (typeof localStorage !== 'undefined') ? readStoredToken() : null;
@@ -44,10 +38,7 @@ axios.interceptors.response.use(
     if (status === 401 && authToken && !handling401) {
       handling401 = true;
       setAuthToken(null);
-      try {
-        localStorage.removeItem(SESSION_KEY);
-        localStorage.removeItem('cdms_session');
-      } catch (e) { /* ignore */ }
+      clearSession();
       window.location.reload();
     }
     return Promise.reject(error);

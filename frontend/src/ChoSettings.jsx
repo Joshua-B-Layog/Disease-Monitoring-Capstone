@@ -201,7 +201,7 @@ export default function CHOSettings({
   onSecurityViewOpened,
 }) {
   const navigate = useNavigate();
-  const { t } = useI18n();
+  const { t, translateStatus } = useI18n();
   const [currentView, setCurrentView] = useState('menu');
   useEffect(() => {
     if (openProfileView) {
@@ -338,6 +338,7 @@ export default function CHOSettings({
     newCaseReported: false, caseStatusUpdated: false,
     updatedCaseReported: false,
     weeklySummary: false, systemMaintenance: false,
+    vaccineAdvisories: false,
   });
   const [notifLoading, setNotifLoading] = useState(false);
   const [notifSaveMsg, setNotifSaveMsg] = useState('');
@@ -355,11 +356,13 @@ export default function CHOSettings({
         setNotifications({
           emailNotifications: !!data.email_notifications,
           pushNotifications: !!data.push_notifications,
+          smsNotifications: !!data.sms_notifications,
           newCaseReported: !!data.new_case_reported,
           caseStatusUpdated: !!data.case_status_updated,
           updatedCaseReported: !!data.updated_case_reported,
           weeklySummary: !!data.weekly_summary,
           systemMaintenance: !!data.system_maintenance,
+          vaccineAdvisories: !!data.vaccine_advisories,
         });
       })
       .catch(() => {})
@@ -407,6 +410,23 @@ export default function CHOSettings({
     keyboardShortcuts: localStorage.getItem('cdms_keyboardShortcuts') === 'true',
   });
   const [systemPrefsSnapshot, setSystemPrefsSnapshot] = useState(null);
+
+  // ── Editable keyboard shortcuts (Phase 3) - per-user, read by ManageCases ──
+  const shortcutConfKey = `cdms_shortcuts_${userId || '0'}`;
+  const [shortcuts, setShortcuts] = useState(() => {
+    try {
+      const p = JSON.parse(localStorage.getItem(shortcutConfKey) || '{}') || {};
+      return { save: 's', saveCtrl: true, newCase: 'n', newCaseCtrl: false, ...p };
+    } catch (e) {
+      return { save: 's', saveCtrl: true, newCase: 'n', newCaseCtrl: false };
+    }
+  });
+  const saveShortcuts = (next) => {
+    setShortcuts(next);
+    localStorage.setItem(shortcutConfKey, JSON.stringify(next));
+    setSystemPrefsSaveMsg(t('Shortcuts updated!'));
+  };
+  const resetShortcuts = () => saveShortcuts({ save: 's', saveCtrl: true, newCase: 'n', newCaseCtrl: false });
 
   // ── Notify App.jsx of language/timezone/dateFormat changes ──
   useEffect(() => {
@@ -874,7 +894,7 @@ if (security.newPassword !== security.confirmPassword) {
 
   // ── Format helpers ──
   const maskEmail = (email) => {
-    if (!email) return '—';
+    if (!email) return '-';
     const [user, domain] = email.split('@');
     if (!domain) return email;
     return `${user.slice(0, 2)}***@${domain}`;
@@ -992,7 +1012,7 @@ if (security.newPassword !== security.confirmPassword) {
         {/* ── MENU VIEW ── */}
         {currentView === 'menu' && (
           <div>
-            <h1 className="settings-title">{t('Settings')}</h1>
+            <h1 className="settings-title">{t('Settings')} Module</h1>
             {offlineMode && (
               <div style={{ padding: '10px 14px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '17px', color: '#D97706', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '16px' }}>⚠</span>
@@ -1607,6 +1627,7 @@ if (security.newPassword !== security.confirmPassword) {
                 rows: [
                   { key: 'pushNotifications', label: 'Push Notifications', sub: 'Receive push notifications in browser' },
                   { key: 'emailNotifications', label: 'Email Notifications', sub: 'Receive notifications via email' },
+                  { key: 'smsNotifications', label: 'SMS Notifications', sub: 'Receive urgent alerts via SMS (mobile number required on your profile)' },
                 ],
               },
               {
@@ -1624,6 +1645,7 @@ if (security.newPassword !== security.confirmPassword) {
                 rows: [
                   { key: 'weeklySummary', label: 'Weekly Summary', sub: 'Receive a weekly summary of cases' },
                   { key: 'systemMaintenance', label: 'System Maintenance', sub: 'Get notified about scheduled maintenance' },
+                  { key: 'vaccineAdvisories', label: 'Seasonal Vaccine Advisories', sub: 'Season-based vaccine reminders so leftover stock does not expire' },
                 ],
               },
             ].map(section => (
@@ -1691,11 +1713,13 @@ if (security.newPassword !== security.confirmPassword) {
                     body: JSON.stringify({
                       push_notifications: notifications.pushNotifications,
                       email_notifications: notifications.emailNotifications,
+                      sms_notifications: notifications.smsNotifications,
                       new_case_reported: notifications.newCaseReported,
                       case_status_updated: notifications.caseStatusUpdated,
                       updated_case_reported: notifications.updatedCaseReported,
                       weekly_summary: notifications.weeklySummary,
                       system_maintenance: notifications.systemMaintenance,
+                      vaccine_advisories: notifications.vaccineAdvisories,
                     }),
                   });
                   if (res.ok) {
@@ -1710,7 +1734,7 @@ if (security.newPassword !== security.confirmPassword) {
               }}>{t('Save Preferences')}</button>
             </div>
 
-            {/* Send Maintenance Notice — only for CHO */}
+            {/* Send Maintenance Notice - only for CHO */}
             {activeUser?.role === 'CHO' && notifications.systemMaintenance && (
               <div className="security-section-card" style={{ marginTop: '24px', borderColor: '#fde68a' }}>
                 <div className="security-card-header">
@@ -1860,20 +1884,6 @@ if (security.newPassword !== security.confirmPassword) {
                   </div>
                 </div>
                 <div className="session-list-row">
-                  <div className="session-info-meta"><h4>{t('Time Zone')}</h4></div>
-                  <div style={{ position: 'relative' }}>
-                      <select value={systemPrefs.timeZone} onChange={e => setSystemPrefs({ ...systemPrefs, timeZone: e.target.value })}
-                        style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px 36px 8px 14px', fontSize: '17px', cursor: 'pointer', appearance: 'none', color: 'var(--text-main)', minWidth: '120px' }}>
-                        <option value="Asia/Manila">Manila, Philippines (GMT+8)</option>
-                        <option value="Asia/Jakarta">Jakarta, Indonesia (GMT+7)</option>
-                        <option value="Asia/Ho_Chi_Minh">Ho Chi Minh, Vietnam (GMT+7)</option>
-                        <option value="Asia/Bangkok">Bangkok, Thailand (GMT+7)</option>
-                        <option value="Asia/Kolkata">Kolkata, India (GMT+5:30)</option>
-                      </select>
-                    <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-muted)', fontSize: '17px' }}>▼</span>
-                  </div>
-                </div>
-                <div className="session-list-row">
                   <div className="session-info-meta"><h4>{t('Date Format')}</h4></div>
                   <div style={{ position: 'relative' }}>
                       <select value={systemPrefs.dateFormat} onChange={e => setSystemPrefs({ ...systemPrefs, dateFormat: e.target.value })}
@@ -1921,6 +1931,39 @@ if (security.newPassword !== security.confirmPassword) {
                     <span className="figma-slider" />
                   </label>
                 </div>
+                {systemPrefs.keyboardShortcuts && (
+                  <>
+                  <div className="session-list-row">
+                    <div className="session-info-meta"><h4>{t('Save Form Shortcut')}</h4><p>{t('Press to save the case form')}</p></div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '15px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                        <input type="checkbox" checked={!!shortcuts.saveCtrl} onChange={e => saveShortcuts({ ...shortcuts, saveCtrl: e.target.checked })} />Ctrl
+                      </label>
+                      <input type="text" maxLength={1} value={String(shortcuts.save || '').toUpperCase()}
+                        onChange={e => {
+                          const ch = (e.target.value || '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 1).toLowerCase();
+                          if (ch || e.target.value === '') saveShortcuts({ ...shortcuts, save: ch });
+                        }}
+                        style={{ width: '64px', textAlign: 'center', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px 12px', fontSize: '17px', color: 'var(--text-main)', textTransform: 'uppercase' }} />
+                    </div>
+                  </div>
+                  <div className="session-list-row">
+                    <div className="session-info-meta"><h4>{t('New Case Shortcut')}</h4><p>{t('Open the Add Case form from the list')}</p></div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '15px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                        <input type="checkbox" checked={!!shortcuts.newCaseCtrl} onChange={e => saveShortcuts({ ...shortcuts, newCaseCtrl: e.target.checked })} />Ctrl
+                      </label>
+                      <input type="text" maxLength={1} value={String(shortcuts.newCase || '').toUpperCase()}
+                        onChange={e => {
+                          const ch = (e.target.value || '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 1).toLowerCase();
+                          if (ch || e.target.value === '') saveShortcuts({ ...shortcuts, newCase: ch });
+                        }}
+                        style={{ width: '64px', textAlign: 'center', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px 12px', fontSize: '17px', color: 'var(--text-main)', textTransform: 'uppercase' }} />
+                      <button onClick={resetShortcuts} style={{ background: 'transparent', border: 'none', color: '#3B82F6', cursor: 'pointer', fontSize: '15px', fontWeight: '600', whiteSpace: 'nowrap' }}>{t('Reset')}</button>
+                    </div>
+                  </div>
+                  </>
+                )}
               </div>
             </div>
 
@@ -1954,21 +1997,21 @@ if (security.newPassword !== security.confirmPassword) {
               <div style={{ padding: '0 16px 20px 16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '17px', marginBottom: '8px', color: 'var(--text-muted)', fontWeight: '500' }}>
                   <span>{t('Storage Used')}</span>
-                  <span style={{ color: 'var(--text-main)', fontWeight: '600' }}>{storageLoading ? t('Loading...') : storageStats ? `${storageStats.totalMB} MB ${t('of ')}10 GB` : `${t('— of ')}10 GB`}</span>
+                  <span style={{ color: 'var(--text-main)', fontWeight: '600' }}>{storageLoading ? t('Loading...') : storageStats ? `${storageStats.totalMB} MB ${t('of ')}10 GB` : `${t('- of ')}10 GB`}</span>
                 </div>
                 <div style={{ width: '100%', height: '12px', background: 'var(--border-color)', borderRadius: '6px', overflow: 'hidden', marginBottom: '24px' }}>
                   <div style={{ width: `${storageStats ? storageStats.usedPercent : 0}%`, height: '100%', background: 'var(--text-main)', borderRadius: '6px' }} />
                 </div>
                 <div className="cdms-storage-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
                   {[
-                    { val: storageStats ? `${storageStats.caseDataMB} MB` : '—', lbl: 'Case Data', sub: `${storageStats ? storageStats.cases : '—'} records` },
-                    { val: storageStats ? `${storageStats.userDataMB} MB` : '—', lbl: 'Reports', sub: `${storageStats ? storageStats.users : '—'} accounts` },
-                    { val: storageStats ? `${storageStats.otherMB} MB` : '—', lbl: 'Other', sub: `${storageStats ? storageStats.notifications : '—'} notifications` },
+                    { val: storageStats ? `${storageStats.caseDataMB} MB` : '-', lbl: 'Case Data', sub: `${storageStats ? storageStats.cases : '-'} records` },
+                    { val: storageStats ? `${storageStats.userDataMB} MB` : '-', lbl: 'Reports', sub: `${storageStats ? storageStats.users : '-'} accounts` },
+                    { val: storageStats ? `${storageStats.otherMB} MB` : '-', lbl: 'Other', sub: `${storageStats ? storageStats.notifications : '-'} notifications` },
                   ].map(item => (
                     <div key={item.lbl} style={{ background: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
                       <div style={{ fontSize: '22px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '4px' }}>{item.val}</div>
                       <div style={{ fontSize: '17px', color: 'var(--text-muted)' }}>{t(item.lbl)}</div>
-                      <div style={{ fontSize: '17px', color: 'var(--text-muted)', marginTop: '2px' }}>{item.sub.includes('records') ? `${storageStats ? storageStats.cases : '—'}${t(' records')}` : item.sub.includes('accounts') ? `${storageStats ? storageStats.users : '—'}${t(' accounts')}` : `${storageStats ? storageStats.notifications : '—'}${t(' notifications')}`}</div>
+                      <div style={{ fontSize: '17px', color: 'var(--text-muted)', marginTop: '2px' }}>{item.sub.includes('records') ? `${storageStats ? storageStats.cases : '-'}${t(' records')}` : item.sub.includes('accounts') ? `${storageStats ? storageStats.users : '-'}${t(' accounts')}` : `${storageStats ? storageStats.notifications : '-'}${t(' notifications')}`}</div>
                     </div>
                   ))}
                 </div>
@@ -2024,7 +2067,7 @@ if (security.newPassword !== security.confirmPassword) {
 
                         if (row.label === 'Export as PDF') {
                           const caseRows = cases.map(c =>
-                            `<tr><td>${c.case_id}</td><td>${c.patient_name||''}</td><td>${c.age||''}</td><td>${c.gender||''}</td><td>${c.barangay_name||''}</td><td>${c.disease_name||''}</td><td>${c.severity||''}</td><td>${translateStatus(c.status)||''}</td><td>${formatDate(c.date_reported, systemPrefs.dateFormat)}</td></tr>`
+                            `<tr><td>${c.case_id}</td><td>${c.patient_name||''}</td><td>${c.age||''}</td><td>${c.gender||''}</td><td>${c.barangay_name||''}</td><td>${c.disease_name||''}</td><td>${c.severity||''}</td><td>${translateStatus(c.status)||''}</td><td>${c.vaccination_status||''}</td><td>${c.vaccine_expiry_date||''}</td><td>${formatDate(c.date_reported, systemPrefs.dateFormat)}</td></tr>`
                           ).join('');
                           const userRows = users.map(u =>
                             `<tr><td>U-${String(u.user_id).padStart(3,'0')}</td><td>${u.full_name||''}</td><td>${u.username||''}</td><td>${u.role||''}</td><td>${u.barangay_name||''}</td><td>${u.is_active?'Active':'Inactive'}</td><td>${u.email||''}</td></tr>`
@@ -2047,7 +2090,7 @@ if (security.newPassword !== security.confirmPassword) {
                           <h2>Cabuyao CDMS - Full Data Export</h2>
                           <p class="meta">Generated: ${formatDateTime(new Date(), systemPrefs.dateFormat)} &nbsp;|&nbsp; ${cases.length} Cases, ${users.length} Users</p>
                           <h3>Case Records (${cases.length})</h3>
-                          <table><thead><tr><th>ID</th><th>Patient Name</th><th>Age</th><th>Gender</th><th>Barangay</th><th>Disease</th><th>Severity</th><th>Status</th><th>Date Reported</th></tr></thead><tbody>${caseRows}</tbody></table>
+                          <table><thead><tr><th>ID</th><th>Patient Name</th><th>Age</th><th>Gender</th><th>Barangay</th><th>Disease</th><th>Severity</th><th>Status</th><th>Vaccination</th><th>Vaccine Expiry</th><th>Date Reported</th></tr></thead><tbody>${caseRows}</tbody></table>
                           <h3>User Accounts (${users.length})</h3>
                           <table><thead><tr><th>User ID</th><th>Full Name</th><th>Username</th><th>Role</th><th>Barangay</th><th>Status</th><th>Email</th></tr></thead><tbody>${userRows}</tbody></table>
                           <h3>System Activity Log</h3>
@@ -2067,16 +2110,16 @@ if (security.newPassword !== security.confirmPassword) {
                           const nl = '\n';
                           let content = '';
                           content += '=== CASE RECORDS ===' + nl;
-                          content += 'Case ID' + sep + 'Patient Name' + sep + 'Age' + sep + 'Barangay' + sep + 'Disease' + sep + 'Severity' + sep + 'Status' + sep + 'Date Reported' + nl;
-                          cases.forEach(c => { content += `${c.case_id}${sep}${c.patient_name||''}${sep}${c.age||''}${sep}${c.barangay_name||''}${sep}${c.disease_name||''}${sep}${c.severity||''}${sep}${translateStatus(c.status)||''}${sep}${c.date_reported||''}${nl}`; });
+                          content += 'Case ID' + sep + 'Patient Name' + sep + 'Age' + sep + 'Barangay' + sep + 'Disease' + sep + 'Severity' + sep + 'Status' + sep + 'Vaccination' + sep + 'Vaccine Expiry' + sep + 'Date Reported' + nl;
+                          cases.forEach(c => { content += `${c.case_id}${sep}${c.patient_name||''}${sep}${c.age||''}${sep}${c.barangay_name||''}${sep}${c.disease_name||''}${sep}${c.severity||''}${sep}${translateStatus(c.status)||''}${sep}${c.vaccination_status||''}${sep}${c.vaccine_expiry_date||''}${sep}${c.date_reported||''}${nl}`; });
                           content += nl + '=== USER ACCOUNTS ===' + nl;
                           content += 'ID' + sep + 'Name' + sep + 'Username' + sep + 'Barangay' + sep + 'Role' + sep + 'Status' + nl;
                           users.forEach(u => { content += `U-${String(u.user_id).padStart(3,'0')}${sep}${u.full_name||''}${sep}${u.username||''}${sep}${u.barangay_name||''}${sep}${u.role||''}${sep}${u.is_active?'Active':'Inactive'}${nl}`; });
                           content += nl + '=== SYSTEM LOGS ===' + nl;
                           content += '#' + sep + 'Timestamp' + sep + 'User' + sep + 'Role' + sep + 'Action' + sep + 'Entity' + sep + 'Details' + nl;
                           logs.forEach(l => { content += `${l.id}${sep}${l.timestamp}${sep}${l.userName}${sep}${l.userRole}${sep}${l.action}${sep}${l.entity}${sep}${l.details}${nl}`; });
-                          const columns = [t('Case ID'), t('Patient Name'), t('Age'), t('Barangay'), t('Disease'), t('Severity'), t('Status'), t('Date Reported')];
-                          const previewRows = cases.map(c => [c.case_id, c.patient_name||'', c.age||'', c.barangay_name||'', c.disease_name||'', c.severity||'', translateStatus(c.status)||'', c.date_reported||'']);
+                          const columns = [t('Case ID'), t('Patient Name'), t('Age'), t('Barangay'), t('Disease'), t('Severity'), t('Status'), t('Vaccination'), t('Vaccine Expiry'), t('Date Reported')];
+                          const previewRows = cases.map(c => [c.case_id, c.patient_name||'', c.age||'', c.barangay_name||'', c.disease_name||'', c.severity||'', translateStatus(c.status)||'', c.vaccination_status||'', c.vaccine_expiry_date||'', c.date_reported||'']);
                           setPreview({
                             title: t('Preview: Excel Export'),
                             columns,
@@ -2095,16 +2138,16 @@ if (security.newPassword !== security.confirmPassword) {
                           const nl = '\n';
                           let content = '';
                           content += '=== CASE RECORDS ===' + nl;
-                          content += 'Case ID' + sep + 'Patient Name' + sep + 'Age' + sep + 'Barangay' + sep + 'Disease' + sep + 'Severity' + sep + 'Status' + sep + 'Date Reported' + nl;
-                          cases.forEach(c => { content += `${c.case_id}${sep}${c.patient_name||''}${sep}${c.age||''}${sep}${c.barangay_name||''}${sep}${c.disease_name||''}${sep}${c.severity||''}${sep}${c.status||''}${sep}${c.date_reported||''}${nl}`; });
+                          content += 'Case ID' + sep + 'Patient Name' + sep + 'Age' + sep + 'Barangay' + sep + 'Disease' + sep + 'Severity' + sep + 'Status' + sep + 'Vaccination' + sep + 'Vaccine Expiry' + sep + 'Date Reported' + nl;
+                          cases.forEach(c => { content += `${c.case_id}${sep}${c.patient_name||''}${sep}${c.age||''}${sep}${c.barangay_name||''}${sep}${c.disease_name||''}${sep}${c.severity||''}${sep}${c.status||''}${sep}${c.vaccination_status||''}${sep}${c.vaccine_expiry_date||''}${sep}${c.date_reported||''}${nl}`; });
                           content += nl + '=== USER ACCOUNTS ===' + nl;
                           content += 'ID' + sep + 'Name' + sep + 'Username' + sep + 'Barangay' + sep + 'Role' + sep + 'Status' + nl;
                           users.forEach(u => { content += `U-${String(u.user_id).padStart(3,'0')}${sep}${u.full_name||''}${sep}${u.username||''}${sep}${u.barangay_name||''}${sep}${u.role||''}${sep}${u.is_active?'Active':'Inactive'}${nl}`; });
                           content += nl + '=== SYSTEM LOGS ===' + nl;
                           content += '#' + sep + 'Timestamp' + sep + 'User' + sep + 'Role' + sep + 'Action' + sep + 'Entity' + sep + 'Details' + nl;
                           logs.forEach(l => { content += `${l.id}${sep}${l.timestamp}${sep}${l.userName}${sep}${l.userRole}${sep}${l.action}${sep}${l.entity}${sep}${l.details}${nl}`; });
-                          const columns = [t('Case ID'), t('Patient Name'), t('Age'), t('Barangay'), t('Disease'), t('Severity'), t('Status'), t('Date Reported')];
-                          const previewRows = cases.map(c => [c.case_id, c.patient_name||'', c.age||'', c.barangay_name||'', c.disease_name||'', c.severity||'', c.status||'', c.date_reported||'']);
+                          const columns = [t('Case ID'), t('Patient Name'), t('Age'), t('Barangay'), t('Disease'), t('Severity'), t('Status'), t('Vaccination'), t('Vaccine Expiry'), t('Date Reported')];
+                          const previewRows = cases.map(c => [c.case_id, c.patient_name||'', c.age||'', c.barangay_name||'', c.disease_name||'', c.severity||'', c.status||'', c.vaccination_status||'', c.vaccine_expiry_date||'', c.date_reported||'']);
                           setPreview({
                             title: t('Preview: CSV Export'),
                             columns,

@@ -64,7 +64,7 @@ const EMPTY_FORM = {
   role: 'BHW',
 };
 
-export default function UserManagement({ confirmDelete, fontScale, compactMode, dateFormat, loggedUserId, loginRole, sessionContext, setActiveTab }) {
+export default function UserManagement({ confirmDelete, fontScale, compactMode, dateFormat, loggedUserId, loginRole, sessionContext, setActiveTab, onShowTour }) {
   const { t } = useI18n();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -462,7 +462,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
     <div style={{ padding: compactMode ? '14px' : '24px', color: 'var(--text-main)' }}>
 
       <div className="cdms-um-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2 style={{ margin: 0, fontSize: '22px', color: 'var(--text-h)', fontWeight: '700' }}>{t('User Accounts')}</h2>
+        <h2 style={{ margin: 0, fontSize: '22px', color: 'var(--text-h)', fontWeight: '700' }}>{t('User Accounts')} Module</h2>
         {offlineMode && (
           <span style={{ fontSize: '15px', color: '#D97706', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '6px', padding: '4px 10px' }}>
             {t('Offline - showing cached data')}
@@ -593,6 +593,11 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
             style={{ ...inputStyle, width: '180px', minWidth: '236px', cursor: offlineMode ? 'not-allowed' : 'pointer', display: 'inline-flex', justifyContent: 'center', alignItems: 'center', gap: '8px', fontWeight: '600', fontSize: '15px', opacity: offlineMode ? 0.4 : 1, whiteSpace: 'nowrap', flexShrink: 0, flexGrow: 0, boxSizing: 'border-box', overflow: 'visible' }}>
             {showArchived ? t('← Back to Active Accounts') : t('🗄️ Show Archived Accounts')}
           </button>
+          <button onClick={() => onShowTour && onShowTour()}
+            title={t('Show Guide')}
+            style={{ ...inputStyle, width: '180px', minWidth: '186px', cursor: 'pointer', display: 'inline-flex', justifyContent: 'center', alignItems: 'center', gap: '8px', fontWeight: '600', fontSize: '15px', whiteSpace: 'nowrap', flexShrink: 0, flexGrow: 0, boxSizing: 'border-box', overflow: 'visible', background: 'rgba(13,148,136,0.12)', border: '1px solid rgba(13,148,136,0.5)', color: 'var(--text-main)' }}>
+            ❓ {t('Show Guide')}
+          </button>
           {selectedIds.length > 0 && (
             <>
               {selectedIds.length < paginatedUsers.length && !showArchived && (
@@ -662,7 +667,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                     </td>
                     <td style={{ padding: compactMode ? '8px 6px' : '15px 10px' }}>U-{String(user.user_id).padStart(3, '0')}</td>
                     <td style={{ padding: compactMode ? '8px 6px' : '15px 10px', fontWeight: '500' }}>{user.full_name}</td>
-                    <td style={{ padding: compactMode ? '8px 6px' : '15px 10px' }}>{user.barangay_name || '—'}</td>
+                    <td style={{ padding: compactMode ? '8px 6px' : '15px 10px' }}>{user.barangay_name || '-'}</td>
                     <td style={{ padding: compactMode ? '8px 6px' : '15px 10px' }}>{t(user.role)}</td>
                     <td style={{ padding: compactMode ? '8px 6px' : '15px 10px' }}>
                       {user.is_archived === 1 ? (
@@ -735,7 +740,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
 
       <div className="cdms-um-pagination" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '18px', paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
           <span className="cdms-um-pageof" style={{ color: 'var(--text-muted)', fontSize: '15px' }}>
-            {t('Showing ')}{filteredUsers.length === 0 ? 0 : (currentPage - 1) * USERS_PER_PAGE + 1}–{Math.min(currentPage * USERS_PER_PAGE, filteredUsers.length)}{t(' of ')}{filteredUsers.length}{t(' Accounts')}
+            {t('Showing ')}{filteredUsers.length === 0 ? 0 : (currentPage - 1) * USERS_PER_PAGE + 1}-{Math.min(currentPage * USERS_PER_PAGE, filteredUsers.length)}{t(' of ')}{filteredUsers.length}{t(' Accounts')}
           </span>
           <div style={{ display: 'flex', gap: '6px', rowGap: '6px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1}
@@ -749,7 +754,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                     style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)', borderRadius: '6px', background: ellipsisOpen ? 'rgba(18,19,88,0.15)' : 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '16px', fontWeight: '700', letterSpacing: '2px' }}>...</button>
                   {ellipsisOpen && (
                     <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px', width: '160px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 100 }}>
-                      <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>{t('Go to page (1–')}{totalPages})</div>
+                      <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>{t('Go to page (1-')}{totalPages})</div>
                       <div style={{ display: 'flex', gap: '4px' }}>
                         <input type="number" min="1" max={totalPages} value={ellipsisPageInput} placeholder="#"
                           onChange={e => setEllipsisPageInput(e.target.value)}
@@ -851,7 +856,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                       <button type="button"
                         onClick={() => { setBarangayAssignOpen(!barangayAssignOpen); setShowAllBarangayAssign(false); }}
                         style={{ ...inputStyle, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left', border: formErrors.barangayId ? '2px solid #ef4444' : '1px solid var(--input-border)', background: formErrors.barangayId ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}>
-                        <span>{barangayList.find(b => b.id === formData.barangayId)?.name || t('— Select Barangay —')}</span>
+                        <span>{barangayList.find(b => b.id === formData.barangayId)?.name || t('- Select Barangay -')}</span>
                         <span style={{ fontSize: '13px', opacity: 0.6, transition: 'transform 0.2s', transform: barangayAssignOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                       </button>
                       {barangayAssignOpen && (
@@ -863,7 +868,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                         }}>
                           <div onClick={() => { setFormData({ ...formData, barangayId: '' }); setBarangayAssignOpen(false); }}
                             style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '15px', color: 'var(--text-muted)', fontStyle: 'italic', borderBottom: '1px solid var(--border-color)' }}>
-                            {t('— Select Barangay —')}
+                            {t('- Select Barangay -')}
                           </div>
                           {visibleBarangayAssignOptions.length > 0 && <div style={{ padding: '6px 14px 2px', fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('CHO Unit I')}</div>}
                           {visibleBarangayAssignOptions.filter(b => unitIBarangays.includes(b)).map(b => (

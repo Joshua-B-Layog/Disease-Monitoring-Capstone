@@ -324,7 +324,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
         </div>
         {offlineMode && (
           <div style={{ padding: '8px 14px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '15px', color: '#D97706' }}>
-            {t('Offline — showing last cached report')}
+            {t('Offline - showing last cached report')}
           </div>
         )}
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>

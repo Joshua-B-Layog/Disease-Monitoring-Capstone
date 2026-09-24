@@ -275,7 +275,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
       l.created_at ? formatDateTime(l.created_at, dateFormat) : '', l.user_id || '', l.user_name || '', l.action, l.entity, l.details || ''
     ]);
     const csv = columns.join(',') + '\n' + logRows.map(r => `"${r.join('","')}"`).join('\n');
-    const filename = `${report.title.replace(/\s+/g, '_').replace(/—/g, '-')}.csv`;
+    const filename = `${report.title.replace(/\s+/g, '_').replace(/-/g, '-')}.csv`;
     setPreview({
       title: t('Preview: CSV Export'),
       columns,
@@ -313,7 +313,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
     </table>
     ${footer}
     </body></html>`;
-    const filename = `${report.title.replace(/\s+/g, '_').replace(/—/g, '-')}.doc`;
+    const filename = `${report.title.replace(/\s+/g, '_').replace(/-/g, '-')}.doc`;
     setPreview({
       title: t('Preview: Word Document'),
       html,
@@ -357,7 +357,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
     </table>
     ${footer}
     </body></html>`;
-    const filename = `${report.title.replace(/\s+/g, '_').replace(/—/g, '-')}.pdf`;
+    const filename = `${report.title.replace(/\s+/g, '_').replace(/-/g, '-')}.pdf`;
     setPreview({
       title: t('Preview: PDF Report'),
       html: htmlStr,
@@ -393,7 +393,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
     XLSX.utils.book_append_sheet(wb, logSheet, t('Logs'));
     const columns = Object.keys(logData[0] || {});
     const previewRows = logData.map(r => columns.map(k => r[k]));
-    const filename = `${report.title.replace(/\s+/g, '_').replace(/—/g, '-')}.xlsx`;
+    const filename = `${report.title.replace(/\s+/g, '_').replace(/-/g, '-')}.xlsx`;
     setPreview({
       title: t('Preview: Excel Export'),
       columns,
@@ -553,6 +553,50 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
   const periodRef = useRef(null);
   const [typeOpen, setTypeOpen] = useState(false);
   const typeRef = useRef(null);
+
+  // ── Archive Vault (Phase 1b) - CHO only ──
+  const [archRecords, setArchRecords] = useState([]);
+  const [archTotal, setArchTotal] = useState(0);
+  const [archTotals, setArchTotals] = useState({ case: 0, user: 0, generated_report: 0, contact_message: 0 });
+  const [archLoading, setArchLoading] = useState(false);
+  const [archEntity, setArchEntity] = useState('');
+  const [archView, setArchView] = useState(null);
+  const ARCH_ENTITY_LABEL = { case: 'Disease Case', user: 'User Account', generated_report: 'Generated Report', contact_message: 'Contact Message' };
+  const ARCH_ENTITY_COLOR = { case: '#0d9488', user: '#8b5cf6', generated_report: '#2563eb', contact_message: '#d97706' };
+  const loadArchive = async () => {
+    if (!activeUser || activeUser.role === 'BHW') return;
+    setArchLoading(true);
+    try {
+      const [listRes, totalsRes] = await Promise.all([
+        axios.get(`${API_URL}/api/archive-records`, { params: archEntity ? { entity: archEntity, limit: 100 } : { limit: 100 } }),
+        axios.get(`${API_URL}/api/archive-records/totals`),
+      ]);
+      setArchRecords(listRes.data.records || []);
+      setArchTotal(listRes.data.total || 0);
+      setArchTotals(totalsRes.data.totals || { case: 0, user: 0, generated_report: 0, contact_message: 0 });
+    } catch (e) {}
+    setArchLoading(false);
+  };
+  const restoreArch = async (rec) => {
+    if (!window.confirm(t('Restore this archived record? It will be returned to the live system.'))) return;
+    try { await axios.post(`${API_URL}/api/archive-records/${rec.id}/restore`); await loadArchive(); }
+    catch (e) { window.alert(t('Restore failed.') + ' ' + (e.response?.data?.error || t('Please try again.'))); }
+  };
+  const deleteArch = async (rec) => {
+    if (!window.confirm(t('Permanently remove this archive record? This cannot be undone.'))) return;
+    try { await axios.delete(`${API_URL}/api/archive-records/${rec.id}`); await loadArchive(); }
+    catch (e) { window.alert(t('Delete failed.') + ' ' + (e.response?.data?.error || t('Please try again.'))); }
+  };
+  const exportArchives = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/archive-records/export`, { params: archEntity ? { entity: archEntity } : {}, responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement('a');
+      a.href = url; a.download = `archive-vault-${archEntity || 'all'}.json`; document.body.appendChild(a); a.click();
+      URL.revokeObjectURL(url); a.remove();
+    } catch (e) { window.alert(t('Export failed.') + ' ' + (e.response?.data?.error || t('Please try again.'))); }
+  };
+  useEffect(() => { if (!isBHW) loadArchive(); }, [isBHW]);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -823,7 +867,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
               const changeColor = season.change > 0 ? '#dc2626' : season.change < 0 ? '#10b981' : '#64748b';
               return (
                 <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderLeft: '4px solid #0d9488', borderRadius: '8px', padding: '14px 18px', marginBottom: '20px' }}>
-                  <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '8px' }}>Seasonal ({viewReport.period}{t(') Comparison — live case data')}</div>
+                  <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '8px' }}>Seasonal ({viewReport.period}{t(') Comparison - live case data')}</div>
                   <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
                     {[{ label: `${t('Current (')}${season.curLabel})`, value: season.curCount, color: '#0d9488' },
                       { label: `${t('Previous (')}${season.prevLabel})`, value: season.prevCount, color: '#64748b' },
@@ -901,7 +945,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                           style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)', borderRadius: '6px', background: modalEllipsisOpen ? 'rgba(18,19,88,0.15)' : 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '16px', fontWeight: '700', letterSpacing: '2px' }}>...</button>
                         {modalEllipsisOpen && (
                           <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px', width: '160px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 100 }}>
-                            <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>{t('Go to page')} (1–{modalTotalPages})</div>
+                            <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>{t('Go to page')} (1-{modalTotalPages})</div>
                             <div style={{ display: 'flex', gap: '4px' }}>
                               <input type="number" min="1" max={modalTotalPages} value={modalEllipsisInput} placeholder="#"
                                 onChange={e => setModalEllipsisInput(e.target.value)}
@@ -1038,7 +1082,7 @@ style={{ padding: '5px 8px', border: '1px solid #2563eb', borderRadius: '4px', b
       {/* ── PAGE HEADER ── */}
       <div style={{ marginBottom: '20px', textAlign: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-          <h2 style={{ margin: '0 0 2px 0', fontSize: '22px', fontWeight: '700', color: 'var(--text-h)' }}>{t('Audit Reports')}</h2>
+          <h2 style={{ margin: '0 0 2px 0', fontSize: '22px', fontWeight: '700', color: 'var(--text-h)' }}>{t('Audit Reports')} Module</h2>
           {offlineMode && (
             <span style={{ fontSize: '15px', color: '#D97706', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '6px', padding: '4px 10px' }}>
               {t('Offline - showing cached data')}
@@ -1107,6 +1151,7 @@ style={{ padding: '5px 8px', border: '1px solid #2563eb', borderRadius: '4px', b
           )}
         </div>
         <button onClick={() => setShowGenModal(true)}
+          data-tour="br-generate"
           disabled={offlineMode}
           style={{ padding: '9px 22px', background: '#129968', color: '#fff', border: 'none', borderRadius: '7px', fontWeight: '600', fontSize: '15px', cursor: offlineMode ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', flexShrink: 0, opacity: offlineMode ? 0.4 : 1 }}
           onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
@@ -1433,13 +1478,13 @@ style={{ padding: '5px 8px', border: '1px solid #2563eb', borderRadius: '4px', b
                   <div style={{ flex: 1, textAlign: 'center' }}>
                     <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '3px', fontWeight: '600' }}>{t('Start Date')}</div>
                     <div style={{ padding: '6px', background: selectingStart ? 'rgba(13,148,136,0.15)' : 'var(--input-bg)', border: `1px solid ${selectingStart ? '#0d9488' : 'var(--border-color)'}`, borderRadius: '6px', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer' }} onClick={() => setSelectingStart(true)}>
-                      {dateRange.start ? formatDate(dateRange.start, dateFormat) : '—'}
+                      {dateRange.start ? formatDate(dateRange.start, dateFormat) : '-'}
                     </div>
                   </div>
                   <div style={{ flex: 1, textAlign: 'center' }}>
                     <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '3px', fontWeight: '600' }}>{t('End Date')}</div>
                     <div style={{ padding: '6px', background: !selectingStart ? 'rgba(13,148,136,0.15)' : 'var(--input-bg)', border: `1px solid ${!selectingStart ? '#0d9488' : 'var(--border-color)'}`, borderRadius: '6px', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer' }} onClick={() => setSelectingStart(false)}>
-                      {dateRange.end ? formatDate(dateRange.end, dateFormat) : '—'}
+                      {dateRange.end ? formatDate(dateRange.end, dateFormat) : '-'}
                     </div>
                   </div>
                 </div>
@@ -1520,7 +1565,7 @@ style={{ padding: '5px 8px', border: '1px solid #2563eb', borderRadius: '4px', b
           </div>
 
           <span style={{ fontSize: '15px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-            {t('Showing ')}{Math.min((logPage - 1) * ITEMS_PER_PAGE + 1, filteredAuditLogs.length)}–{Math.min(logPage * ITEMS_PER_PAGE, filteredAuditLogs.length)}{t(' of ')}{filteredAuditLogs.length}{t(' entries')}
+            {t('Showing ')}{Math.min((logPage - 1) * ITEMS_PER_PAGE + 1, filteredAuditLogs.length)}-{Math.min(logPage * ITEMS_PER_PAGE, filteredAuditLogs.length)}{t(' of ')}{filteredAuditLogs.length}{t(' entries')}
           </span>
         </div>
 
@@ -1601,7 +1646,7 @@ style={{ padding: '5px 8px', border: '1px solid #2563eb', borderRadius: '4px', b
                     style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)', borderRadius: '6px', background: logEllipsisOpen ? 'rgba(18,19,88,0.15)' : 'var(--bg-surface)', color: 'var(--text-main)', cursor: 'pointer', fontSize: '16px', fontWeight: '700', letterSpacing: '2px' }}>...</button>
                   {logEllipsisOpen && (
                     <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px', width: '160px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 100 }}>
-                      <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>{t('Go to page')} (1–{totalLogPages})</div>
+                      <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>{t('Go to page')} (1-{totalLogPages})</div>
                       <div style={{ display: 'flex', gap: '4px' }}>
                         <input type="number" min="1" max={totalLogPages} value={logEllipsisInput} placeholder="#"
                           onChange={e => setLogEllipsisInput(e.target.value)}
@@ -1631,6 +1676,125 @@ style={{ padding: '5px 8px', border: '1px solid #2563eb', borderRadius: '4px', b
           </div>
         )}
       </div>
+
+      {/* ── ARCHIVE VAULT (Phase 1b, CHO only) ── */}
+      {!isBHW && (
+        <div style={{ ...s.card, marginTop: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', gap: '10px', flexWrap: 'wrap' }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: 'var(--text-main)' }}>🗄️ {t('Archive Vault')}</h3>
+              <p style={{ margin: '4px 0 0 0', fontSize: '14px', color: 'var(--text-muted)' }}>{t('Snapshots of deleted records. Restore to bring a record back to the live system.')}</p>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button onClick={exportArchives} disabled={archLoading}
+                style={{ padding: '8px 16px', border: '1px solid var(--border-color)', borderRadius: '7px', fontSize: '15px', color: 'var(--text-main)', background: 'var(--bg-surface)', cursor: archLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '500' }}>
+                ⬇ {t('Export')}
+              </button>
+              <button onClick={loadArchive} disabled={archLoading}
+                style={{ padding: '8px 16px', border: '1px solid var(--border-color)', borderRadius: '7px', fontSize: '15px', color: 'var(--text-main)', background: 'var(--bg-surface)', cursor: archLoading ? 'not-allowed' : 'pointer', fontWeight: '500' }}>
+                ↻ {t('Refresh')}
+              </button>
+            </div>
+          </div>
+
+          {/* Entity filter chips + totals */}
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '14px' }}>
+            {[{ key: '', label: t('All Records') }, ...Object.entries(ARCH_ENTITY_LABEL).map(([k, v]) => ({ key: k, label: t(v) }))].map((ent) => (
+              <button key={ent.key || 'all'} onClick={() => setArchEntity(ent.key)}
+                style={{ padding: '7px 14px', borderRadius: '20px', border: archEntity === ent.key ? '1px solid var(--accent, #0d9488)' : '1px solid var(--border-color)', background: archEntity === ent.key ? 'rgba(13,148,136,0.12)' : 'var(--bg-surface)', color: archEntity === ent.key ? 'var(--accent, #0d9488)' : 'var(--text-muted)', fontSize: '14px', cursor: 'pointer', fontWeight: archEntity === ent.key ? '600' : '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {archEntity === ent.key ? '' : <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: ent.key ? (ARCH_ENTITY_COLOR[ent.key] || '#999') : '#999' }} />}
+                {ent.label}
+                <span style={{ background: 'rgba(0,0,0,0.06)', borderRadius: '10px', padding: '1px 8px', fontSize: '13px' }}>{ent.key ? (archTotals[ent.key] || 0) : archTotal}</span>
+              </button>
+            ))}
+          </div>
+
+          {archLoading ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '15px' }}>{t('Loading archive records...')}</div>
+          ) : archRecords.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)', fontSize: '15px' }}>{t('No archived records yet.')}</div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14.5px' }}>
+                <thead>
+                  <tr style={{ color: 'var(--text-muted)', textAlign: 'left', fontSize: '13.5px' }}>
+                    <th style={{ padding: '8px 10px', borderBottom: '1px solid var(--border-color)', fontWeight: '600' }}>{t('Entity')}</th>
+                    <th style={{ padding: '8px 10px', borderBottom: '1px solid var(--border-color)', fontWeight: '600' }}>{t('Snapshot')}</th>
+                    <th style={{ padding: '8px 10px', borderBottom: '1px solid var(--border-color)', fontWeight: '600' }}>{t('Archived By')}</th>
+                    <th style={{ padding: '8px 10px', borderBottom: '1px solid var(--border-color)', fontWeight: '600' }}>{t('Archived On')}</th>
+                    <th style={{ padding: '8px 10px', borderBottom: '1px solid var(--border-color)', fontWeight: '600' }}>{t('Status')}</th>
+                    <th style={{ padding: '8px 10px', borderBottom: '1px solid var(--border-color)', fontWeight: '600', textAlign: 'right' }}>{t('Actions')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {archRecords.map(rec => (
+                    <tr key={rec.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '9px 10px' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: ARCH_ENTITY_COLOR[rec.entity] || 'var(--text-main)', fontWeight: '600' }}>
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: ARCH_ENTITY_COLOR[rec.entity] || '#999' }} />
+                          {t(ARCH_ENTITY_LABEL[rec.entity] || rec.entity)}
+                        </span>
+                      </td>
+                      <td style={{ padding: '9px 10px', color: 'var(--text-main)', maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rec.snapshot_name}</td>
+                      <td style={{ padding: '9px 10px', color: 'var(--text-muted)' }}>{rec.actor_name}</td>
+                      <td style={{ padding: '9px 10px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{formatDateTime(rec.archived_at, dateFormat)}</td>
+                      <td style={{ padding: '9px 10px' }}>
+                        {rec.restored_at ? (
+                          <span style={{ color: '#16a34a', fontSize: '13.5px', fontWeight: '600' }}>{t('Restored')} {formatDateTime(rec.restored_at, dateFormat)}</span>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)', fontSize: '13.5px' }}>{t('Archived')}</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '9px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        <button onClick={() => setArchView(rec)}
+                          style={{ padding: '5px 10px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '13.5px', background: 'transparent', color: '#2563eb', cursor: 'pointer', marginRight: '6px', fontWeight: '500' }}>{t('View')}</button>
+                        {!rec.restored_at && (
+                          <button onClick={() => restoreArch(rec)}
+                            style={{ padding: '5px 10px', border: '1px solid rgba(22,163,74,0.4)', borderRadius: '6px', fontSize: '13.5px', background: 'rgba(22,163,74,0.1)', color: '#16a34a', cursor: 'pointer', marginRight: '6px', fontWeight: '600' }}>{t('Restore')}</button>
+                        )}
+                        <button onClick={() => deleteArch(rec)}
+                          style={{ padding: '5px 10px', border: '1px solid rgba(220,38,38,0.4)', borderRadius: '6px', fontSize: '13.5px', background: 'rgba(220,38,38,0.08)', color: '#dc2626', cursor: 'pointer', fontWeight: '600' }}>{t('Delete')}</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {archRecords.length >= 100 && archTotal > archRecords.length && (
+                <p style={{ margin: '12px 0 0 0', fontSize: '13.5px', color: 'var(--text-muted)', textAlign: 'center' }}>{t('Showing first 100 records of')} {archTotal}</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Archive snapshot viewer modal */}
+      {archView && (
+        <div className="cdms-modal-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}
+          onClick={() => setArchView(null)}>
+          <div className="cdms-modal-card" style={{ background: 'var(--bg-surface)', borderRadius: '14px', padding: '28px', width: '720px', maxWidth: '95vw', boxShadow: '0 24px 60px rgba(0,0,0,0.2)', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: 'var(--text-main)' }}>{t('Archive Record')} #{archView.id}</h3>
+              <button onClick={() => setArchView(null)} style={{ background: 'transparent', border: 'none', fontSize: '24px', cursor: 'pointer', color: 'var(--text-muted)', lineHeight: '1' }}>&times;</button>
+            </div>
+            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '14px', fontSize: '14px', color: 'var(--text-muted)' }}>
+              <span><b style={{ color: 'var(--text-main)' }}>{t('Entity')}:</b> {t(ARCH_ENTITY_LABEL[archView.entity] || archView.entity)}</span>
+              <span><b style={{ color: 'var(--text-main)' }}>{t('Snapshot')}:</b> {archView.snapshot_name}</span>
+              <span><b style={{ color: 'var(--text-main)' }}>{t('Archived By')}:</b> {archView.actor_name} ({archView.actor_role})</span>
+              <span><b style={{ color: 'var(--text-main)' }}>{t('Archived On')}:</b> {formatDateTime(archView.archived_at, dateFormat)}</span>
+              {archView.restored_at && <span style={{ color: '#16a34a' }}><b>{t('Restored')}:</b> {formatDateTime(archView.restored_at, dateFormat)}</span>}
+            </div>
+            <pre style={{ flex: 1, overflow: 'auto', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '14px', fontSize: '12.5px', color: 'var(--text-main)', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{JSON.stringify(archView.data, null, 2)}</pre>
+            {!archView.restored_at && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px' }}>
+                <button onClick={() => setArchView(null)} style={{ padding: '8px 18px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '15px', cursor: 'pointer', color: 'var(--text-main)' }}>{t('Close')}</button>
+                <button onClick={() => { restoreArch(archView); setArchView(null); }}
+                  style={{ padding: '8px 18px', background: '#16a34a', border: 'none', borderRadius: '6px', fontSize: '15px', fontWeight: '600', color: '#fff', cursor: 'pointer' }}>{t('Restore')}</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (

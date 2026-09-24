@@ -130,6 +130,12 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   const [lastUpdated, setLastUpdated] = useState(null);
   const [now, setNow] = useState(Date.now());
 
+  const [currentAdvisory, setCurrentAdvisory] = useState(null);
+  const [advisoryList, setAdvisoryList] = useState([]);
+  const [advisoryEditing, setAdvisoryEditing] = useState(false);
+  const [advisoryDraft, setAdvisoryDraft] = useState(null);
+  const [advisoryNotice, setAdvisoryNotice] = useState('');
+
   const [offlineMode, setOfflineMode] = useState(!isOnline());
   const fetchCasesData = () => {
     axios.get(API_URL + '/api/disease_cases')
@@ -146,6 +152,54 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     const interval = setInterval(fetchCasesData, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  const loadAdvisories = () => {
+    axios.get(API_URL + '/api/vaccine-advisories/current')
+      .then(res => setCurrentAdvisory(res.data))
+      .catch(() => {});
+    axios.get(API_URL + '/api/vaccine-advisories')
+      .then(res => setAdvisoryList(Array.isArray(res.data) ? res.data : []))
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    loadAdvisories();
+    const int = setInterval(loadAdvisories, 60000);
+    return () => clearInterval(int);
+  }, []);
+
+  const startAdvEdit = () => {
+    setAdvisoryDraft(currentAdvisory ? { ...currentAdvisory } : (advisoryList[0] ? { ...advisoryList[0] } : null));
+    setAdvisoryEditing(true);
+  };
+
+  const saveAdvisory = () => {
+    if (!advisoryDraft || !advisoryDraft.id) return;
+    axios.put(`${API_URL}/api/vaccine-advisories/${advisoryDraft.id}`, advisoryDraft)
+      .then(() => {
+        setCurrentAdvisory({ ...advisoryDraft });
+        setAdvisoryEditing(false);
+        setAdvisoryNotice(t('Vaccine advisory updated.'));
+        setTimeout(() => setAdvisoryNotice(''), 4000);
+        loadAdvisories();
+      })
+      .catch(err => {
+        setAdvisoryNotice(t('Save failed: ') + (err.response?.data?.error || err.message));
+        setTimeout(() => setAdvisoryNotice(''), 5000);
+      });
+  };
+
+  const sendAdvisory = () => {
+    axios.post(`${API_URL}/api/vaccine-advisories/send`)
+      .then(res => {
+        setAdvisoryNotice(res.data?.message || t('Vaccine advisory sent to subscribed staff.'));
+        setTimeout(() => setAdvisoryNotice(''), 5000);
+      })
+      .catch(err => {
+        setAdvisoryNotice(t('Send failed: ') + (err.response?.data?.error || err.message));
+        setTimeout(() => setAdvisoryNotice(''), 5000);
+      });
+  };
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -201,6 +255,92 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     }
     return filtered;
   })();
+
+  // ── Repeat Cases: same patient + same disease reported 2+ times in the period ──
+  const repeatCases = (() => {
+    const groups = {};
+    displayCases.forEach(c => {
+      const name = (c.patient_name || '').trim();
+      if (!name) return;
+      const disease = c.disease_name || 'Unknown';
+      const key = name.toLowerCase().replace(/\s+/g, ' ').trim() + '|' + disease;
+      if (!groups[key]) groups[key] = { name, disease, count: 0, dates: [] };
+      groups[key].count++;
+      if (c.date_reported) groups[key].dates.push(c.date_reported.slice(0, 10));
+    });
+    return Object.values(groups)
+      .filter(g => g.count >= 2)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8)
+      .map(g => ({ ...g, dates: g.dates.sort() }));
+  })();
+  const repeatMax = repeatCases.length ? repeatCases[0].count : 0;
+
+  // ── Recurring Hotspots: same disease reported 2+ times in the same barangay ──
+  const recurringHotspots = (() => {
+    const groups = {};
+    displayCases.forEach(c => {
+      const brgy = (c.barangay_name || '').trim();
+      if (!brgy) return;
+      const disease = c.disease_name || 'Unknown';
+      const key = brgy.toLowerCase().replace(/\s+/g, ' ').trim() + '|' + disease.toLowerCase();
+      if (!groups[key]) groups[key] = { barangay: brgy, disease, count: 0, lastReport: null };
+      groups[key].count++;
+      if (c.date_reported) {
+        const d = c.date_reported.slice(0, 10);
+        if (!groups[key].lastReport || d > groups[key].lastReport) groups[key].lastReport = d;
+      }
+    });
+    return Object.values(groups)
+      .filter(g => g.count >= 2)
+      .sort((a, b) => b.count - a.count || (a.barangay.localeCompare(b.barangay)))
+      .slice(0, 6);
+  })();
+
+  // ── Same-period-last-year comparison (for period charts with a date range) ──
+  const lastYearRange = (() => {
+    if (!dateRange.start || !dateRange.end) return null;
+    const s = new Date(dateRange.start); s.setFullYear(s.getFullYear() - 1);
+    const e = new Date(dateRange.end); e.setFullYear(e.getFullYear() - 1);
+    if (isNaN(s) || isNaN(e) || s > e) return null;
+    return { start: s.toISOString().slice(0, 10), end: e.toISOString().slice(0, 10) };
+  })();
+  const lastYearCases = lastYearRange
+    ? scopedCases.filter(c => {
+        if (!c.date_reported) return false;
+        const d = c.date_reported.slice(0, 10);
+        return d >= lastYearRange.start && d <= lastYearRange.end;
+      })
+    : [];
+  const lastYearTotal = lastYearCases.length;
+
+  // ── Vaccine Expiry Alerts: active cases with a vaccine expiry within 30 days ──
+  const vaccineAlerts = (() => {
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    const horizon = new Date(now); horizon.setDate(horizon.getDate() + 30);
+    return (Array.isArray(displayCases) ? displayCases : [])
+      .filter(c => c.vaccine_expiry_date)
+      .filter(c => !['Draft', 'Recovered', 'Deceased'].includes(c.status))
+      .map(c => {
+        const d = new Date(c.vaccine_expiry_date.slice(0, 10));
+        return {
+          ...c,
+          vaccineExpiry: isNaN(d.getTime()) ? null : d,
+          isOverdue: isNaN(d.getTime()) ? false : d < now,
+          daysLeft: isNaN(d.getTime()) ? null : Math.ceil((d - now) / 86400000),
+        };
+      })
+      .filter(a => a.vaccineExpiry && a.vaccineExpiry <= horizon)
+      .sort((a, b) => a.vaccineExpiry - b.vaccineExpiry)
+      .slice(0, 8);
+  })();
+  const getDiseaseColor = (diseaseName) => {
+    if (!diseaseName) return '#374151';
+    let hash = 0;
+    for (let i = 0; i < diseaseName.length; i++) hash = diseaseName.charCodeAt(i) + ((hash << 5) - hash);
+    const colors = ['#3b82f6','#ef4444','#10b981','#f59e0b','#8b5cf6','#ec4899','#06b6d4','#84cc16','#f97316','#6366f1','#14b8a6','#e11d48','#a855f7','#eab308'];
+    return colors[Math.abs(hash) % colors.length];
+  };
 
   const allDiseaseDisplayCases = (() => {
     let filtered = scopedCases;
@@ -297,7 +437,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           </button>
         </div>
 
-        {/* Period selector bar — local state only */}
+        {/* Period selector bar - local state only */}
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '16px' }}>
           <div style={{ display: 'flex', gap: '4px' }}>
             {['weekly', 'monthly', 'quarterly', 'yearly'].map(p => (
@@ -434,7 +574,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                     const isHovered = hoveredBar && hoveredBar.idx === i;
                     return (
                       <div key={bar.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%', position: 'relative' }}>
-                        {/* Tooltip — only on hovered bar */}
+                        {/* Tooltip - only on hovered bar */}
                         {isHovered && (
                           <div style={{
                             position: 'absolute', bottom: `${h + 32}px`, left: '50%', transform: 'translateX(-50%)',
@@ -469,7 +609,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                   })}
                 </div>
               </div>
-              {/* X-axis labels — abbreviated, full name on hover */}
+              {/* X-axis labels - abbreviated, full name on hover */}
               <div style={{ display: 'flex', gap: '3px', marginTop: '4px', paddingLeft: '30px' }}>
                 {allDiseaseList.map((bar) => {
                   const short = bar.label.length > 8 ? bar.label.slice(0, 7) + '.' : bar.label;
@@ -607,7 +747,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     return { label: MONTH_SHORT[m], full: MONTH_FULL[m], count };
   });
 
-  // Weekly: 5 bars (Mon–Fri) within the date range
+  // Weekly: 5 bars (Mon-Fri) within the date range
   const buildWeekBars = () => {
     const bars = [];
     const start = new Date(dateRange.start);
@@ -644,7 +784,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         return d >= sKey && d <= eKey;
       }).length;
       const label = `Wk ${weekNum}`;
-      const full = `Week ${weekNum} (${cursor.getDate()} ${MONTH_SHORT[cursor.getMonth()]} – ${effectiveEnd.getDate()} ${MONTH_SHORT[effectiveEnd.getMonth()]})`;
+      const full = `Week ${weekNum} (${cursor.getDate()} ${MONTH_SHORT[cursor.getMonth()]} - ${effectiveEnd.getDate()} ${MONTH_SHORT[effectiveEnd.getMonth()]})`;
       bars.push({ label, full, count });
       cursor = new Date(effectiveEnd);
       cursor.setDate(cursor.getDate() + 1);
@@ -690,7 +830,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           return d >= sKey && d <= eKey;
         }).length;
         const label = `Wk ${weekNum}`;
-        const full = `Week ${weekNum} (${cursor.getDate()} ${MONTH_SHORT[cursor.getMonth()]} – ${effectiveEnd.getDate()} ${MONTH_SHORT[effectiveEnd.getMonth()]})`;
+        const full = `Week ${weekNum} (${cursor.getDate()} ${MONTH_SHORT[cursor.getMonth()]} - ${effectiveEnd.getDate()} ${MONTH_SHORT[effectiveEnd.getMonth()]})`;
         bars.push({ label, full, count });
         cursor = new Date(effectiveEnd);
         cursor.setDate(cursor.getDate() + 1);
@@ -998,6 +1138,26 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       ${buildChartSectionHTML(t('Top Diseases'), topDiseases, topDiseaseMax)}
       ${buildStatusSectionHTML()}
 
+      ${repeatCases.length > 0 ? `<h3>${t('Repeat Cases')}</h3><table class="alt"><tbody>${repeatCases.map(g =>
+        `<tr><td style="font-weight:600;">${g.name}</td><td>${g.disease}</td><td style="text-align:right;font-weight:700;">${g.count}×</td><td style="color:#64748b;">${formatDateStr(g.dates[0], dateFormat)} → ${formatDateStr(g.dates[g.dates.length - 1], dateFormat)}</td></tr>`
+      ).join('')}</tbody></table>` : ''}
+
+      ${recurringHotspots.length > 0 ? `<h3>${t('Recurring Hotspots')}</h3><table class="alt"><tbody>${recurringHotspots.map(h =>
+        `<tr><td style="font-weight:600;">${h.barangay}</td><td>${h.disease}</td><td style="text-align:right;font-weight:700;">${h.count}×</td><td style="color:#64748b;">${t('Last')} ${formatDateStr(h.lastReport, dateFormat)}</td></tr>`
+      ).join('')}</tbody></table>` : ''}
+
+      ${movingAvgData && movingAvgData.length > 0 ? `<h3>${t('7-Day Moving Average')}</h3><table class="alt"><tbody>${movingAvgData.map((p) => {
+        const b = monthBars[p.idx];
+        const label = b ? (b.full || b.label) : `${t('Day')} ${p.idx + 1}`;
+        return `<tr><td>${label}</td><td style="text-align:right;font-weight:700;">${p.avg.toFixed(1)}</td></tr>`;
+      }).join('')}</tbody></table>` : ''}
+
+      ${lastYearRange ? `<h3>${t('Same period last year')}</h3><table class="alt"><tbody>
+        <tr><td>${t('Current period cases')}</td><td style="text-align:right;font-weight:700;">${totalCases}</td></tr>
+        <tr><td>${t('Same period last year')}</td><td style="text-align:right;font-weight:700;">${lastYearTotal}</td></tr>
+        <tr><td>${t('Change')}</td><td style="text-align:right;font-weight:700;color:${lastYearTotal > 0 ? (totalCases > lastYearTotal ? '#DC2626' : totalCases < lastYearTotal ? '#059669' : '#64748b') : '#64748b'};">${lastYearTotal > 0 ? `${totalCases > lastYearTotal ? '▲ +' : totalCases < lastYearTotal ? '▼ ' : ''}${Math.round(Math.abs(((totalCases - lastYearTotal) / lastYearTotal) * 100))}%` : (totalCases > 0 ? 'NEW' : '-')}</td></tr>
+      </tbody></table>` : ''}
+
       <h3>${t('Recent Case Records')}</h3>
       <table class="main">
         <thead><tr><th>${t('ID')}</th><th>${t('Patient')}</th><th>${t('Age')}</th><th>${t('Barangay')}</th><th>${t('Disease')}</th><th>${t('Severity')}</th><th>${t('Case Type')}</th><th>${t('Disease Subtype')}</th><th>${t('Status')}</th><th>${t('Date Reported')}</th></tr></thead>
@@ -1218,6 +1378,235 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         </div>
       )}
 
+      {/* ── REPEAT CASES ── */}
+      <div data-tour="dash-repeat" className="cdms-view-in" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', marginBottom: repeatCases.length ? '14px' : '0' }}>
+          <h4 style={{ color: 'var(--text-main)', margin: 0, fontSize: '15px', fontWeight: '600' }}>
+            🔁 {t('Repeat Cases')}
+          </h4>
+          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+            {t('Same patient + same disease reported 2+ times in the selected period.')}
+          </span>
+        </div>
+        {repeatCases.length === 0 ? (
+          <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-muted)' }}>
+            {t('No repeating cases in this period.')}
+          </p>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px' }}>
+            {repeatCases.map((g, i) => (
+              <div key={`${g.name}-${g.disease}`} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '12px 14px', animationDelay: `${i * 45}ms` }}>
+                <span style={{ width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: getDiseaseColor(g.disease) + '22', color: getDiseaseColor(g.disease), fontWeight: '800', fontSize: '16px' }}>
+                  {g.count}
+                </span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={g.name}>{g.name}</div>
+                  <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: getDiseaseColor(g.disease), marginRight: '5px', verticalAlign: 'middle' }} />
+                    {g.disease}
+                  </div>
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'right', flexShrink: 0, lineHeight: '1.5' }}>
+                  {g.dates.length > 0
+                    ? <>{formatDateStr(g.dates[0], dateFormat)}<br />→ {formatDateStr(g.dates[g.dates.length - 1], dateFormat)}</>
+                    : t('No dates')}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── SAME PERIOD LAST YEAR ── */}
+      {lastYearRange && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '10px 14px' }}>
+          <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-main)' }}>📅 {t('Same period last year')}</span>
+          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+            {lastYearTotal} {t('case')}(s) vs {totalCases} -
+            <strong style={{ color: lastYearTotal > 0 ? (totalCases > lastYearTotal ? 'var(--danger, #DC2626)' : totalCases < lastYearTotal ? 'var(--success, #059669)' : 'var(--text-main)') : 'var(--text-main)' }}>
+              {lastYearTotal > 0
+                ? `${totalCases > lastYearTotal ? '▲ +' : totalCases < lastYearTotal ? '▼ ' : ''}${Math.round(Math.abs(((totalCases - lastYearTotal) / lastYearTotal) * 100))}%`
+                : totalCases > 0 ? 'NEW' : '-'}
+            </strong>
+          </span>
+        </div>
+      )}
+
+      {/* ── RECURRING HOTSPOTS ── */}
+      <div data-tour="dash-hotspots" className="cdms-view-in" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', marginBottom: recurringHotspots.length ? '14px' : '0' }}>
+          <h4 style={{ color: 'var(--text-main)', margin: 0, fontSize: '15px', fontWeight: '600' }}>
+            📍 {t('Recurring Hotspots')}
+          </h4>
+          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+            {t('Disease reported 2+ times in the same barangay in the selected period.')}
+          </span>
+        </div>
+        {recurringHotspots.length === 0 ? (
+          <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-muted)' }}>
+            {t('No recurring hotspots in this period.')}
+          </p>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px' }}>
+            {recurringHotspots.map((h, i) => (
+              <div key={`${h.barangay}-${h.disease}`} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '12px 14px', animationDelay: `${i * 45}ms` }}>
+                <span style={{ width: '36px', height: '36px', borderRadius: '8px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: getDiseaseColor(h.disease) + '22', color: getDiseaseColor(h.disease), fontWeight: '800', fontSize: '15px' }}>
+                  {h.count}×
+                </span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={h.barangay}>{h.barangay}</div>
+                  <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: getDiseaseColor(h.disease), marginRight: '5px', verticalAlign: 'middle' }} />
+                    {h.disease}
+                  </div>
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'right', flexShrink: 0 }}>
+                  {h.lastReport ? <>{t('Last')} {formatDateStr(h.lastReport, dateFormat)}</> : '-'}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── SEASONAL VACCINE ADVISORY ── */}
+      <div className="cdms-view-in" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', marginBottom: '12px' }}>
+          <h4 style={{ color: 'var(--text-main)', margin: 0, fontSize: '15px', fontWeight: '600' }}>
+            🌦️ {t('Seasonal Vaccine Advisory')}
+          </h4>
+          {loginRole === 'CHO' && !advisoryEditing && (
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <button onClick={startAdvEdit}
+                style={{ padding: '6px 12px', borderRadius: '20px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '14px', fontWeight: '500', color: 'var(--text-main)', whiteSpace: 'nowrap' }}>
+                ✏️ {t('Edit')}
+              </button>
+              <button onClick={sendAdvisory}
+                style={{ padding: '6px 12px', borderRadius: '20px', background: '#129968', border: 'none', color: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: '600', whiteSpace: 'nowrap' }}>
+                📣 {t('Notify Staff')}
+              </button>
+            </div>
+          )}
+        </div>
+        {advisoryNotice && (
+          <div style={{ marginBottom: '10px', padding: '9px 14px', borderRadius: '8px', fontSize: '14px', color: '#0d9488', background: 'rgba(13,148,136,0.12)' }}>
+            {advisoryNotice}
+          </div>
+        )}
+        {!currentAdvisory && !advisoryEditing ? (
+          <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-muted)' }}>
+            {t('No active vaccine advisory.')}
+          </p>
+        ) : advisoryEditing && advisoryDraft ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '14px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Season')}</label>
+              <select className="cdms-cf-dropdown" value={advisoryDraft.id || ''}
+                onChange={e => { const sel = advisoryList.find(a => String(a.id) === e.target.value); if (sel) setAdvisoryDraft({ ...sel }); }}
+                style={{ width: '100%', maxWidth: 420, background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '10px 12px', fontSize: '15px' }}>
+                {advisoryList.map(a => <option key={a.id} value={a.id}>{a.season_label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '14px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Title')}</label>
+              <input className="cdms-cf-input" value={advisoryDraft.title || ''}
+                onChange={e => setAdvisoryDraft({ ...advisoryDraft, title: e.target.value })}
+                style={{ width: '100%', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '10px 12px', fontSize: '15px' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '14px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Vaccines to Prioritize')} ({t('one per line')})</label>
+              <textarea className="cdms-cf-input" rows={4} value={advisoryDraft.vaccine_recommendations || ''}
+                onChange={e => setAdvisoryDraft({ ...advisoryDraft, vaccine_recommendations: e.target.value })}
+                style={{ width: '100%', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '10px 12px', fontSize: '15px', resize: 'vertical' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '14px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Message')}</label>
+              <textarea className="cdms-cf-input" rows={3} value={advisoryDraft.message || ''}
+                onChange={e => setAdvisoryDraft({ ...advisoryDraft, message: e.target.value })}
+                style={{ width: '100%', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '10px 12px', fontSize: '15px', resize: 'vertical' }} />
+            </div>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <button onClick={saveAdvisory} style={{ padding: '8px 18px', background: '#129968', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
+                ✓ {t('Save')}
+              </button>
+              <button onClick={() => { setAdvisoryEditing(false); setAdvisoryDraft(null); setAdvisoryNotice(''); }}
+                style={{ padding: '8px 18px', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
+                {t('Cancel')}
+              </button>
+            </div>
+          </div>
+        ) : currentAdvisory ? (
+          <div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <span style={{ padding: '3px 10px', borderRadius: '20px', background: 'rgba(13,148,136,0.15)', color: '#0d9488', fontSize: '13px', fontWeight: '600' }}>
+                {currentAdvisory.season_label}
+              </span>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                {t('Vaccines to stock up on this season so none expire unused.')}
+              </span>
+            </div>
+            <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '10px' }}>
+              {currentAdvisory.title}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {(currentAdvisory.vaccine_recommendations || '').split('\n').map(v => v.trim()).filter(Boolean).map((v, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: 'var(--text-main)' }}>
+                  <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#0d9488', flexShrink: 0 }} />
+                  {v}
+                </div>
+              ))}
+            </div>
+            {currentAdvisory.message && (
+              <div style={{ fontSize: '14px', color: 'var(--text-muted)', marginTop: '10px' }}>
+                {currentAdvisory.message}
+              </div>
+            )}
+          </div>
+        ) : (
+          <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-muted)' }}>
+            {t('Loading vaccine advisory...')}
+          </p>
+        )}
+      </div>
+
+      {/* ── VACCINE EXPIRY ALERTS ── */}
+      <div className="cdms-view-in" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', marginBottom: vaccineAlerts.length ? '14px' : '0' }}>
+          <h4 style={{ color: 'var(--text-main)', margin: 0, fontSize: '15px', fontWeight: '600' }}>
+            💉 {t('Vaccine Expiry Alerts')}
+          </h4>
+          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+            {t('Active cases with a vaccine expiry within the next 30 days.')}
+          </span>
+        </div>
+        {vaccineAlerts.length === 0 ? (
+          <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-muted)' }}>
+            {t('No vaccines expiring in the next 30 days.')}
+          </p>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px' }}>
+            {vaccineAlerts.map((a, i) => (
+              <div key={`${a.case_id}-${a.vaccine_expiry_date}`} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--input-bg)', border: '1px solid ' + (a.isOverdue ? 'rgba(239,68,68,0.5)' : a.daysLeft <= 7 ? 'rgba(245,158,11,0.5)' : 'var(--border-color)'), borderRadius: '8px', padding: '12px 14px', animationDelay: `${i * 45}ms` }}>
+                <span style={{ width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: (a.isOverdue ? '#ef4444' : a.daysLeft <= 7 ? '#f59e0b' : '#0d9488') + '22', color: a.isOverdue ? '#ef4444' : a.daysLeft <= 7 ? '#f59e0b' : '#0d9488', fontWeight: '700', fontSize: '13px' }}>
+                  {a.isOverdue ? t('Due') : `${a.daysLeft}d`}
+                </span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={a.patient_name}>{a.patient_name}</div>
+                  <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    {t(a.vaccination_status || 'Not specified')} · &nbsp;
+                    <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: getDiseaseColor(a.disease_name), marginRight: '5px', verticalAlign: 'middle' }} />
+                    {a.disease_name}
+                  </div>
+                </div>
+                <div style={{ fontSize: '12px', color: a.isOverdue ? '#ef4444' : 'var(--text-muted)', textAlign: 'right', flexShrink: 0, lineHeight: '1.5' }}>
+                  {a.isOverdue ? t('Overdue') : t('Expires')}<br />{formatDateStr(a.vaccine_expiry_date.slice(0, 10), dateFormat)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* ── CHART + FILTER ROW ── */}
       <div className="cdms-dash-grid-main" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 280px)', gap: '16px' }}>
 
@@ -1378,7 +1767,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           <div key={`filters-${statSignature}`} className="cdms-view-in" style={{ minWidth: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', display: 'flex', flexDirection: 'column', gap: compactMode ? '10px' : '12px' }}>
           <h4 style={{ color: 'var(--text-main)', margin: '0', fontSize: '15px', fontWeight: '600' }}>{t('Filter & Controls')}</h4>
 
-          {!isBhw && dashPeriod === 'weekly' && <div>
+          {dashPeriod === 'weekly' && <div>
             <label style={{ color: 'var(--text-muted)', fontSize: '15px', display: 'block', marginBottom: '4px' }}>{t('Disease')}</label>
             <div style={{ position: 'relative' }} ref={diseaseRef}>
               <button
@@ -1641,7 +2030,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         };
         return (
           <div className="cdms-dash-grid-2" style={{ display: 'grid', gridTemplateColumns: isBhw ? '1fr' : '1fr 1fr', gap: '16px' }}>
-            {/* Top Barangays — CHO only */}
+            {/* Top Barangays - CHO only */}
             {!isBhw && (
               <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' }}>
 <h4 style={{ color: 'var(--text-main)', margin: `0 0 ${compactMode ? '10px' : '16px'} 0`, fontSize: '15px', fontWeight: '600' }}>
@@ -1668,7 +2057,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
               </div>
             )}
 
-            {/* Top Diseases — all roles */}
+            {/* Top Diseases - all roles */}
             <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <h4 style={{ color: 'var(--text-main)', margin: 0, fontSize: '15px', fontWeight: '600' }}>
@@ -1812,7 +2201,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         {/* Pagination */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--border-color)', flexWrap: 'wrap', rowGap: '10px' }}>
           <span style={{ color: 'var(--text-muted)', fontSize: '15px' }}>
-            {t('Showing')} {(currentPage - 1) * CASES_PER_PAGE + 1}–{Math.min(currentPage * CASES_PER_PAGE, displayCases.length)} {t('of')} {displayCases.length} {t('cases')}
+            {t('Showing')} {(currentPage - 1) * CASES_PER_PAGE + 1}-{Math.min(currentPage * CASES_PER_PAGE, displayCases.length)} {t('of')} {displayCases.length} {t('cases')}
           </span>
           <div style={{ display: 'flex', gap: '6px', rowGap: '6px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             <button
@@ -1840,7 +2229,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                     style={{ padding: '5px 8px', background: ellipsisOpen ? 'rgba(18,19,88,0.15)' : 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '15px', fontWeight: '700', letterSpacing: '2px' }}>...</button>
                   {ellipsisOpen && (
                     <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px', width: '160px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 100 }}>
-                      <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>{t('Go to page')} (1–{totalPages})</div>
+                      <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>{t('Go to page')} (1-{totalPages})</div>
                       <div style={{ display: 'flex', gap: '4px' }}>
                         <input type="number" min="1" max={totalPages} value={ellipsisPageInput} placeholder="#"
                           onChange={e => setEllipsisPageInput(e.target.value)}

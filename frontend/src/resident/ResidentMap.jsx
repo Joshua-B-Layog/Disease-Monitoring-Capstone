@@ -1012,8 +1012,7 @@ export default function ResidentMap() {
           <BoundsSetter key="bounds-setter" />
           <ZoomToBarangay key="zoom-barangay" barangay={selectedBrgy} cases={allCases} />
           <ZoomListener key="zoom-listener" onZoom={setMapZoom} autoDetectedBrgy={autoDetectedBrgy} setAutoDetectedBrgy={setAutoDetectedBrgy} />
-          {!showAutoPurok ? (
-            <GeoJSON
+          <GeoJSON
               key="brgy-geojson"
               ref={geoJsonLayerRef}
               data={cabuyaoBoundaries}
@@ -1061,15 +1060,13 @@ export default function ResidentMap() {
                 });
               }}
             />
-          ) : (
-            <PulseMarkers
+          <PulseMarkers
               key="pulse-markers"
               barangayData={purokData.length > 0 ? purokData : barangayData}
               onHover={setTooltip}
               onLeave={() => setTooltip(null)}
               onClick={handlePulseClick}
-            />
-          )}
+          />
         </MapContainer>
 
         {/* SD / HD BASE LAYER TOGGLE */}
@@ -1159,7 +1156,7 @@ export default function ResidentMap() {
         })()}
         </div>
 
-      {/* CLICK POPUP — full-screen overlay (escapes .resident-map-area clipping so the ✕ is always reachable) */}
+      {/* CLICK POPUP - full-screen overlay (escapes .resident-map-area clipping so the ✕ is always reachable) */}
       {popup && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 5000,
