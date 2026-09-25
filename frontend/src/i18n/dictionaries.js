@@ -93,6 +93,17 @@ const fil = {
   'Hover a barangay for a quick summary, click for the full disease breakdown, and zoom in to see purok-level case dots.': 'I-hover ang isang barangay para sa mabilis na buod, i-click para sa buong detalye ng sakit, at mag-zoom in upang makita ang purok-level na tuldok ng kaso.',
   'Browse the About, Contact, Help, and Prevention Tips sections. Prevention Tips lists what to watch out for and how to stay safe.': 'Tingnan ang mga seksyon ng About, Contact, Help, at Prevention Tips. Ang Prevention Tips ay naglilista ng dapat bantayan at kung paano manatiling ligtas.',
   'Switch between English and Filipino here, and press ❓ anytime to replay this short guide.': 'Lumipat sa pagitan ng English at Filipino dito, at pindutin ang ❓ anumang oras upang i-replay ang maikling gabay na ito.',
+  'Introductory Guide': 'Pambungad na Gabay',
+  'Follow a short guided tour through every section of this site, from the disease map to this help page. Press the button below to replay it anytime.': 'Sundan ang isang maikling guided tour sa bawat seksyon ng site na ito, mula sa mapa ng sakit hanggang sa tulong na pahinang ito. Pindutin ang button sa ibaba upang i-replay ito anumang oras.',
+  'Tour: About': 'Gabay: Tungkol sa CHO',
+  'Tour: Contact Us': 'Gabay: Makipag-ugnayan',
+  'Tour: Prevention Tips': 'Gabay: Mga Tip sa Pag-iwas',
+  'Tour: Help & Resources': 'Gabay: Tulong at mga Resources',
+  'Explore the live disease map of Cabuyao. Barangay colors show risk by case count. Zoom in close and the colors fade away, leaving only the borders so you can read the case markers clearly.': 'Tuklasin ang live na mapa ng sakit ng Cabuyao. Ang kulay ng barangay ay nagpapakita ng panganib batay sa bilang ng kaso. Mag-zoom in nang malapit at mawawala ang kulay, mananatili lamang ang mga gilid ng barangay upang malinaw na mabasa ang mga marker ng kaso.',
+  'Learn about the City Health Office of Cabuyao, the health services it provides, and how it works with barangay health workers to protect the community.': 'Alamin ang tungkol sa City Health Office ng Cabuyao, ang mga serbisyong pangkalusugan na ibinibigay nito, at kung paano ito nakikipagtulungan sa mga barangay health worker upang protektahan ang komunidad.',
+  'Find the CHO address, office hours, and hotline numbers, or send a direct message to the health office from this section.': 'Hanapin ang address ng CHO, mga oras ng opisina, at mga hotline number, o magpadala ng direktang mensahe sa opisina ng kalusugan mula sa seksyong ito.',
+  'Search any tracked disease to read its prevention tips and symptom checker. Know what to watch out for and how to keep your family safe.': 'Maghanap ng anumang sakit na sinusubaybayan upang mabasa ang mga tip sa pag-iwas nito at ang symptom checker. Alamin ang dapat bantayan at kung paano panatilihing ligtas ang iyong pamilya.',
+  'This is the support hub. Use the first box to replay this guided tour anytime you need a refresh, and explore the guides, symptom lists, and warnings below.': 'Ito ang support hub. Gamitin ang unang kahon upang i-replay ang guided tour na ito anumang oras na kailangan mo ng refresher, at tuklasin ang mga gabay, listahan ng sintomas, at mga babala sa ibaba.',
 };
 
 export const dictionaries = { en, fil };

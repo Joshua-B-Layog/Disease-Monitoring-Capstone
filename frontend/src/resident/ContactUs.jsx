@@ -142,7 +142,7 @@ export default function ContactUs() {
 
   return (
     <div className="resident-page">
-      <h2 style={{ margin: '0 0 24px', fontSize: '26px', fontWeight: '700' }}>
+      <h2 data-tour="contact-title" style={{ margin: '0 0 24px', fontSize: '26px', fontWeight: '700' }}>
         Contact Us
       </h2>
 

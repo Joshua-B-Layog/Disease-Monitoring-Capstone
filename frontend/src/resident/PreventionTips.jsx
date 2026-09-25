@@ -738,7 +738,7 @@ export default function PreventionTips() {
 
   return (
     <div className="resident-page">
-      <h2 style={{ margin: '0 0 24px', fontSize: '26px', fontWeight: '700' }}>
+      <h2 data-tour="tips-title" style={{ margin: '0 0 24px', fontSize: '26px', fontWeight: '700' }}>
         Prevention Tips
       </h2>
 

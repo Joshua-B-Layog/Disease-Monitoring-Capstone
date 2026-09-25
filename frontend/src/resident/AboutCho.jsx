@@ -54,7 +54,7 @@ export default function AboutCho() {
 
   return (
     <div className="resident-page">
-      <h2 style={{ margin: '0 0 8px', fontSize: '26px', fontWeight: '700' }}>
+      <h2 data-tour="about-title" style={{ margin: '0 0 8px', fontSize: '26px', fontWeight: '700' }}>
         {t('About the City Health Office')}
       </h2>
       <p style={{ margin: '0 0 24px', color: 'var(--text-muted)', fontSize: '17px' }}>

@@ -2,15 +2,32 @@ import { useState } from 'react';
 import { useI18n } from '../i18n';
 
 
-export default function Help() {
+export default function Help({ onShowGuide }) {
   const { t } = useI18n();
   return (
     <div className="resident-page">
-      <h2 style={{ margin: '0 0 24px', fontSize: '26px', fontWeight: '700' }}>
+      <h2 data-tour="help-title" style={{ margin: '0 0 24px', fontSize: '26px', fontWeight: '700' }}>
         {t('Help & Resources')}
       </h2>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+        {/* Section 0: Intro Guide */}
+        <Section title="Introductory Guide" icon="❓">
+          <p style={{ fontSize: '17px', color: 'var(--text-muted)', margin: '0 0 16px' }}>
+            {t('Follow a short guided tour through every section of this site, from the disease map to this help page. Press the button below to replay it anytime.')}
+          </p>
+          <div style={{ textAlign: 'center' }}>
+            <button onClick={() => onShowGuide && onShowGuide()}
+              style={{
+                padding: '12px 28px', background: '#0d9488', color: '#fff',
+                border: 'none', borderRadius: '8px', fontSize: '17px', fontWeight: '600',
+                cursor: 'pointer',
+              }}>
+              ❓ {t('Show Guide')}
+            </button>
+          </div>
+        </Section>
 
         {/* Section 1: User Guides & Tutorials */}
         <Section title="User Guides & Video Tutorials" icon="📚">

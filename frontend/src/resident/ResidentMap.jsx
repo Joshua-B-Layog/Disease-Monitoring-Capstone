@@ -275,7 +275,7 @@ function getPurokGroups(barangayName, cases) {
 
   return Object.values(groups).map(g => ({
     purok: g.purok,
-    barangayName: g.purok === 'Unspecified' ? barangayName : barangayName + ' - ' + g.purok,
+    barangayName,
     barangay: barangayName,
     coords: g.validCoordCount > 0
       ? [g.latSum / g.validCoordCount, g.lngSum / g.validCoordCount]
@@ -397,7 +397,7 @@ function getGradientColor(count) {
   }
 }
 
-const getGeoJsonStyle = (feature, barangayData) => {
+const getGeoJsonBaseStyle = (feature, barangayData) => {
   const dbName = getDbNameFromGeoJson(feature.properties.ADM4_EN);
   const match = barangayData.find(b => b.barangayName === dbName);
   const count = match ? match.totalCases : 0;
@@ -575,6 +575,17 @@ export default function ResidentMap() {
   }, [showOverview]);
   const barangayDataRef = useRef(barangayData);
   useEffect(() => { barangayDataRef.current = barangayData; }, [barangayData]);
+  const mapZoomRef = useRef(mapZoom);
+  useEffect(() => { mapZoomRef.current = mapZoom; }, [mapZoom]);
+
+  // When zoomed in close enough to see the case pins, drop the colored fill
+  // and keep only the barangay borders so the pins stand out cleanly.
+  const getGeoJsonStyle = (feature, data) => {
+    if (mapZoomRef.current >= PUROK_ZOOM_THRESHOLD) {
+      return { fillColor: 'transparent', fillOpacity: 0, color: '#ffffff', weight: 2 };
+    }
+    return getGeoJsonBaseStyle(feature, data);
+  };
 
   const fetchMapData = () => {
     axios.get(API_URL + '/api/disease_cases')
@@ -635,13 +646,13 @@ export default function ResidentMap() {
     }
   }, [autoDetectedBrgy, allCases]);
 
-  // Update GeoJSON styles when barangayData changes
+  // Update GeoJSON styles when barangayData or the zoom level changes
   useEffect(() => {
     if (!geoJsonLayerRef.current) return;
     geoJsonLayerRef.current.eachLayer((layer) => {
       layer.setStyle(getGeoJsonStyle(layer.feature, barangayData));
     });
-  }, [barangayData]);
+  }, [barangayData, mapZoom]);
 
   // Update permanent labels when data refreshes
   useEffect(() => {
@@ -1035,7 +1046,8 @@ export default function ResidentMap() {
                 `, { permanent: true, direction: 'center', className: 'brgy-tooltip-label' });
                 layer.on({
                   mouseover: function (e) {
-                    e.target.setStyle({ fillOpacity: 0.75, weight: 2.5 });
+                    const zoomedIn = mapZoomRef.current >= PUROK_ZOOM_THRESHOLD;
+                    e.target.setStyle({ fillOpacity: zoomedIn ? 0 : 0.75, weight: 2.5 });
                     const liveData = barangayDataRef.current.find(b => b.barangayName === barangayName);
                     if (liveData) {
                       setTooltip(liveData);
@@ -1044,7 +1056,7 @@ export default function ResidentMap() {
                     }
                   },
                   mouseout: function (e) {
-                    e.target.setStyle(getGeoJsonStyle(feature, barangayData));
+                    e.target.setStyle(getGeoJsonStyle(feature, barangayDataRef.current));
                     setTooltip(null);
                   },
                   click: function () {

@@ -134,17 +134,27 @@ export const TOUR_STEPS = {
     {
       target: '.resident-map-area',
       title: 'Tour: Disease Map',
-      desc: 'Hover a barangay for a quick summary, click for the full disease breakdown, and zoom in to see purok-level case dots.',
+      desc: 'Explore the live disease map of Cabuyao. Barangay colors show risk by case count. Zoom in close and the colors fade away, leaving only the borders so you can read the case markers clearly.',
     },
     {
-      target: '.resident-nav-desktop',
-      title: 'Tour: Navigation',
-      desc: 'Browse the About, Contact, Help, and Prevention Tips sections. Prevention Tips lists what to watch out for and how to stay safe.',
+      target: '[data-tour="about-title"]',
+      title: 'Tour: About',
+      desc: 'Learn about the City Health Office of Cabuyao, the health services it provides, and how it works with barangay health workers to protect the community.',
     },
     {
-      target: '[data-tour="resident-lang"]',
-      title: 'Tour: Language & Guide',
-      desc: 'Switch between English and Filipino here, and press ❓ anytime to replay this short guide.',
+      target: '[data-tour="contact-title"]',
+      title: 'Tour: Contact Us',
+      desc: 'Find the CHO address, office hours, and hotline numbers, or send a direct message to the health office from this section.',
+    },
+    {
+      target: '[data-tour="tips-title"]',
+      title: 'Tour: Prevention Tips',
+      desc: 'Search any tracked disease to read its prevention tips and symptom checker. Know what to watch out for and how to keep your family safe.',
+    },
+    {
+      target: '[data-tour="help-title"]',
+      title: 'Tour: Help & Resources',
+      desc: 'This is the support hub. Use the first box to replay this guided tour anytime you need a refresh, and explore the guides, symptom lists, and warnings below.',
     },
   ],
 };

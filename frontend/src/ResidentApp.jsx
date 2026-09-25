@@ -41,7 +41,7 @@ export default function ResidentApp() {
 
   const toggleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark');
 
-  // ── Onboarding guide: auto-runs once, replays via the ❓ button beside language ──
+  // ── Onboarding guide: auto-runs once, replays from the Help & Resources module ──
   useEffect(() => {
     if (localStorage.getItem('cdms_resident_tour_done') !== '1') {
       const timer = setTimeout(() => setTourOpen(true), 900);
@@ -222,7 +222,7 @@ export default function ResidentApp() {
               </button>
             ))}
             {/* Language switcher */}
-            <div data-tour="resident-lang" style={{ display: 'flex', gap: '8px', alignItems: 'center', marginLeft: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginLeft: '8px' }}>
               <button onClick={() => setLang(lang === 'en' ? 'fil' : 'en')}
                 style={{
                   padding: '8px 12px',
@@ -234,20 +234,6 @@ export default function ResidentApp() {
                   cursor: 'pointer',
                 }}>
                 {getLangName(lang === 'en' ? 'fil' : 'en')}
-              </button>
-              <button onClick={() => setTourOpen(true)}
-                title="Show Guide"
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid rgba(255,255,255,0.3)',
-                  background: 'rgba(13,148,136,0.35)',
-                  color: '#fff',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                }}>
-                ❓ {t('Show Guide')}
               </button>
             </div>
             {/* Theme toggle */}
@@ -306,15 +292,6 @@ export default function ResidentApp() {
               }}>
               🌐 {getLangName(lang === 'en' ? 'fil' : 'en')}
             </button>
-            <button onClick={() => setTourOpen(true)}
-              style={{
-                display: 'block', width: '100%', textAlign: 'left',
-                padding: '10px 16px',
-                background: 'rgba(13,148,136,0.25)', border: 'none',
-                color: '#fff', fontSize: '15px', cursor: 'pointer',
-              }}>
-              ❓ {t('Show Guide')}
-            </button>
             <button onClick={toggleTheme}
               style={{
                 display: 'block', width: '100%', textAlign: 'left',
@@ -335,8 +312,9 @@ export default function ResidentApp() {
         textAlign: 'center',
       }}>
         <h1 className="resident-hero-title" style={{
-          margin: '0 0 8px', color: '#fff', fontSize: '36px', fontWeight: '800',
-          letterSpacing: '-0.02em',
+          margin: '0 0 10px', color: '#fff', fontSize: '36px', fontWeight: '800',
+          letterSpacing: '0.02em',
+          lineHeight: '1.4',
         }}>
           Cabuyao Disease Monitoring System
         </h1>
@@ -360,7 +338,7 @@ export default function ResidentApp() {
         <ContactUs />
       </section>
       <section id="section-help" className="section-fade-in resident-section">
-        <Help />
+        <Help onShowGuide={() => setTourOpen(true)} />
       </section>
       <section id="section-tips" className="section-fade-in resident-section">
         <PreventionTips />
