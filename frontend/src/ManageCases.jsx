@@ -15,6 +15,7 @@ import { FeverIcon, InfluenzaAIcon, LeptospirosisIcon, TuberculosisIcon, Typhoid
 import { formatDate as formatDateStr, formatDateTime } from './formatDate';
 import DatePicker from './components/DatePicker';
 import ExportPreviewModal from './components/ExportPreview';
+import { buildPdfDoc } from './exportPdf';
 import { useI18n } from './i18n';
 
 const AllDiseasesIcon = ({ color = '#121358', size = 28 }) => (
@@ -1465,6 +1466,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         notes: routingDescription || null,
       });
       setSubmitMsg(t('Case sent to ') + targetUnit + t(' inbox successfully!'));
+      notify(t('Case sent to ') + targetUnit + t(' inbox successfully!'), 'success');
       setRoutingStep(null);
       setRoutingData(null);
       setRoutingDescription('');
@@ -1474,6 +1476,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       setTimeout(() => { setView('list'); setSubmitMsg(''); setSubmitLoading(false); }, 1200);
     } catch (routeErr) {
       setSubmitMsg(t('Error') + ': ' + (routeErr.response?.data?.error || routeErr.message));
+      notify(t('Error') + ': ' + (routeErr.response?.data?.error || routeErr.message), 'error');
       setSubmitLoading(false);
     }
   };
@@ -1909,7 +1912,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     const rows = filteredCases.map(c =>
       `<tr><td>${c.case_id}</td><td>${c.patient_name || ''}</td><td>${c.age || ''}</td><td>${c.barangay_name || ''}</td><td>${c.disease_name || ''}</td><td>${c.severity || ''}</td><td>${c.case_type || ''}</td><td>${c.disease_type || ''}</td><td>${translateStatus(c.status) || ''}</td></tr>`
     ).join('');
-    const html = `<html><head><meta charset="utf-8"></head><body>
+    const html = `<html><head><meta charset="utf-8"><style>*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}</style></head><body>
       <h2>${t('CDMS - ')}${selectedDisease?.name || t('Cases')}${t(' Export')}</h2>
       <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:13px;">
         <thead><tr style="background:#1e3a8a;color:white;"><th>${t('ID')}</th><th>${t('Patient')}</th><th>${t('Age')}</th><th>${t('Barangay')}</th><th>${t('Disease')}</th><th>${t('Severity')}</th><th>${t('Case Type')}</th><th>${t('Disease Subtype')}</th><th>${t('Status')}</th></tr></thead>
@@ -1924,6 +1927,34 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           primary: true,
           onClick: () => {
             downloadBlob(new Blob(['\ufeff' + html], { type: 'application/msword' }), `CDMS_${selectedDisease?.name || t('Cases')}_Export.doc`);
+            setExportPreview(null);
+          },
+        },
+        {
+          label: `⬇ ${t('Download PDF (.pdf)')}`,
+          primary: true,
+          onClick: () => {
+            const pdfCols = [t('ID'), t('Patient'), t('Age'), t('Barangay'), t('Disease'), t('Severity'), t('Case Type'), t('Disease Subtype'), t('Status')];
+            const pdfRows = filteredCases.map(c => [
+              `#${String(c.case_id).padStart(3, '0')}`,
+              c.patient_name || '',
+              c.age || '',
+              c.barangay_name || '',
+              c.disease_name || '',
+              c.severity || '',
+              c.case_type || '',
+              c.disease_type || '',
+              translateStatus(c.status) || '',
+            ]);
+            const pdfFilename = `CDMS_${selectedDisease?.name || t('Cases')}_Export.pdf`;
+            const doc = buildPdfDoc({
+              title: `${t('CDMS - ')}${selectedDisease?.name || t('Cases')}${t(' Export')}`,
+              subtitle: `${t('Generated:')} ${formatDateTime(new Date(), dateFormat)} | ${filteredCases.length} ${t('cases')}`,
+              filename: pdfFilename,
+              sections: [{ heading: null, columns: pdfCols, rows: pdfRows }],
+              t,
+            });
+            doc.save(pdfFilename);
             setExportPreview(null);
           },
         },

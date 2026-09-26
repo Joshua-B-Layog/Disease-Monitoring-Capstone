@@ -9,6 +9,7 @@ import { cacheUserProfile, getCachedUserProfile, getCachedBarangays, isOnline, g
 import { authHeaders } from './auth';
 import { emitTwoFaChanged, onTwoFaChanged } from './twoFaSignal';
 import { formatDate, formatDateTime } from './formatDate';
+import { buildPdfDoc } from './exportPdf';
 import { useI18n } from './i18n';
 import './ChoSettings.css';
 
@@ -2073,7 +2074,7 @@ if (security.newPassword !== security.confirmPassword) {
                             `<tr><td>U-${String(u.user_id).padStart(3,'0')}</td><td>${u.full_name||''}</td><td>${u.username||''}</td><td>${u.role||''}</td><td>${u.barangay_name||''}</td><td>${u.is_active?'Active':'Inactive'}</td><td>${u.email||''}</td></tr>`
                           ).join('');
                           const html = `<html><head><title>CDMS Export</title><style>
-                            body{font-family:Arial,sans-serif;padding:28px;font-size:13px;color:#111;background:#fff;}
+                            body{font-family:Arial,sans-serif;padding:28px;font-size:13px;color:#111;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
                             h2{color:#1e3a8a;margin-bottom:2px;}
                             .meta{color:#555;margin:0 0 20px 0;font-size:12px;}
                             h3{color:#1e3a8a;margin:24px 0 8px 0;font-size:14px;}
@@ -2099,11 +2100,55 @@ if (security.newPassword !== security.confirmPassword) {
                           setPreview({
                             title: t('Preview: PDF Document'),
                             html,
-                            actions: [{
-                              label: `🖨 ${t('Print / Save as PDF')}`,
-                              primary: true,
-                              onClick: () => openPrint(html),
-                            }],
+                            actions: [
+                              {
+                                label: `⬇ ${t('Download PDF (.pdf)')}`,
+                                primary: true,
+                                onClick: () => {
+                                  const pdfCasesCols = ['ID', t('Patient Name'), t('Age'), 'Gender', t('Barangay'), t('Disease'), 'Severity', 'Status', 'Vaccination', 'Vaccine Expiry', t('Date Reported')];
+                                  const pdfCasesRows = cases.map(c => [
+                                    `#${String(c.case_id).padStart(3, '0')}`,
+                                    c.patient_name || '',
+                                    c.age || '',
+                                    c.gender || '',
+                                    c.barangay_name || '',
+                                    c.disease_name || '',
+                                    c.severity || '',
+                                    translateStatus(c.status) || '',
+                                    c.vaccination_status || '',
+                                    c.vaccine_expiry_date || '',
+                                    formatDate(c.date_reported, systemPrefs.dateFormat),
+                                  ]);
+                                  const pdfUsersCols = ['User ID', 'Full Name', 'Username', 'Role', t('Barangay'), 'Status', 'Email'];
+                                  const pdfUsersRows = users.map(u => [
+                                    `U-${String(u.user_id).padStart(3, '0')}`,
+                                    u.full_name || '',
+                                    u.username || '',
+                                    u.role || '',
+                                    u.barangay_name || '',
+                                    u.is_active ? 'Active' : 'Inactive',
+                                    u.email || '',
+                                  ]);
+                                  const pdfFilename = `CDMS_Export_${stamp}.pdf`;
+                                  const doc = buildPdfDoc({
+                                    title: 'Cabuyao CDMS - Full Data Export',
+                                    subtitle: `${t('Generated:')} ${formatDateTime(new Date(), systemPrefs.dateFormat)} | ${cases.length} Cases, ${users.length} Users`,
+                                    filename: pdfFilename,
+                                    sections: [
+                                      { heading: `Case Records (${cases.length})`, columns: pdfCasesCols, rows: pdfCasesRows },
+                                      { heading: `User Accounts (${users.length})`, columns: pdfUsersCols, rows: pdfUsersRows },
+                                    ],
+                                    t,
+                                  });
+                                  doc.save(pdfFilename);
+                                },
+                              },
+                              {
+                                label: `🖨 ${t('Print / Save as PDF')}`,
+                                primary: false,
+                                onClick: () => openPrint(html),
+                              },
+                            ],
                           });
                         } else if (row.label === 'Export as Excel') {
                           const sep = '\t';

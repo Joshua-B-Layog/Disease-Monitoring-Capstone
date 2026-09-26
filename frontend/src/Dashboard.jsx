@@ -964,9 +964,13 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     if (bars.length === 0) {
       return `<p style="color:#64748b;font-size:14px;">${t('No cases found.')}</p>`;
     }
+    const rankColors = Array(bars.length).fill('#3b82f6');
+    const ranked = bars.map((b, i) => ({ i, count: b.count })).sort((a, b) => b.count - a.count);
+    if (ranked.length > 0) rankColors[ranked[0].i] = '#DC2626';
+    if (ranked.length > 1) rankColors[ranked[1].i] = '#D97706';
     const barRows = bars.map((bar, i) => {
       const pct = highest > 0 ? Math.round((bar.count / highest) * 100) : 0;
-      const color = i === 0 ? '#DC2626' : i === 1 ? '#D97706' : '#3b82f6';
+      const color = rankColors[i];
       return `
         <tr>
           <td style="padding:6px 10px 6px 0;font-size:13px;white-space:nowrap;min-width:160px;">${bar.label}</td>
@@ -1064,17 +1068,17 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
     const monthLabel = MONTH_FULL[new Date(dateRange.start || Date.now()).getMonth()] || dashYear;
     const headCSS = isSlide ? `
-      body { font-family: 'Segoe UI', Arial, sans-serif; background:#0B1120; color:white; padding:40px; }
+      body { font-family: 'Segoe UI', Arial, sans-serif; background:#0B1120; color:white; padding:40px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
       h1 { color: #129968; margin-bottom: 4px; font-size: 26px; }
       h2 { color: #3b82f6; margin-top: 34px; font-size: 20px; border-bottom: 1px solid #1e293b; padding-bottom: 8px; }
       p.meta { color: #94a3b8; margin: 0 0 18px 0; font-size: 13px; }
       .title-line { color:#e2e8f0; font-size:15px; font-weight:600; margin: 0 0 4px 0; }
       h3 { color: #3b82f6; margin: 22px 0 8px 0; font-size: 15px; }
-      table.main { width:100%; border-collapse: collapse; margin-top: 8px; }
-      table.main th { background:#1e293b; color:#e2e8f0; padding:8px 10px; text-align:center; font-size:12px; }
-      table.main td { padding:7px 10px; border-bottom:1px solid #1e293b; text-align:center; font-size:12px; color:#e2e8f0; }
-      table.alt { width:100%; border-collapse:collapse; }
-      table.alt td { padding:6px 10px; font-size:13px; color:#e2e8f0; }
+      table.main { width:100%; border-collapse: collapse; margin-top: 8px; border: 1px solid #1e293b; }
+      table.main th { background:#1e293b; color:#e2e8f0; padding:8px 10px; text-align:center; font-size:12px; border: 1px solid #1e293b; }
+      table.main td { padding:7px 10px; border:1px solid #1e293b; text-align:center; font-size:12px; color:#e2e8f0; }
+      table.alt { width:100%; border-collapse:collapse; border: 1px solid #1e293b; }
+      table.alt td { padding:6px 10px; font-size:13px; color:#e2e8f0; border: 1px solid #1e293b; }
       .srow:nth-child(even) td { background:#1e293b; }
       .bar-section { margin: 6px 0 22px 0; }
       .statgrid { width:100%; border-collapse:separate; border-spacing:12px 0; }
@@ -1089,17 +1093,17 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       .alert.amber { border-color:#fcd34d; background:#451a03; color:#fde68a; }
       footer { color:#4b5563; font-size:12px; margin-top:40px; border-top:1px solid #1e293b; padding-top:12px; }
     ` : `
-      body { font-family: Arial, sans-serif; padding: 32px; font-size: 13px; color: #111; }
+      body { font-family: Arial, sans-serif; padding: 32px; font-size: 13px; color: #111; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
       h2 { color: #1e3a8a; margin-bottom: 4px; }
       h3 { color: #1e3a8a; margin: 22px 0 8px 0; font-size: 15px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
       p.meta { color: #555; margin: 0 0 8px 0; }
       .title-line { font-size: 14px; font-weight: 600; margin: 0 0 4px 0; }
-      table.main { width: 100%; border-collapse: collapse; margin-top: 8px; }
-      table.main th { background: #1e3a8a; color: white; padding: 8px 10px; text-align: center; font-size: 11px; }
-      table.main td { padding: 7px 10px; border-bottom: 1px solid #e5e7eb; text-align: center; font-size: 11px; }
+      table.main { width: 100%; border-collapse: collapse; margin-top: 8px; border: 1px solid #d1d5db; }
+      table.main th { background: #1e3a8a; color: white; padding: 8px 10px; text-align: center; font-size: 11px; border: 1px solid #64748b; }
+      table.main td { padding: 7px 10px; border: 1px solid #d1d5db; text-align: center; font-size: 11px; }
       table.main tr:nth-child(even) td { background: #f9fafb; }
-      table.alt { width: 100%; border-collapse: collapse; }
-      table.alt td { padding: 6px 10px; font-size: 12px; }
+      table.alt { width: 100%; border-collapse: collapse; border: 1px solid #d1d5db; }
+      table.alt td { padding: 6px 10px; font-size: 12px; border: 1px solid #d1d5db; }
       .srow:nth-child(even) td { background: #f9fafb; }
       .bar-section { margin: 6px 0 20px 0; }
       .statgrid { width: 100%; border-collapse: separate; border-spacing: 10px 0; }

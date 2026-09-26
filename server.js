@@ -349,7 +349,7 @@ db.on('error', (err) => {
 // t.commit(cb) commits (releasing the connection), t.rollback() aborts. DB writes inside
 // work() are atomic � any failure aborts the whole batch.
 function withTransaction(work, onError) {
-    pool.getConnection((connErr, conn) => {
+    db.getConnection((connErr, conn) => {
         if (connErr) return onError(connErr);
         conn.beginTransaction((beginErr) => {
             if (beginErr) { conn.release(); return onError(beginErr); }

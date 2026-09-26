@@ -7,6 +7,7 @@ import { cacheCases, getCachedCases, cacheAuditLogs, getCachedAuditLogs, cacheGe
 import { formatDate, formatDateTime } from './formatDate';
 import DatePicker from './components/DatePicker';
 import ExportPreviewModal from './components/ExportPreview';
+import { buildPdfDoc } from './exportPdf';
 import { useI18n } from './i18n';
 
 // ── CHO Unit → Barangay mapping ──
@@ -298,22 +299,23 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
     ).join('');
     const letterhead = buildReportLetterhead(report.title, `${report.period} | ${report.entity} | ${report.timestamp}`);
     const footer = buildReportFooter();
+    const filename = `${report.title.replace(/\s+/g, '_').replace(/-/g, '-')}.doc`;
     const html = `<html><head><meta charset="utf-8"><title>${report.title}</title>
     <style>
-      body{font-family:Arial,sans-serif;padding:32px;font-size:13px;color:#111;}
-      table{width:100%;border-collapse:collapse;margin-top:12px;}
-      th{background:#1e3a8a;color:white;padding:9px 10px;text-align:left;font-size:12px;}
-      td{padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;}
+      body{font-family:Arial,sans-serif;padding:32px;font-size:13px;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+      table{width:100%;border-collapse:collapse;margin-top:12px;border:1px solid #d1d5db;}
+      th{background:#1e3a8a;color:white;padding:9px 10px;text-align:left;font-size:12px;border:1px solid #64748b;}
+      td{padding:8px 10px;border:1px solid #d1d5db;font-size:12px;}
       tr:nth-child(even) td{background:#f9fafb;}
     </style></head><body>
     ${letterhead}
+    <div style="text-align:right;margin:10px 0 0 0;font-size:11px;color:#64748b;">${t('File')}: ${filename}</div>
     <table>
       <thead><tr><th>${t('Timestamp')}</th><th>${t('User ID')}</th><th>${t('Name')}</th><th>${t('Action')}</th><th>${t('Entity')}</th><th>${t('Details')}</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
     ${footer}
     </body></html>`;
-    const filename = `${report.title.replace(/\s+/g, '_').replace(/-/g, '-')}.doc`;
     setPreview({
       title: t('Preview: Word Document'),
       html,
@@ -337,34 +339,31 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
   };
 
   const handleDownloadPDF = (report) => {
-    const rows = (report.snapshotLogs || []).map(l =>
-      `<tr><td>${l.created_at ? formatDateTime(l.created_at, dateFormat) : ''}</td><td>${l.user_id || ''}</td><td>${l.user_name || ''}</td><td>${l.action}</td><td>${l.entity}</td><td>${l.details}</td></tr>`
-    ).join('');
-    const letterhead = buildReportLetterhead(report.title, `${report.period} | ${report.entity} | ${report.timestamp}`);
-    const footer = buildReportFooter();
-    const htmlStr = `<html><head><meta charset="utf-8"><title>${report.title}</title>
-    <style>
-      body{font-family:Arial,sans-serif;padding:32px;font-size:13px;color:#111;}
-      table{width:100%;border-collapse:collapse;margin-top:12px;}
-      th{background:#1e3a8a;color:white;padding:9px 10px;text-align:left;font-size:12px;}
-      td{padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;}
-      tr:nth-child(even) td{background:#f9fafb;}
-    </style></head><body>
-    ${letterhead}
-    <table>
-      <thead><tr><th>${t('Timestamp')}</th><th>${t('User ID')}</th><th>${t('Name')}</th><th>${t('Action')}</th><th>${t('Entity')}</th><th>${t('Details')}</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-    ${footer}
-    </body></html>`;
+    const columns = [t('Timestamp'), t('User ID'), t('Name'), t('Action'), t('Entity'), t('Details')];
+    const rows = (report.snapshotLogs || []).map(l => [
+      l.created_at ? formatDateTime(l.created_at, dateFormat) : '',
+      l.user_id || '', l.user_name || '', l.action, l.entity, l.details || '',
+    ]);
     const filename = `${report.title.replace(/\s+/g, '_').replace(/-/g, '-')}.pdf`;
+
     setPreview({
       title: t('Preview: PDF Report'),
-      html: htmlStr,
+      columns,
+      rows,
       actions: [{
-        label: `🖨 ${t('Print / Save as PDF')}`,
+        label: `⬇ ${t('Download PDF (.pdf)')}`,
         primary: true,
-        onClick: () => openPrint(htmlStr, filename),
+        onClick: () => {
+          const doc = buildPdfDoc({
+            title: report.title,
+            subtitle: `${report.period} | ${report.entity} | ${report.timestamp}`,
+            filename,
+            sections: [{ heading: null, columns, rows }],
+            t,
+          });
+          doc.save(filename);
+          setPreview(null);
+        },
       }],
     });
     setShowDownloadMenu(null);
@@ -456,23 +455,25 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
         }],
       });
     } else {
-      const headRow = `<tr>${columns.map(k => `<th>${k}</th>`).join('')}</tr>`;
-      const bodyRows = tableRows.map(r => `<tr>${r.map(v => `<td>${String(v ?? '')}</td>`).join('')}</tr>`).join('');
-      const letterhead = buildReportLetterhead(t('Cabuyao CDMS - Audit Log Export'), `${rows.length}${t(' entries | Generated ')}${formatDateTime(new Date(), dateFormat)}`);
-      const footer = buildReportFooter();
-      const htmlStr = `<html><head><meta charset="utf-8"><title>Audit Logs</title>
-      <style>body{font-family:Arial,sans-serif;padding:32px;font-size:12px;color:#111;}table{width:100%;border-collapse:collapse;}th{background:#1e3a8a;color:white;padding:8px;text-align:left;font-size:11px;}td{padding:7px;border-bottom:1px solid #e5e7eb;font-size:11px;}tr:nth-child(even) td{background:#f9fafb;}</style></head><body>
-      ${letterhead}
-      <table><thead>${headRow}</thead><tbody>${bodyRows}</tbody></table>
-      ${footer}
-      </body></html>`;
+      const filename = `audit_logs_${stamp}.pdf`;
       setPreview({
         title: t('Preview: PDF Report'),
-        html: htmlStr,
+        columns,
+        rows: tableRows,
         actions: [{
-          label: `🖨 ${t('Print / Save as PDF')}`,
+          label: `⬇ ${t('Download PDF (.pdf)')}`,
           primary: true,
-          onClick: () => openPrint(htmlStr, `audit_logs_${stamp}.pdf`),
+          onClick: () => {
+            const doc = buildPdfDoc({
+              title: t('Cabuyao CDMS - Audit Log Export'),
+              subtitle: `${rows.length}${t(' entries | Generated ')}${formatDateTime(new Date(), dateFormat)}`,
+              filename,
+              sections: [{ heading: null, columns, rows: tableRows }],
+              t,
+            });
+            doc.save(filename);
+            setPreview(null);
+          },
         }],
       });
     }

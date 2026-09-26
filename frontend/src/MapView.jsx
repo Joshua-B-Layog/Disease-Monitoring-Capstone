@@ -603,6 +603,11 @@ if (!document.getElementById('cdms-barangay-labels')) {
     .brgy-labels-hidden .brgy-tooltip-label {
       display: none !important;
     }
+    /* CHO barangay-tier pins: the permanent name box already says the name, so the
+       pin's own name tag is hidden live and only restored in exports. */
+    .cdms-barangay-pin .pin-label-tag {
+      display: none;
+    }
   `;
   document.head.appendChild(ls);
 }
@@ -613,6 +618,14 @@ function CreateTopPane() {
     const pane = map.createPane('topPane');
     pane.style.zIndex = 800;
   }, [map]);
+  return null;
+}
+
+// Hands the Leaflet map instance up to MapView so the Export Image handler can
+// use the real projection (latLngToContainerPoint) for the canvas redraw.
+function MapBridge({ mapRef }) {
+  const map = useMap();
+  useEffect(() => { mapRef.current = map; }, [mapRef, map]);
   return null;
 }
 
@@ -681,7 +694,7 @@ const escapeHtmlBasic = (s) =>
 // label tag underneath (used by per-unit pins, area pins and barangay pins).
 const getPinSize = (count) => Math.max(40, Math.min(76, 28 + count * 1.8));
 
-const createPinIcon = ({ count, color, label = null }) => {
+const createPinIcon = ({ count, color, label = null, className = '' }) => {
   const size = getPinSize(count);
   const w = size;
   const h = Math.round(size * 44 / 34);
@@ -692,7 +705,7 @@ const createPinIcon = ({ count, color, label = null }) => {
   const totalH = h + labelH;
 
   return L.divIcon({
-    className: '',
+    className,
     html: `
       <div style="position:relative;width:${w}px;height:${totalH}px;cursor:pointer;">
         <svg width="${w}" height="${h}" viewBox="0 0 34 44" style="position:absolute;top:0;left:0;display:block;filter:drop-shadow(0 3px 4px rgba(0,0,0,0.5));">
@@ -700,7 +713,7 @@ const createPinIcon = ({ count, color, label = null }) => {
           <circle cx="17" cy="17" r="11" fill="#ffffff"/>
           <text x="17" y="22" text-anchor="middle" font-size="14" font-weight="800" fill="${color}" font-family="Tw Cen MT Condensed,system-ui,sans-serif">${count}</text>
         </svg>
-        ${hasLabel ? `<div style="position:absolute;left:50%;top:${h + 1}px;transform:translateX(-50%);background:rgba(15,23,42,0.85);border:1px solid rgba(255,255,255,0.18);color:#fff;font-size:9.5px;font-weight:600;padding:2px 7px;border-radius:8px;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis;line-height:1.2;text-shadow:0 1px 2px rgba(0,0,0,0.3);">${labelText}</div>` : ''}
+        ${hasLabel ? `<div class="pin-label-tag" style="position:absolute;left:50%;top:${h + 1}px;transform:translateX(-50%);background:rgba(15,23,42,0.85);border:1px solid rgba(255,255,255,0.18);color:#fff;font-size:9.5px;font-weight:600;padding:2px 7px;border-radius:8px;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis;line-height:1.2;text-shadow:0 1px 2px rgba(0,0,0,0.3);">${labelText}</div>` : ''}
       </div>`,
     iconSize: [w, totalH],
     iconAnchor: [w / 2, h],
@@ -804,29 +817,101 @@ function AreaPins({ groups, barangay, onHover, onLeave, onClick }) {
   return null;
 }
 
+// Screen-space radius (px) below which two pins are considered "colliding"
+// and get spread apart. Scales implicitly with how tightly zoomed you are,
+// since it's measured in *pixels*, not geographic distance.
+const PIN_COLLISION_RADIUS = 64;
+
+// Given barangayData (each with .coords = [lat,lng]), group any pins whose
+// projected screen positions land within PIN_COLLISION_RADIUS of each other.
+function clusterByScreenProximity(map, barangayData) {
+  const points = barangayData.map(b => ({
+    b,
+    pt: map.latLngToContainerPoint(b.coords),
+  }));
+  const clusters = [];
+  const used = new Array(points.length).fill(false);
+
+  for (let i = 0; i < points.length; i++) {
+    if (used[i]) continue;
+    const group = [points[i]];
+    used[i] = true;
+    for (let j = i + 1; j < points.length; j++) {
+      if (used[j]) continue;
+      const dx = points[i].pt.x - points[j].pt.x;
+      const dy = points[i].pt.y - points[j].pt.y;
+      if (Math.sqrt(dx * dx + dy * dy) < PIN_COLLISION_RADIUS) {
+        group.push(points[j]);
+        used[j] = true;
+      }
+    }
+    clusters.push(group);
+  }
+  return clusters;
+}
+
 // T1 (zoom <= 16): exactly one pin per barangay, parked at the barangay's
-// centre, showing that barangay's full case total.
-function BarangayPins({ barangayData, onHover, onLeave, onClick }) {
+// centre, showing that barangay's full case total. Pins whose centroids
+// collide on screen (e.g. the three tightly-packed Poblacion barangays) are
+// radially spread apart so every label stays readable at any zoom level.
+function BarangayPins({ barangayData, onHover, onLeave, onClick, loginRole }) {
   const map = useMap();
   const markersRef = useRef([]);
 
-  useEffect(() => {
+  const placeSinglePin = (b, coords) => {
+    const dcount = b.diseases || {};
+    const top = Object.entries(dcount).sort((a, b2) => b2[1] - a[1])[0];
+    const color = top ? getDiseaseColor(top[0]) : '#374151';
+    // For CHO the permanent barangay-name box shows the name at this tier, so the
+    // pin's own name tag is hidden live (CSS: .cdms-barangay-pin .pin-label-tag).
+    // BHW has no box (own barangay only) so keeps its name tag. Exports unhide the
+    // tag on all pins so the image shows names under every pin.
+    const pinClass = loginRole === 'BHW' ? '' : 'cdms-barangay-pin';
+    const icon = createPinIcon({ count: b.totalCases, color, label: b.barangayName, className: pinClass });
+    const m = L.marker(coords, { icon, zIndexOffset: 1000 }).addTo(map);
+    m.on('mouseover', () => onHover(b));
+    m.on('mouseout',  () => onLeave());
+    m.on('click',     () => onClick(b));
+    markersRef.current.push(m);
+  };
+
+  const placeMarkers = () => {
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
 
-    barangayData.forEach(b => {
-      const dcount = b.diseases || {};
-      const top = Object.entries(dcount).sort((a, b2) => b2[1] - a[1])[0];
-      const color = top ? getDiseaseColor(top[0]) : '#374151';
-      const icon = createPinIcon({ count: b.totalCases, color, label: b.barangayName });
-      const m = L.marker(b.coords, { icon, zIndexOffset: 1000 }).addTo(map);
-      m.on('mouseover', () => onHover(b));
-      m.on('mouseout',  () => onLeave());
-      m.on('click',     () => onClick(b));
-      markersRef.current.push(m);
-    });
+    if (!barangayData || barangayData.length === 0) return;
 
-    return () => { markersRef.current.forEach(m => m.remove()); };
+    const clusters = clusterByScreenProximity(map, barangayData);
+
+    clusters.forEach(group => {
+      if (group.length === 1) {
+        placeSinglePin(group[0].b, group[0].b.coords);
+        return;
+      }
+      // Radially spread colliding pins around their shared screen centroid.
+      const cx = group.reduce((s, g) => s + g.pt.x, 0) / group.length;
+      const cy = group.reduce((s, g) => s + g.pt.y, 0) / group.length;
+      // Spread radius grows a bit with group size so 3+ pins don't re-collide.
+      const spreadRadius = PIN_COLLISION_RADIUS * 0.55 * Math.max(1, group.length / 2);
+      group.forEach((g, idx) => {
+        const angle = (2 * Math.PI * idx) / group.length - Math.PI / 2; // start pointing up
+        const nx = cx + spreadRadius * Math.cos(angle);
+        const ny = cy + spreadRadius * Math.sin(angle);
+        const newLatLng = map.containerPointToLatLng([nx, ny]);
+        placeSinglePin(g.b, [newLatLng.lat, newLatLng.lng]);
+      });
+    });
+  };
+
+  useEffect(() => {
+    placeMarkers();
+    // Recompute spread positions on zoom/move so collisions stay resolved
+    // (pins that overlap when zoomed out may not once zoomed in, and vice versa).
+    map.on('zoomend moveend', placeMarkers);
+    return () => {
+      map.off('zoomend moveend', placeMarkers);
+      markersRef.current.forEach(m => m.remove());
+    };
   }, [barangayData, map]);
 
   return null;
@@ -1161,7 +1246,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   useEffect(() => {
     const container = document.querySelector('.cdms-map-area .leaflet-container');
     if (!container) return;
-    if (mapZoom < 13) container.classList.add('brgy-labels-hidden');
+    if (mapZoom < 13 || mapZoom >= PUROK_ZOOM_THRESHOLD) container.classList.add('brgy-labels-hidden');
     else container.classList.remove('brgy-labels-hidden');
   }, [mapZoom]);
 
@@ -1782,7 +1867,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           {mapZoom === 17 && purokData.length > 0 && pinnedBarangay && (
             <AreaPins key="area-pins" groups={purokData} barangay={pinnedBarangay} onHover={setTooltip} onLeave={() => setTooltip(null)} onClick={setPopup} />
           )}
-          {mapZoom < 17 && <BarangayPins key="barangay-pins" barangayData={barangayData} onHover={setTooltip} onLeave={() => setTooltip(null)} onClick={setPopup} />}
+          {mapZoom < 17 && <BarangayPins key="barangay-pins" barangayData={barangayData} onHover={setTooltip} onLeave={() => setTooltip(null)} onClick={setPopup} loginRole={loginRole} />}
           <GeoJSON
               key="brgy-geojson"
               ref={geoJsonLayerRef}
@@ -1793,15 +1878,17 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                 const match = barangayDataRef.current.find(b => b.barangayName === barangayName);
                 const risk = match ? getRisk(match.totalCases) : getRisk(0);
                 const html = buildLabelHtml({ dbName: barangayName, match, risk, t });
-                layer.bindTooltip(html, {
-                  permanent: true,
-                  direction: 'center',
-                  className: 'brgy-tooltip-label',
-                  offset: LABEL_OFFSETS[barangayName] || [0, 0],
-                  interactive: false,
-                });
-                const anchor = getLabelPoint(feature.geometry);
-                if (anchor) layer.getTooltip().setLatLng(anchor);
+                if (loginRole !== 'BHW') {
+                  layer.bindTooltip(html, {
+                    permanent: true,
+                    direction: 'center',
+                    className: 'brgy-tooltip-label',
+                    offset: LABEL_OFFSETS[barangayName] || [0, 0],
+                    interactive: false,
+                  });
+                  const anchor = getLabelPoint(feature.geometry);
+                  if (anchor) layer.getTooltip().setLatLng(anchor);
+                }
                 layer.on({
                   mouseover: function (e) {
                     setHoveredBarangay(barangayName);
@@ -1851,49 +1938,6 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               color: mapLayer === 'HD' ? '#fff' : 'var(--text-muted)',
             }}>
             {t('HD Map')}
-          </button>
-        </div>
-
-        {/* EXPORT MAP AS IMAGE */}
-        <div style={{
-          position: 'absolute', bottom: '16px', right: '16px', zIndex: 1000,
-        }}>
-          <button
-            onClick={() => {
-              const mapContainer = document.querySelector('.leaflet-container');
-              if (!mapContainer) return;
-              import('html2canvas').then(({ default: html2canvas }) => {
-                const rect = mapContainer.getBoundingClientRect();
-                html2canvas(mapContainer, {
-                  useCORS: true,
-                  allowTaint: true,
-                  scale: 2,
-                  backgroundColor: null,
-                  scrollX: -window.scrollX,
-                  scrollY: -window.scrollY,
-                  windowWidth: Math.ceil(rect.right - rect.left),
-                  windowHeight: Math.ceil(rect.bottom - rect.top),
-                  logging: false,
-                }).then(canvas => {
-                  const link = document.createElement('a');
-                  link.download = 'CDMS_Map_Export.png';
-                  link.href = canvas.toDataURL('image/png');
-                  link.click();
-                });
-              }).catch(() => {
-                notify(t('Export requires html2canvas. Please use the Print option instead.'), 'info');
-              });
-            }}
-            style={{
-              padding: '8px 14px', borderRadius: '8px', cursor: 'pointer',
-              background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
-              boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
-              fontSize: '13px', fontWeight: '700', color: 'var(--text-main)',
-              display: 'flex', alignItems: 'center', gap: '6px',
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            {t('Export Image')}
           </button>
         </div>
 

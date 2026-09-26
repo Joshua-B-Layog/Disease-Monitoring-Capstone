@@ -84,7 +84,7 @@ const Sidebar = ({ role, activeTab, setActiveTab, choUnit }) => {
           className={`menu-item ${activeTab === item.name ? 'active' : ''}`}
           onClick={() => { setActiveTab(item.name); setMobileOpen(false); }}
         >
-          {item.icon} {t(item.name)} Module
+          {item.icon} {t(item.name)}
         </div>
         ))}
       </div>

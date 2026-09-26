@@ -6,6 +6,7 @@ import { authHeaders } from './auth';
 import { formatDate, formatDateTime } from './formatDate';
 import DatePicker from './components/DatePicker';
 import ExportPreviewModal from './components/ExportPreview';
+import { buildPdfDoc } from './exportPdf';
 import { useI18n } from './i18n';
 
 export default function WeeklySummary({ userId, loginRole, compactMode, fontScale, onBack, dateFormat = 'MM/DD/YY' }) {
@@ -163,7 +164,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
 
     const html = `<!DOCTYPE html><html><head><title>Weekly Summary Report</title>
       <style>
-        body { font-family: Arial, sans-serif; padding: 28px; font-size: 13px; color: #111; margin: 0; }
+        body { font-family: Arial, sans-serif; padding: 28px; font-size: 13px; color: #111; margin: 0; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
         h1 { color: #1e3a8a; font-size: 22px; margin: 0 0 4px 0; }
         h2 { color: #1e3a8a; font-size: 16px; margin: 24px 0 8px 0; border-bottom: 2px solid #1e3a8a; padding-bottom: 4px; }
         p { color: #555; margin: 0 0 16px 0; font-size: 13px; }
@@ -171,9 +172,9 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
         .metric-card { flex: 1; text-align: center; padding: 14px 8px; border-radius: 8px; }
         .metric-val { font-size: 28px; font-weight: 700; }
         .metric-label { font-size: 12px; color: #64748b; margin-top: 2px; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-        th { background: #1e3a8a; color: white; padding: 9px 12px; text-align: left; font-size: 12px; }
-        td { padding: 8px 12px; border-bottom: 1px solid #e5e7eb; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 16px; border: 1px solid #d1d5db; }
+        th { background: #1e3a8a; color: white; padding: 9px 12px; text-align: left; font-size: 12px; border: 1px solid #64748b; }
+        td { padding: 8px 12px; border: 1px solid #d1d5db; }
         tr:nth-child(even) td { background: #f9fafb; }
         .footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 12px; text-align: center; }
         @media print { .no-print { display: none !important; } body { padding: 16px; } }
@@ -207,7 +208,50 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
     setPreview({
       title: t('Preview: Print Report'),
       html,
-      actions: [{ label: `🖨 ${t('Print / Save as PDF')}`, primary: true, onClick: () => openPrint(html) }],
+      actions: [
+        {
+          label: `⬇ ${t('Download PDF (.pdf)')}`,
+          primary: true,
+          onClick: () => {
+            const kpiCols = [t('Metric'), t('Value')];
+            const kpiRows = [
+              [t('Total Cases'), summary.total_cases],
+              [t('New This Week'), summary.new_this_week],
+              [t('Active'), summary.active_cases],
+              [t('Recovered'), summary.recovered],
+              [t('Deceased'), summary.deceased],
+            ];
+            const bRows = byBarangay.map(b => [b.barangay_name, b.count, `${t(getRiskLabel(b.count))}${t(' Risk')}`]);
+            const dRows = byDisease.filter(d => d.count > 0).map(d => [d.disease_name, d.count]);
+            const sRows = bySeverity.map(s => [s.severity, s.count]);
+            const nRows = newCases.map(c => [
+              `#${String(c.case_id).padStart(3, '0')}`,
+              c.patient_name || '',
+              c.age || '--',
+              c.disease_name || '',
+              c.barangay_name || '',
+              c.severity || 'N/A',
+              translateStatus(c.status) || '',
+            ]);
+            const pdfFilename = `Weekly_Summary_${scopeLabel.replace(/[^a-zA-Z0-9]/g, '_')}_${startDate}.pdf`;
+            const doc = buildPdfDoc({
+              title: t('Weekly Disease Summary Report'),
+              subtitle: `${t('Scope:')} ${scopeLabel} | ${t('Period:')} ${fmtDate(dateRange.start)} - ${fmtDate(dateRange.end)} | ${t('Prepared by:')} ${data.generatedBy}`,
+              filename: pdfFilename,
+              sections: [
+                { heading: t('Summary'), columns: kpiCols, rows: kpiRows },
+                { heading: t('Cases by Barangay'), columns: [t('Barangay'), t('Count'), t('Risk Level')], rows: bRows },
+                { heading: t('Cases by Disease'), columns: [t('Disease'), t('Count')], rows: dRows },
+                { heading: t('Cases by Severity'), columns: [t('Severity'), t('Count')], rows: sRows },
+                { heading: `${t('New Cases This Period')} (${newCases.length})`, columns: [t('ID'), t('Patient'), t('Age'), t('Disease'), t('Barangay'), t('Severity'), t('Status')], rows: nRows },
+              ],
+              t,
+            });
+            doc.save(pdfFilename);
+          },
+        },
+        { label: `🖨 ${t('Print / Save as PDF')}`, primary: false, onClick: () => openPrint(html) },
+      ],
     });
   };
 
