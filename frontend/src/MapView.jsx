@@ -1082,6 +1082,7 @@ function ChoroplethLayer({ barangayData, onHover, onLeave, onClick }) {
 
 export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginBarangay, sessionContext, compactMode, dateFormat = 'MM/DD/YY' }) {
   const { t, translateStatus } = useI18n();
+  const currentYear = new Date().getFullYear();
   const [allCases, setAllCases] = useState([]);
   const [barangayData, setBarangayData] = useState([]);
   const [purokData, setPurokData] = useState([]);
@@ -1091,8 +1092,9 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const [hotspotData, setHotspotData]  = useState([]);
   const [filterBarangay, setFilterBarangay] = useState('All Barangays');
   const [filterStatus, setFilterStatus]  = useState('All Status');
-  const [filterDateFrom, setFilterDateFrom] = useState('');
-  const [filterDateTo, setFilterDateTo] = useState('');
+  const [filterDateFrom, setFilterDateFrom] = useState(() => `${new Date().getFullYear()}-01-01`);
+  const [filterDateTo, setFilterDateTo] = useState(() => `${new Date().getFullYear()}-12-31`);
+  const [filterYear, setFilterYear] = useState(() => String(new Date().getFullYear()));
   const [filterSeverity, setFilterSeverity] = useState('All Severities');
   const [filterPurok, setFilterPurok] = useState('All Puroks');
   const [filterDisease, setFilterDisease] = useState('All Diseases');
@@ -1113,6 +1115,8 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const statusRef = useRef(null);
   const [severityOpen, setSeverityOpen] = useState(false);
   const severityRef = useRef(null);
+  const [yearOpen, setYearOpen] = useState(false);
+  const yearRef = useRef(null);
   const [mapLayer, setMapLayer] = useState('HD'); // 'SD' = street map (OSM), 'HD' = satellite (Esri)
   const [filtersOpen, setFiltersOpen] = useState(false); // mobile: filter sidebar as hamburger drawer
   const geoJsonLayerRef = useRef(null);
@@ -1170,6 +1174,17 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     }
     return allCases;
   })();
+
+  const yearOptions = (() => {
+    let minYear = currentYear;
+    scopedCasesForPurok.forEach(c => {
+      const y = parseInt((c.date_reported || '').slice(0, 4), 10);
+      if (!isNaN(y) && y < minYear) minYear = y;
+    });
+    const list = [];
+    for (let y = currentYear; y >= minYear; y--) list.push(String(y));
+    return list;
+  })();
   const dynamicPurokOptions = ['All Puroks', ...Array.from(
     new Set(
       scopedCasesForPurok
@@ -1190,6 +1205,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       if (purokRef.current && !purokRef.current.contains(e.target)) setPurokOpen(false);
       if (statusRef.current && !statusRef.current.contains(e.target)) setStatusOpen(false);
       if (severityRef.current && !severityRef.current.contains(e.target)) setSeverityOpen(false);
+      if (yearRef.current && !yearRef.current.contains(e.target)) setYearOpen(false);
       if (diseaseRef.current && !diseaseRef.current.contains(e.target)) setDiseaseOpen(false);
     };
     document.addEventListener('mousedown', handler);
@@ -1664,19 +1680,49 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         {/* ─── FILTER LAYER: DATE ─── */}
         <p style={sectionHeaderStyle}>{t('Filter by Date')}</p>
 
+        {/* Filter Year - quick year presets */}
+        <div style={{ position: 'relative', marginBottom: '10px' }} ref={yearRef}>
+          <button type="button" onClick={() => setYearOpen(!yearOpen)}
+            style={{ ...SEL, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' }}>
+            <span>{filterYear || t('From / To dates')}</span>
+            <span style={{ fontSize: '13px', opacity: 0.6, transition: 'transform 0.2s', transform: yearOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+          </button>
+          {yearOpen && (
+            <div className="cdms-dropdown-panel" style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', zIndex: 100, overflow: 'hidden' }}>
+              {yearOptions.map(y => (
+                <button key={y} type="button"
+                  onClick={() => { setFilterYear(y); setFilterDateFrom(`${y}-01-01`); setFilterDateTo(`${y}-12-31`); setYearOpen(false); }}
+                  style={{ display: 'block', width: '100%', padding: '10px 14px', background: filterYear === y ? 'var(--input-bg)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: filterYear === y ? '600' : '400' }}
+                  onMouseEnter={e => { if (filterYear !== y) e.target.style.background = 'var(--input-bg)'; }}
+                  onMouseLeave={e => { if (filterYear !== y) e.target.style.background = 'transparent'; }}>
+                  {t(y)}
+                </button>
+              ))}
+              <div style={{ height: '1px', margin: '4px 12px', background: 'var(--border-color)' }} />
+              <button type="button"
+                onClick={() => { setFilterYear(''); setYearOpen(false); }}
+                style={{ display: 'block', width: '100%', padding: '10px 14px', background: filterYear === '' ? 'var(--input-bg)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: filterYear === '' ? '600' : '400' }}
+                onMouseEnter={e => { if (filterYear !== '') e.target.style.background = 'var(--input-bg)'; }}
+                onMouseLeave={e => { if (filterYear !== '') e.target.style.background = 'transparent'; }}>
+                {t('From / To dates')}
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Date range - From / To */}
         <div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <div style={{ flex: 1 }}>
               <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>{t('From')}</label>
               <DatePicker value={filterDateFrom} dateFormat={dateFormat} placeholder={t('Start date')} clearable={true}
-                onChange={v => setFilterDateFrom(v)}
+                onChange={v => { setFilterDateFrom(v); setFilterYear(''); }}
                 style={{ width: '100%' }} />
             </div>
             <div style={{ flex: 1 }}>
               <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>{t('To')}</label>
-              <DatePicker value={filterDateTo} dateFormat={dateFormat} placeholder={t('End date')} clearable={true}
-                onChange={v => setFilterDateTo(v)}
+              <DatePicker value={filterDateTo} dateFormat={dateFormat} placeholder={t('End date')} clearable={true} anchorRight={true}
+                onChange={v => { setFilterDateTo(v); setFilterYear(''); }}
                 style={{ width: '100%' }} />
             </div>
           </div>
@@ -1796,7 +1842,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         </div>
 
         <button
-          onClick={() => { setAutoDetectedBrgy(null); setFilterBarangay('All Barangays'); setFilterStatus('All Status'); setFilterDateFrom(''); setFilterDateTo(''); setFilterSeverity('All Severities'); setFilterDisease('All Diseases'); setFilterPurok('All Puroks'); }}
+          onClick={() => { setAutoDetectedBrgy(null); setFilterBarangay('All Barangays'); setFilterStatus('All Status'); setFilterDateFrom(`${currentYear}-01-01`); setFilterDateTo(`${currentYear}-12-31`); setFilterYear(String(currentYear)); setFilterSeverity('All Severities'); setFilterDisease('All Diseases'); setFilterPurok('All Puroks'); }}
           style={{ padding: '11px', background: '#DC2626', color: 'white', border: 'none', borderRadius: '7px', cursor: 'pointer', fontWeight: '600', fontSize: '15px', marginTop: 'auto' }}>
           {t('Reset Filters')}
         </button>

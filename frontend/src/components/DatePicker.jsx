@@ -6,7 +6,7 @@ const DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
 const toISO = (y, m, d) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 
-export default function DatePicker({ value, onChange, dateFormat = 'MM/DD/YY', placeholder = 'Select date', style, clearable = true, disabled = false, error = false }) {
+export default function DatePicker({ value, onChange, dateFormat = 'MM/DD/YY', placeholder = 'Select date', style, clearable = true, disabled = false, error = false, anchorRight = false }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const today = new Date();
@@ -64,7 +64,8 @@ export default function DatePicker({ value, onChange, dateFormat = 'MM/DD/YY', p
 
       {open && (
         <div style={{
-          position: 'absolute', top: 'calc(100% + 6px)', left: 0, minWidth: '264px', zIndex: 3000,
+          position: 'absolute', top: 'calc(100% + 6px)', minWidth: '246px', zIndex: 3000,
+          left: anchorRight ? 'auto' : 0, right: anchorRight ? 0 : 'auto',
           background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px',
           boxShadow: '0 12px 32px rgba(0,0,0,0.3)', padding: '12px',
         }}>
