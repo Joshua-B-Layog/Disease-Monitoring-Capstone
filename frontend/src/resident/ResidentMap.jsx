@@ -380,28 +380,41 @@ const findCanonicalName = (rawName) => {
   return match || rawName;
 };
 
-function getGradientColor(count) {
-  const clamped = Math.min(count, 40);
-  if (clamped <= 10) {
-    const t = clamped / 10;
-    const r = Math.round(16 + t * (245 - 16));
-    const g = Math.round(185 + t * (158 - 185));
-    const b = Math.round(129 + t * (11 - 129));
-    return `rgb(${r},${g},${b})`;
-  } else {
-    const t = Math.min((clamped - 10) / 30, 1);
-    const r = Math.round(245 + t * (220 - 245));
-    const g = Math.round(158 + t * (0 - 158));
-    const b = Math.round(11 + t * (38 - 11));
-    return `rgb(${r},${g},${b})`;
+// Smooth mid-band-peak fill gradient for polygon fills only (pins stay discrete):
+// 0 green -> 10 half green/amber -> 15 amber -> 19 half amber/red -> 22 red ->
+// 34 half red/dark-red -> 45 dark red -> 55 half dark-red/crimson -> 65+ crimson
+function getRiskFill(count) {
+  const stops = [
+    [0, 16, 185, 129],
+    [10, 130, 172, 70],
+    [15, 245, 158, 11],
+    [19, 233, 98, 25],
+    [22, 220, 38, 38],
+    [34, 203, 33, 33],
+    [45, 185, 28, 28],
+    [55, 156, 29, 29],
+    [65, 127, 29, 29],
+  ];
+  const c = Math.max(0, Math.min(count || 0, stops[stops.length - 1][0]));
+  for (let i = 1; i < stops.length; i++) {
+    const [c1, r1, g1, b1] = stops[i - 1];
+    const [c2, r2, g2, b2] = stops[i];
+    if (c <= c2) {
+      const t = (c - c1) / (c2 - c1);
+      const r = Math.round(r1 + t * (r2 - r1));
+      const g = Math.round(g1 + t * (g2 - g1));
+      const b = Math.round(b1 + t * (b2 - b1));
+      return `rgb(${r},${g},${b})`;
+    }
   }
+  return 'rgb(127,29,29)';
 }
 
 const getGeoJsonBaseStyle = (feature, barangayData) => {
   const dbName = getDbNameFromGeoJson(feature.properties.ADM4_EN);
   const match = barangayData.find(b => b.barangayName === dbName);
   const count = match ? match.totalCases : 0;
-  const fillColor = count > 0 ? getGradientColor(count) : '#374151';
+  const fillColor = count > 0 ? getRiskFill(count) : '#374151';
   return {
     fillColor,
     fillOpacity: count > 0 ? 0.5 : 0.12,
@@ -426,6 +439,8 @@ function PulseMarkers({ barangayData, onHover, onLeave, onClick }) {
   const markersRef = useRef([]);
 
   const getRiskColor = (count) => {
+    if (count >= 60) return { color: '#7F1D1D', ring: 'rgba(127,29,29,0.3)' };
+    if (count >= 40) return { color: '#B91C1C', ring: 'rgba(185,28,28,0.3)' };
     if (count >= 20) return { color: '#DC2626', ring: 'rgba(220,38,38,0.3)' };
     if (count >= 10) return { color: '#f59e0b', ring: 'rgba(245,158,11,0.3)' };
     return { color: '#10b981', ring: 'rgba(16,185,129,0.3)' };
@@ -548,6 +563,8 @@ export default function ResidentMap() {
   const { t } = useI18n();
 
   const getRisk = (count) => {
+    if (count >= 60) return { color: '#7F1D1D', ring: 'rgba(127,29,29,0.3)', label: t('Critical Risk') };
+    if (count >= 40) return { color: '#B91C1C', ring: 'rgba(185,28,28,0.3)', label: t('Very High Risk') };
     if (count >= 20) return { color: '#DC2626', ring: 'rgba(220,38,38,0.3)', label: t('High Risk') };
     if (count >= 10) return { color: '#f59e0b', ring: 'rgba(245,158,11,0.3)', label: t('Medium Risk') };
     return { color: '#10b981', ring: 'rgba(16,185,129,0.3)', label: t('Low Risk') };
@@ -1242,9 +1259,11 @@ export default function ResidentMap() {
         <div>
           <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>{t('Risk Levels')}</div>
           <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-            <LegendItem color="#DC2626" label={t('High Risk (20+)')} />
-            <LegendItem color="#f59e0b" label={t('Medium (10-20)')} />
-            <LegendItem color="#10b981" label={t('Low (<10)')} />
+            <LegendItem color="#7F1D1D" label={t('Critical Risk (60+ cases)')} />
+            <LegendItem color="#B91C1C" label={t('Very High Risk (40-59 cases)')} />
+            <LegendItem color="#DC2626" label={t('High Risk (20-39 cases)')} />
+            <LegendItem color="#f59e0b" label={t('Medium Risk (10-19 cases)')} />
+            <LegendItem color="#10b981" label={t('Low Risk (Below 10 cases)')} />
             <LegendItem color="#374151" label={t('No cases')} />
           </div>
         </div>

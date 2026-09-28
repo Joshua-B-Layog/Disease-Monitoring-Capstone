@@ -672,6 +672,23 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       ? allCases.filter(c => choUnitBarangays.includes(c.barangay_name))
       : allCases;
 
+  const currentYear = new Date().getFullYear();
+  const [browseYear, setBrowseYear] = useState(() => String(new Date().getFullYear()));
+  const [browseYearOpen, setBrowseYearOpen] = useState(false);
+  const browseYearRef = useRef(null);
+
+  const browseYearOptions = (() => {
+    const years = new Set(
+      baseCases.map(c => (c.date_reported || '').slice(0, 4)).filter(Boolean)
+    );
+    years.add(String(currentYear));
+    return ['All Years', ...[...years].sort().reverse()];
+  })();
+
+  const browseYearSource = browseYear === 'All Years'
+    ? baseCases
+    : baseCases.filter(c => (c.date_reported || '').slice(0, 4) === browseYear);
+
   // Table filters
   const [searchQuery, setSearchQuery] = useState('');
   const [filterBarangay, setFilterBarangay] = useState('All Barangays');
@@ -1589,6 +1606,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       if (box2DiseaseRef.current && !box2DiseaseRef.current.contains(e.target)) {
         setBox2DiseaseOpen(false);
       }
+      if (browseYearRef.current && !browseYearRef.current.contains(e.target)) {
+        setBrowseYearOpen(false);
+      }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -1739,16 +1759,16 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     return caseItem.disease_name.toLowerCase().startsWith(entry.dbName.toLowerCase());
   };
 
-  const getCaseCount = (cardOrCategory) => {
+  const getCaseCount = (cardOrCategory, source = baseCases) => {
     if (!cardOrCategory) return 0;
     if (cardOrCategory.diseases) {
       // It's a category - sum counts across diseases
       return cardOrCategory.diseases.reduce((sum, d) => {
-        return sum + baseCases.filter(c => matchesCard(c, d)).length;
+        return sum + source.filter(c => matchesCard(c, d)).length;
       }, 0);
     }
     // It's a single disease entry
-    return baseCases.filter(c => matchesCard(c, cardOrCategory)).length;
+    return source.filter(c => matchesCard(c, cardOrCategory)).length;
   };
 
   // ── Filter cases for list ──
@@ -1806,6 +1826,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         // Fallback: plain substring match anywhere in the full address
         return normalize(addr).includes(target);
       });
+    }
+    if (browseYear !== 'All Years') {
+      result = result.filter(c => (c.date_reported || '').slice(0, 4) === browseYear);
     }
     return result;
   };
@@ -2688,8 +2711,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       setBoardOpen({});
     };
 
-    const renderBoardDiseaseRow = (entry) => {
-      const count = getCaseCount(entry);
+    const renderBoardDiseaseRow = (entry, source = baseCases) => {
+      const count = getCaseCount(entry, source);
       return (
         <div key={entry.dbName || entry.name}
           onClick={() => boardNav(entry)}
@@ -2705,7 +2728,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
     const trelloColumns = (id, list, accentLabel, accentIcon, badgeColor, hint) => {
       const open = !!boardOpen[id];
-      const activeCount = list.reduce((s, d) => s + (getCaseCount(d) || 0), 0);
+      const activeCount = list.reduce((s, d) => s + (getCaseCount(d, browseYearSource) || 0), 0);
       return (
         <div key={id} style={{ flex: '1 1 0', minWidth: '240px', maxWidth: '340px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden', textAlign: 'left' }}>
           <div onClick={() => setBoardOpen(o => ({ ...o, [id]: !o[id] }))}
@@ -2723,7 +2746,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           {open ? (
             <div data-scroll-y style={{ maxHeight: '300px', overflowY: 'auto', padding: '8px', display: 'flex', flexDirection: 'column', gap: '4px', borderTop: '1px solid var(--border-color)' }}>
               {list.length === 0 && <div style={{ padding: '10px 12px', fontSize: '13px', color: 'var(--text-muted)' }}>{t('No diseases')}</div>}
-              {list.map(d => renderBoardDiseaseRow(d))}
+              {list.map(d => renderBoardDiseaseRow(d, browseYearSource))}
             </div>
           ) : (
             <div style={{ padding: '10px 14px', borderTop: '1px solid var(--border-color)', fontSize: '13px', color: 'var(--text-muted)' }}>
@@ -2881,6 +2904,27 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
           }}>
             <div key={carouselIndex} className="cdms-carousel-slide" style={{ textAlign: 'center' }}>
+              {carouselIndex !== 2 && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+                  <div style={{ position: 'relative' }} ref={browseYearRef}>
+                    <button type="button" onClick={() => setBrowseYearOpen(o => !o)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', fontSize: '14px', fontWeight: '600', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '8px', cursor: 'pointer' }}>
+                      <span>{browseYear === 'All Years' ? t('All Years') : browseYear}</span>
+                      <span style={{ fontSize: '11px', opacity: 0.6, transition: 'transform 0.2s', transform: browseYearOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                    </button>
+                    {browseYearOpen && (
+                      <div style={{ position: 'absolute', top: '105%', right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', zIndex: 120, overflow: 'hidden', minWidth: '150px' }}>
+                        {browseYearOptions.map(opt => (
+                          <button key={opt} type="button" onClick={() => { setBrowseYear(opt); setBrowseYearOpen(false); }}
+                            style={{ display: 'block', width: '100%', padding: '9px 14px', background: browseYear === opt ? 'var(--input-bg)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '14px', color: browseYear === opt ? 'var(--accent)' : 'var(--text-main)', cursor: 'pointer', fontWeight: browseYear === opt ? '600' : '400' }}>
+                            {opt === 'All Years' ? t('All Years') : opt}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               {carouselIndex === 0 && (
                 <div>
                   <h3 style={{ margin: '0 0 6px 0', fontSize: '17px', color: 'var(--text-main)' }}>{t('📋 All Diseases & Categories')}</h3>
@@ -2937,7 +2981,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                           <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '4px' }}>{d.name}</div>
                           <div style={{ fontSize: '15px', color: 'var(--text-muted)', lineHeight: '1.35', marginBottom: '10px' }}>{d.desc}</div>
                           <div style={{ background: d.color, color: '#fff', borderRadius: '50%', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', fontWeight: '700', margin: '0 auto' }}>
-                            {getCaseCount(d)}
+                            {getCaseCount(d, browseYearSource)}
                           </div>
                         </div>
                       ))}

@@ -425,29 +425,44 @@ const findCanonicalName = (rawName) => {
   return match || rawName;
 };
 
-// Risk thresholds: <10 = Low (green), 10-19 = Medium (amber), >=20 = High (red)
+// Risk thresholds: 60+ = Critical (crimson), 40-59 = Very High (dark red), 20-39 = High (red), 10-19 = Medium (amber), <10 = Low (green)
 const getRisk = (count) => {
+  if (count >= 60) return { color: '#7F1D1D', ring: 'rgba(127,29,29,0.3)', label: 'Critical Risk' };
+  if (count >= 40) return { color: '#B91C1C', ring: 'rgba(185,28,28,0.3)', label: 'Very High Risk' };
   if (count >= 20) return { color: '#DC2626', ring: 'rgba(220,38,38,0.3)', label: 'High Risk' };
   if (count >= 10) return { color: '#f59e0b', ring: 'rgba(245,158,11,0.3)', label: 'Medium Risk' };
   return { color: '#10b981', ring: 'rgba(16,185,129,0.3)', label: 'Low Risk' };
 };
 
-function getGradientColor(count) {
-  const clamped = Math.min(count, 40);
-  if (clamped <= 10) {
-    const t = clamped / 10;
-    const r = Math.round(16 + t * (245 - 16));
-    const g = Math.round(185 + t * (158 - 185));
-    const b = Math.round(129 + t * (11 - 129));
-    return `rgb(${r},${g},${b})`;
-  } else {
-    const t = Math.min((clamped - 10) / 30, 1);
-    const r = Math.round(245 + t * (220 - 245));
-    const g = Math.round(158 + t * (0 - 158));
-    const b = Math.round(11 + t * (38 - 11));
-    return `rgb(${r},${g},${b})`;
+// Smooth mid-band-peak fill gradient for polygon fills only (pins stay discrete):
+// 0 green -> 10 half green/amber -> 15 amber -> 19 half amber/red -> 22 red ->
+// 34 half red/dark-red -> 45 dark red -> 55 half dark-red/crimson -> 65+ crimson
+const getRiskFill = (count) => {
+  const stops = [
+    [0, 16, 185, 129],
+    [10, 130, 172, 70],
+    [15, 245, 158, 11],
+    [19, 233, 98, 25],
+    [22, 220, 38, 38],
+    [34, 203, 33, 33],
+    [45, 185, 28, 28],
+    [55, 156, 29, 29],
+    [65, 127, 29, 29],
+  ];
+  const c = Math.max(0, Math.min(count || 0, stops[stops.length - 1][0]));
+  for (let i = 1; i < stops.length; i++) {
+    const [c1, r1, g1, b1] = stops[i - 1];
+    const [c2, r2, g2, b2] = stops[i];
+    if (c <= c2) {
+      const t = (c - c1) / (c2 - c1);
+      const r = Math.round(r1 + t * (r2 - r1));
+      const g = Math.round(g1 + t * (g2 - g1));
+      const b = Math.round(b1 + t * (b2 - b1));
+      return `rgb(${r},${g},${b})`;
+    }
   }
-}
+  return 'rgb(127,29,29)';
+};
 
 const getGeoJsonStyle = (feature, barangayData, activeBarangay = null, focused = false, mapLayer = 'HD', bordersOnly = false) => {
   const dbName = getDbNameFromGeoJson(feature.properties.ADM4_EN);
@@ -455,7 +470,7 @@ const getGeoJsonStyle = (feature, barangayData, activeBarangay = null, focused =
   const count = match ? match.totalCases : 0;
   const isActive = activeBarangay && norm(activeBarangay) === norm(dbName);
   const mutedLine = mapLayer === 'SD' ? '#334155' : 'rgba(255,255,255,0.75)';
-  const fill = (visibleCount) => (visibleCount > 0 ? getGradientColor(visibleCount) : '#374151');
+  const fill = (visibleCount) => (visibleCount > 0 ? getRiskFill(visibleCount) : '#374151');
   const fillOpacity = (visibleCount) => (visibleCount > 0 ? 0.5 : 0.12);
   if (bordersOnly) {
     return {
@@ -1040,7 +1055,7 @@ function ChoroplethLayer({ barangayData, onHover, onLeave, onClick }) {
   const style = (feature) => {
     const match = findMatch(feature);
     const count = match ? match.totalCases : 0;
-    const fillColor = match ? getGradientColor(count) : '#444';
+    const fillColor = match ? getRiskFill(count) : '#444';
     return {
       fillColor,
       weight: 1,
@@ -1360,7 +1375,9 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   };
 
   const activeData  = (filterBarangay !== 'All Barangays' || loginRole === 'BHW') && purokData.length > 0 ? purokData : barangayData;
-  const highCount   = activeData.filter(b => b.totalCases >= 20).length;
+  const criticalCount = activeData.filter(b => b.totalCases >= 60).length;
+  const veryHighCount = activeData.filter(b => b.totalCases >= 40 && b.totalCases < 60).length;
+  const highCount   = activeData.filter(b => b.totalCases >= 20 && b.totalCases < 40).length;
   const mediumCount = activeData.filter(b => b.totalCases >= 10 && b.totalCases < 20).length;
   const lowCount    = activeData.filter(b => b.totalCases < 10).length;
 
@@ -1757,7 +1774,9 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         <div data-tour="map-legend" style={{ paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
           <p style={{ margin: '0 0 10px 0', fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('Legend')}</p>
           {[
-            { color: '#DC2626', label: 'High Risk (20+ cases)' },
+            { color: '#7F1D1D', label: 'Critical Risk (60+ cases)' },
+            { color: '#B91C1C', label: 'Very High Risk (40-59 cases)' },
+            { color: '#DC2626', label: 'High Risk (20-39 cases)' },
             { color: '#f59e0b', label: 'Medium Risk (10-19 cases)' },
             { color: '#10b981', label: 'Low Risk (Below 10 cases)' },
             { color: '#374151', label: 'No cases' },
@@ -1802,6 +1821,8 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           <p style={{ margin: '0 0 10px 0', fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('Active Hotspots')}</p>
           <div style={{ display: 'flex', gap: '8px' }}>
             {[
+              { label: 'Critical', count: criticalCount, color: '#7F1D1D' },
+              { label: 'Very High', count: veryHighCount, color: '#B91C1C' },
               { label: 'High',   count: highCount,   color: '#DC2626' },
               { label: 'Medium', count: mediumCount, color: '#f59e0b' },
               { label: 'Low',    count: lowCount,    color: '#10b981' },
@@ -1813,7 +1834,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
             ))}
           </div>
           <p style={{ margin: '8px 0 0 0', fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
-            {t('Risk from the current filter scope. Thresholds: >20 red, 10-20 amber, <10 green.')}
+            {t('Risk from the current filter scope. Thresholds: 20-39 red, 40-59 dark red, 60+ critical, 10-19 amber, <10 green.')}
           </p>
         </div>
 
