@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { MapContainer, TileLayer, useMap, useMapEvents, GeoJSON } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -9,6 +9,7 @@ import cabuyaoBoundaries from '../data/cabuyao_barangays.geojson.json';
 import { getPointInBarangay, pointInFeature } from '../data/coordinates';
 import { onDiseasesChanged } from '../diseaseSignal';
 import { useI18n } from '../i18n';
+import DatePicker from '../components/DatePicker';
 
 const CABUYAO_CENTER = [14.2253, 121.1254];
 const CABUYAO_BOUNDS = [
@@ -562,6 +563,38 @@ export default function ResidentMap() {
   const [offlineMode, setOfflineMode]   = useState(false);
   const { t } = useI18n();
 
+  const currentYear = new Date().getFullYear();
+  const [filterDateFrom, setFilterDateFrom] = useState(() => `${currentYear}-01-01`);
+  const [filterDateTo, setFilterDateTo]     = useState(() => `${currentYear}-12-31`);
+  const [filterYear, setFilterYear]         = useState(() => String(currentYear));
+  const [yearOpen, setYearOpen]             = useState(false);
+  const yearRef = useRef(null);
+
+  const yearOptions = (() => {
+    let minYear = currentYear;
+    allCases.forEach(c => {
+      const y = parseInt((c.date_reported || '').slice(0, 4), 10);
+      if (!isNaN(y) && y < minYear) minYear = y;
+    });
+    const list = [];
+    for (let y = currentYear; y >= minYear; y--) list.push(String(y));
+    return list;
+  })();
+
+  const scopedCases = useMemo(() => allCases.filter(c => {
+    const d = (c.date_reported || '').slice(0, 10);
+    if (!d) return true;
+    if (filterDateFrom && d < filterDateFrom) return false;
+    if (filterDateTo && d > filterDateTo) return false;
+    return true;
+  }), [allCases, filterDateFrom, filterDateTo]);
+
+  useEffect(() => {
+    const handler = (e) => { if (yearRef.current && !yearRef.current.contains(e.target)) setYearOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
   const getRisk = (count) => {
     if (count >= 60) return { color: '#7F1D1D', ring: 'rgba(127,29,29,0.3)', label: t('Critical Risk') };
     if (count >= 40) return { color: '#B91C1C', ring: 'rgba(185,28,28,0.3)', label: t('Very High Risk') };
@@ -632,10 +665,10 @@ export default function ResidentMap() {
   }, []);
 
   useEffect(() => {
-    if (!allCases.length) return;
+    if (!scopedCases.length) return;
 
     const groups = {};
-    allCases.forEach(c => {
+    scopedCases.forEach(c => {
       if (!c.barangay_name) return;
       const bn = findCanonicalName(c.barangay_name);
       if (!bn) return;
@@ -650,18 +683,18 @@ export default function ResidentMap() {
     });
 
     setBarangayData(Object.values(groups));
-  }, [allCases]);
+  }, [scopedCases]);
 
   // Purok grouping - only when scoped to a detected barangay
   useEffect(() => {
     if (autoDetectedBrgy) {
       const canon = findCanonicalName(autoDetectedBrgy);
-      const purokCases = allCases.filter(c => findCanonicalName(c.barangay_name) === canon);
+      const purokCases = scopedCases.filter(c => findCanonicalName(c.barangay_name) === canon);
       setPurokData(getPurokGroups(canon, purokCases));
     } else {
       setPurokData([]);
     }
-  }, [autoDetectedBrgy, allCases]);
+  }, [autoDetectedBrgy, scopedCases]);
 
   // Update GeoJSON styles when barangayData or the zoom level changes
   useEffect(() => {
@@ -749,16 +782,16 @@ export default function ResidentMap() {
   }
 
   // ── City-wide summary stats ──
-  const totalCases = allCases.length;
+  const totalCases = scopedCases.length;
   const sortedBarangays = [...barangayData].sort((a, b) => b.totalCases - a.totalCases);
   const mostAffected = sortedBarangays[0] || null;
   const affectedBrgyCount = sortedBarangays.filter(b => b.totalCases > 0).length;
-  const activeCases = allCases.filter(c => {
+  const activeCases = scopedCases.filter(c => {
     const s = (c.status || '').toLowerCase();
     return s === 'active' || s === 'under treatment';
   }).length;
   const cityDiseaseMap = {};
-  allCases.forEach(c => { const dn = (c.disease_name || 'Unknown').trim(); cityDiseaseMap[dn] = (cityDiseaseMap[dn] || 0) + 1; });
+  scopedCases.forEach(c => { const dn = (c.disease_name || 'Unknown').trim(); cityDiseaseMap[dn] = (cityDiseaseMap[dn] || 0) + 1; });
   const topDiseasesSorted = Object.entries(cityDiseaseMap).sort((a, b) => b[1] - a[1]);
   const topDiseaseCitywide = topDiseasesSorted[0] || null;
   const top8Diseases = topDiseasesSorted.slice(0, 8);
@@ -766,7 +799,7 @@ export default function ResidentMap() {
 
   // ── Age distribution (grouped into brackets) ──
   const ageGroups = { '0-5': 0, '6-17': 0, '18-35': 0, '36-55': 0, '56-75': 0, '76+': 0 };
-  allCases.forEach(c => {
+  scopedCases.forEach(c => {
     const a = parseInt(c.age) || 0;
     if (a <= 5) ageGroups['0-5']++;
     else if (a <= 17) ageGroups['6-17']++;
@@ -779,9 +812,9 @@ export default function ResidentMap() {
 
   // ── Gender distribution ──
   const genderCounts = {};
-  allCases.forEach(c => { const g = (c.gender || 'Unknown').trim(); genderCounts[g] = (genderCounts[g] || 0) + 1; });
+  scopedCases.forEach(c => { const g = (c.gender || 'Unknown').trim(); genderCounts[g] = (genderCounts[g] || 0) + 1; });
   const genderEntries = Object.entries(genderCounts).sort((a, b) => b[1] - a[1]);
-  const totalCasesCount = allCases.length;
+  const totalCasesCount = scopedCases.length;
 
   // ── Barangay health advisories (top 3 affected barangays) ──
   const brgyAdvisories = barangayData.filter(b => b.totalCases > 0).slice(0, 3).map(b => {
@@ -900,7 +933,7 @@ export default function ResidentMap() {
             )}
 
             {/* Age Distribution */}
-            {allCases.length > 0 && (
+            {scopedCases.length > 0 && (
               <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
                 <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '8px' }}>{t('Distribusyon ng Edad')}</div>
                 <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '100px' }}>
@@ -1007,6 +1040,49 @@ export default function ResidentMap() {
         <div style={{ marginBottom: '12px', fontSize: '17px', color: '#ef4444' }}>No barangay found matching "{searchQuery}".</div>
       )}
 
+      {/* Filter by Date - year + From/To */}
+      <div style={{ marginBottom: '12px' }}>
+        <div style={{ fontSize: '15px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '6px' }}>{t('Filter by Date')}</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+          <div style={{ position: 'relative', marginTop: '30px' }} ref={yearRef}>
+            <button type="button" onClick={() => setYearOpen(!yearOpen)}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '7px 10px', background: 'var(--bg-surface)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', minWidth: '110px' }}>
+              <span>{filterYear || t('From / To dates')}</span>
+              <span style={{ fontSize: '11px', opacity: 0.6, transition: 'transform 0.2s', transform: yearOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+            </button>
+            {yearOpen && (
+              <div style={{ position: 'absolute', top: '105%', left: 0, width: '100%', minWidth: '150px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.25)', zIndex: 120, overflow: 'hidden' }}>
+                {yearOptions.map(y => (
+                  <button key={y} type="button"
+                    onClick={() => { setFilterYear(y); setFilterDateFrom(`${y}-01-01`); setFilterDateTo(`${y}-12-31`); setYearOpen(false); }}
+                    style={{ display: 'block', width: '100%', padding: '8px 12px', background: filterYear === y ? 'var(--input-bg)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: filterYear === y ? '600' : '400' }}>
+                    {t(y)}
+                  </button>
+                ))}
+                <div style={{ height: '1px', margin: '4px 12px', background: 'var(--border-color)' }} />
+                <button type="button"
+                  onClick={() => { setFilterYear(''); setYearOpen(false); }}
+                  style={{ display: 'block', width: '100%', padding: '8px 12px', background: filterYear === '' ? 'var(--input-bg)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: filterYear === '' ? '600' : '400' }}>
+                  {t('From / To dates')}
+                </button>
+              </div>
+            )}
+          </div>
+          <div style={{ flex: 1, minWidth: '170px' }}>
+            <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '600' }}>{t('From')}</div>
+            <DatePicker value={filterDateFrom} dateFormat="MM/DD/YY" placeholder={t('Start date')} clearable={true}
+              onChange={v => { setFilterDateFrom(v); setFilterYear(''); }}
+              style={{ width: '100%' }} />
+          </div>
+          <div style={{ flex: 1, minWidth: '170px' }}>
+            <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '600' }}>{t('To')}</div>
+            <DatePicker value={filterDateTo} dateFormat="MM/DD/YY" placeholder={t('End date')} clearable={true} anchorRight={true}
+              onChange={v => { setFilterDateTo(v); setFilterYear(''); }}
+              style={{ width: '100%' }} />
+          </div>
+        </div>
+      </div>
+
       {/* Map area */}
       <div className="resident-map-area" style={{
         borderRadius: '12px', overflow: 'hidden',
@@ -1038,7 +1114,7 @@ export default function ResidentMap() {
             />
           )}
           <BoundsSetter key="bounds-setter" />
-          <ZoomToBarangay key="zoom-barangay" barangay={selectedBrgy} cases={allCases} />
+          <ZoomToBarangay key="zoom-barangay" barangay={selectedBrgy} cases={scopedCases} />
           <ZoomListener key="zoom-listener" onZoom={setMapZoom} autoDetectedBrgy={autoDetectedBrgy} setAutoDetectedBrgy={setAutoDetectedBrgy} />
           <GeoJSON
               key="brgy-geojson"
@@ -1255,10 +1331,10 @@ export default function ResidentMap() {
       )}
 
       {/* Legend */}
-      <div style={{ marginTop: '16px', display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '24px', padding: '0 16px', alignItems: 'start' }}>
+      <div style={{ marginTop: '16px', display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', gap: '24px', padding: '0 16px', alignItems: 'start' }}>
         <div>
-          <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>{t('Risk Levels')}</div>
-          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+          <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', textAlign: 'center' }}>{t('Risk Levels')}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, max-content))', gap: '8px 18px', justifyContent: 'center' }}>
             <LegendItem color="#7F1D1D" label={t('Critical Risk (60+ cases)')} />
             <LegendItem color="#B91C1C" label={t('Very High Risk (40-59 cases)')} />
             <LegendItem color="#DC2626" label={t('High Risk (20-39 cases)')} />
@@ -1269,10 +1345,10 @@ export default function ResidentMap() {
         </div>
         {usedDiseaseColors.length > 0 && (
           <div>
-            {t('Top Diseases')}
-            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', textAlign: 'center' }}>{t('Top Diseases')}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, max-content))', gap: '8px 18px', justifyContent: 'center' }}>
               {usedDiseaseColors.map(({ disease, color }) => (
-                <div key={disease} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '17px', color: 'var(--text-muted)' }}>
+                <div key={disease} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '17px', color: 'var(--text-muted)', minWidth: 0 }}>
                   <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: color, flexShrink: 0 }} />
                   {disease}
                 </div>
