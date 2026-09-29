@@ -178,6 +178,9 @@ function validateCasePayload(payload = {}) {
   } = payload;
   const st = case_status || status || 'Active';
 
+  // Drafts are intentionally incomplete - a draft may be missing most fields.
+  if (st === 'Draft') return [];
+
   if (patient_name === undefined || patient_name === null || !String(patient_name).trim()) {
     errors.push('Patient name is required.');
   } else if (String(patient_name).trim().length < 2) {
@@ -2078,6 +2081,8 @@ app.post('/api/cases', authenticate, (req, res) => {
 
     function routeOrProceed(selectedBarangayName) {
       console.log("🔍 routeOrProceed:", JSON.stringify({ detectedBarangay, selectedBarangayName, submitterChoUnit, submitterRole, barangay_id }));
+      // Drafts are author-private work-in-progress - never route them (incomplete addresses).
+      if (status === 'Draft') return proceedAfterCrossCheck();
       if (detectedBarangay && submitterChoUnit) {
         const targetUnit = getChoUnitForBarangayName(detectedBarangay);
         console.log("🔍 Cross-unit check:", JSON.stringify({ targetUnit, submitterChoUnit, mismatch: targetUnit !== submitterChoUnit }));
@@ -2157,7 +2162,7 @@ function proceedToCheck() {
                 patient_name, dId, age || 0, severity, resolvedCaseType, resolvedDiseaseType, gender || 'Male',
                 status || 'Active', contact || null, onset_date || null, address || null,
                 barangay_id || null, symptoms || null, physician || null,
-                latitude || null, longitude || null, reportTs, req.body.user_id || null,
+                latitude || null, longitude || null, reportTs, (req.user && req.user.user_id) || req.body.user_id || null,
                 vaccination_status || null, vaccine_expiry_date || null
             ];
 

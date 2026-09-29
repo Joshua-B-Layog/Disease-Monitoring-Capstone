@@ -2235,7 +2235,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         onset_date: payload.onset_date,
         address: payload.address,
         barangay_id: payload.barangay_id,
-        barangay_name: brgy?.name || payload.barangay_name || '',
+        barangay_name: brgy?.name || payload.barangay_name || loginBarangay || '',
         symptoms: payload.symptoms,
         physician: payload.physician,
         latitude: payload.latitude,
@@ -2283,6 +2283,13 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
     if (!formData.barangayId) {
       setFormErrors({ barangayId: true });
       notify(t('Please select an assigned barangay.'), 'error');
+      setSubmitLoading(false);
+      return;
+    }
+
+    if (isDraft && !String(formData.patientName || '').trim()) {
+      setFormErrors({ patientName: true });
+      notify(t('Enter a patient name to save the draft.'), 'error');
       setSubmitLoading(false);
       return;
     }
@@ -2391,7 +2398,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         if (editingCase) {
           const op = {
             type: 'edit',
-            endpoint: `/api/cases/${editingCase.case_id}`,
+            endpoint: isDraft ? `/api/disease_cases/${editingCase.case_id}` : `/api/cases/${editingCase.case_id}`,
             method: 'PUT',
             payload,
             userId: loggedUserId,
@@ -2423,7 +2430,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         } else {
           const op = {
             type: 'create',
-            endpoint: '/api/cases',
+            endpoint: isDraft ? '/api/disease_cases' : '/api/cases',
             method: 'POST',
             payload: { ...payload, case_id: tempId },
             userId: loggedUserId,
@@ -2439,11 +2446,21 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         return;
       }
 
-      if (editingCase) {
+      if (isDraft) {
+        // Drafts are author-private work-in-progress: they bypass CHO approval,
+        // routing and strict validation. Go straight to the dedicated draft route.
+        if (editingCase) {
+          await axios.put(`${API_URL}/api/disease_cases/${editingCase.case_id}`, payload);
+        } else {
+          await axios.post(API_URL + '/api/disease_cases', payload);
+        }
+        setSubmitMsg(t('Case saved as draft!'));
+        notify(t('Case saved as draft!'), 'success');
+      } else if (editingCase) {
         await axios.put(`${API_URL}/api/cases/${editingCase.case_id}`, payload);
         setSubmitMsg(t('Case updated successfully!'));
         notify(t('Case updated successfully!'), 'success');
-      } else if (loginRole === 'BHW' && !isDraft) {
+      } else if (loginRole === 'BHW') {
         // BHW adds now go through CHO approval (leader requirement)
         // Cross-unit: confirm when the address belongs to another CHO unit's barangay
         const ownedUnit = sessionContext || getChoUnitForBarangay(loginBarangay);
@@ -2487,8 +2504,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           setPendingContactMessageId(null);
           fetchOutbox();
         }
-        setSubmitMsg(isDraft ? t('Case saved as draft!') : t('Case added successfully!'));
-        notify(isDraft ? t('Case saved as draft!') : t('Case added successfully!'), 'success');
+        setSubmitMsg(t('Case added successfully!'));
+        notify(t('Case added successfully!'), 'success');
       }
       await fetchCases();
       const diseaseEntry = findDiseaseEntry(formData.diseaseType);
@@ -2502,7 +2519,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           if (editingCase) {
             const op = {
               type: 'edit',
-              endpoint: `/api/cases/${editingCase.case_id}`,
+              endpoint: isDraft ? `/api/disease_cases/${editingCase.case_id}` : `/api/cases/${editingCase.case_id}`,
               method: 'PUT',
               payload,
               userId: loggedUserId,
@@ -2513,7 +2530,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
           } else {
             const op = {
               type: 'create',
-              endpoint: '/api/cases',
+              endpoint: isDraft ? '/api/disease_cases' : '/api/cases',
               method: 'POST',
               payload: { ...payload, case_id: tempId },
               userId: loggedUserId,
@@ -2730,9 +2747,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       const open = !!boardOpen[id];
       const activeCount = list.reduce((s, d) => s + (getCaseCount(d, browseYearSource) || 0), 0);
       return (
-        <div key={id} style={{ flex: '1 1 0', minWidth: '240px', maxWidth: '340px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden', textAlign: 'left' }}>
+        <div key={id} style={{ flex: '1 1 0', minWidth: '265px', maxWidth: '385px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden', textAlign: 'left' }}>
           <div onClick={() => setBoardOpen(o => ({ ...o, [id]: !o[id] }))}
-            style={{ padding: '12px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', background: open ? 'var(--input-bg)' : 'transparent', transition: 'background 0.15s' }}
+            style={{ padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', background: open ? 'var(--input-bg)' : 'transparent', transition: 'background 0.15s' }}
             onMouseEnter={e => { if (!open) e.currentTarget.style.background = 'var(--input-bg)'; }}
             onMouseLeave={e => { if (!open) e.currentTarget.style.background = 'transparent'; }}>
             <span style={{ fontSize: '18px', lineHeight: 1, flexShrink: 0 }}>{accentIcon}</span>
@@ -2891,16 +2908,16 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         <div data-tour="mc-carousel" style={{ position: 'relative', marginBottom: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0px', minHeight: '220px' }}>
           {/* LEFT faded peek */}
           <div className="cdms-carousel-peek" style={{
-            width: '80px', height: '180px', background: 'var(--bg-surface)',
+            width: '90px', height: '195px', background: 'var(--bg-surface)',
             border: '1px solid var(--border-color)', borderRadius: '12px 0 0 12px',
             opacity: 0.35, flexShrink: 0, clipPath: 'polygon(0 0, 100% 10%, 100% 90%, 0 100%)',
           }} />
 
           {/* CENTER active card */}
           <div style={{
-            flex: '0 1 980px', width: 'min(100%, 980px)', minHeight: '260px',
+            flex: '0 1 1120px', width: 'min(100%, 1120px)', minHeight: '285px',
             background: 'var(--bg-surface)', border: '2px solid var(--border-color)',
-            borderRadius: '14px', padding: '24px', position: 'relative',
+            borderRadius: '14px', padding: '26px', position: 'relative',
             boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
           }}>
             <div key={carouselIndex} className="cdms-carousel-slide" style={{ textAlign: 'center' }}>
@@ -2927,8 +2944,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
               )}
               {carouselIndex === 0 && (
                 <div>
-                  <h3 style={{ margin: '0 0 6px 0', fontSize: '17px', color: 'var(--text-main)' }}>{t('📋 All Diseases & Categories')}</h3>
-                  <p style={{ margin: '0 0 14px 0', fontSize: '15px', color: 'var(--text-muted)' }}>
+                  <h3 style={{ margin: '0 0 6px 0', fontSize: '18px', color: 'var(--text-main)' }}>{t('📋 All Diseases & Categories')}</h3>
+                  <p style={{ margin: '0 0 14px 0', fontSize: '16px', color: 'var(--text-muted)' }}>
                     {t('Click any column header to expand that disease list. Use your mouse wheel to scroll sideways across the categories.')}
                   </p>
 
@@ -2940,7 +2957,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                         el.scrollLeft += e.deltaY;
                       }
                     }
-                  }} style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', textAlign: 'left', overflowX: 'auto', padding: '2px 2px 10px' }}>
+                  }} style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', textAlign: 'left', overflowX: 'auto', padding: '2px 2px 10px' }}>
                     {trelloColumns('all', ALL_DISEASE_ENTRIES, t('All Diseases'), resolveIcon('svg:alldiseases'), '#121358', t('Click to view all 28 diseases'))}
                     {(() => {
                       const list = ALL_DISEASE_ENTRIES.filter(e => notifTypeForEntry(e, allDiseases) === 'immediate');
@@ -3260,9 +3277,9 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
 
           {/* RIGHT faded peek */}
           <div className="cdms-carousel-peek" style={{
-            width: '80px', height: '180px', background: 'var(--bg-surface)',
-            border: '1px solid var(--border-color)', borderRadius: '0 12px 12px 0',
-            opacity: 0.35, flexShrink: 0, clipPath: 'polygon(0 10%, 100% 0, 100% 100%, 0 90%)',
+width: '90px', height: '195px', background: 'var(--bg-surface)',
+    border: '1px solid var(--border-color)', borderRadius: '0 12px 12px 0',
+    opacity: 0.35, flexShrink: 0, clipPath: 'polygon(0 10%, 100% 0, 100% 100%, 0 90%)',
           }} />
         </div>
         )}

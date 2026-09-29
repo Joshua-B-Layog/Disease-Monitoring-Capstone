@@ -19,21 +19,7 @@ export default defineConfig({
             options: {
               cacheName: 'osm-tiles',
               expiration: {
-                maxEntries: 500,
-                maxAgeSeconds: 30 * 24 * 60 * 60
-              },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          },
-          {
-            urlPattern: /^https:\/\/.*\.basemaps\.cartocdn\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'carto-tiles',
-              expiration: {
-                maxEntries: 500,
+                maxEntries: 6000,
                 maxAgeSeconds: 30 * 24 * 60 * 60
               },
               cacheableResponse: {
@@ -47,7 +33,7 @@ export default defineConfig({
             options: {
               cacheName: 'esri-imagery-tiles',
               expiration: {
-                maxEntries: 500,
+                maxEntries: 6000,
                 maxAgeSeconds: 30 * 24 * 60 * 60
               },
               cacheableResponse: {

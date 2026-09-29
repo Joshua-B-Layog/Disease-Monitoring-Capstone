@@ -10,6 +10,7 @@ import { getPointInBarangay, pointInFeature } from '../data/coordinates';
 import { onDiseasesChanged } from '../diseaseSignal';
 import { useI18n } from '../i18n';
 import DatePicker from '../components/DatePicker';
+import { precacheTiles } from '../mapTileCache';
 
 const CABUYAO_CENTER = [14.2253, 121.1254];
 const CABUYAO_BOUNDS = [
@@ -607,6 +608,29 @@ export default function ResidentMap() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchMatches, setSearchMatches] = useState([]);
   const [mapLayer, setMapLayer] = useState('HD'); // 'SD' = street map (Carto), 'HD' = satellite (Esri)
+
+  // Offline tile pre-cache for the whole city area
+  const [tileCache, setTileCache] = useState({ running: false, done: 0, total: 0, completed: false, error: '' });
+  const handleCacheOffline = async () => {
+    if (tileCache.running) return;
+    if (!navigator.onLine) {
+      setTileCache({ running: false, done: 0, total: 0, completed: false, error: t('You need to be online to cache the map.') });
+      return;
+    }
+    setTileCache({ running: true, done: 0, total: 1, completed: false, error: '' });
+    try {
+      const layers = mapLayer === 'HD' ? ['esri'] : ['osm'];
+      const result = await precacheTiles(CABUYAO_BOUNDS, 12, 17, layers, (done, all) =>
+        setTileCache({ running: true, done, total: all, completed: false, error: '' })
+      );
+      setTileCache({
+        running: false, done: result.succeeded, total: result.total, completed: true,
+        error: (result.total > 0 && result.succeeded === 0) ? t('Could not download map tiles - the tile server blocked the request.') : '',
+      });
+    } catch (err) {
+      setTileCache({ running: false, done: 0, total: 0, completed: false, error: (err && err.message) || t('Failed to cache map') });
+    }
+  };
   const [showOverview, setShowOverview] = useState(false);
   const geoJsonLayerRef = useRef(null);
   const overviewContentRef = useRef(null);
@@ -704,10 +728,15 @@ export default function ResidentMap() {
     });
   }, [barangayData, mapZoom]);
 
-  // Update permanent labels when data refreshes
+  // Update permanent labels when data refreshes (hidden when zoomed into the
+  // individual pins view so the name boxes don't cover the pins/heat visual)
   useEffect(() => {
     if (!geoJsonLayerRef.current) return;
     geoJsonLayerRef.current.eachLayer((layer) => {
+      if (mapZoom >= PUROK_ZOOM_THRESHOLD) {
+        if (layer.getTooltip()) layer.unbindTooltip();
+        return;
+      }
       const rawName = layer.feature.properties.ADM4_EN;
       const barangayName = getDbNameFromGeoJson(rawName);
       const match = barangayData.find(b => b.barangayName === barangayName);
@@ -730,7 +759,7 @@ export default function ResidentMap() {
         layer.bindTooltip(html, { permanent: true, direction: 'center', className: 'brgy-tooltip-label' });
       }
     });
-  }, [barangayData]);
+  }, [barangayData, mapZoom]);
 
   const showAutoPurok = mapZoom >= PUROK_ZOOM_THRESHOLD && autoDetectedBrgy;
 
@@ -1093,6 +1122,37 @@ export default function ResidentMap() {
           setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
         }}
       >
+        <button
+          className="cdms-map-filter-btn"
+          onClick={handleCacheOffline}
+          disabled={tileCache.running}
+          title={t('Downloads map tiles for the whole city so they work offline (zooms 12-17).')}
+          style={{
+            position: 'absolute', top: '12px', left: '12px', zIndex: 1000,
+            display: 'flex', alignItems: 'center', gap: '7px',
+            padding: '9px 14px', borderRadius: '8px', cursor: 'pointer',
+            background: tileCache.running ? 'var(--input-bg)' : 'var(--bg-surface)',
+            border: '1px solid var(--border-color)',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+            fontSize: '14px', fontWeight: '600', color: 'var(--text-main)',
+          }}
+        >
+          {tileCache.running ? (
+            <>⬇ {t('Caching')}… {Math.round((tileCache.done / Math.max(1, tileCache.total)) * 100)}%</>
+          ) : (
+            <>⬇ {t('Cache map offline')}</>
+          )}
+        </button>
+        {tileCache.completed && !tileCache.running && (
+          <div style={{ position: 'absolute', top: '56px', left: '12px', zIndex: 1000, fontSize: '12px', fontWeight: '600', color: '#129968', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '7px', padding: '6px 10px', boxShadow: '0 2px 10px rgba(0,0,0,0.2)' }}>
+            ✓ {t('Offline map saved for your area!')}
+          </div>
+        )}
+        {tileCache.error && (
+          <div style={{ position: 'absolute', top: '56px', left: '12px', zIndex: 1000, fontSize: '12px', fontWeight: '600', color: '#DC2626', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '7px', padding: '6px 10px', boxShadow: '0 2px 10px rgba(0,0,0,0.2)' }}>
+            ⚠ {t(tileCache.error)}
+          </div>
+        )}
         <MapContainer
           center={CABUYAO_CENTER} zoom={14} minZoom={12.3} maxZoom={19} scrollWheelZoom={true}
           zoomSnap={0} zoomDelta={0.5}

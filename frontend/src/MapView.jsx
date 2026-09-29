@@ -12,6 +12,7 @@ import cabuyaoGeoJSON from './data/cabuyao_barangays.geojson';
 import { getPointInBarangay, pointInFeature } from './data/coordinates';
 import DatePicker from './components/DatePicker';
 import { useI18n } from './i18n';
+import { precacheTiles } from './mapTileCache';
 
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -1107,6 +1108,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const [hotspotData, setHotspotData]  = useState([]);
   const [filterBarangay, setFilterBarangay] = useState('All Barangays');
   const [filterStatus, setFilterStatus]  = useState('All Status');
+  const [filterCaseType, setFilterCaseType] = useState('All Case Types');
   const [filterDateFrom, setFilterDateFrom] = useState(() => `${new Date().getFullYear()}-01-01`);
   const [filterDateTo, setFilterDateTo] = useState(() => `${new Date().getFullYear()}-12-31`);
   const [filterYear, setFilterYear] = useState(() => String(new Date().getFullYear()));
@@ -1128,6 +1130,8 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const purokRef = useRef(null);
   const [statusOpen, setStatusOpen] = useState(false);
   const statusRef = useRef(null);
+  const [caseTypeOpen, setCaseTypeOpen] = useState(false);
+  const caseTypeRef = useRef(null);
   const [severityOpen, setSeverityOpen] = useState(false);
   const severityRef = useRef(null);
   const [yearOpen, setYearOpen] = useState(false);
@@ -1155,6 +1159,32 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     }
     return CABUYAO_BOUNDS;
   }, [loginRole, sessionContext, loginBarangay]);
+
+  // Offline tile pre-cache for the user's area of responsibility
+  const [tileCache, setTileCache] = useState({ running: false, done: 0, total: 0, error: '' });
+  const handleCacheOffline = async () => {
+    if (tileCache.running) return;
+    if (!navigator.onLine) {
+      notify(t('You need to be online to cache the map.'), 'error');
+      return;
+    }
+    setTileCache({ running: true, done: 0, total: 1, error: '' });
+    try {
+      const layers = mapLayer === 'HD' ? ['esri'] : ['osm'];
+      const result = await precacheTiles(roleBounds, 12, 17, layers, (done, all) =>
+        setTileCache({ running: true, done, total: all, error: '' })
+      );
+      setTileCache({ running: false, done: result.succeeded, total: result.total, error: '' });
+      if (result.total > 0 && result.succeeded === 0) {
+        notify(t('Could not download map tiles - the tile server blocked the request.'), 'error');
+      } else {
+        notify(t('Offline map saved for your area!'), 'success');
+      }
+    } catch (err) {
+      setTileCache({ running: false, done: 0, total: 0, error: (err && err.message) || t('Failed to cache map') });
+      notify(t('Failed to cache the map offline.'), 'error');
+    }
+  };
 
 
   const scopedGeoJson = useMemo(() => {
@@ -1219,6 +1249,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       }
       if (purokRef.current && !purokRef.current.contains(e.target)) setPurokOpen(false);
       if (statusRef.current && !statusRef.current.contains(e.target)) setStatusOpen(false);
+    if (caseTypeRef.current && !caseTypeRef.current.contains(e.target)) setCaseTypeOpen(false);
       if (severityRef.current && !severityRef.current.contains(e.target)) setSeverityOpen(false);
       if (yearRef.current && !yearRef.current.contains(e.target)) setYearOpen(false);
       if (diseaseRef.current && !diseaseRef.current.contains(e.target)) setDiseaseOpen(false);
@@ -1296,6 +1327,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     const filtered = allCases.filter(c => {
       if (filterBarangay !== 'All Barangays'  && c.barangay_name !== filterBarangay)   return false;
       if (filterStatus   !== 'All Status'     && c.status        !== filterStatus)      return false;
+      if (filterCaseType !== 'All Case Types' && (c.case_type || '') !== filterCaseType) return false;
       if (filterSeverity !== 'All Severities' && c.severity      !== filterSeverity)    return false;
       if (filterDateFrom || filterDateTo) {
         const d = (c.date_reported || '').slice(0, 10);
@@ -1317,6 +1349,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     // Active Hotspots - scope-only, ignores barangay/purok filter
     const scopeBase = allCases.filter(c => {
       if (filterStatus   !== 'All Status'     && c.status    !== filterStatus)   return false;
+      if (filterCaseType !== 'All Case Types' && (c.case_type || '') !== filterCaseType) return false;
       if (filterSeverity !== 'All Severities' && c.severity  !== filterSeverity) return false;
       if (filterDateFrom || filterDateTo) {
         const d = (c.date_reported || '').slice(0, 10);
@@ -1366,7 +1399,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     } else {
       setPurokData([]);
     }
-  }, [allCases, filterBarangay, filterStatus, filterDateFrom, filterDateTo, filterSeverity, filterPurok, filterDisease, autoDetectedBrgy]);
+  }, [allCases, filterBarangay, filterStatus, filterCaseType, filterDateFrom, filterDateTo, filterSeverity, filterPurok, filterDisease, autoDetectedBrgy]);
 
   const goToDisease = (barangayName, diseaseName, purok) => {
     if (setCaseFilter) setCaseFilter({ disease: diseaseName.trim(), barangay: barangayName, purok: purok || '' });
@@ -1396,6 +1429,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     return allCases.filter(c => {
       if (filterBarangay !== 'All Barangays'  && c.barangay_name !== filterBarangay)  return false;
       if (filterStatus   !== 'All Status'     && c.status        !== filterStatus)     return false;
+      if (filterCaseType !== 'All Case Types' && (c.case_type || '') !== filterCaseType) return false;
       if (filterSeverity !== 'All Severities' && c.severity      !== filterSeverity)   return false;
       if (filterDateFrom || filterDateTo) {
         const d = (c.date_reported || '').slice(0, 10);
@@ -1407,7 +1441,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       if (loginRole === 'CHO' && choUnitBarangays.length > 0) return choUnitBarangays.includes(c.barangay_name);
       return true;
     });
-  }, [allCases, filterBarangay, filterStatus, filterSeverity, filterDateFrom, filterDateTo, filterPurok, filterDisease, loginRole, loginBarangay, sessionContext]);
+  }, [allCases, filterBarangay, filterStatus, filterCaseType, filterSeverity, filterDateFrom, filterDateTo, filterPurok, filterDisease, loginRole, loginBarangay, sessionContext]);
 
   const diseaseOptions = useMemo(() => {
     const s = new Set();
@@ -1694,6 +1728,34 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           </div>
         </div>
 
+        {/* ─── FILTER LAYER: CASE TYPE ─── */}
+        <p style={sectionHeaderStyle}>{t('Filter by Case Type')}</p>
+
+        {/* Case Type */}
+        <div>
+          <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>{t('Case Type')}</label>
+          <div style={{ position: 'relative' }} ref={caseTypeRef}>
+            <button type="button" onClick={() => setCaseTypeOpen(!caseTypeOpen)}
+              style={{ ...SEL, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' }}>
+              <span>{t(filterCaseType)}</span>
+              <span style={{ fontSize: '13px', opacity: 0.6, transition: 'transform 0.2s', transform: caseTypeOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+            </button>
+            {caseTypeOpen && (
+              <div className="cdms-dropdown-panel" style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', zIndex: 100, overflow: 'hidden' }}>
+                {['All Case Types', 'Suspected', 'Probable', 'Confirmed'].map(ct => (
+                  <button key={ct} type="button"
+                    onClick={() => { setFilterCaseType(ct); setCaseTypeOpen(false); }}
+                    style={{ display: 'block', width: '100%', padding: '10px 14px', background: filterCaseType === ct ? 'var(--input-bg)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: filterCaseType === ct ? '600' : '400' }}
+                    onMouseEnter={e => { if (filterCaseType !== ct) e.target.style.background = 'var(--input-bg)'; }}
+                    onMouseLeave={e => { if (filterCaseType !== ct) e.target.style.background = 'transparent'; }}>
+                    {t(ct)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* ─── FILTER LAYER: DATE ─── */}
         <p style={sectionHeaderStyle}>{t('Filter by Date')}</p>
 
@@ -1863,7 +1925,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         </div>
 
         <button
-          onClick={() => { setAutoDetectedBrgy(null); setFilterBarangay('All Barangays'); setFilterStatus('All Status'); setFilterDateFrom(`${currentYear}-01-01`); setFilterDateTo(`${currentYear}-12-31`); setFilterYear(String(currentYear)); setFilterSeverity('All Severities'); setFilterDisease('All Diseases'); setFilterPurok('All Puroks'); }}
+          onClick={() => { setAutoDetectedBrgy(null); setFilterBarangay('All Barangays'); setFilterStatus('All Status'); setFilterCaseType('All Case Types'); setFilterDateFrom(`${currentYear}-01-01`); setFilterDateTo(`${currentYear}-12-31`); setFilterYear(String(currentYear)); setFilterSeverity('All Severities'); setFilterDisease('All Diseases'); setFilterPurok('All Puroks'); }}
           style={{ padding: '11px', background: '#DC2626', color: 'white', border: 'none', borderRadius: '7px', cursor: 'pointer', fontWeight: '600', fontSize: '15px', marginTop: 'auto' }}>
           {t('Reset Filters')}
         </button>
@@ -1901,6 +1963,27 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           }}
         >
           ⚙ {t('Filters')}
+        </button>
+        <button
+          className="cdms-map-filter-btn"
+          onClick={handleCacheOffline}
+          disabled={tileCache.running}
+          title={t('Downloads map tiles for your area so they work offline (zooms 12-17).')}
+          style={{
+            position: 'absolute', top: '58px', left: '12px', zIndex: 1000,
+            display: 'flex', alignItems: 'center', gap: '7px',
+            padding: '9px 14px', borderRadius: '8px', cursor: 'pointer',
+            background: tileCache.running ? 'var(--input-bg)' : 'var(--bg-surface)',
+            border: '1px solid var(--border-color)',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+            fontSize: '14px', fontWeight: '600', color: 'var(--text-main)',
+          }}
+        >
+          {tileCache.running ? (
+            <>⬇ {t('Caching')}… {Math.round((tileCache.done / Math.max(1, tileCache.total)) * 100)}%</>
+          ) : (
+            <>⬇ {t('Cache map offline')}</>
+          )}
         </button>
         <MapContainer
           center={(loginRole === 'BHW' && loginBarangay && findCoords(loginBarangay)) 
