@@ -712,6 +712,21 @@ const escapeHtmlBasic = (s) =>
 // label tag underneath (used by per-unit pins, area pins and barangay pins).
 const getPinSize = (count) => Math.max(40, Math.min(76, 28 + count * 1.8));
 
+// Lift (px) that keeps a hazard badge fully clear of the pin beneath it.
+// Pins anchor at their tip and grow upward as the case count rises, so a fixed
+// offset clears a near-empty purok and still buries the number on a busy one.
+// The whole badge has to clear - not just the disc - because the optional count
+// pill is rendered below it and would clip the pin on its own. HAZARD_BADGE_GAP
+// is the visible breathing room; keep it small or the dot reads as detached from
+// its pin. Tuned down from 6 after the badges proved to sit too high.
+const HAZARD_BADGE_GAP = 2;
+const hazardBadgeLift = (count, size = 32, hasPill = false) => {
+  const pinH = Math.round(getPinSize(Number(count) || 0) * 44 / 34);
+  const discCentre = hasPill ? (size / 2) + 8 : size / 2;
+  const badgeH = hasPill ? size + 12 : size;
+  return pinH + badgeH + HAZARD_BADGE_GAP - discCentre;
+};
+
 const createPinIcon = ({ count, color, label = null, className = '' }) => {
   const size = getPinSize(count);
   const w = size;
@@ -965,7 +980,12 @@ function LayerBadgeMarkers({ items }) {
       }
       const h = it.svg ? (it.count && it.count > 0 ? size + 12 : size) : 28;
       const html = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:${rowGap};width:${w}px;height:${h}px;cursor:pointer;background:transparent;padding:2px 0 0 0">${inner}</div>`;
-      const icon = L.divIcon({ className: '', html, iconSize: [w, h], iconAnchor: [w / 2, it.svg ? (it.count && it.count > 0 ? (size / 2) + 8 : size / 2) : (h / 2)] });
+      // `above` (px) lifts a badge clear of the pin it shares coordinates with.
+      // Pins anchor at their tip, so the round head already occupies the space
+      // directly above the point - without this the disc hides the pin entirely.
+      const discCentre = it.count && it.count > 0 ? (size / 2) + 8 : size / 2;
+      const anchorY = it.svg ? discCentre + (it.above || 0) : (h / 2);
+      const icon = L.divIcon({ className: '', html, iconSize: [w, h], iconAnchor: [w / 2, anchorY] });
       const coords = it.dy ? [it.coords[0] + it.dy, it.coords[1]] : it.coords;
       const m = L.marker(coords, { icon, zIndexOffset: it.z != null ? it.z : 800 }).addTo(map);
       m.bindTooltip(it.title || '', { direction: 'top', offset: [0, -12] });
@@ -1675,6 +1695,12 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   });
 
   // Barangay-tier badges (zoomed out): automatic PAGASA-style warning dot for every barangay
+  // Case count of the barangay pin each badge sits on, so the badge can lift
+  // clear of a busy pin instead of burying its number.
+  const barangayCaseCount = {};
+  (barangayData || []).forEach(b => {
+    if (b && b.barangayName) barangayCaseCount[wxKey(b.barangayName)] = b.totalCases;
+  });
   const hazardBadgeItems = [];
   hazardScopeList.forEach(name => {
     const coords = findCoords(name);
@@ -1694,7 +1720,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         title: off ? `${name} — Weather offline` : `${name} — No active weather hazard`,
         size: 38,
         z: 1500,
-        dy: 0.0012,
+        above: hazardBadgeLift(barangayCaseCount[wxKey(name)] || 0, 38, false),
         onClick: () => openBarangayPopup(name),
       });
       return;
@@ -1718,12 +1744,26 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       title: `${name} — ${details.join(' · ')}${diseaseHint}`,
       size: 38,
       z: 1500,
-      dy: 0.0012,
+      above: hazardBadgeLift(barangayCaseCount[wxKey(name)] || 0, 38, pinCount > 0),
       onClick: () => openBarangayPopup(name),
     });
   });
 
   // Pin tier (zoomed in): weather on the purok dots + manual pins at their exact lat/lng
+  // Manual hazard pins sit wherever the admin clicked rather than on a purok
+  // centre, so measure the pin that actually renders underneath and lift past
+  // that one. Falls back to a near-empty pin when nothing is close enough.
+  const pinCountNear = (lat, lng) => {
+    let best = null;
+    let bestD = Infinity;
+    (purokData || []).forEach(g => {
+      if (!g || !g.coords) return;
+      const d = (g.coords[0] - lat) ** 2 + (g.coords[1] - lng) ** 2;
+      if (d < bestD) { bestD = d; best = g; }
+    });
+    return bestD <= 0.0015 ** 2 ? (best ? best.totalCases : 0) : 0;
+  };
+
   const hazardPinItems = [];
   (purokData || []).forEach(p => {
     const w = weatherByName[wxKey(p.barangay)];
@@ -1736,6 +1776,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       color: hazardColor(w.hazards[0]),
       title: `${p.purok || p.barangay} — ${w.hazards.join(', ')}${diseases.length ? ` · Possible: ${diseases.join(', ')}` : ''}`,
       size: 32,
+      above: hazardBadgeLift(p.totalCases),
       z: 1500,
       onClick: () => openBarangayPopup(p.barangay),
     });
@@ -1749,6 +1790,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       color: hazardColor(ev.event_type),
       title: `${ev.event_type}${ev.purok ? ' · ' + ev.purok : ''} (${ev.severity})${diseases.length ? ` · Possible: ${diseases.join(', ')}` : ''}`,
       size: 32,
+      above: hazardBadgeLift(pinCountNear(parseFloat(ev.latitude), parseFloat(ev.longitude))),
       z: 1400,
       onClick: () => openBarangayPopup(ev.barangay_name),
     });
