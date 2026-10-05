@@ -13,6 +13,8 @@ import { getPointInBarangay, pointInFeature } from './data/coordinates';
 import DatePicker from './components/DatePicker';
 import { useI18n } from './i18n';
 import { precacheTiles } from './mapTileCache';
+import EpiPanel from './epiStats';
+import { ACTION_TYPES, ACTION_TYPE_ICONS, ACTION_STATUSES, DISASTER_EVENT_TYPES, DISASTER_SEVERITIES, SEVERITY_COLORS, hazardIcon, hazardDiseases, hazardColor, hazardSvgMarkup, hazardSvgIcon, isDisasterActive, getDisasterWatch, WEATHER_ATTRIBUTION } from './disasterRisk';
 
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -933,6 +935,48 @@ function BarangayPins({ barangayData, onHover, onLeave, onClick, loginRole }) {
   return null;
 }
 
+// Overlay badges for the Barangay Actions + Weather/Hazard layers.
+// `items` = [{ id, coords, svg | emoji, count, color, onClick, title, size?, z?, dy? }]
+// svg items render a PAGASA-style warning disc (guaranteed visible on any machine).
+// `size` = disc pixel width (default 28); `z` = zIndexOffset (default 800, case pins use 1000 so pass >1000 to float on top); `dy` = latitude offset applied to coords.
+function LayerBadgeMarkers({ items }) {
+  const map = useMap();
+  const markersRef = useRef([]);
+  useEffect(() => {
+    markersRef.current.forEach(m => m.remove());
+    markersRef.current = [];
+    (items || []).forEach(it => {
+      let inner, w, rowGap;
+      const size = it.size || 28;
+      if (it.svg) {
+        // SVG warning disc + optional folded count pill below
+        inner = `<div style="width:${size}px;height:${size}px;text-align:center;line-height:1">${it.svg}</div>` +
+          (it.count && it.count > 0
+            ? `<div style="font-size:${size >= 34 ? '11px' : '9px'};font-weight:800;line-height:1;text-align:center;color:${it.color};margin-top:2px;background:var(--bg-surface);border:1px solid ${it.color};border-radius:7px;padding:1px 4px">${it.count}</div>`
+            : '');
+        w = size + 6; rowGap = '4px';
+      } else if (it.emoji) {
+        inner = `<div style="font-size:14px;line-height:1;text-align:center">${it.emoji}</div>` +
+          (it.count ? `<div style="font-size:9px;font-weight:800;line-height:1;text-align:center;color:${it.color};margin-top:1px">${it.count}</div>` : '');
+        w = 28; rowGap = '2px';
+      } else {
+        inner = `<div style="font-size:13px;font-weight:800;line-height:26px;text-align:center;color:${it.color}">${it.count}</div>`;
+        w = 28; rowGap = '0px';
+      }
+      const h = it.svg ? (it.count && it.count > 0 ? size + 12 : size) : 28;
+      const html = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:${rowGap};width:${w}px;height:${h}px;cursor:pointer;background:transparent;padding:2px 0 0 0">${inner}</div>`;
+      const icon = L.divIcon({ className: '', html, iconSize: [w, h], iconAnchor: [w / 2, it.svg ? (it.count && it.count > 0 ? (size / 2) + 8 : size / 2) : (h / 2)] });
+      const coords = it.dy ? [it.coords[0] + it.dy, it.coords[1]] : it.coords;
+      const m = L.marker(coords, { icon, zIndexOffset: it.z != null ? it.z : 800 }).addTo(map);
+      m.bindTooltip(it.title || '', { direction: 'top', offset: [0, -12] });
+      m.on('click', () => it.onClick && it.onClick());
+      markersRef.current.push(m);
+    });
+    return () => markersRef.current.forEach(m => m.remove());
+  }, [items, map]);
+  return null;
+}
+
 function ZoomListener({ onZoom, filterBarangay, autoDetectedBrgy, setAutoDetectedBrgy, loginRole }) {
   useMapEvents({
     zoomend: (e) => {
@@ -1138,6 +1182,49 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const yearRef = useRef(null);
   const [mapLayer, setMapLayer] = useState('HD'); // 'SD' = street map (OSM), 'HD' = satellite (Esri)
   const [filtersOpen, setFiltersOpen] = useState(false); // mobile: filter sidebar as hamburger drawer
+
+  // ── F: Barangay Actions layer + H: Weather/Hazard layer (weather + manual pins) ──
+  const [actions, setActions] = useState([]);
+  const [disasterEvents, setDisasterEvents] = useState([]);
+  const [weatherHazards, setWeatherHazards] = useState([]);
+  const [pagasa, setPagasa] = useState(null);
+  const [showActionsLayer, setShowActionsLayer] = useState(true);
+  const [showDisasterLayer, setShowDisasterLayer] = useState(true);
+  const [weatherOffline, setWeatherOffline] = useState(false);
+  const [manageActionsOpen, setManageActionsOpen] = useState(false);
+  const [actionForm, setActionForm] = useState({ id: null, barangay_id: '', barangay_name: '', hazard_id: '', action_type: ACTION_TYPES[0], description: '', target_disease: '', date_started: '', date_ended: '', status: 'planned' });
+  const [actionsSaving, setActionsSaving] = useState(false);
+  const [barangayIdMap, setBarangayIdMap] = useState({});
+  const [manageHazardsOpen, setManageHazardsOpen] = useState(false);
+  const [hazardForm, setHazardForm] = useState({ id: null, barangay_id: '', barangay_name: '', event_type: DISASTER_EVENT_TYPES[0], severity: DISASTER_SEVERITIES[1], purok: '', latitude: '', longitude: '', date_started: '', date_ended: '', notes: '' });
+  const [hazardsSaving, setHazardsSaving] = useState(false);
+  // Lazily-fetched "same week in past years" historical summary for the open popup
+  const [histSummary, setHistSummary] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    const load = () => {
+      axios.get(API_URL + '/api/barangay-actions').then(res => { if (alive) setActions(Array.isArray(res.data) ? res.data : []); }).catch(() => {});
+      axios.get(API_URL + '/api/disaster-events').then(res => { if (alive) setDisasterEvents(Array.isArray(res.data) ? res.data : []); }).catch(() => {});
+      axios.get(API_URL + '/api/weather/hazards').then(res => {
+        if (alive) { setWeatherHazards(Array.isArray(res.data) ? res.data : []); setWeatherOffline(false); }
+        if (!window.__wxLogged && Array.isArray(res.data)) { window.__wxLogged = true; console.info('[weather/hazards]', res.data); }
+      }).catch(() => { if (alive) setWeatherOffline(true); });
+      axios.get(API_URL + '/api/weather/pagasa').then(res => {
+        if (alive && res.data && res.data.ok) setPagasa(res.data);
+      }).catch(() => {});
+      axios.get(API_URL + '/api/barangays').then(res => {
+        if (alive && Array.isArray(res.data)) {
+          const m = {};
+          res.data.forEach(b => { m[b.id] = b.name; });
+          setBarangayIdMap(m);
+        }
+      }).catch(() => {});
+    };
+    load();
+    const iv = setInterval(load, 30000);
+    return () => { alive = false; clearInterval(iv); };
+  }, []);
   const geoJsonLayerRef = useRef(null);
   const bordersOnly = loginRole === 'BHW';
   const barangayDataRef = useRef(barangayData);
@@ -1514,6 +1601,351 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     borderBottom: '1px solid var(--border-color)',
   };
 
+  // ── F/H overlay data: action badge markers + disaster watch ──
+  const openBarangayPopup = (name) => {
+    const liveData = barangayDataRef.current.find(b => b.barangayName === name);
+    if (liveData) setPopup(liveData);
+    else setPopup({ barangayName: name, totalCases: 0, diseases: {}, coords: findCoords(name) });
+  };
+
+  const actionBadgeItems = [];
+  const ongoingActions = actions.filter(a => a.status !== 'completed');
+  const wxKey = (n) => (n || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const actionsByName = {};
+  const actionScopeList = (loginRole === 'BHW' && loginBarangay) ? [loginBarangay]
+    : (loginRole === 'CHO' && sessionContext && CHO_UNIT_BARANGAYS[sessionContext]) ? CHO_UNIT_BARANGAYS[sessionContext]
+    : ALL_BARANGAYS;
+  const actionScopeKeys = new Set(actionScopeList.map(wxKey));
+  ongoingActions.forEach(a => {
+    const name = a.barangay_name || (a.barangay_id ? '' : 'Citywide');
+    if (!name) return;
+    if (actionScopeKeys.size && !actionScopeKeys.has(wxKey(name))) return;
+    if (!actionsByName[name]) actionsByName[name] = [];
+    actionsByName[name].push(a);
+  });
+  Object.entries(actionsByName).forEach(([name, list]) => {
+    const coords = findCoords(name);
+    if (!coords) return;
+    actionBadgeItems.push({
+      id: 'act-' + name,
+      coords,
+      count: list.length,
+      color: '#0891b2',
+      title: `${list.length} ongoing action(s) - ${name}`,
+      onClick: () => openBarangayPopup(name),
+    });
+  });
+
+
+  const weatherByName = {};
+  const wxOfflineNames = new Set();
+  const hazardScopeList = (loginRole === 'BHW' && loginBarangay) ? [loginBarangay]
+    : (loginRole === 'CHO' && sessionContext && CHO_UNIT_BARANGAYS[sessionContext]) ? CHO_UNIT_BARANGAYS[sessionContext]
+    : ALL_BARANGAYS;
+  const hazardScopeKeys = new Set(hazardScopeList.map(wxKey));
+  (weatherHazards || []).forEach(w => {
+    if (!w || !w.name) return;
+    if (w.error === 'offline') wxOfflineNames.add(wxKey(w.name));
+    if (w.hazards && w.hazards.length) weatherByName[wxKey(w.name)] = w;
+  });
+  const activeHazardEvents = (disasterEvents || []).filter(ev => isDisasterActive(ev));
+  const allManualPinEvents = activeHazardEvents.filter(ev => ev.latitude && ev.longitude);
+  const manualPinEvents = allManualPinEvents.filter(ev => !hazardScopeKeys.size || hazardScopeKeys.has(wxKey(ev.barangay_name)));
+  const manualBarangayEvents = {};
+  manualPinEvents.forEach(ev => {
+    if (!ev.barangay_name) return;
+    const k = wxKey(ev.barangay_name);
+    if (!manualBarangayEvents[k]) manualBarangayEvents[k] = [];
+    manualBarangayEvents[k].push(ev);
+  });
+  // Also include bar-level manual events (no coords) scoped
+  const barLevelManualAll = activeHazardEvents.filter(ev => !(ev.latitude && ev.longitude));
+  barLevelManualAll.forEach(ev => {
+    if (hazardScopeKeys.size && !hazardScopeKeys.has(wxKey(ev.barangay_name))) return;
+    const k = wxKey(ev.barangay_name);
+    if (!manualBarangayEvents[k]) manualBarangayEvents[k] = [];
+    manualBarangayEvents[k].push(ev);
+  });
+  // Purok-tier badges are derived from the case purok dots inside a hazard barangay
+  const weatherPinsByBarangay = {};
+  (purokData || []).forEach(p => {
+    if (!p.barangay || !weatherByName[wxKey(p.barangay)]) return;
+    const k = wxKey(p.barangay);
+    weatherPinsByBarangay[k] = (weatherPinsByBarangay[k] || 0) + 1;
+  });
+
+  // Barangay-tier badges (zoomed out): automatic PAGASA-style warning dot for every barangay
+  const hazardBadgeItems = [];
+  hazardScopeList.forEach(name => {
+    const coords = findCoords(name);
+    if (!coords) return;
+    const w = weatherByName[wxKey(name)];
+    const man = manualBarangayEvents[wxKey(name)] || [];
+    const barLevelEvents = man.filter(m => !(m.latitude && m.longitude));
+    const pinCount = (weatherPinsByBarangay[wxKey(name)] || 0) + man.filter(m => m.latitude && m.longitude).length;
+    if (!w && man.length === 0) {
+      const off = wxOfflineNames.has(wxKey(name));
+      hazardBadgeItems.push({
+        id: 'hzd-' + name,
+        coords,
+        svg: hazardSvgMarkup(off ? '⚠️' : '☁️', off ? '#f59e0b' : '#94a3b8', 38, off ? 'Off' : 'Clear'),
+        count: 0,
+        color: off ? '#f59e0b' : '#94a3b8',
+        title: off ? `${name} — Weather offline` : `${name} — No active weather hazard`,
+        size: 38,
+        z: 1500,
+        dy: 0.0012,
+        onClick: () => openBarangayPopup(name),
+      });
+      return;
+    }
+    const allTypes = [];
+    if (w) allTypes.push(w.hazards[0]);
+    barLevelEvents.forEach(e => allTypes.push(e.event_type));
+    const mainType = allTypes[0] || (man.find(m => m.latitude && m.longitude) || {}).event_type || 'Flood';
+    const details = [];
+    if (w) details.push(`${w.hazards.join(', ')}${w.temperature != null ? ' ' + w.temperature + '°C' : ''}`);
+    if (w && w.outlook) details.push(w.outlook);
+    barLevelEvents.forEach(e => details.push(`${hazardIcon(e.event_type)} ${e.event_type} (${e.severity})`));
+    const diseases = [...new Set(allTypes.flatMap(hazardDiseases))];
+    const diseaseHint = diseases.length ? ` · Possible: ${diseases.join(', ')}` : '';
+    hazardBadgeItems.push({
+      id: 'hzd-' + name,
+      coords,
+      svg: hazardSvgIcon(mainType, 38),
+      count: pinCount,
+      color: hazardColor(mainType),
+      title: `${name} — ${details.join(' · ')}${diseaseHint}`,
+      size: 38,
+      z: 1500,
+      dy: 0.0012,
+      onClick: () => openBarangayPopup(name),
+    });
+  });
+
+  // Pin tier (zoomed in): weather on the purok dots + manual pins at their exact lat/lng
+  const hazardPinItems = [];
+  (purokData || []).forEach(p => {
+    const w = weatherByName[wxKey(p.barangay)];
+    if (!w || !w.hazards || !w.hazards.length) return;
+    const diseases = [...new Set(w.hazards.flatMap(hazardDiseases))];
+    hazardPinItems.push({
+      id: 'wxp-' + (p.purok || p.barangay) + '-' + p.barangay,
+      coords: p.coords,
+      svg: hazardSvgIcon(w.hazards[0], 32),
+      color: hazardColor(w.hazards[0]),
+      title: `${p.purok || p.barangay} — ${w.hazards.join(', ')}${diseases.length ? ` · Possible: ${diseases.join(', ')}` : ''}`,
+      size: 32,
+      z: 1500,
+      onClick: () => openBarangayPopup(p.barangay),
+    });
+  });
+  manualPinEvents.forEach(ev => {
+    const diseases = hazardDiseases(ev.event_type);
+    hazardPinItems.push({
+      id: 'hzp-' + ev.id,
+      coords: [parseFloat(ev.latitude), parseFloat(ev.longitude)],
+      svg: hazardSvgIcon(ev.event_type, 32),
+      color: hazardColor(ev.event_type),
+      title: `${ev.event_type}${ev.purok ? ' · ' + ev.purok : ''} (${ev.severity})${diseases.length ? ` · Possible: ${diseases.join(', ')}` : ''}`,
+      size: 32,
+      z: 1400,
+      onClick: () => openBarangayPopup(ev.barangay_name),
+    });
+  });
+
+  const popupActionKey = (popup && (popup.barangay || popup.barangayName)) || '';
+  const popupActionsList = actions.filter(a => a.barangay_name === popupActionKey);
+  const popupWeather = popupActionKey ? weatherByName[wxKey(popupActionKey)] : null;
+  const popupManualEvents = popupActionKey ? (manualBarangayEvents[wxKey(popupActionKey)] || []) : [];
+  const popupWxRaw = popupActionKey && Array.isArray(weatherHazards)
+    ? weatherHazards.find(x => wxKey(x.name) === wxKey(popupActionKey))
+    : null;
+
+  // Hazards an action can be linked to. Manual pins only - auto-detected weather
+  // hazards have no DB row, so they deliberately cannot be response targets.
+  // Scoped to the user's area of responsibility like every other hazard layer.
+  const linkableHazards = activeHazardEvents.filter(
+    ev => !ev.barangay_id || !hazardScopeKeys.size || hazardScopeKeys.has(wxKey(ev.barangay_name))
+  );
+  const actionHazardOptions = linkableHazards
+    .filter(ev => !actionForm.barangay_id || !ev.barangay_id ||
+      String(ev.barangay_id) === String(actionForm.barangay_id))
+    .slice()
+    .sort((a, b) => String(b.date_started || '').localeCompare(String(a.date_started || '')));
+
+  // How many actions across the user's scope point at a given hazard.
+  const responseCountFor = (hazardId) => actions.filter(
+    a => String(a.hazard_id || '') === String(hazardId) && a.status !== 'completed'
+  ).length;
+
+  // Response coverage: of the barangays currently carrying a hazard, how many
+  // also have at least one non-completed action logged against that hazard.
+  const hazardBarangays = [...new Set(
+    (activeHazardEvents || [])
+      .filter(ev => ev.barangay_id)
+      .map(ev => String(ev.barangay_id))
+  )];
+  const responseCoveredCount = hazardBarangays.filter(bid =>
+    actions.some(a => String(a.barangay_id) === bid && a.hazard_id && a.status !== 'completed')
+  ).length;
+
+  // Historical comparison for the open popup: the same calendar week one year ago
+  useEffect(() => {
+    if (!popupActionKey) { setHistSummary(null); return; }
+    let alive = true;
+    const nowDate = new Date();
+    const day = nowDate.getDay() === 0 ? 7 : nowDate.getDay();
+    const monday = new Date(nowDate); monday.setDate(nowDate.getDate() - (day - 1));
+    const startPrev = new Date(monday); startPrev.setDate(monday.getDate() - 7); startPrev.setFullYear(monday.getFullYear() - 1);
+    const endPrev = new Date(monday); endPrev.setFullYear(monday.getFullYear() - 1);
+    const f = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    setHistSummary(null);
+    axios.get(API_URL + '/api/weather/historical', { params: { barangay: popupActionKey, from: f(startPrev), to: f(endPrev) } })
+      .then(res => {
+        if (!alive) return;
+        const rows = (res.data && res.data.rows) || [];
+        let totalRain = 0, rainy = 0, maxRain = 0;
+        rows.forEach(r => {
+          if (r.precipitation_sum == null) return;
+          const v = Number(r.precipitation_sum);
+          totalRain += v;
+          if (v > 0) rainy++;
+          if (v > maxRain) maxRain = v;
+        });
+        if (rainy === 0) { setHistSummary({ text: '' }); return; }
+        setHistSummary({ text: `Same week last year in ${popupActionKey}: ${rainy} rainy day(s), ~${Math.round(totalRain)}mm · heaviest ${Math.round(maxRain)}mm` });
+      })
+      .catch(() => { if (alive) setHistSummary({ text: '' }); });
+    return () => { alive = false; };
+  }, [popupActionKey]);
+
+  const openManageActions = () => {
+    const popupId = popupActionKey
+      ? (Object.keys(barangayIdMap).find(id => barangayIdMap[id] === popupActionKey) || '')
+      : '';
+    setActionForm({
+      id: null, barangay_id: popupId, barangay_name: popupActionKey,
+      hazard_id: '',
+      action_type: ACTION_TYPES[0],
+      description: '', target_disease: '', date_started: '', date_ended: '', status: 'planned',
+    });
+    setManageActionsOpen(true);
+  };
+
+  const saveAction = async () => {
+    setActionsSaving(true);
+    const payload = {
+      barangay_id: actionForm.barangay_id || null,
+      hazard_id: actionForm.hazard_id || null,
+      action_type: actionForm.action_type,
+      description: actionForm.description,
+      target_disease: actionForm.target_disease,
+      date_started: actionForm.date_started || null,
+      date_ended: actionForm.date_ended || null,
+      status: actionForm.status,
+    };
+    try {
+      if (actionForm.id) {
+        await axios.put(API_URL + '/api/barangay-actions/' + actionForm.id, payload);
+        notify(t('Barangay action updated.'), 'success');
+      } else {
+        await axios.post(API_URL + '/api/barangay-actions', payload);
+        notify(t('Barangay action added.'), 'success');
+      }
+      const res = await axios.get(API_URL + '/api/barangay-actions');
+      setActions(Array.isArray(res.data) ? res.data : []);
+      setManageActionsOpen(false);
+    } catch (err) {
+      notify(err.response?.data?.error || t('Failed to save action.'), 'error');
+    } finally {
+      setActionsSaving(false);
+    }
+  };
+
+  const editAction = (a) => {
+    setActionForm({
+      id: a.id,
+      barangay_id: a.barangay_id || '',
+      barangay_name: a.barangay_name || '',
+      hazard_id: a.hazard_id || '',
+      action_type: a.action_type,
+      description: a.description || '',
+      target_disease: a.target_disease || '',
+      date_started: a.date_started || '',
+      date_ended: a.date_ended || '',
+      status: a.status || 'planned',
+    });
+  };
+
+  const deleteAction = async (id) => {
+    if (!window.confirm(t('Delete this barangay action?'))) return;
+    try {
+      await axios.delete(API_URL + '/api/barangay-actions/' + id);
+      notify(t('Barangay action deleted.'), 'success');
+      const res = await axios.get(API_URL + '/api/barangay-actions');
+      setActions(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      notify(err.response?.data?.error || t('Failed to delete action.'), 'error');
+    }
+  };
+
+  const openManageHazards = () => {
+    const popupId = popupActionKey
+      ? (Object.keys(barangayIdMap).find(id => barangayIdMap[id] === popupActionKey) || '')
+      : '';
+    setHazardForm({
+      id: null, barangay_id: popupId, barangay_name: popupActionKey,
+      event_type: DISASTER_EVENT_TYPES[0], severity: DISASTER_SEVERITIES[1],
+      purok: '', latitude: '', longitude: '', date_started: '', date_ended: '', notes: '',
+    });
+    setManageHazardsOpen(true);
+  };
+
+  const saveHazard = async () => {
+    if (!hazardForm.date_started) { notify(t('Start date is required.'), 'error'); return; }
+    setHazardsSaving(true);
+    const payload = {
+      barangay_id: hazardForm.barangay_id || null,
+      event_type: hazardForm.event_type,
+      severity: hazardForm.severity,
+      purok: hazardForm.purok,
+      latitude: hazardForm.latitude ? parseFloat(hazardForm.latitude) : null,
+      longitude: hazardForm.longitude ? parseFloat(hazardForm.longitude) : null,
+      date_started: hazardForm.date_started,
+      date_ended: hazardForm.date_ended || null,
+      notes: hazardForm.notes,
+    };
+    try {
+      if (hazardForm.id) {
+        await axios.put(API_URL + '/api/disaster-events/' + hazardForm.id, payload);
+        notify(t('Hazard pin updated.'), 'success');
+      } else {
+        await axios.post(API_URL + '/api/disaster-events', payload);
+        notify(t('Hazard pin added.'), 'success');
+      }
+      const res = await axios.get(API_URL + '/api/disaster-events');
+      setDisasterEvents(Array.isArray(res.data) ? res.data : []);
+      setManageHazardsOpen(false);
+    } catch (err) {
+      notify(err.response?.data?.error || t('Failed to save hazard pin.'), 'error');
+    } finally {
+      setHazardsSaving(false);
+    }
+  };
+
+  const deleteHazard = async (id) => {
+    if (!window.confirm(t('Delete this hazard pin?'))) return;
+    try {
+      await axios.delete(API_URL + '/api/disaster-events/' + id);
+      notify(t('Hazard pin deleted.'), 'success');
+      const res = await axios.get(API_URL + '/api/disaster-events');
+      setDisasterEvents(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      notify(err.response?.data?.error || t('Failed to delete hazard pin.'), 'error');
+    }
+  };
+
   return (
     <div className="cdms-map-wrap" style={{ display: 'flex', height: compactMode ? 'calc(100vh - 56px)' : 'calc(100vh - 70px)' }}>
 
@@ -1528,13 +1960,42 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           {t('Filters')}
         </p>
 
+        {/* ─── PAGASA ADVISORY STRIP (Cabuyao = Southern Luzon / SLPRSD) ─── */}
+        {pagasa && (
+          <div style={{
+            background: 'var(--input-bg)', border: '1px solid var(--border-color)',
+            borderRadius: '10px', padding: '10px 12px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', flexWrap: 'wrap' }}>
+              <span style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text-main)' }}>🇵🇭 PAGASA · {pagasa.region}</span>
+              {pagasa.issued && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>· {pagasa.issued}</span>}
+            </div>
+            {pagasa.advisories && pagasa.advisories.length > 0 ? pagasa.advisories.map((a, i) => (
+              <div key={i} style={{
+                padding: '6px 10px', borderRadius: '8px', marginBottom: '6px',
+                background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.35)',
+                fontSize: '12px', color: 'var(--text-main)', lineHeight: 1.4,
+              }}>
+                ⚠️ {a}
+              </div>
+            )) : (
+              <div style={{ padding: '6px 10px', borderRadius: '8px', background: 'var(--bg-surface)', fontSize: '12px', color: 'var(--text-muted)' }}>
+                {t('No active PAGASA advisory for Southern Luzon')}
+              </div>
+            )}
+            <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>
+              {WEATHER_ATTRIBUTION} · auto-refresh 30s
+            </div>
+          </div>
+        )}
+
         {/* ─── FILTER LAYER: AREA ─── */}
         <p style={sectionHeaderStyle}>{t('Filter by Area')}</p>
 
         {/* Barangay - all 18 hardcoded (hidden for BHW) */}
         {loginRole !== 'BHW' && (
           <div>
-            <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>{t('Barangay')}</label>
+            <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-main)', marginBottom: '6px', fontWeight: '600' }}>{t('Barangay')}</label>
             <div style={{ position: 'relative' }} ref={barangayRef}>
               <button
                 onClick={() => setBarangayOpen(!barangayOpen)}
@@ -1610,7 +2071,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         {/* BHW - static barangay display */}
         {loginRole === 'BHW' && loginBarangay && (
           <div>
-            <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>{t('Barangay')}</label>
+            <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-main)', marginBottom: '6px', fontWeight: '600' }}>{t('Barangay')}</label>
             <div style={{ padding: '9px 12px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '7px', color: 'var(--text-main)', fontSize: '15px' }}>
               {loginBarangay}
             </div>
@@ -1619,7 +2080,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
 
         {/* Purok / Blk / Phase */}
         <div>
-          <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>{t('Purok / Blk / Phase')}</label>
+          <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-main)', marginBottom: '6px', fontWeight: '600' }}>{t('Purok / Blk / Phase')}</label>
           <div style={{ position: 'relative' }} ref={purokRef}>
             <button
               onClick={() => setPurokOpen(!purokOpen)}
@@ -1677,7 +2138,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
 
         {/* Disease */}
         <div>
-          <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>{t('Disease')}</label>
+          <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-main)', marginBottom: '6px', fontWeight: '600' }}>{t('Disease')}</label>
           <div style={{ position: 'relative' }} ref={diseaseRef}>
             <button type="button" onClick={() => setDiseaseOpen(!diseaseOpen)}
               style={{ ...SEL, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' }}>
@@ -1705,7 +2166,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
 
         {/* Status */}
         <div>
-          <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>{t('Status')}</label>
+          <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-main)', marginBottom: '6px', fontWeight: '600' }}>{t('Status')}</label>
           <div style={{ position: 'relative' }} ref={statusRef}>
             <button type="button" onClick={() => setStatusOpen(!statusOpen)}
               style={{ ...SEL, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' }}>
@@ -1733,7 +2194,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
 
         {/* Case Type */}
         <div>
-          <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>{t('Case Type')}</label>
+          <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-main)', marginBottom: '6px', fontWeight: '600' }}>{t('Case Type')}</label>
           <div style={{ position: 'relative' }} ref={caseTypeRef}>
             <button type="button" onClick={() => setCaseTypeOpen(!caseTypeOpen)}
               style={{ ...SEL, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' }}>
@@ -1793,13 +2254,13 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         <div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>{t('From')}</label>
+              <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-main)', marginBottom: '6px', fontWeight: '600' }}>{t('From')}</label>
               <DatePicker value={filterDateFrom} dateFormat={dateFormat} placeholder={t('Start date')} clearable={true}
                 onChange={v => { setFilterDateFrom(v); setFilterYear(''); }}
                 style={{ width: '100%' }} />
             </div>
             <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>{t('To')}</label>
+              <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-main)', marginBottom: '6px', fontWeight: '600' }}>{t('To')}</label>
               <DatePicker value={filterDateTo} dateFormat={dateFormat} placeholder={t('End date')} clearable={true} anchorRight={true}
                 onChange={v => { setFilterDateTo(v); setFilterYear(''); }}
                 style={{ width: '100%' }} />
@@ -1809,7 +2270,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
 
         {/* Severity - includes Asymptomatic */}
         <div>
-          <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>{t('Severity')}</label>
+          <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-main)', marginBottom: '6px', fontWeight: '600' }}>{t('Severity')}</label>
           <div style={{ position: 'relative' }} ref={severityRef}>
             <button type="button" onClick={() => setSeverityOpen(!severityOpen)}
               style={{ ...SEL, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' }}>
@@ -1924,6 +2385,34 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           </p>
         </div>
 
+        {/* Hazard Response Coverage - are we answering the hazards we logged? */}
+        <div style={{ paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
+          <p style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('Hazard Response')}</p>
+          {hazardBarangays.length === 0 ? (
+            <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>{t('No active hazard pins in this scope.')}</p>
+          ) : (
+            <>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '6px' }}>
+                <span style={{ fontSize: '22px', fontWeight: '800', color: 'var(--text-main)' }}>{responseCoveredCount}</span>
+                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{t('of')}{` ${hazardBarangays.length} ${t('affected barangays')}`}</span>
+              </div>
+              <div style={{ height: '7px', background: 'var(--input-bg)', borderRadius: '4px', overflow: 'hidden', marginBottom: '8px' }}>
+                <div style={{
+                  width: `${hazardBarangays.length ? Math.round((responseCoveredCount / hazardBarangays.length) * 100) : 0}%`,
+                  height: '100%',
+                  background: responseCoveredCount === hazardBarangays.length ? '#10b981' : responseCoveredCount > 0 ? '#f59e0b' : '#dc2626',
+                  borderRadius: '4px',
+                }} />
+              </div>
+              <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                {responseCoveredCount === 0
+                  ? t('Affected barangays with no response logged yet.')
+                  : t('Affected barangays with at least one active response logged.')}
+              </p>
+            </>
+          )}
+        </div>
+
         <button
           onClick={() => { setAutoDetectedBrgy(null); setFilterBarangay('All Barangays'); setFilterStatus('All Status'); setFilterCaseType('All Case Types'); setFilterDateFrom(`${currentYear}-01-01`); setFilterDateTo(`${currentYear}-12-31`); setFilterYear(String(currentYear)); setFilterSeverity('All Severities'); setFilterDisease('All Diseases'); setFilterPurok('All Puroks'); }}
           style={{ padding: '11px', background: '#DC2626', color: 'white', border: 'none', borderRadius: '7px', cursor: 'pointer', fontWeight: '600', fontSize: '15px', marginTop: 'auto' }}>
@@ -2018,6 +2507,9 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
             <AreaPins key="area-pins" groups={purokData} barangay={pinnedBarangay} onHover={setTooltip} onLeave={() => setTooltip(null)} onClick={setPopup} />
           )}
           {mapZoom < 17 && <BarangayPins key="barangay-pins" barangayData={barangayData} onHover={setTooltip} onLeave={() => setTooltip(null)} onClick={setPopup} loginRole={loginRole} />}
+          {showActionsLayer && <LayerBadgeMarkers key="layer-actions" items={actionBadgeItems} />}
+          {showDisasterLayer && mapZoom < 17 && <LayerBadgeMarkers key="layer-hazards-badges" items={hazardBadgeItems} />}
+          {showDisasterLayer && mapZoom >= 17 && <LayerBadgeMarkers key="layer-hazards-pins" items={hazardPinItems} />}
           <GeoJSON
               key="brgy-geojson"
               ref={geoJsonLayerRef}
@@ -2063,6 +2555,44 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               }}
             />
         </MapContainer>
+
+        {/* F + H LAYER TOGGLES */}
+        <div style={{
+          position: 'absolute', bottom: '64px', left: '16px', zIndex: 1000,
+          display: 'flex', gap: '4px', padding: '4px',
+          background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
+          borderRadius: '10px', boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
+        }}>
+          <button onClick={() => setShowActionsLayer(!showActionsLayer)}
+            style={{
+              padding: '6px 14px', border: 'none', borderRadius: '7px', cursor: 'pointer',
+              fontSize: '13px', fontWeight: '700',
+              background: showActionsLayer ? '#0891b2' : 'transparent',
+              color: showActionsLayer ? '#fff' : 'var(--text-muted)',
+            }}>
+            🗂 {t('Actions')}
+          </button>
+          <button onClick={() => setShowDisasterLayer(!showDisasterLayer)}
+            style={{
+              padding: '6px 14px', border: 'none', borderRadius: '7px', cursor: 'pointer',
+              fontSize: '13px', fontWeight: '700',
+              background: showDisasterLayer ? '#2563eb' : 'transparent',
+              color: showDisasterLayer ? '#fff' : 'var(--text-muted)',
+            }}>
+            🌦 {t('Hazards')}
+          </button>
+        </div>
+
+        {/* Weather attribution (Open-Meteo, CC BY 4.0) when the hazard layer is on */}
+        {showDisasterLayer && (
+          <div style={{
+            position: 'absolute', bottom: '118px', left: '16px', zIndex: 1000,
+            fontSize: '10px', color: 'var(--text-muted)', background: 'var(--bg-surface)',
+            border: '1px solid var(--border-color)', borderRadius: '6px', padding: '2px 8px',
+          }}>
+            {WEATHER_ATTRIBUTION}
+          </div>
+        )}
 
         {/* SD / HD BASE LAYER TOGGLE */}
         <div style={{
@@ -2240,8 +2770,480 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                   );
                 })}
 
+              <EpiPanel cases={popup.cases} t={t} />
+
+              {popupActionsList.length > 0 && (
+                <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
+                  <p style={{ margin: '0 0 10px 0', fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {t('Barangay Actions')}
+                  </p>
+                  {popupActionsList.map(a => (
+                    <div key={a.id} style={{
+                      display: 'flex', alignItems: 'center', gap: '9px',
+                      padding: '9px 12px', marginBottom: '7px', borderRadius: '8px',
+                      background: 'var(--input-bg)', borderLeft: '3px solid #0891b2',
+                    }}>
+                      <span style={{ fontSize: '17px', flexShrink: 0 }}>{ACTION_TYPE_ICONS[a.action_type] || '📋'}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-main)' }}>
+                          {t(a.action_type)}{a.target_disease ? ` · ${a.target_disease}` : ''}
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                          {a.description || ''}{a.date_started ? ` · from ${a.date_started}` : ''}
+                        </div>
+                        {a.hazard_type && (
+                          <div style={{ fontSize: '12px', color: 'var(--text-main)', opacity: 0.85, marginTop: '2px' }}>
+                            ↳ {t('Responding to')} {hazardIcon(a.hazard_type)} {t(a.hazard_type)}
+                          </div>
+                        )}
+                      </div>
+                      <span style={{
+                        flexShrink: 0, fontSize: '11px', fontWeight: '700', padding: '3px 8px', borderRadius: '10px',
+                        background: a.status === 'completed' ? 'rgba(16,185,129,0.15)' : a.status === 'ongoing' ? 'rgba(8,145,178,0.15)' : 'rgba(245,158,11,0.15)',
+                        color: a.status === 'completed' ? '#10b981' : a.status === 'ongoing' ? '#0891b2' : '#d97706',
+                        textTransform: 'capitalize',
+                      }}>
+                        {t(a.status)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {popupWeather && popupWeather.hazards.length > 0 && (
+                <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
+                  <p style={{ margin: '0 0 10px 0', fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    🌦 {t('Weather & Hazards')}
+                  </p>
+                  {popupWeather.hazards.map(hz => {
+                    const dis = hazardDiseases(hz);
+                    return (
+                      <div key={hz} style={{
+                        display: 'flex', alignItems: 'center', gap: '9px',
+                        padding: '9px 12px', marginBottom: '7px', borderRadius: '8px',
+                        background: 'var(--input-bg)', borderLeft: `3px solid ${hazardColor(hz)}`,
+                      }}>
+                        <span style={{ fontSize: '17px', flexShrink: 0 }}>{hazardIcon(hz)}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-main)' }}>{hz}</div>
+                          {dis.length > 0 && (
+                            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                              {t('Possible diseases')}: {dis.join(', ')}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', paddingLeft: '4px' }}>
+                    {popupWeather.temperature != null ? `${popupWeather.temperature}°C` : ''}
+                    {popupWeather.temperature != null && popupWeather.precipitation != null ? ' · ' : ''}
+                    {popupWeather.precipitation != null ? `${popupWeather.precipitation} mm rain` : ''}
+                    {popupWeather.temperature != null || popupWeather.precipitation != null ? ' · ' : ''}{WEATHER_ATTRIBUTION}
+                  </div>
+                </div>
+              )}
+
+              {popupManualEvents.length > 0 && (
+                <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
+                  <p style={{ margin: '0 0 10px 0', fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {t('Active Hazard Pins')}
+                  </p>
+                  {popupManualEvents.map(ev => {
+                    const responding = responseCountFor(ev.id);
+                    return (
+                    <div key={ev.id} style={{
+                      display: 'flex', alignItems: 'center', gap: '9px',
+                      padding: '9px 12px', marginBottom: '7px', borderRadius: '8px',
+                      background: 'var(--input-bg)', borderLeft: `3px solid ${hazardColor(ev.event_type)}`,
+                    }}>
+                      <span style={{ fontSize: '17px', flexShrink: 0 }}>{hazardIcon(ev.event_type)}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-main)' }}>
+                          {ev.event_type}{ev.purok ? ` · ${ev.purok}` : ''}
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                          {ev.severity} · {t('since')} {ev.date_started}{ev.date_ended ? ` · ${t('until')} ${ev.date_ended}` : ''}{ev.notes ? ` · ${ev.notes}` : ''}
+                        </div>
+                        <div style={{ fontSize: '12px', marginTop: '3px', color: responding > 0 ? '#10b981' : '#d97706', fontWeight: '600' }}>
+                          {responding > 0
+                            ? `✓ ${responding} ${t('action')}${responding === 1 ? '' : 's'} ${t('responding')}`
+                            : `⚠ ${t('No response logged yet')}`}
+                        </div>
+                      </div>
+                    </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {histSummary && histSummary.text && (
+                <div style={{ marginTop: '8px', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', color: 'var(--text-muted)', background: 'var(--input-bg)' }}>
+                  📊 {histSummary.text}
+                </div>
+              )}
+
+              {!popupWeather && popupManualEvents.length === 0 && (popupWxRaw || weatherOffline) && (
+                <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--border-color)', fontSize: '12px', color: 'var(--text-muted)' }}>
+                  {popupWxRaw && popupWxRaw.error === 'offline'
+                    ? `🌦 ${WEATHER_ATTRIBUTION} — ${t('offline')}`
+                    : `☁️ ${t('No active weather hazard')} · ${WEATHER_ATTRIBUTION}`}
+                </div>
+              )}
+
               <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--border-color)', fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center' }}>
                 {t('Click "Go To →" to open Manage Cases filtered to that disease and barangay')}
+              </div>
+              {loginRole === 'CHO' && (
+                <button onClick={openManageActions}
+                  style={{
+                    marginTop: '12px', width: '100%', padding: '9px 14px', borderRadius: '8px',
+                    background: '#0891b2', color: 'white', border: 'none', cursor: 'pointer',
+                    fontSize: '14px', fontWeight: '700',
+                  }}>
+                  🗂 {t('Manage Barangay Actions')}
+                </button>
+              )}
+              {loginRole === 'CHO' && (
+                <button onClick={openManageHazards}
+                  style={{
+                    marginTop: '8px', width: '100%', padding: '9px 14px', borderRadius: '8px',
+                    background: '#2563eb', color: 'white', border: 'none', cursor: 'pointer',
+                    fontSize: '14px', fontWeight: '700',
+                  }}>
+                  🌦 {t('Manage Hazard Pins')}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── MANAGE BARANGAY ACTIONS MODAL (CHO) ── */}
+        {manageActionsOpen && loginRole === 'CHO' && (
+          <div style={{
+            position: 'fixed', inset: 0, zIndex: 3000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.55)', padding: '20px',
+          }} onClick={() => setManageActionsOpen(false)}>
+            <div style={{
+              background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '14px',
+              padding: '24px', width: '520px', maxWidth: '95vw', maxHeight: '85vh', overflowY: 'auto',
+              boxShadow: '0 24px 60px rgba(0,0,0,0.3)',
+            }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--text-main)' }}>🗂 {t('Barangay Actions')}</h3>
+                <button onClick={() => setManageActionsOpen(false)}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '24px', lineHeight: 1, padding: 0 }}>
+                  ×
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                  {t('Barangay')}
+                  <select
+                    value={actionForm.barangay_id}
+                    onChange={e => setActionForm({ ...actionForm, barangay_id: e.target.value, barangay_name: barangayIdMap[e.target.value] || '' })}
+                    style={{ padding: '8px 10px', borderRadius: '7px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '14px' }}>
+                    <option value="">{t('Citywide')}</option>
+                    {Object.entries(barangayIdMap)
+                      .filter(([_, name]) => {
+                        if (actionScopeKeys.size === 0) return true;
+                        return actionScopeKeys.has(wxKey(name));
+                      })
+                      .map(([id, name]) => (
+                        <option key={id} value={id}>{name}</option>
+                      ))}
+                  </select>
+                </label>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                  {t('Action Type')}
+                  <select
+                    value={actionForm.action_type}
+                    onChange={e => setActionForm({ ...actionForm, action_type: e.target.value })}
+                    style={{ padding: '8px 10px', borderRadius: '7px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '14px' }}>
+                    {ACTION_TYPES.map(x => <option key={x} value={x}>{x}</option>)}
+                  </select>
+                </label>
+              </div>
+
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '10px' }}>
+                {t('Responding to hazard')} ({t('optional')})
+                <select
+                  value={actionForm.hazard_id || ''}
+                  onChange={e => setActionForm({ ...actionForm, hazard_id: e.target.value })}
+                  style={{ padding: '8px 10px', borderRadius: '7px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '14px' }}>
+                  <option value="">{t('None - proactive action')}</option>
+                  {actionHazardOptions.map(ev => (
+                    <option key={ev.id} value={ev.id}>
+                      {`${hazardIcon(ev.event_type)} ${ev.event_type} · ${ev.severity}${ev.date_started ? ` · ${ev.date_started}` : ''}`}
+                    </option>
+                  ))}
+                </select>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '400' }}>
+                  {actionHazardOptions.length === 0
+                    ? t('No active hazard pins to link yet - log one under Manage Hazard Pins.')
+                    : t('Links this action to the hazard it responds to.')}
+                </span>
+              </label>
+
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '10px' }}>
+                {t('Target Disease')} ({t('optional')})
+                <input
+                  value={actionForm.target_disease}
+                  onChange={e => setActionForm({ ...actionForm, target_disease: e.target.value })}
+                  placeholder={t('e.g. Dengue')}
+                  style={{ padding: '8px 10px', borderRadius: '7px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '14px' }}
+                />
+              </label>
+
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '10px' }}>
+                {t('Description')}
+                <textarea
+                  value={actionForm.description}
+                  onChange={e => setActionForm({ ...actionForm, description: e.target.value })}
+                  rows={3}
+                  placeholder={t('e.g. Barangay-wide fogging, priority houses near stagnant water')}
+                  style={{ padding: '8px 10px', borderRadius: '7px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '14px', resize: 'vertical' }}
+                />
+              </label>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                  {t('Start date')}
+                  <DatePicker value={actionForm.date_started} onChange={v => setActionForm({ ...actionForm, date_started: v })} dateFormat={dateFormat} clearable />
+                </label>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                  {t('End date')}
+                  <DatePicker value={actionForm.date_ended} onChange={v => setActionForm({ ...actionForm, date_ended: v })} dateFormat={dateFormat} clearable />
+                </label>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                  {t('Status')}
+                  <select
+                    value={actionForm.status}
+                    onChange={e => setActionForm({ ...actionForm, status: e.target.value })}
+                    style={{ padding: '8px 10px', borderRadius: '7px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '14px' }}>
+                    {ACTION_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </label>
+              </div>
+
+              <button onClick={saveAction} disabled={actionsSaving}
+                style={{
+                  width: '100%', padding: '10px 14px', borderRadius: '8px',
+                  background: '#0891b2', color: 'white', border: 'none', cursor: 'pointer',
+                  fontSize: '15px', fontWeight: '700',
+                }}>
+                {actionsSaving ? t('Saving…') : actionForm.id ? t('Save Changes') : t('Save Barangay Action')}
+              </button>
+
+              {actionForm.id && (
+                <button onClick={() => setActionForm({ id: null, barangay_id: actionForm.barangay_id, barangay_name: actionForm.barangay_name, hazard_id: '', action_type: ACTION_TYPES[0], description: '', target_disease: '', date_started: '', date_ended: '', status: 'planned' })}
+                  style={{
+                    width: '100%', marginTop: '8px', padding: '9px 14px', borderRadius: '8px',
+                    background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-color)',
+                    cursor: 'pointer', fontSize: '14px', fontWeight: '600',
+                  }}>
+                  {t('Cancel Edit')}
+                </button>
+              )}
+
+              <div style={{ marginTop: '18px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
+                <p style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                  {t('Existing Actions')}
+                </p>
+                {actions.filter(a => a.barangay_name === (actionForm.barangay_name || null)).length === 0 && (
+                  <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>{t('No actions for this barangay yet.')}</p>
+                )}
+                {actions.filter(a => a.barangay_name === (actionForm.barangay_name || null)).map(a => (
+                  <div key={a.id} style={{
+                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px',
+                    marginBottom: '6px', borderRadius: '7px', background: 'var(--input-bg)',
+                    border: '1px solid var(--border-color)',
+                  }}>
+                    <span style={{ fontSize: '15px' }}>{ACTION_TYPE_ICONS[a.action_type] || '📋'}</span>
+                    <span style={{ flex: 1, fontSize: '13px', color: 'var(--text-main)' }}>
+                      {t(a.action_type)} · <span style={{ textTransform: 'capitalize' }}>{t(a.status)}</span>
+                      {a.hazard_type && (
+                        <span style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)' }}>
+                          ↳ {t('Responding to')} {hazardIcon(a.hazard_type)} {t(a.hazard_type)}
+                        </span>
+                      )}
+                    </span>
+                    <button onClick={() => editAction(a)}
+                      style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: '#0891b2', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>
+                      {t('Edit')}
+                    </button>
+                    <button onClick={() => deleteAction(a.id)}
+                      style={{ background: 'rgba(220,38,38,0.1)', border: 'none', color: '#dc2626', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>
+                      {t('Delete')}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── MANAGE HAZARD PINS MODAL (CHO) ── */}
+        {manageHazardsOpen && loginRole === 'CHO' && (
+          <div style={{
+            position: 'fixed', inset: 0, zIndex: 3000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.55)', padding: '20px',
+          }} onClick={() => setManageHazardsOpen(false)}>
+            <div style={{
+              background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '14px',
+              padding: '24px', width: '560px', maxWidth: '95vw', maxHeight: '85vh', overflowY: 'auto',
+              boxShadow: '0 24px 60px rgba(0,0,0,0.3)',
+            }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--text-main)' }}>🌦 {t('Manage Hazard Pins')}</h3>
+                <button onClick={() => setManageHazardsOpen(false)}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '24px', lineHeight: 1, padding: 0 }}>
+                  ×
+                </button>
+              </div>
+
+              <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                {t('Weather hazards (rain, thunderstorm, heat) update automatically from Open-Meteo.')}
+                <br />
+                {t('Add pins here for on-the-ground hazards weather can not detect, like a fire or flood phase in a purok.')}
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                  {t('Barangay')}
+                  <select
+                    value={hazardForm.barangay_id}
+                    onChange={e => setHazardForm({ ...hazardForm, barangay_id: e.target.value, barangay_name: barangayIdMap[e.target.value] || '' })}
+                    style={{ padding: '8px 10px', borderRadius: '7px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '14px' }}>
+                    <option value="">—</option>
+{Object.entries(barangayIdMap)
+                      .filter(([_, name]) => {
+                        if (actionScopeKeys.size === 0) return true;
+                        return actionScopeKeys.has(wxKey(name));
+                      })
+                      .map(([id, name]) => (
+                        <option key={id} value={id}>{name}</option>
+                      ))}
+                  </select>
+                </label>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                  {t('Hazard Type')}
+                  <select
+                    value={hazardForm.event_type}
+                    onChange={e => setHazardForm({ ...hazardForm, event_type: e.target.value })}
+                    style={{ padding: '8px 10px', borderRadius: '7px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '14px' }}>
+                    {DISASTER_EVENT_TYPES.map(x => <option key={x} value={x}>{hazardIcon(x)} {x}</option>)}
+                  </select>
+                </label>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                  {t('Severity')}
+                  <select
+                    value={hazardForm.severity}
+                    onChange={e => setHazardForm({ ...hazardForm, severity: e.target.value })}
+                    style={{ padding: '8px 10px', borderRadius: '7px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '14px' }}>
+                    {DISASTER_SEVERITIES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </label>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                  {t('Purok')} ({t('optional')})
+                  <input
+                    value={hazardForm.purok}
+                    onChange={e => setHazardForm({ ...hazardForm, purok: e.target.value })}
+                    placeholder={t('e.g. Purok 3')}
+                    style={{ padding: '8px 10px', borderRadius: '7px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '14px' }}
+                  />
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'row', gap: '6px' }}>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600', flex: 1 }}>
+                    <span>Lat ({t('optional')})</span>
+                    <input
+                      value={hazardForm.latitude}
+                      onChange={e => setHazardForm({ ...hazardForm, latitude: e.target.value })}
+                      placeholder="14.xxx"
+                      style={{ padding: '8px 10px', borderRadius: '7px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '14px', width: '100%', boxSizing: 'border-box' }}
+                    />
+                  </label>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600', flex: 1 }}>
+                    <span>Lng ({t('optional')})</span>
+                    <input
+                      value={hazardForm.longitude}
+                      onChange={e => setHazardForm({ ...hazardForm, longitude: e.target.value })}
+                      placeholder="121.xxx"
+                      style={{ padding: '8px 10px', borderRadius: '7px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '14px', width: '100%', boxSizing: 'border-box' }}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                  {t('Start date')}
+                  <DatePicker value={hazardForm.date_started} onChange={v => setHazardForm({ ...hazardForm, date_started: v })} dateFormat={dateFormat} clearable />
+                </label>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                  {t('End date')}
+                  <DatePicker value={hazardForm.date_ended} onChange={v => setHazardForm({ ...hazardForm, date_ended: v })} dateFormat={dateFormat} clearable />
+                </label>
+              </div>
+
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '12px' }}>
+                {t('Notes')} ({t('optional')})
+                <textarea
+                  value={hazardForm.notes}
+                  onChange={e => setHazardForm({ ...hazardForm, notes: e.target.value })}
+                  rows={2}
+                  placeholder={t('e.g. Phase 2 flood near the riverbank')}
+                  style={{ padding: '8px 10px', borderRadius: '7px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '14px', resize: 'vertical' }}
+                />
+              </label>
+
+              <button onClick={saveHazard} disabled={hazardsSaving}
+                style={{
+                  width: '100%', padding: '10px 14px', borderRadius: '8px',
+                  background: '#2563eb', color: 'white', border: 'none', cursor: 'pointer',
+                  fontSize: '15px', fontWeight: '700',
+                }}>
+                {hazardsSaving ? t('Saving…') : hazardForm.id ? t('Save Hazard Pin') : t('Add Hazard Pin')}
+              </button>
+
+              <div style={{ marginTop: '18px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
+                <p style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                  {t('Active Hazard Pins')}
+                </p>
+                {disasterEvents.filter(e => e.barangay_name === (hazardForm.barangay_name || '')).filter(isDisasterActive).length === 0 && (
+                  <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>{t('No hazard pins for this barangay yet.')}</p>
+                )}
+                {disasterEvents.filter(e => e.barangay_name === (hazardForm.barangay_name || '')).filter(isDisasterActive).map(ev => (
+                  <div key={ev.id} style={{
+                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px',
+                    marginBottom: '6px', borderRadius: '7px', background: 'var(--input-bg)',
+                    border: '1px solid var(--border-color)',
+                  }}>
+                    <span style={{ fontSize: '15px' }}>{hazardIcon(ev.event_type)}</span>
+                    <span style={{ flex: 1, fontSize: '13px', color: 'var(--text-main)' }}>
+                      {ev.event_type}{ev.purok ? ` · ${ev.purok}` : ''} · <span style={{ textTransform: 'capitalize' }}>{ev.severity.toLowerCase()}</span>
+                    </span>
+                    <button onClick={() => setHazardForm({
+                      id: ev.id, barangay_id: String(ev.barangay_id || ''), barangay_name: ev.barangay_name,
+                      event_type: ev.event_type, severity: ev.severity, purok: ev.purok || '',
+                      latitude: ev.latitude != null ? String(ev.latitude) : '', longitude: ev.longitude != null ? String(ev.longitude) : '',
+                      date_started: ev.date_started || '', date_ended: ev.date_ended || '', notes: ev.notes || '',
+                    })}
+                      style={{ background: 'rgba(8,145,178,0.1)', border: 'none', color: '#0891b2', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>
+                      {t('Edit')}
+                    </button>
+                    <button onClick={() => deleteHazard(ev.id)}
+                      style={{ background: 'rgba(220,38,38,0.1)', border: 'none', color: '#dc2626', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>
+                      {t('Delete')}
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

@@ -496,6 +496,26 @@ db.query("SHOW COLUMNS FROM disease_cases LIKE 'vaccination_status'", (err, rows
     }
 });
 
+// Migration: report management columns (intervention + action plan) on disease_cases
+db.query("SHOW COLUMNS FROM disease_cases LIKE 'intervention'", (err, rows) => {
+    if (!err && rows.length === 0) {
+        db.query("ALTER TABLE disease_cases ADD COLUMN intervention TEXT NULL, ADD COLUMN action_plan TEXT NULL", (alterErr) => {
+            if (alterErr) console.error('Migration error adding intervention/action_plan columns:', alterErr.message);
+            else console.log('Migration: added intervention/action_plan columns to disease_cases table');
+        });
+    }
+});
+
+// Migration: pending add requests carry the same report-management columns so approval prefill + insert stay in sync
+db.query("SHOW COLUMNS FROM case_add_requests LIKE 'intervention'", (err, rows) => {
+    if (!err && rows.length === 0) {
+        db.query("ALTER TABLE case_add_requests ADD COLUMN intervention TEXT NULL, ADD COLUMN action_plan TEXT NULL", (alterErr) => {
+            if (alterErr) console.error('Migration error adding intervention/action_plan columns to case_add_requests:', alterErr.message);
+            else console.log('Migration: added intervention/action_plan columns to case_add_requests table');
+        });
+    }
+});
+
 // -- Read-path index migration (Phase 9): speed up the heaviest filtered queries
 // Self-migrates at boot: any listed index that is missing gets created exactly once.
 const REQUIRED_INDEXES = [
@@ -1555,12 +1575,18 @@ app.get('/api/disease_cases', (req, res) => {
             dc.is_archived,
             dc.vaccination_status,
             dc.vaccine_expiry_date,
+            dc.intervention,
+            dc.action_plan,
             d.name AS disease_name, 
             b.name AS barangay_name,
-            dc.barangay_id
+            dc.barangay_id,
+            dc.created_by,
+            u.full_name AS created_by_name,
+            u.role AS created_by_role
         FROM disease_cases dc
         LEFT JOIN diseases d ON dc.disease_id = d.id
         LEFT JOIN barangays b ON dc.barangay_id = b.id
+        LEFT JOIN users u ON u.user_id = dc.created_by
         WHERE (dc.status != 'Draft' OR dc.created_by = ?)${archiveFilter}
         ORDER BY dc.case_id DESC`;
     db.query(baseSql + paging, [requesterId], (err, results) => {
@@ -2041,6 +2067,7 @@ app.post('/api/cases', authenticate, (req, res) => {
         status, contact, onset_date, address, barangay_id,
         symptoms, physician, latitude, longitude, case_type,
         disease_type, vaccination_status, vaccine_expiry_date,
+        intervention, action_plan,
     } = req.body;
 
     console.log("--- Add Case ---", { patient_name, disease_name, barangay_id });
@@ -2155,15 +2182,16 @@ function proceedToCheck() {
                 INSERT INTO disease_cases 
                 (patient_name, disease_id, age, severity, case_type, disease_type, gender, status, contact, 
                  onset_date, address, barangay_id, symptoms, physician, latitude, longitude, date_reported, created_by,
-                 vaccination_status, vaccine_expiry_date)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, NOW()), ?, ?, ?)
+                 vaccination_status, vaccine_expiry_date, intervention, action_plan)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, NOW()), ?, ?, ?, ?, ?)
             `;
             const vals = [
                 patient_name, dId, age || 0, severity, resolvedCaseType, resolvedDiseaseType, gender || 'Male',
                 status || 'Active', contact || null, onset_date || null, address || null,
                 barangay_id || null, symptoms || null, physician || null,
                 latitude || null, longitude || null, reportTs, (req.user && req.user.user_id) || req.body.user_id || null,
-                vaccination_status || null, vaccine_expiry_date || null
+                vaccination_status || null, vaccine_expiry_date || null,
+                intervention || null, action_plan || null
             ];
 
             t.q(insertQuery, vals, (insertErr, result) => {
@@ -2749,6 +2777,7 @@ app.post('/api/cases/request-add', authenticate, (req, res) => {
     onset_date, address, barangay_id, symptoms, physician, latitude, longitude,
     requested_by, requested_by_name, from_barangay_name, submitter_cho_unit, note,
     case_type, disease_type, vaccination_status, vaccine_expiry_date,
+    intervention, action_plan,
   } = req.body;
 
   if (!requested_by || !patient_name || !disease_name) {
@@ -2791,12 +2820,12 @@ app.post('/api/cases/request-add', authenticate, (req, res) => {
         `INSERT INTO case_add_requests
           (patient_name, disease_name, age, severity, case_type, disease_type, gender, case_status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude,
            requested_by, requested_by_name, from_barangay_name, target_cho_unit, note,
-           vaccination_status, vaccine_expiry_date)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           vaccination_status, vaccine_expiry_date, intervention, action_plan)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [patient_name, disease_name, age || 0, severity, resolvedCaseType, resolvedDiseaseType, gender || 'Male', case_status || 'Active', contact || null, onset_date || null, address || null,
           barangay_id || null, symptoms || null, physician || null, finalLat, finalLng,
           requested_by, requested_by_name || 'Unknown', from_barangay_name || null, targetChoUnit || null, note || null,
-          vaccination_status || null, vaccine_expiry_date || null],
+          vaccination_status || null, vaccine_expiry_date || null, intervention || null, action_plan || null],
         (err, result) => {
           if (err) {
             console.error('Add request insert error:', err.message);
@@ -2870,6 +2899,7 @@ app.put('/api/case-add-requests/:id/approve', authenticate, (req, res) => {
     patient_name, disease_name, age, severity, gender, case_status, contact,
     onset_date, address, barangay_id, symptoms, physician, latitude, longitude,
     case_type, disease_type, vaccination_status, vaccine_expiry_date,
+    intervention, action_plan,
   } = body;
 
   db.query('SELECT * FROM case_add_requests WHERE id = ? AND status = ?', [id, 'pending'], (qErr, rows) => {
@@ -2895,6 +2925,8 @@ app.put('/api/case-add-requests/:id/approve', authenticate, (req, res) => {
       disease_type: (disease_type !== undefined && disease_type !== null && String(disease_type).trim() !== '') ? String(disease_type).trim().slice(0, 100) : reqRow.disease_type,
       vaccination_status: vaccination_status || reqRow.vaccination_status || null,
       vaccine_expiry_date: vaccine_expiry_date || reqRow.vaccine_expiry_date || null,
+      intervention: (intervention !== undefined && intervention !== null && String(intervention).trim() !== '') ? String(intervention) : reqRow.intervention || null,
+      action_plan: (action_plan !== undefined && action_plan !== null && String(action_plan).trim() !== '') ? String(action_plan) : reqRow.action_plan || null,
     };
 
     // ── Server-side validation mirror (2.4) ──
@@ -2929,12 +2961,12 @@ app.put('/api/case-add-requests/:id/approve', authenticate, (req, res) => {
             withTransaction((t) => {
               t.q(
                 `INSERT INTO disease_cases
-                    (patient_name, disease_id, age, severity, case_type, disease_type, gender, status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude, created_by, vaccination_status, vaccine_expiry_date)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    (patient_name, disease_id, age, severity, case_type, disease_type, gender, status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude, created_by, vaccination_status, vaccine_expiry_date, intervention, action_plan)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [final.patient_name, finalId, final.age || 0, final.severity, final.case_type, final.disease_type || null, final.gender, final.case_status,
                   final.contact || null, final.onset_date || null, final.address || null, final.barangay_id,
                   final.symptoms || null, final.physician || null, lat, lng, reqRow.requested_by || null,
-                  final.vaccination_status, final.vaccine_expiry_date],
+                  final.vaccination_status, final.vaccine_expiry_date, final.intervention, final.action_plan],
               (insErr, insResult) => {
                 if (insErr) { t.rollback(); return console.error('Approve insert case error:', insErr.message); }
                 const newCaseId = insResult.insertId;
@@ -3258,6 +3290,7 @@ app.put('/api/cases/:id', authenticate, (req, res) => {
         status, contact, onset_date, address, barangay_id,
         symptoms, physician, latitude, longitude, case_type,
         disease_type, vaccination_status, vaccine_expiry_date,
+        intervention, action_plan,
     } = req.body;
 
     console.log("--- Update Case ---", { id, patient_name });
@@ -3287,7 +3320,8 @@ app.put('/api/cases/:id', authenticate, (req, res) => {
                     patient_name = ?, disease_id = ?, age = ?, severity = ?, case_type = ?, disease_type = ?, gender = ?,
                     status = ?, contact = ?, onset_date = ?, address = ?,
                     barangay_id = ?, symptoms = ?, physician = ?,
-                    latitude = ?, longitude = ?, vaccination_status = ?, vaccine_expiry_date = ?
+                    latitude = ?, longitude = ?, vaccination_status = ?, vaccine_expiry_date = ?,
+                    intervention = ?, action_plan = ?
                 WHERE case_id = ?
             `;
             const resolvedCaseType = ['Suspected', 'Probable', 'Confirmed'].includes(case_type)
@@ -3299,7 +3333,8 @@ app.put('/api/cases/:id', authenticate, (req, res) => {
                 status, contact || null, onset_date || null, address || null,
                 barangay_id || null, symptoms || null, physician || null,
                 latitude || null, longitude || null,
-                vaccination_status || null, vaccine_expiry_date || null, id
+                vaccination_status || null, vaccine_expiry_date || null,
+                intervention || null, action_plan || null, id
             ];
 
             withTransaction((t) => {
@@ -4597,12 +4632,12 @@ app.post('/api/sync', authenticate, (req, res) => {
                 `INSERT INTO case_add_requests
                   (patient_name, disease_name, age, severity, case_type, disease_type, gender, case_status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude,
                    requested_by, requested_by_name, from_barangay_name, target_cho_unit, note,
-                   vaccination_status, vaccine_expiry_date)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                   vaccination_status, vaccine_expiry_date, intervention, action_plan)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [p.patient_name, p.disease_name, p.age || 0, p.severity || 'Moderate', resolvedCaseType, resolvedDiseaseType, p.gender || 'Male', p.status || 'Active', p.contact || null, p.onset_date || null, p.address || null,
                   p.barangay_id || null, p.symptoms || null, p.physician || null, finalLat, finalLng,
                   p._offlineUserId || null, p._offlineUserName || 'Offline BHW', p.from_barangay_name || null, targetChoUnit || null, p.note || null,
-                  p.vaccination_status || null, p.vaccine_expiry_date || null],
+                  p.vaccination_status || null, p.vaccine_expiry_date || null, p.intervention || null, p.action_plan || null],
                 (err, result) => {
                   if (err) {
                     results.push({ type, error: 'Internal database error. Please try again.' });
@@ -6243,6 +6278,941 @@ app.post('/api/weekly-summary/run', authenticate, (req, res) => {
     );
     runWeeklySummary();
     return res.json({ message: 'Weekly summary run started. Notifications and emails will be sent to subscribed users.' });
+});
+
+// ═════════════════════════════════════════════════════════
+// EPIDEMIOLOGICAL ALERTS (Decision Support - server-side)
+// ═════════════════════════════════════════════════════════
+db.query(`CREATE TABLE IF NOT EXISTS epi_alerts (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  period_start DATE NOT NULL,
+  barangay_id INT NULL,
+  barangay_name VARCHAR(100),
+  disease_name VARCHAR(100) NOT NULL,
+  alert_type VARCHAR(30) NOT NULL,
+  alert_value INT NOT NULL,
+  detail TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_epi_alert (period_start, barangay_id, disease_name, alert_type)
+)`, (err) => {
+  if (err) console.error('Error creating epi_alerts table:', err.message);
+  else console.log('Epi alerts table created/verified');
+});
+
+const EPI_ALERT_MIN_CASES = 5;      // ≥5 cases of one disease in a barangay this week
+const EPI_ALERT_SURGE_RATIO = 1.5;  // ≥50% surge vs previous week
+const EPI_ALERT_SURGE_BASE = 3;     // previous week must have ≥3 cases to fire a surge alert
+const EPI_ALERT_MORTALITY_MIN = 2;  // ≥2 deaths of the same disease in a barangay this week
+
+function startOfWeekDate(d) {
+  const date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const day = (date.getDay() + 6) % 7; // Monday = 0
+  date.setDate(date.getDate() - day);
+  return date;
+}
+
+function isoDateFor(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function notifyEpiAlert(alert) {
+  const titles = {
+    count_threshold: 'Epidemiological Alert',
+    surge: 'Rapid Surge Alert',
+    mortality: 'Mortality Alert',
+  };
+  const title = titles[alert.alert_type] || 'Epidemiological Alert';
+  const html = `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#fff7ed;border-radius:12px">
+    <h2 style="color:#b91c1c;margin:0 0 8px 0">${title}</h2>
+    <p style="color:#475569;font-size:15px;line-height:1.5">${alert.detail}</p>
+    <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0" />
+    <p style="color:#94a3b8;font-size:12px">Cabuyao City Disease Monitoring System</p>
+  </div>`;
+  const insert = (uId, uEmail) => {
+    db.query(
+      'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
+      [uId, title, alert.detail, 'warning', 'ManageCases'],
+      (nErr) => { if (nErr) console.error('Epi alert notification insert failed:', nErr.message); }
+    );
+    if (uEmail) {
+      sendBrevoEmail(uEmail, title, html).catch(err => console.error('Epi alert email failed:', err.message));
+    }
+  };
+  // All active CHOs get the alert (decision support recipients)
+  db.query("SELECT user_id, email FROM users WHERE role = 'CHO' AND is_active = 1 AND is_archived = 0", (cErr, chos) => {
+    if (!cErr && chos) chos.forEach(u => insert(u.user_id, u.email));
+  });
+  // The barangay's assigned BHW also gets it (field follow-up)
+  if (alert.barangay_id) {
+    db.query("SELECT user_id, email FROM users WHERE assigned_barangay_id = ? AND role = 'BHW' AND is_active = 1 AND is_archived = 0", [alert.barangay_id], (bErr, bhws) => {
+      if (!bErr && bhws) bhws.forEach(u => insert(u.user_id, u.email));
+    });
+  }
+}
+
+
+
+function runEpiAlerts() {
+  const now = new Date();
+  const weekStart = startOfWeekDate(now);
+  const prevStart = new Date(weekStart.getTime() - 7 * 86400000);
+  const weekStartIso = isoDateFor(weekStart);
+  const nextWeekIso = isoDateFor(new Date(weekStart.getTime() + 7 * 86400000));
+  const prevStartIso = isoDateFor(prevStart);
+
+  const thisWeekQuery = `
+    SELECT b.id AS barangay_id, b.name AS barangay_name, d.name AS disease_name,
+           COUNT(*) AS cnt,
+           SUM(CASE WHEN dc.status = 'Deceased' THEN 1 ELSE 0 END) AS deaths
+    FROM disease_cases dc
+    JOIN barangays b ON dc.barangay_id = b.id
+    JOIN diseases d ON dc.disease_id = d.id
+    WHERE dc.is_archived = 0 AND dc.status != 'Draft'
+      AND dc.date_reported >= ? AND dc.date_reported < ?
+    GROUP BY b.id, b.name, d.name
+  `;
+  const prevWeekQuery = `
+    SELECT b.id AS barangay_id, d.name AS disease_name, COUNT(*) AS cnt
+    FROM disease_cases dc
+    JOIN barangays b ON dc.barangay_id = b.id
+    JOIN diseases d ON dc.disease_id = d.id
+    WHERE dc.is_archived = 0 AND dc.status != 'Draft'
+      AND dc.date_reported >= ? AND dc.date_reported < ?
+    GROUP BY b.id, d.name
+  `;
+
+  db.query(thisWeekQuery, [weekStartIso, nextWeekIso], (err, rows) => {
+    if (err) { console.error('Epi alerts this-week query error:', err.message); return; }
+    db.query(prevWeekQuery, [prevStartIso, weekStartIso], (pErr, prevRows) => {
+      if (pErr) { console.error('Epi alerts prev-week query error:', pErr.message); return; }
+      const prevMap = {};
+      (prevRows || []).forEach(r => { prevMap[`${r.barangay_id}|${r.disease_name}`] = r.cnt; });
+
+      const candidates = [];
+      (rows || []).forEach(r => {
+        const prevCnt = prevMap[`${r.barangay_id}|${r.disease_name}`] || 0;
+        if (r.cnt >= EPI_ALERT_MIN_CASES) {
+          candidates.push({
+            period_start: weekStartIso, barangay_id: r.barangay_id, barangay_name: r.barangay_name,
+            disease_name: r.disease_name, alert_type: 'count_threshold', alert_value: r.cnt,
+            detail: `${r.cnt} cases of ${r.disease_name} reported in Barangay ${r.barangay_name} this week (threshold: ${EPI_ALERT_MIN_CASES}+).`,
+          });
+        }
+        if (prevCnt >= EPI_ALERT_SURGE_BASE && r.cnt >= prevCnt * EPI_ALERT_SURGE_RATIO) {
+          candidates.push({
+            period_start: weekStartIso, barangay_id: r.barangay_id, barangay_name: r.barangay_name,
+            disease_name: r.disease_name, alert_type: 'surge', alert_value: r.cnt,
+            detail: `${r.cnt} cases of ${r.disease_name} in Barangay ${r.barangay_name} this week vs ${prevCnt} last week (${Math.round(r.cnt / prevCnt * 100)}% surge).`,
+          });
+        }
+        if ((r.deaths || 0) >= EPI_ALERT_MORTALITY_MIN) {
+          candidates.push({
+            period_start: weekStartIso, barangay_id: r.barangay_id, barangay_name: r.barangay_name,
+            disease_name: r.disease_name, alert_type: 'mortality', alert_value: r.deaths,
+            detail: `${r.deaths} deaths from ${r.disease_name} recorded in Barangay ${r.barangay_name} this week.`,
+          });
+        }
+      });
+
+      candidates.forEach(alert => {
+        db.query(
+          'SELECT id FROM epi_alerts WHERE period_start = ? AND barangay_id = ? AND disease_name = ? AND alert_type = ? LIMIT 1',
+          [alert.period_start, alert.barangay_id, alert.disease_name, alert.alert_type],
+          (dErr, dRows) => {
+            if (dErr || (dRows && dRows.length > 0)) return; // already fired this week
+            db.query(
+              'INSERT INTO epi_alerts (period_start, barangay_id, barangay_name, disease_name, alert_type, alert_value, detail) VALUES (?, ?, ?, ?, ?, ?, ?)',
+              [alert.period_start, alert.barangay_id, alert.barangay_name, alert.disease_name, alert.alert_type, alert.alert_value, alert.detail],
+              (iErr) => {
+                if (iErr) { console.error('Epi alert insert error:', iErr.message); return; }
+                console.log('🚨 Epi alert fired:', alert.alert_type, '-', alert.detail);
+                notifyEpiAlert(alert);
+              }
+            );
+          }
+        );
+      });
+    });
+  });
+}
+
+// Hourly epi alert sweep
+cron.schedule('0 * * * *', () => {
+  console.log('🚨 Running epidemiological alert sweep...');
+  runEpiAlerts();
+});
+
+// Manual run for testing/on-demand (CHO only)
+app.post('/api/epi-alerts/run', authenticate, (req, res) => {
+  if (req.user.role !== 'CHO') {
+    return res.status(403).json({ error: 'Only CHO can trigger an epi alert run.' });
+  }
+  createAuditLog(
+    req.user.user_id,
+    req.user.name,
+    req.user.role,
+    null,
+    req.user.barangay || null,
+    'Epi Alerts',
+    'System',
+    'Epidemiological alert sweep run manually'
+  );
+  runEpiAlerts();
+  return res.json({ message: 'Epidemiological alert sweep started.' });
+});
+
+// GET alerts for the current week (dashboard banner)
+app.get('/api/epi-alerts', (req, res) => {
+  const weekStartIso = isoDateFor(startOfWeekDate(new Date()));
+  db.query('SELECT * FROM epi_alerts WHERE period_start >= ? ORDER BY created_at DESC', [weekStartIso], (err, rows) => {
+    if (err) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+    res.json(rows || []);
+  });
+});
+
+// BARANGAY ACTIONS (public health response layer)
+// ═════════════════════════════════════════════════════════
+db.query(`CREATE TABLE IF NOT EXISTS barangay_actions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  barangay_id INT NULL,
+  hazard_id INT NULL,
+  action_type VARCHAR(50) NOT NULL,
+  description TEXT,
+  target_disease VARCHAR(100),
+  date_started DATE NULL,
+  date_ended DATE NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'planned',
+  created_by INT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)`, (err) => {
+  if (err) console.error('Error creating barangay_actions table:', err.message);
+  else console.log('Barangay actions table created/verified');
+  // Self-migration for installs created before actions could link to a hazard.
+  // Soft reference (no FK): deleting a hazard leaves a dangling id that the
+  // LEFT JOIN renders as "no link" rather than blocking the delete.
+  db.query("SHOW COLUMNS FROM barangay_actions LIKE 'hazard_id'", (colErr, colRows) => {
+    if (!colErr && (!colRows || colRows.length === 0)) {
+      db.query('ALTER TABLE barangay_actions ADD COLUMN hazard_id INT NULL, ADD INDEX idx_ba_hazard (hazard_id)', (altErr) => {
+        if (altErr) console.error('Error migrating barangay_actions.hazard_id:', altErr.message);
+        else console.log('barangay_actions hazard_id column added');
+      });
+    }
+  });
+});
+
+const ACTION_TYPES = ['Fogging', 'Vaccination Drive', 'Info Campaign', 'Active Case Finding', 'Home Visits', 'Sanitation'];
+const ACTION_STATUSES = ['planned', 'ongoing', 'completed'];
+// Mirrors ACTION_TYPE_ICONS in frontend/src/disasterRisk.js
+const ACTION_TYPE_GLYPH = {
+  'Fogging': '💨', 'Vaccination Drive': '💉', 'Info Campaign': '📢',
+  'Active Case Finding': '🔍', 'Home Visits': '🏠', 'Sanitation': '🧹',
+};
+
+app.get('/api/barangay-actions', (req, res) => {
+  // LEFT JOIN disaster_events so the client gets the hazard pairing in the same
+  // payload - no extra round trip just to label an action as a response.
+  let sql = `SELECT ba.*, b.name AS barangay_name,
+       de.event_type AS hazard_type, de.severity AS hazard_severity,
+       de.date_started AS hazard_date_started, de.date_ended AS hazard_date_ended
+    FROM barangay_actions ba
+    LEFT JOIN barangays b ON ba.barangay_id = b.id
+    LEFT JOIN disaster_events de ON ba.hazard_id = de.id
+    WHERE 1=1`;
+  const params = [];
+  if (req.query.barangay_id) { sql += ' AND ba.barangay_id = ?'; params.push(req.query.barangay_id); }
+  if (req.query.status) { sql += ' AND ba.status = ?'; params.push(req.query.status); }
+  if (req.query.active === '1') { sql += " AND ba.status != 'completed'"; }
+  sql += ' ORDER BY ba.created_at DESC';
+  db.query(sql, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+    res.json(rows || []);
+  });
+});
+
+// Shared validator for the optional action -> hazard link. A proactive action
+// (vaccination drive with no storm behind it) legitimately has no hazard, so
+// blank/null is always fine; a supplied id must point at a real hazard row.
+function resolveActionHazardId(hazardId, res) {
+  if (hazardId === undefined || hazardId === null || hazardId === '') return null;
+  const id = Number(hazardId);
+  if (!Number.isInteger(id) || id <= 0) {
+    res.status(400).json({ error: 'Invalid linked hazard.' });
+    return undefined;
+  }
+  return id;
+}
+
+function verifyActionHazard(hazardId, cb) {
+  if (!hazardId) return cb(null, null);
+  db.query('SELECT id, event_type, severity FROM disaster_events WHERE id = ?', [hazardId], (err, rows) => {
+    if (err) return cb(err);
+    if (!rows || !rows.length) return cb(null, null, 'Linked hazard not found.');
+    cb(null, rows[0]);
+  });
+}
+
+app.post('/api/barangay-actions', authenticate, (req, res) => {
+  if (req.user.role !== 'CHO') return res.status(403).json({ error: 'Only CHO can add a barangay action.' });
+  const { barangay_id, action_type, description, target_disease, date_started, date_ended, status, hazard_id } = req.body;
+  if (!action_type || !ACTION_TYPES.includes(action_type)) return res.status(400).json({ error: 'A valid action type is required.' });
+  const st = status || 'planned';
+  if (!ACTION_STATUSES.includes(st)) return res.status(400).json({ error: 'Invalid action status.' });
+  const hazardId = resolveActionHazardId(hazard_id, res);
+  if (hazardId === undefined) return;
+  verifyActionHazard(hazardId, (hErr, hazard, hMsg) => {
+    if (hErr) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+    if (hMsg) return res.status(400).json({ error: hMsg });
+    db.query(
+      'INSERT INTO barangay_actions (barangay_id, hazard_id, action_type, description, target_disease, date_started, date_ended, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [barangay_id || null, hazardId, action_type, description || null, target_disease || null, date_started || null, date_ended || null, st, req.user.user_id],
+      (err, result) => {
+        if (err) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+        createAuditLog(req.user.user_id, req.user.name, req.user.role, result.insertId, req.user.barangay || null, 'Barangay Action', 'Add', `${action_type} action added`);
+        // Field workers do the actual work - tell the affected barangay's BHW.
+        notifyBhwOfAction({
+          action_type, hazard, barangay_id: barangay_id || null, status: st,
+          verb: 'logged',
+        });
+        res.status(201).json({ id: result.insertId });
+      }
+    );
+  });
+});
+
+app.put('/api/barangay-actions/:id', authenticate, (req, res) => {
+  if (req.user.role !== 'CHO') return res.status(403).json({ error: 'Only CHO can update a barangay action.' });
+  const { barangay_id, action_type, description, target_disease, date_started, date_ended, status, hazard_id } = req.body;
+  if (status && !ACTION_STATUSES.includes(status)) return res.status(400).json({ error: 'Invalid action status.' });
+  const hazardId = resolveActionHazardId(hazard_id, res);
+  if (hazardId === undefined) return;
+  verifyActionHazard(hazardId, (hErr, hazard, hMsg) => {
+    if (hErr) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+    if (hMsg) return res.status(400).json({ error: hMsg });
+    // Read the row as it stands before writing, so the status-change test uses
+    // the real prior value rather than something the client claims.
+    db.query('SELECT status, hazard_id FROM barangay_actions WHERE id = ?', [req.params.id], (gErr, existing) => {
+      if (gErr) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+      if (!existing || !existing.length) return res.status(404).json({ error: 'Barangay action not found.' });
+      const previousStatus = existing[0].status;
+      const newStatus = status || previousStatus || 'planned';
+      db.query(
+        'UPDATE barangay_actions SET barangay_id = ?, hazard_id = ?, action_type = ?, description = ?, target_disease = ?, date_started = ?, date_ended = ?, status = ? WHERE id = ?',
+        [barangay_id || null, hazardId, action_type, description || null, target_disease || null, date_started || null, date_ended || null, newStatus, req.params.id],
+        (err, result) => {
+          if (err) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+          if (!result.affectedRows) return res.status(404).json({ error: 'Barangay action not found.' });
+          createAuditLog(req.user.user_id, req.user.name, req.user.role, req.params.id, req.user.barangay || null, 'Barangay Action', 'Update', `${action_type} action updated`);
+          // Notify only when the status genuinely moved. Editing a description or
+          // a date is not news, and notifying on those would spam the BHW with
+          // echoes of the CHO's own typo fixes.
+          if (newStatus !== previousStatus) {
+            notifyBhwOfAction({
+              action_type, hazard, barangay_id: barangay_id || null, status: newStatus,
+              verb: newStatus === 'completed' ? 'completed' : `now ${newStatus}`,
+            });
+          }
+          res.json({ message: 'Barangay action updated.' });
+        }
+      );
+    });
+  });
+});
+
+app.delete('/api/barangay-actions/:id', authenticate, (req, res) => {
+  if (req.user.role !== 'CHO') return res.status(403).json({ error: 'Only CHO can delete a barangay action.' });
+  db.query('DELETE FROM barangay_actions WHERE id = ?', [req.params.id], (err, result) => {
+    if (err) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+    if (!result.affectedRows) return res.status(404).json({ error: 'Barangay action not found.' });
+    createAuditLog(req.user.user_id, req.user.name, req.user.role, req.params.id, req.user.barangay || null, 'Barangay Action', 'Delete', `Barangay action #${req.params.id} deleted`);
+    res.json({ message: 'Barangay action deleted.' });
+  });
+});
+
+// ═════════════════════════════════════════════════════════
+// DISASTER EVENTS (hazard events ↔ disease risk correlation)
+// ═════════════════════════════════════════════════════════
+db.query(`CREATE TABLE IF NOT EXISTS disaster_events (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  barangay_id INT NULL,
+  event_type VARCHAR(30) NOT NULL,
+  severity VARCHAR(20) NOT NULL DEFAULT 'Moderate',
+  date_started DATE NOT NULL,
+  date_ended DATE NULL,
+  purok VARCHAR(100) NULL,
+  latitude DECIMAL(10,7) NULL,
+  longitude DECIMAL(10,7) NULL,
+  notes TEXT,
+  created_by INT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)`, (err) => {
+  if (err) console.error('Error creating disaster_events table:', err.message);
+  else console.log('Disaster events table created/verified');
+  // Self-migration for older installs missing the pin location columns
+  db.query("SHOW COLUMNS FROM disaster_events LIKE 'purok'", (colErr, colRows) => {
+    if (!colErr && (!colRows || colRows.length === 0)) {
+      db.query('ALTER TABLE disaster_events ADD COLUMN purok VARCHAR(100) NULL, ADD COLUMN latitude DECIMAL(10,7) NULL, ADD COLUMN longitude DECIMAL(10,7) NULL', (altErr) => {
+        if (altErr) console.error('Error migrating disaster_events columns:', altErr.message);
+        else console.log('Disaster events purok/latitude/longitude columns added');
+      });
+    }
+  });
+});
+
+// ═════════════════════════════════════════════════════════
+// WEATHER ALERTS (de-duplicated upcoming-hazard notifications)
+// ═════════════════════════════════════════════════════════
+// The hourly sweep re-detects the same upcoming rain every hour, so the unique
+// key is what stops CHO/BHW getting the same alert all afternoon.
+db.query(`CREATE TABLE IF NOT EXISTS weather_alerts (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  barangay_id INT NULL,
+  hazard_type VARCHAR(50) NOT NULL,
+  onset_hour DATETIME NOT NULL,
+  detail TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_weather_alert (barangay_id, hazard_type, onset_hour)
+)`, (err) => {
+  if (err) console.error('Error creating weather_alerts table:', err.message);
+  else console.log('Weather alerts table created/verified');
+});
+
+// Fixed, config-driven hazard -> disease correlation. Mirrors HAZARD_CONFIG in
+// frontend/src/disasterRisk.js so CHO, BHW and resident views agree.
+const HAZARD_DISEASE_LINK = {
+  'Thunderstorm': ['Leptospirosis', 'Diarrhea'],
+  'Heavy Rain':   ['Leptospirosis'],
+  'Flood':        ['Leptospirosis', 'Diarrhea'],
+  'Typhoon':      ['Leptospirosis', 'Acute Respiratory Infection'],
+  'Extreme Heat': ['Acute Respiratory Infection'],
+  'Fire':         ['Acute Respiratory Infection'],
+};
+const HAZARD_GLYPH = {
+  'Thunderstorm': '⛈', 'Heavy Rain': '🌧', 'Flood': '🌊',
+  'Typhoon': '🌀', 'Extreme Heat': '☀', 'Fire': '🔥',
+};
+const linkedDiseasesFor = (hazardType) => HAZARD_DISEASE_LINK[hazardType] || [];
+const hazardGlyph = (hazardType) => HAZARD_GLYPH[hazardType] || '⚠';
+
+// '2026-01-15T13:00' -> '1 PM'
+const formatOnsetHour = (isoHour) => {
+  const hh = parseInt(String(isoHour || '').slice(11, 13), 10);
+  if (Number.isNaN(hh)) return '';
+  const suffix = hh >= 12 ? 'PM' : 'AM';
+  return `${hh === 0 ? 12 : (hh > 12 ? hh - 12 : hh)} ${suffix}`;
+};
+
+// Single delivery path for every hazard/action notice.
+// recipients: 'staff'    -> all active CHOs + the affected barangay's BHW
+//             'barangay' -> only the affected barangay's BHW (no CHO echo-back)
+// Channel delivery follows each user's own notification_preferences toggles.
+const deliverNotice = (opts, done) => {
+  const { title, message, barangay_id, severity, type, linkTo, recipients } = opts;
+  const notifType = type || (severity === 'Severe' ? 'warning' : 'info');
+  const link = linkTo || 'MapView';
+  const audience = recipients || 'staff';
+  const insert = (u) => {
+    db.query(
+      'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
+      [u.user_id, title, message, notifType, link],
+      (nErr) => { if (nErr) console.error('Notice notification insert failed:', nErr.message); }
+    );
+  };
+
+  // 'staff'    -> every active CHO, plus the affected barangay's BHW
+  // 'barangay' -> only the affected barangay's BHW
+  let where, params;
+  if (audience === 'barangay' && barangay_id) {
+    where = "u.role = 'BHW' AND u.assigned_barangay_id = ?";
+    params = [barangay_id];
+  } else if (audience === 'barangay' && !barangay_id) {
+    // Citywide action with no single affected barangay - every field worker needs it.
+    where = "u.role = 'BHW'";
+    params = [];
+  } else {
+    where = `u.role = 'CHO' ${barangay_id ? 'OR (u.role = \'BHW\' AND u.assigned_barangay_id = ?)' : ''}`;
+    params = barangay_id ? [barangay_id] : [];
+  }
+
+  db.query(
+    `SELECT u.user_id, u.email, u.mobile_number, p.push_notifications, p.email_notifications, p.sms_notifications
+       FROM users u
+       LEFT JOIN notification_preferences p ON p.user_id = u.user_id
+      WHERE u.is_active = 1 AND u.is_archived = 0 AND (${where})`,
+    params,
+    (uErr, rows) => {
+      if (uErr) { console.error('Notice recipient query failed:', uErr.message); if (done) done(); return; }
+      (rows || []).forEach((u) => {
+        // Severe weather always delivers in-app (safety-critical), otherwise honour the toggle.
+        const alwaysDeliver = severity === 'Severe';
+        const push = alwaysDeliver || u.push_notifications == true;
+        if (push) insert(u);
+
+        if ((u.email_notifications == true || alwaysDeliver) && u.email) {
+          sendBrevoEmail(u.email, title, `
+            <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#eff6ff;border-radius:12px">
+              <h2 style="color:#1d4ed8;margin:0 0 8px 0">${title}</h2>
+              <p style="color:#475569;font-size:15px;line-height:1.5">${message}</p>
+              <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0" />
+              <p style="color:#94a3b8;font-size:12px">Cabuyao City Disease Monitoring System</p>
+            </div>`
+          ).catch(err => console.error('Notice email failed:', err.message));
+        }
+
+        if ((u.sms_notifications == true || alwaysDeliver) && u.mobile_number) {
+          const phNumber = toPhMobile(u.mobile_number);
+          // SMS is 160-char GSM; strip non-ASCII (glyphs) and trim.
+          const smsBody = (message.replace(/[^\x20-\x7E]/g, '').trim() || title).slice(0, 160);
+          if (phNumber) {
+            sendBrevoSms(phNumber, smsBody).catch(err =>
+              console.error('Notice SMS failed:', err.message)
+            );
+          }
+        }
+      });
+      if (done) done();
+    }
+  );
+};
+
+// Weather hazard notices go to staff (CHO decision-support + field follow-up).
+const sendWeatherAlert = (opts, done) => deliverNotice({ recipients: 'staff', ...opts }, done);
+
+// Tells the affected barangay's BHWs what the health office is doing there.
+// severity is intentionally left undefined: an action is not safety-critical,
+// so it always honours the user's own notification toggles.
+// A citywide action has no single affected barangay, so every active BHW is told.
+const notifyBhwOfAction = ({ action_type, hazard, barangay_id, status, verb }) => {
+  const glyph = ACTION_TYPE_GLYPH[action_type] || '🗂';
+  const linked = hazard ? ` Responding to ${hazardGlyph(hazard.event_type)} ${hazard.event_type}.` : '';
+  const st = status ? ` Status: ${status}.` : '';
+  const send = (placeLabel) => {
+    // "citywide" only when there is genuinely no barangay attached. A failed
+    // name lookup must not claim citywide - the notice is still barangay-scoped.
+    const where = barangay_id ? (placeLabel ? ` in ${placeLabel}` : '') : ' citywide';
+    deliverNotice({
+      title: 'Barangay Action',
+      message: `${glyph} ${action_type} ${verb}${where}.` + linked + st,
+      barangay_id: barangay_id || null,
+      recipients: 'barangay',
+    });
+  };
+  if (!barangay_id) return send(null);
+  db.query('SELECT name FROM barangays WHERE id = ?', [barangay_id], (bErr, rows) => {
+    send((bErr || !rows || !rows.length) ? null : rows[0].name);
+  });
+};
+
+const DISASTER_EVENT_TYPES = ['Flood', 'Typhoon', 'Extreme Heat', 'Heavy Rain', 'Fire'];
+const DISASTER_SEVERITIES = ['Minor', 'Moderate', 'Severe'];
+
+app.get('/api/disaster-events', (req, res) => {
+  let sql = `SELECT de.*, b.name AS barangay_name FROM disaster_events de LEFT JOIN barangays b ON de.barangay_id = b.id WHERE 1=1`;
+  const params = [];
+  if (req.query.barangay_id) { sql += ' AND de.barangay_id = ?'; params.push(req.query.barangay_id); }
+  if (req.query.active === '1') { sql += ' AND (de.date_ended IS NULL OR de.date_ended >= CURDATE())'; }
+  sql += ' ORDER BY de.date_started DESC';
+  db.query(sql, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+    res.json(rows || []);
+  });
+});
+
+app.post('/api/disaster-events', authenticate, (req, res) => {
+  if (req.user.role !== 'CHO') return res.status(403).json({ error: 'Only CHO can log a hazard pin.' });
+  const { barangay_id, event_type, severity, date_started, date_ended, purok, latitude, longitude, notes } = req.body;
+  if (!event_type || !DISASTER_EVENT_TYPES.includes(event_type)) return res.status(400).json({ error: 'A valid event type is required.' });
+  if (!date_started) return res.status(400).json({ error: 'Start date is required.' });
+  const sev = (DISASTER_SEVERITIES.includes(severity) && severity) || 'Moderate';
+  db.query(
+    'INSERT INTO disaster_events (barangay_id, event_type, severity, date_started, date_ended, purok, latitude, longitude, notes, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [barangay_id || null, event_type, sev, date_started, date_ended || null, purok || null, latitude || null, longitude || null, notes || null, req.user.user_id],
+    (err, result) => {
+      if (err) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+      createAuditLog(req.user.user_id, req.user.name, req.user.role, result.insertId, req.user.barangay || null, 'Disaster Event', 'Add', `${event_type} event in barangay logged`);
+      // Severe CHO-logged hazard pins alert the field team immediately (no dedup needed:
+      // each pin is a distinct human-recorded event).
+      if (sev === 'Severe') {
+        db.query('SELECT name FROM barangays WHERE id = ?', [barangay_id || null], (bErr, rows) => {
+          const bName = (bErr || !rows || !rows.length) ? null : rows[0].name;
+          const where = bName ? ` in ${bName}` : '';
+          const linked = linkedDiseasesFor(event_type);
+          const detail = `${hazardGlyph(event_type)} Severe ${event_type} reported${where}.` +
+            (linked.length ? ` Possible: ${linked.join(', ')}` : '');
+          sendWeatherAlert({
+            title: 'Severe Hazard Reported',
+            message: detail,
+            barangay_id: barangay_id || null,
+            severity: 'Severe',
+          });
+        });
+      }
+      res.status(201).json({ id: result.insertId });
+    }
+  );
+});
+
+app.put('/api/disaster-events/:id', authenticate, (req, res) => {
+  if (req.user.role !== 'CHO') return res.status(403).json({ error: 'Only CHO can update a hazard pin.' });
+  const { barangay_id, event_type, severity, date_started, date_ended, purok, latitude, longitude, notes } = req.body;
+  db.query(
+    'UPDATE disaster_events SET barangay_id = ?, event_type = ?, severity = ?, date_started = ?, date_ended = ?, purok = ?, latitude = ?, longitude = ?, notes = ? WHERE id = ?',
+    [barangay_id || null, event_type, (DISASTER_SEVERITIES.includes(severity) && severity) || 'Moderate', date_started, date_ended || null, purok || null, latitude || null, longitude || null, notes || null, req.params.id],
+    (err, result) => {
+      if (err) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+      if (!result.affectedRows) return res.status(404).json({ error: 'Disaster event not found.' });
+      createAuditLog(req.user.user_id, req.user.name, req.user.role, req.params.id, req.user.barangay || null, 'Disaster Event', 'Update', `${event_type} event updated`);
+      res.json({ message: 'Disaster event updated.' });
+    }
+  );
+});
+
+app.delete('/api/disaster-events/:id', authenticate, (req, res) => {
+  if (req.user.role !== 'CHO') return res.status(403).json({ error: 'Only CHO can delete a disaster event.' });
+  db.query('DELETE FROM disaster_events WHERE id = ?', [req.params.id], (err, result) => {
+    if (err) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+    if (!result.affectedRows) return res.status(404).json({ error: 'Disaster event not found.' });
+    createAuditLog(req.user.user_id, req.user.name, req.user.role, req.params.id, req.user.barangay || null, 'Disaster Event', 'Delete', `Disaster event #${req.params.id} deleted`);
+    res.json({ message: 'Disaster event deleted.' });
+  });
+});
+
+// ═════════════════════════════════════════════════════════
+// WEATHER HAZARDS (Open-Meteo live forecast + historical archive)
+// ═════════════════════════════════════════════════════════
+db.query(`CREATE TABLE IF NOT EXISTS weather_daily (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  barangay_id INT NOT NULL,
+  date DATE NOT NULL,
+  weather_code INT NULL,
+  precipitation_sum DECIMAL(6,2) NULL,
+  tmax DECIMAL(5,2) NULL,
+  tmin DECIMAL(5,2) NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_weather_daily (barangay_id, date)
+)`, (err) => {
+  if (err) console.error('Error creating weather_daily table:', err.message);
+  else console.log('Weather daily table created/verified');
+});
+
+// Cabuyao barangay centroids (mirrors the frontend BARANGAY_COORDS for the server)
+const WEATHER_BARANGAY_COORDS = {
+  'Baclaran': [14.2450, 121.1630], 'Banay-Banay': [14.2550, 121.1300], 'Banlic': [14.2330, 121.1380],
+  'Barangay Dos (Poblacion)': [14.2770, 121.1260], 'Barangay Tres (Poblacion)': [14.2760, 121.1230],
+  'Barangay Uno (Poblacion)': [14.2800, 121.1240], 'Bigaa': [14.2860, 121.1300], 'Butong': [14.2850, 121.1370],
+  'Casile': [14.1830, 121.0350], 'Diezmo': [14.2340, 121.1000], 'Gulod': [14.2530, 121.1590],
+  'Mamatid': [14.2360, 121.1600], 'Marinig': [14.2660, 121.1480], 'Niugan': [14.2690, 121.1340],
+  'Pittland': [14.2160, 121.0600], 'Pulo': [14.2480, 121.1390], 'Sala': [14.2790, 121.1180],
+  'San Isidro': [14.2840, 121.1500],
+};
+
+let weatherHazardsCache = { at: 0, data: null };
+const WEATHER_CACHE_TTL = 10 * 60 * 1000;  // 10 minutes
+
+// Hourly upcoming-hazard notification sweep (dedup safety net lives in the weather_alerts unique key).
+let weatherAlertsCache = { at: 0 };
+const WEATHER_ALERT_SWEEP_TTL = 50 * 60 * 1000;  // 50 min - hourly cron, tolerant of drift
+const WEATHER_STALE_TTL = 30 * 60 * 1000;  // serve last-good data for 30 min on network failure
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+async function fetchWithRetry(url, tries = 3, backoffMs = 600) {
+  let lastErr;
+  for (let i = 0; i < tries; i++) {
+    try {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return await r.json();
+    } catch (e) {
+      lastErr = e;
+      if (i < tries - 1) await sleep(backoffMs * (i + 1));
+    }
+  }
+  throw lastErr;
+}
+
+const wmoToHazard = (code) => {
+  if (code >= 95) return 'Thunderstorm';
+  if ((code >= 51 && code <= 67)) return 'Heavy Rain';
+  if (code >= 71) return 'Heavy Rain';
+  if (code >= 80 && code <= 82) return 'Heavy Rain';
+  return null;
+};
+
+const detectWeatherHazards = (cur) => {
+  const hazards = [];
+  const w = wmoToHazard(cur.weather_code);
+  if (w) hazards.push(w);
+  if (cur.wind_gusts_10m >= 25) hazards.push('Typhoon');
+  if (cur.temperature_2m >= 35) hazards.push('Extreme Heat');
+  return [...new Set(hazards)];
+};
+
+const isRainyCode = (c) => c != null && ((c >= 51 && c <= 67) || c >= 71 || (c >= 80 && c <= 82));
+const isStormCode = (c) => c != null && c >= 95;
+
+// PAGASA-style day-aware outlook: scan the next ~6 hours of hourly forecast plus today's
+// daily totals, so a thunderstorm due in 2 hours still lights the badge up now.
+const buildWeatherInfo = (data) => {
+  const cur = (data && data.current) || {};
+  const hourly = (data && data.hourly) || {};
+  const daily = (data && data.daily) || {};
+  const now = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 13); // Manila hour bucket
+  const times = hourly.time || [];
+  const codes = hourly.weather_code || [];
+  const precip = hourly.precipitation || [];
+  let startIdx = 0;
+  for (let i = 0; i < times.length; i++) {
+    if ((times[i] || '').slice(0, 13) >= now) { startIdx = i; break; }
+  }
+  const horizon = Math.min(startIdx + 6, times.length);
+  let stormSoon = false, rainSoon = false, nextBadCode = null, nextBadTime = null;
+  for (let i = startIdx; i < horizon; i++) {
+    if (isStormCode(codes[i])) { stormSoon = true; if (!nextBadCode) { nextBadCode = 'Thunderstorm'; nextBadTime = times[i]; } }
+    else if (isRainyCode(codes[i])) { rainSoon = true; if (!nextBadCode) { nextBadCode = 'Heavy Rain'; nextBadTime = times[i]; } }
+  }
+  // Today's daily totals (precip + dominant code) for a summary line
+  const today = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
+  let todayPrecip = 0, dayIdx = -1;
+  (daily.time || []).forEach((t, i) => { if (t === today) dayIdx = i; });
+  if (dayIdx >= 0) todayPrecip = (daily.precipitation_sum || [])[dayIdx] || 0;
+
+  const hazards = detectWeatherHazards(cur);
+  if (stormSoon) hazards.push('Thunderstorm');
+  if (rainSoon) hazards.push('Heavy Rain');
+  const unique = [...new Set(hazards)];
+  const outlookParts = [];
+  if (nextBadCode && nextBadTime) {
+    const clk = (nextBadTime || '').slice(11, 13);
+    const hh = parseInt(clk, 10);
+    const suffix = hh >= 12 ? 'PM' : 'AM';
+    const display = hh === 0 ? 12 : (hh > 12 ? hh - 12 : hh);
+    outlookParts.push(`${nextBadCode === 'Thunderstorm' ? '⛈' : '🌧'} ${nextBadCode} ~${display} ${suffix}`);
+  }
+  if (todayPrecip > 0) outlookParts.push(`~${Math.round(todayPrecip)} mm today`);
+  return {
+    hazards: unique,
+    temperature: cur.temperature_2m != null ? Math.round(cur.temperature_2m * 10) / 10 : null,
+    precipitation: cur.precipitation != null ? Math.round(cur.precipitation * 10) / 10 : null,
+    weather_code: cur.weather_code || null,
+    outlook: outlookParts.join(' · '),
+    // Raw onset bucket for the alert sweep's dedup key (null when nothing is due soon).
+    next_hazard_type: nextBadCode || null,
+    next_hazard_time: nextBadTime || null,
+  };
+};
+
+// One batched Open-Meteo request for ALL barangays.
+// Open-Meteo accepts comma-separated latitude/longitude lists and answers with an
+// array in the same order, so this is 1 HTTP request instead of 18. That matters:
+// firing 18 single-point requests in parallel trips Open-Meteo's rate limiter and
+// the surplus requests come back HTTP 429, which used to surface as random
+// "offline" barangays on the map.
+const fetchWeatherForBarangays = async (barangays) => {
+  const rows = barangays.map(b => ({
+    barangay_id: b.id, name: b.name,
+    hazards: [], temperature: null, precipitation: null, weather_code: null, outlook: '',
+    next_hazard_type: null, next_hazard_time: null,
+  }));
+  if (barangays.length === 0) return rows;
+
+  const lats = barangays.map(b => WEATHER_BARANGAY_COORDS[b.name][0]).join(',');
+  const lons = barangays.map(b => WEATHER_BARANGAY_COORDS[b.name][1]).join(',');
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}` +
+    `&current=weather_code,precipitation,temperature_2m,wind_gusts_10m,relative_humidity_2m` +
+    `&hourly=weather_code,precipitation&daily=weather_code,precipitation_sum` +
+    `&forecast_days=2&timezone=Asia%2FManila`;
+
+  const payload = await fetchWithRetry(url);
+  const series = Array.isArray(payload) ? payload : [payload];
+  series.forEach((data, i) => {
+    if (!data || !rows[i]) return;
+    Object.assign(rows[i], buildWeatherInfo(data));
+  });
+  return rows;
+};
+
+app.get('/api/weather/hazards', (req, res) => {
+  if (weatherHazardsCache.data && Date.now() - weatherHazardsCache.at < WEATHER_CACHE_TTL) {
+    return res.json(weatherHazardsCache.data);
+  }
+  db.query('SELECT id, name FROM barangays ORDER BY id', async (err, barangays) => {
+    if (err) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+    const pending = (barangays || []).filter(b => WEATHER_BARANGAY_COORDS[b.name]);
+    try {
+      const results = await fetchWeatherForBarangays(pending);
+      weatherHazardsCache = { at: Date.now(), data: results };
+      res.json(results);
+    } catch (e) {
+      console.error('Weather batch fetch failed:', e.message);
+      // Serve last-good rows while the upstream is unreachable/rate-limited,
+      // but only inside the stale window - past that, report offline honestly.
+      const cached = weatherHazardsCache.data;
+      if (cached && Date.now() - weatherHazardsCache.at < WEATHER_STALE_TTL) {
+        return res.json(cached);
+      }
+      res.json(pending.map(b => ({
+        barangay_id: b.id, name: b.name, hazards: [], temperature: null,
+        precipitation: null, weather_code: null, outlook: '', error: 'offline',
+      })));
+    }
+  });
+});
+
+// ═════════════════════════════════════════════════════════
+// WEATHER ALERT SWEEP (upcoming-hazard notifications)
+// ═════════════════════════════════════════════════════════
+// Hourly. Reuses the same Open-Meteo fetch + buildWeatherInfo as /api/weather/hazards,
+// so the map layer and the notifications can never disagree about what is coming.
+// Every candidate is INSERT IGNORE'd against the unique key, so re-detecting the
+// same onset hour on the next sweep is a no-op instead of a repeat notification.
+function runWeatherAlerts() {
+  // Hourly cadence, not per-request.
+  if (weatherAlertsCache.at && Date.now() - weatherAlertsCache.at < WEATHER_ALERT_SWEEP_TTL) return;
+  db.query('SELECT id, name FROM barangays ORDER BY id', async (err, barangays) => {
+    if (err) { console.error('Weather alert sweep barangay query error:', err.message); return; }
+    const pending = (barangays || []).filter(b => WEATHER_BARANGAY_COORDS[b.name]);
+    if (pending.length === 0) return;
+
+    let rows;
+    try {
+      // Same single batched request the map uses. The sweep also refreshes
+      // weatherHazardsCache so the map (and PAGASA strip) get a warm cache
+      // instead of firing their own fan-out straight after this one.
+      rows = await fetchWeatherForBarangays(pending);
+      weatherHazardsCache = { at: Date.now(), data: rows };
+    } catch (e) {
+      // Upstream unreachable/rate-limited - skip this sweep, retry next hour.
+      console.error('Weather alert sweep batch fetch failed:', e.message);
+      return;
+    }
+    weatherAlertsCache = { at: Date.now() };
+
+    rows.forEach((info) => {
+      if (!info.next_hazard_type || !info.next_hazard_time) return;
+
+      const onset = String(info.next_hazard_time).slice(0, 13) + ':00';
+      const when = formatOnsetHour(info.next_hazard_time);
+      const linked = linkedDiseasesFor(info.next_hazard_type);
+      const detail = `${hazardGlyph(info.next_hazard_type)} ${info.next_hazard_type} expected ~${when} in ${info.name}.` +
+        (linked.length ? ` Possible: ${linked.join(', ')}` : '');
+
+      db.query(
+        `INSERT IGNORE INTO weather_alerts (barangay_id, hazard_type, onset_hour, detail)
+         VALUES (?, ?, ?, ?)`,
+        [info.barangay_id, info.next_hazard_type, onset, detail],
+        (insErr, res) => {
+          if (insErr) { console.error('Weather alert insert error:', insErr.message); return; }
+          if (!res || !res.affectedRows) return; // already alerted for this onset hour
+          console.log(`⛈ Weather alert — ${info.name}: ${detail}`);
+          sendWeatherAlert({
+            title: 'Weather Hazard Expected',
+            message: detail,
+            barangay_id: info.barangay_id,
+            severity: info.next_hazard_type === 'Thunderstorm' ? 'Severe' : 'Moderate',
+          });
+        }
+      );
+    });
+  });
+}
+
+// Hourly weather alert sweep
+cron.schedule('0 * * * *', () => {
+  runWeatherAlerts();
+});
+
+// CHO-only manual trigger (on-demand test / after an evacuation order)
+app.post('/api/weather/alerts/run', authenticate, (req, res) => {
+  if (req.user.role !== 'CHO') {
+    return res.status(403).json({ error: 'Only CHO can trigger a weather alert run.' });
+  }
+  createAuditLog(
+    req.user.user_id, req.user.name, req.user.role, null, req.user.barangay || null,
+    'Weather Alerts', 'System', 'Weather alert sweep run manually'
+  );
+  weatherAlertsCache = { at: 0 }; // bypass the hourly guard so a manual run actually runs
+  runWeatherAlerts();
+  return res.json({ message: 'Weather alert sweep started.' });
+});
+
+// PAGASA Southern Luzon advisory strip (Cabuyao = Laguna = Southern Luzon / SLPRSD).
+// Public-page scraping - resilient on failure (returns { ok: false }, frontend hides the strip).
+let pagasaCache = { at: 0, data: null };
+app.get('/api/weather/pagasa', (req, res) => {
+  if (pagasaCache.data && Date.now() - pagasaCache.at < WEATHER_CACHE_TTL) {
+    return res.json(pagasaCache.data);
+  }
+  fetchWithRetry('https://www.pagasa.dost.gov.ph/regional-forecast/slprsd', 2, 700)
+    .then(async (html) => {
+      const text = String(html).replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+      const issuedMatch = text.match(/Issued\s+(?:[Aa]t:?\s+)?([0-9]{1,2}:[0-9]{2}\s*(?:AM|PM|am|pm)[^A-Z]{0,40})/);
+      const advisories = [];
+      const lines = text.split(/(?=Thunderstorm Advisory|Heavy Rainfall Warning|General Flood Advisory|Rainfall Warning|Tropical Storm|Severe Weather Bulletin)/i);
+      lines.forEach(line => {
+        const m = line.match(/^(Thunderstorm Advisory|Heavy Rainfall Warning|General Flood Advisory|Rainfall Warning)[^.]{0,20}/i);
+        if (m) {
+          const cleaned = line.replace(/^[A-Za-z ]*?(Issued at|Issued At)[^A-Z0-9#]{0,60}/, '').trim();
+          advisories.push(cleaned.slice(0, 260));
+        }
+      });
+      const data = { ok: true, region: 'Southern Luzon (SLPRSD)', issued: issuedMatch ? issuedMatch[1].trim() : null, advisories: advisories.slice(0, 3) };
+      pagasaCache = { at: Date.now(), data };
+      res.json(data);
+    })
+    .catch(() => res.json({ ok: false, region: 'Southern Luzon (SLPRSD)', advisories: [] }));
+});
+
+// Historical archive (Open-Meteo ERA5, 1940→) cached into weather_daily.
+app.get('/api/weather/historical', (req, res) => {
+  const barangayName = req.query.barangay || '';
+  const from = req.query.from || '';
+  const to = req.query.to || '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+    return res.status(400).json({ error: 'Valid from/to dates (YYYY-MM-DD) are required.' });
+  }
+  db.query('SELECT id, name FROM barangays WHERE name = ?', [barangayName], (err, rows) => {
+    if (err) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+    const bg = rows && rows[0];
+    if (!bg) return res.status(404).json({ error: 'Barangay not found.' });
+    const coords = WEATHER_BARANGAY_COORDS[bg.name];
+    if (!coords) return res.status(400).json({ error: 'No weather coordinates for this barangay.' });
+    db.query('SELECT date, weather_code, precipitation_sum, tmax, tmin FROM weather_daily WHERE barangay_id = ? AND date BETWEEN ? AND ? ORDER BY date', [bg.id, from, to], (err2, cachedRows) => {
+      if (err2) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+      const expected = Math.round((new Date(to + 'T00:00:00Z') - new Date(from + 'T00:00:00Z')) / 86400000) + 1;
+      if (cachedRows && cachedRows.length >= expected && expected > 0) {
+        return res.json({ barangay: bg.name, rows: cachedRows, cached: true });
+      }
+      const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${coords[0]}&longitude=${coords[1]}&start_date=${from}&end_date=${to}&daily=weather_code,precipitation_sum,temperature_2m_max,temperature_2m_min&timezone=Asia%2FManila`;
+      fetch(url)
+        .then(r => r.json())
+        .then(async (data) => {
+          const daily = (data && data.daily) || {};
+          const times = daily.time || [];
+          const codes = daily.weather_code || [];
+          const precip = daily.precipitation_sum || [];
+          const tmax = daily.temperature_2m_max || [];
+          const tmin = daily.temperature_2m_min || [];
+          for (let i = 0; i < times.length; i++) {
+            if (precip[i] == null && codes[i] == null) continue;
+            await new Promise((resolve, reject) => {
+              db.query(
+                'INSERT INTO weather_daily (barangay_id, date, weather_code, precipitation_sum, tmax, tmin) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE weather_code = VALUES(weather_code), precipitation_sum = VALUES(precipitation_sum), tmax = VALUES(tmax), tmin = VALUES(tmin)',
+                [bg.id, times[i], codes[i], precip[i], tmax[i], tmin[i]],
+                (e3) => { if (e3) reject(e3); else resolve(); }
+              );
+            });
+          }
+          db.query('SELECT date, weather_code, precipitation_sum, tmax, tmin FROM weather_daily WHERE barangay_id = ? AND date BETWEEN ? AND ? ORDER BY date', [bg.id, from, to], (err3, saved) => {
+            if (err3) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+            res.json({ barangay: bg.name, rows: saved || [], cached: false });
+          });
+        })
+        .catch(() => res.status(502).json({ error: 'Weather service unavailable. Try again later.' }));
+    });
+  });
 });
 
 // ═════════════════════════════════════════════════════════

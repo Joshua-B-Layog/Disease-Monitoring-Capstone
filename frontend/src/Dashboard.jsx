@@ -6,6 +6,7 @@ import { cacheCases, getCachedCases, isOnline } from './offlineSync';
 import { formatDate as formatDateStr } from './formatDate';
 import DatePicker from './components/DatePicker';
 import ExportPreviewModal from './components/ExportPreview';
+import { DISASTER_ICONS, SEVERITY_COLORS } from './disasterRisk';
 
 // Counts up (or down) to `value` whenever it changes
 const AnimatedNumber = ({ value, style }) => {
@@ -113,6 +114,25 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   const [yearOpen, setYearOpen] = useState(false);
   const yearRef = useRef(null);
   const [hoveredCard, setHoveredCard] = useState(null);
+  const [epiAlerts, setEpiAlerts] = useState([]);
+  const [disasterEvents, setDisasterEvents] = useState([]);
+
+  // Fetch server-side epidemiological alerts (fired hourly by the backend cron)
+  useEffect(() => {
+    let alive = true;
+    const load = () => {
+      if (!isOnline()) return;
+      axios.get(API_URL + '/api/epi-alerts')
+        .then(res => { if (alive) setEpiAlerts(Array.isArray(res.data) ? res.data : []); })
+        .catch(() => {});
+      axios.get(API_URL + '/api/disaster-events?active=1')
+        .then(res => { if (alive) setDisasterEvents(Array.isArray(res.data) ? res.data : []); })
+        .catch(() => {});
+    };
+    load();
+    const iv = setInterval(load, 60000);
+    return () => { alive = false; clearInterval(iv); };
+  }, []);
 
   const CHO_UNIT_BARANGAYS = {
     'CHO Unit I (Sala)': [
@@ -891,6 +911,34 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       const growth = ((totalCases - totalPrev) / totalPrev) * 100;
       if (growth >= 50) alerts.push({ label: t('Rapid Surge'), detail: `+${Math.round(growth)}% vs previous period`, color: '#DC2626', bg: 'rgba(220,38,38,0.1)', border: 'rgba(220,38,38,0.3)' });
       else if (growth >= 20) alerts.push({ label: t('Rising Trend'), detail: `+${Math.round(growth)}% vs previous period`, color: '#D97706', bg: 'rgba(217,119,6,0.1)', border: 'rgba(217,119,6,0.3)' });
+    }
+    // Server-side epidemiological alerts (per barangay × disease, hourly cron + dedupe)
+    if (epiAlerts.length > 0) {
+      epiAlerts.forEach(a => {
+        const label = a.alert_type === 'surge' ? t('Rapid Surge')
+          : a.alert_type === 'mortality' ? t('Mortality Alert')
+          : t('Epidemiological Alert');
+        alerts.push({
+          label,
+          detail: `${a.disease_name} · ${a.barangay_name} (${a.alert_value})`,
+          color: a.alert_type === 'surge' ? '#D97706' : '#DC2626',
+          bg: 'rgba(220,38,38,0.08)',
+          border: a.alert_type === 'surge' ? 'rgba(217,119,6,0.3)' : 'rgba(220,38,38,0.3)',
+        });
+      });
+    }
+    // Active disaster events (CHO-logged in the disaster module)
+    if (disasterEvents.length > 0) {
+      disasterEvents.forEach(a => {
+        const color = SEVERITY_COLORS[a.severity] || '#2563eb';
+        alerts.push({
+          label: `${DISASTER_ICONS[a.event_type] || '⚠️'} ${t('Disaster Alert')}`,
+          detail: `${a.barangay_name}${a.purok ? ' · ' + a.purok : ''}${(a.latitude != null && a.longitude != null) ? ' (' + a.latitude + ',' + a.longitude + ')' : ''}: ${a.event_type} (${a.severity})`,
+          color,
+          bg: 'rgba(37,99,235,0.08)',
+          border: 'rgba(37,99,235,0.3)',
+        });
+      });
     }
     return alerts;
   })();
@@ -2094,6 +2142,137 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── DISEASES PER BARANGAY HEATMAP ── */}
+      {(() => {
+        const heat = {};
+        const brgySet = {};
+        displayCases.forEach(c => {
+          if (!c.barangay_name) return;
+          const dis = findBestDisease(c.disease_name);
+          if (!dis) return;
+          brgySet[c.barangay_name] = true;
+          heat[dis] = heat[dis] || {};
+          heat[dis][c.barangay_name] = (heat[dis][c.barangay_name] || 0) + 1;
+        });
+        const heatBrgys = Object.keys(brgySet).sort();
+        if (heatBrgys.length === 0) return null;
+        const heatRows = Object.entries(heat)
+          .map(([name, per]) => ({ name, per, total: Object.values(per).reduce((s, n) => s + n, 0) }))
+          .sort((a, b) => b.total - a.total)
+          .slice(0, 12);
+        let heatMax = 0;
+        heatRows.forEach(r => Object.values(r.per).forEach(n => { if (n > heatMax) heatMax = n; }));
+        const heatBg = (n) => {
+          if (!n) return 'var(--input-bg)';
+          const f = Math.max(0.08, Math.min(1, n / heatMax));
+          return `rgba(13,148,136,${(0.15 + 0.75 * f).toFixed(2)})`;
+        };
+        const heatFg = (n) => (n && n / heatMax >= 0.55 ? '#ffffff' : 'var(--text-main)');
+        return (
+          <div className="cdms-view-in" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' }}>
+            <h4 style={{ margin: '0 0 16px 0', fontSize: '15px', fontWeight: '600', color: 'var(--text-main)' }}>
+              {t('Diseases per Barangay')}
+              <span style={{ color: 'var(--text-muted)', fontSize: '15px', fontWeight: '400', marginLeft: '8px' }}>
+                · {formatDateStr(dateRange.start, dateFormat)} {t('to')} {formatDateStr(dateRange.end, dateFormat)}
+              </span>
+            </h4>
+            <div style={{ overflowX: 'auto', paddingBottom: '4px' }}>
+              {/* width:100% lets the cells' flex-basis grow into any spare box
+                  width; minWidth keeps the 18-column grid scrollable when it
+                  cannot fit, so narrow screens behave exactly as before. */}
+              <div style={{ minWidth: '540px', width: '100%' }}>
+                {/* header row */}
+                <div style={{ display: 'flex' }}>
+                  <div style={{ width: '150px', flexShrink: 0, fontSize: '14px', fontWeight: '600', color: 'var(--text-h)', padding: '6px 10px', borderBottom: '1px solid var(--border-color)' }}>{t('Disease')}</div>
+                  {heatBrgys.map(b => (
+                    <div key={b} title={b} style={{ flex: '1 1 64px', minWidth: '64px', maxWidth: '140px', fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', textAlign: 'center', padding: '6px 2px', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b}</div>
+                  ))}
+                  <div style={{ width: '52px', flexShrink: 0, fontSize: '14px', fontWeight: '700', color: 'var(--text-h)', textAlign: 'right', padding: '6px 10px', borderBottom: '1px solid var(--border-color)' }}>{t('Total')}</div>
+                </div>
+                {heatRows.map(row => (
+                  <div key={row.name} style={{ display: 'flex' }}>
+                    <div style={{ width: '150px', flexShrink: 0, fontSize: '14px', color: 'var(--text-main)', padding: '7px 10px', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={row.name}>{row.name}</div>
+                    {heatBrgys.map(b => {
+                      const n = row.per[b] || 0;
+                      return (
+                        <div key={b} title={`${row.name}: ${n}`} style={{ flex: '1 1 64px', minWidth: '64px', maxWidth: '140px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '600', color: heatFg(n), background: heatBg(n), borderBottom: '1px solid var(--border-color)', borderLeft: '1px solid var(--border-color)', boxSizing: 'border-box' }}>
+                          {n || ''}
+                        </div>
+                      );
+                    })}
+                    <div style={{ width: '52px', flexShrink: 0, fontSize: '14px', fontWeight: '700', color: 'var(--text-main)', textAlign: 'right', padding: '7px 10px', borderBottom: '1px solid var(--border-color)' }}>{row.total}</div>
+                  </div>
+                ))}
+                {/* legend */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>{t('Low')}</span>
+                  {[0.15, 0.3, 0.5, 0.7, 0.9].map(a => (
+                    <span key={a} style={{ width: '26px', height: '14px', borderRadius: '3px', background: `rgba(13,148,136,${a})`, display: 'inline-block' }} />
+                  ))}
+                  <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>{t('High')}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── CASES ADDED PER USER ── */}
+      {(() => {
+        const per = {};
+        displayCases.forEach(c => {
+          const key = c.created_by ? String(c.created_by) : 'legacy';
+          if (!per[key]) {
+            per[key] = {
+              id: c.created_by ? String(c.created_by) : null,
+              name: (c.created_by_name || '').trim() || (c.created_by ? t('Unknown User') : t('Unspecified')),
+              role: c.created_by_role || '—',
+              count: 0,
+            };
+          }
+          per[key].count++;
+        });
+        const userStats = Object.values(per).sort((a, b) => b.count - a.count);
+        if (userStats.length === 0) return null;
+        const userMax = userStats[0].count;
+        const roleSplit = (() => {
+          const acc = {};
+          userStats.forEach(u => { acc[u.role] = acc[u.role] || { accounts: 0, cases: 0 }; acc[u.role].accounts++; acc[u.role].cases += u.count; });
+          return Object.entries(acc).sort((a, b) => b[1].cases - a[1].cases);
+        })();
+        return (
+          <div className="cdms-view-in" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' }}>
+            <h4 style={{ margin: '0 0 16px 0', fontSize: '15px', fontWeight: '600', color: 'var(--text-main)' }}>
+              {t('Cases Added per User')}
+              <span style={{ color: 'var(--text-muted)', fontSize: '15px', fontWeight: '400', marginLeft: '8px' }}>
+                · {formatDateStr(dateRange.start, dateFormat)} {t('to')} {formatDateStr(dateRange.end, dateFormat)}
+              </span>
+            </h4>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
+              {roleSplit.map(([role, v]) => (
+                <span key={role} style={{ padding: '4px 12px', borderRadius: '16px', fontSize: '14px', fontWeight: '600', background: role === 'BHW' ? 'rgba(13,148,136,0.15)' : 'rgba(59,130,246,0.15)', color: role === 'BHW' ? '#0d9488' : '#3B82F6', border: `1px solid ${role === 'BHW' ? 'rgba(13,148,136,0.4)' : 'rgba(59,130,246,0.4)'}` }}>
+                  {role}: {v.accounts} {t('accounts')} · {v.cases} {t('Cases')}
+                </span>
+              ))}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {userStats.map((u, i) => (
+                <div key={u.id || 'legacy'} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '22px', height: '22px', borderRadius: '50%', background: i === 0 ? '#DC2626' : i === 1 ? '#D97706' : '#3b82f6', color: '#fff', fontSize: '13px', fontWeight: '700', flexShrink: 0 }}>{i + 1}</span>
+                  <span style={{ minWidth: '130px', fontSize: '15px', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={u.name}>{u.name}</span>
+                  <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '13px', fontWeight: '600', background: u.role === 'BHW' ? 'rgba(13,148,136,0.15)' : 'rgba(59,130,246,0.15)', color: u.role === 'BHW' ? '#0d9488' : '#3B82F6', flexShrink: 0 }}>{u.role}</span>
+                  <div style={{ flex: 1, background: 'var(--input-bg)', height: '20px', borderRadius: '6px', overflow: 'hidden' }}>
+                    <div style={{ width: `${userMax > 0 ? (u.count / userMax) * 100 : 0}%`, background: getCountColor(u.count, userStats), height: '100%', borderRadius: '6px', transition: 'width 0.4s ease', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '6px', color: '#fff', fontSize: '13px', fontWeight: '700', boxSizing: 'border-box' }}>
+                      {u.count > 0 ? u.count : ''}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         );

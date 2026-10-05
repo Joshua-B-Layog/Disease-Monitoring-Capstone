@@ -831,17 +831,17 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Current Password</label>
+                    <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Current Password <span style={{ color: '#dc2626' }}>*</span></label>
                     <input type="password" value={forcePw.current} onChange={(e) => setForcePw({ ...forcePw, current: e.target.value })}
                       style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px' }} />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>New Password</label>
+                    <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>New Password <span style={{ color: '#dc2626' }}>*</span></label>
                     <input type="password" value={forcePw.next} onChange={(e) => setForcePw({ ...forcePw, next: e.target.value })}
                       style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px' }} />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Confirm New Password</label>
+                    <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Confirm New Password <span style={{ color: '#dc2626' }}>*</span></label>
                     <input type="password" value={forcePw.confirm} onChange={(e) => setForcePw({ ...forcePw, confirm: e.target.value })}
                       onKeyDown={(e) => { if (e.key === 'Enter') handleForcedPasswordChange(); }}
                       style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px' }} />

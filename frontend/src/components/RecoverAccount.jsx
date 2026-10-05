@@ -43,7 +43,9 @@ export default function RecoverAccount() {
           </p>
 
           <form onSubmit={handleRequest}>
+            <label htmlFor="recover-identity" style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Username or email address{' '}<span style={{ color: '#dc2626', fontWeight: 700 }}>*</span></label>
             <input
+              id="recover-identity"
               type="text"
               placeholder="Username or email address"
               value={identity}

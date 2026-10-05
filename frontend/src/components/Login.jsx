@@ -258,6 +258,8 @@ function AnimatedMapView({ setFade, active, onSequenceComplete }) {
     );
   }
 
+  const Req = () => <span style={{ color: '#dc2626', fontWeight: 700 }}> *</span>;
+
   export default function Login({ onLoginSuccess, onForgotPassword, theme, toggleTheme }) {
     const [step, setStep] = useState('role'); // 'role', 'cho_select', 'bhw_select', 'auth', 'forgot_password', 'signup', 'cho_contact', 'signup_role'
     const [pendingUser, setPendingUser] = useState(null); // holds session data while waiting for OTP
@@ -890,7 +892,7 @@ const handleLoginOtpSubmit = async (e) => {
 
                 <form onSubmit={handleFormSubmit}>
                   <div className="form-group" style={{ textAlign: 'left' }}>
-                    <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Username or Email address</label>
+                    <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Username or Email address<Req /></label>
                     <input 
                       type="text"
                       className="form-input" 
@@ -902,7 +904,7 @@ const handleLoginOtpSubmit = async (e) => {
                   </div>
                   
                   <div className="form-group" style={{ marginTop: '20px', textAlign: 'left' }}>
-                    <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Password</label>
+                    <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Password<Req /></label>
                     
                     <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                       <input 
@@ -981,7 +983,7 @@ const handleLoginOtpSubmit = async (e) => {
       <form onSubmit={handleLoginOtpSubmit}>
       <div className="form-group" style={{ textAlign: 'left' }}>
         <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>
-          Verification Code
+          Verification Code<Req />
         </label>
         <input
           type="text"
@@ -1111,7 +1113,7 @@ const handleLoginOtpSubmit = async (e) => {
                 <form onSubmit={handleRecoverySubmit}>
                   <div className="form-group" style={{ textAlign: 'left' }}>
                     <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>
-                      Registered Email Address
+                      Registered Email Address<Req />
                     </label>
                     <input 
                       type="text"
@@ -1147,7 +1149,7 @@ const handleLoginOtpSubmit = async (e) => {
                     <form onSubmit={handleSignupSubmit}>
                         {/* Full Name */}
                         <div className="form-group" style={{ textAlign: 'left' }}>
-                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Full Name</label>
+                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Full Name<Req /></label>
                             <input
                                 type="text"
                                 className="form-input"
@@ -1160,7 +1162,7 @@ const handleLoginOtpSubmit = async (e) => {
 
                         {/* Username */}
                         <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
-                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Username</label>
+                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Username<Req /></label>
                             <input
                                 type="text"
                                 className="form-input"
@@ -1173,7 +1175,7 @@ const handleLoginOtpSubmit = async (e) => {
 
                         {/* Email */}
                         <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
-                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Email Address</label>
+                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Email Address<Req /></label>
                             <input
                                 type="email"
                                 className="form-input"
@@ -1186,7 +1188,7 @@ const handleLoginOtpSubmit = async (e) => {
 
                         {/* Mobile Number */}
                         <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
-                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Mobile Number</label>
+                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Mobile Number<Req /></label>
                             <input
                                 type="text"
                                 className="form-input"
@@ -1200,7 +1202,7 @@ const handleLoginOtpSubmit = async (e) => {
                         {/* Assigned Station */}
                         <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
                             <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>
-                                Assigned Barangay
+                                Assigned Barangay<Req />
                             </label>
                             <div style={{ position: 'relative' }} ref={signupBarangayRef}>
                                 <button
@@ -1251,7 +1253,7 @@ const handleLoginOtpSubmit = async (e) => {
 
                         {/* Password */}
                         <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
-                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Password</label>
+<label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Password<Req /></label>
                             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                                 <input
                                     type={showSignupPassword ? 'text' : 'password'}
@@ -1284,7 +1286,7 @@ const handleLoginOtpSubmit = async (e) => {
 
                         {/* Confirm Password */}
                         <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
-                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Confirm Password</label>
+                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Confirm Password<Req /></label>
                             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                                 <input
                                     type={showSignupConfirm ? 'text' : 'password'}

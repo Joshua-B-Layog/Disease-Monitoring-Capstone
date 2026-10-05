@@ -110,7 +110,7 @@ export default function ResetPasswordLanding() {
                 display: 'block', color: '#9CA3AF', fontSize: '15px',
                 fontWeight: '500', marginBottom: '8px'
               }}>
-                New Password
+                New Password <span style={{ color: '#f87171' }}>*</span>
               </label>
               <div style={{ position: 'relative' }}>
                 <input
@@ -152,7 +152,7 @@ export default function ResetPasswordLanding() {
                 display: 'block', color: '#9CA3AF', fontSize: '15px',
                 fontWeight: '500', marginBottom: '8px'
               }}>
-                Confirm New Password
+                Confirm New Password <span style={{ color: '#f87171' }}>*</span>
               </label>
               <div style={{ position: 'relative' }}>
                 <input

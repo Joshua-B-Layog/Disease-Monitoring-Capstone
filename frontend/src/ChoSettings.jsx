@@ -1241,7 +1241,7 @@ if (security.newPassword !== security.confirmPassword) {
                           { field: 'confirmPassword', label: 'Confirm New Password', show: showConfirm, setShow: setShowConfirm },
                         ].map(({ field, label, show, setShow }) => (
                           <div key={field} className="security-input-row">
-                            <label>{t(label)}</label>
+                            <label>{t(label)} <span style={{ color: '#dc2626' }}>*</span></label>
                             <div className="security-password-wrapper">
                               <input type={show ? 'text' : 'password'} value={security[field]}
                                 onChange={e => setSecurity({ ...security, [field]: e.target.value })}
@@ -1295,7 +1295,7 @@ if (security.newPassword !== security.confirmPassword) {
                       { field: 'confirmPassword', label: 'Confirm New Password', show: showConfirm, setShow: setShowConfirm },
                     ].map(({ field, label, show, setShow }) => (
                       <div key={field} className="security-input-row">
-                        <label>{t(label)}</label>
+                        <label>{t(label)} <span style={{ color: '#dc2626' }}>*</span></label>
                         <div className="security-password-wrapper">
                           <input type={show ? 'text' : 'password'} value={security[field]}
                             onChange={e => setSecurity({ ...security, [field]: e.target.value })}
@@ -2068,7 +2068,7 @@ if (security.newPassword !== security.confirmPassword) {
 
                         if (row.label === 'Export as PDF') {
                           const caseRows = cases.map(c =>
-                            `<tr><td>${c.case_id}</td><td>${c.patient_name||''}</td><td>${c.age||''}</td><td>${c.gender||''}</td><td>${c.barangay_name||''}</td><td>${c.disease_name||''}</td><td>${c.severity||''}</td><td>${translateStatus(c.status)||''}</td><td>${c.vaccination_status||''}</td><td>${c.vaccine_expiry_date||''}</td><td>${formatDate(c.date_reported, systemPrefs.dateFormat)}</td></tr>`
+                            `<tr><td>${c.case_id}</td><td>${c.patient_name||''}</td><td>${c.age||''}</td><td>${c.gender||''}</td><td>${c.barangay_name||''}</td><td>${c.disease_name||''}</td><td>${c.severity||''}</td><td>${translateStatus(c.status)||''}</td><td>${c.vaccination_status||''}</td><td>${c.vaccine_expiry_date||''}</td><td>${c.intervention||''}</td><td>${c.action_plan||''}</td><td>${formatDate(c.date_reported, systemPrefs.dateFormat)}</td></tr>`
                           ).join('');
                           const userRows = users.map(u =>
                             `<tr><td>U-${String(u.user_id).padStart(3,'0')}</td><td>${u.full_name||''}</td><td>${u.username||''}</td><td>${u.role||''}</td><td>${u.barangay_name||''}</td><td>${u.is_active?'Active':'Inactive'}</td><td>${u.email||''}</td></tr>`
@@ -2091,7 +2091,7 @@ if (security.newPassword !== security.confirmPassword) {
                           <h2>Cabuyao CDMS - Full Data Export</h2>
                           <p class="meta">Generated: ${formatDateTime(new Date(), systemPrefs.dateFormat)} &nbsp;|&nbsp; ${cases.length} Cases, ${users.length} Users</p>
                           <h3>Case Records (${cases.length})</h3>
-                          <table><thead><tr><th>ID</th><th>Patient Name</th><th>Age</th><th>Gender</th><th>Barangay</th><th>Disease</th><th>Severity</th><th>Status</th><th>Vaccination</th><th>Vaccine Expiry</th><th>Date Reported</th></tr></thead><tbody>${caseRows}</tbody></table>
+                          <table><thead><tr><th>ID</th><th>Patient Name</th><th>Age</th><th>Gender</th><th>Barangay</th><th>Disease</th><th>Severity</th><th>Status</th><th>Vaccination</th><th>Vaccine Expiry</th><th>Intervention</th><th>Action Plan</th><th>Date Reported</th></tr></thead><tbody>${caseRows}</tbody></table>
                           <h3>User Accounts (${users.length})</h3>
                           <table><thead><tr><th>User ID</th><th>Full Name</th><th>Username</th><th>Role</th><th>Barangay</th><th>Status</th><th>Email</th></tr></thead><tbody>${userRows}</tbody></table>
                           <h3>System Activity Log</h3>
@@ -2105,7 +2105,7 @@ if (security.newPassword !== security.confirmPassword) {
                                 label: `⬇ ${t('Download PDF (.pdf)')}`,
                                 primary: true,
                                 onClick: () => {
-                                  const pdfCasesCols = ['ID', t('Patient Name'), t('Age'), 'Gender', t('Barangay'), t('Disease'), 'Severity', 'Status', 'Vaccination', 'Vaccine Expiry', t('Date Reported')];
+                                  const pdfCasesCols = ['ID', t('Patient Name'), t('Age'), 'Gender', t('Barangay'), t('Disease'), 'Severity', 'Status', 'Vaccination', 'Vaccine Expiry', t('Intervention'), t('Action Plan'), t('Date Reported')];
                                   const pdfCasesRows = cases.map(c => [
                                     `#${String(c.case_id).padStart(3, '0')}`,
                                     c.patient_name || '',
@@ -2117,6 +2117,8 @@ if (security.newPassword !== security.confirmPassword) {
                                     translateStatus(c.status) || '',
                                     c.vaccination_status || '',
                                     c.vaccine_expiry_date || '',
+                                    c.intervention || '',
+                                    c.action_plan || '',
                                     formatDate(c.date_reported, systemPrefs.dateFormat),
                                   ]);
                                   const pdfUsersCols = ['User ID', 'Full Name', 'Username', 'Role', t('Barangay'), 'Status', 'Email'];
@@ -2155,16 +2157,16 @@ if (security.newPassword !== security.confirmPassword) {
                           const nl = '\n';
                           let content = '';
                           content += '=== CASE RECORDS ===' + nl;
-                          content += 'Case ID' + sep + 'Patient Name' + sep + 'Age' + sep + 'Barangay' + sep + 'Disease' + sep + 'Severity' + sep + 'Status' + sep + 'Vaccination' + sep + 'Vaccine Expiry' + sep + 'Date Reported' + nl;
-                          cases.forEach(c => { content += `${c.case_id}${sep}${c.patient_name||''}${sep}${c.age||''}${sep}${c.barangay_name||''}${sep}${c.disease_name||''}${sep}${c.severity||''}${sep}${translateStatus(c.status)||''}${sep}${c.vaccination_status||''}${sep}${c.vaccine_expiry_date||''}${sep}${c.date_reported||''}${nl}`; });
+                          content += 'Case ID' + sep + 'Patient Name' + sep + 'Age' + sep + 'Barangay' + sep + 'Disease' + sep + 'Severity' + sep + 'Status' + sep + 'Vaccination' + sep + 'Vaccine Expiry' + sep + 'Intervention' + sep + 'Action Plan' + sep + 'Date Reported' + nl;
+                          cases.forEach(c => { content += `${c.case_id}${sep}${c.patient_name||''}${sep}${c.age||''}${sep}${c.barangay_name||''}${sep}${c.disease_name||''}${sep}${c.severity||''}${sep}${translateStatus(c.status)||''}${sep}${c.vaccination_status||''}${sep}${c.vaccine_expiry_date||''}${sep}${(c.intervention||'').replace(/\t|\n/g,' ')}${sep}${(c.action_plan||'').replace(/\t|\n/g,' ')}${sep}${c.date_reported||''}${nl}`; });
                           content += nl + '=== USER ACCOUNTS ===' + nl;
                           content += 'ID' + sep + 'Name' + sep + 'Username' + sep + 'Barangay' + sep + 'Role' + sep + 'Status' + nl;
                           users.forEach(u => { content += `U-${String(u.user_id).padStart(3,'0')}${sep}${u.full_name||''}${sep}${u.username||''}${sep}${u.barangay_name||''}${sep}${u.role||''}${sep}${u.is_active?'Active':'Inactive'}${nl}`; });
                           content += nl + '=== SYSTEM LOGS ===' + nl;
                           content += '#' + sep + 'Timestamp' + sep + 'User' + sep + 'Role' + sep + 'Action' + sep + 'Entity' + sep + 'Details' + nl;
                           logs.forEach(l => { content += `${l.id}${sep}${l.timestamp}${sep}${l.userName}${sep}${l.userRole}${sep}${l.action}${sep}${l.entity}${sep}${l.details}${nl}`; });
-                          const columns = [t('Case ID'), t('Patient Name'), t('Age'), t('Barangay'), t('Disease'), t('Severity'), t('Status'), t('Vaccination'), t('Vaccine Expiry'), t('Date Reported')];
-                          const previewRows = cases.map(c => [c.case_id, c.patient_name||'', c.age||'', c.barangay_name||'', c.disease_name||'', c.severity||'', translateStatus(c.status)||'', c.vaccination_status||'', c.vaccine_expiry_date||'', c.date_reported||'']);
+                          const columns = [t('Case ID'), t('Patient Name'), t('Age'), t('Barangay'), t('Disease'), t('Severity'), t('Status'), t('Vaccination'), t('Vaccine Expiry'), t('Intervention'), t('Action Plan'), t('Date Reported')];
+                          const previewRows = cases.map(c => [c.case_id, c.patient_name||'', c.age||'', c.barangay_name||'', c.disease_name||'', c.severity||'', translateStatus(c.status)||'', c.vaccination_status||'', c.vaccine_expiry_date||'', c.intervention||'', c.action_plan||'', c.date_reported||'']);
                           setPreview({
                             title: t('Preview: Excel Export'),
                             columns,
@@ -2183,16 +2185,16 @@ if (security.newPassword !== security.confirmPassword) {
                           const nl = '\n';
                           let content = '';
                           content += '=== CASE RECORDS ===' + nl;
-                          content += 'Case ID' + sep + 'Patient Name' + sep + 'Age' + sep + 'Barangay' + sep + 'Disease' + sep + 'Severity' + sep + 'Status' + sep + 'Vaccination' + sep + 'Vaccine Expiry' + sep + 'Date Reported' + nl;
-                          cases.forEach(c => { content += `${c.case_id}${sep}${c.patient_name||''}${sep}${c.age||''}${sep}${c.barangay_name||''}${sep}${c.disease_name||''}${sep}${c.severity||''}${sep}${c.status||''}${sep}${c.vaccination_status||''}${sep}${c.vaccine_expiry_date||''}${sep}${c.date_reported||''}${nl}`; });
+                          content += 'Case ID' + sep + 'Patient Name' + sep + 'Age' + sep + 'Barangay' + sep + 'Disease' + sep + 'Severity' + sep + 'Status' + sep + 'Vaccination' + sep + 'Vaccine Expiry' + sep + 'Intervention' + sep + 'Action Plan' + sep + 'Date Reported' + nl;
+                          cases.forEach(c => { content += `${c.case_id}${sep}${c.patient_name||''}${sep}${c.age||''}${sep}${c.barangay_name||''}${sep}${c.disease_name||''}${sep}${c.severity||''}${sep}${c.status||''}${sep}${c.vaccination_status||''}${sep}${c.vaccine_expiry_date||''}${sep}${(c.intervention||'').replace(/,|\n/g,' ')}${sep}${(c.action_plan||'').replace(/,|\n/g,' ')}${sep}${c.date_reported||''}${nl}`; });
                           content += nl + '=== USER ACCOUNTS ===' + nl;
                           content += 'ID' + sep + 'Name' + sep + 'Username' + sep + 'Barangay' + sep + 'Role' + sep + 'Status' + nl;
                           users.forEach(u => { content += `U-${String(u.user_id).padStart(3,'0')}${sep}${u.full_name||''}${sep}${u.username||''}${sep}${u.barangay_name||''}${sep}${u.role||''}${sep}${u.is_active?'Active':'Inactive'}${nl}`; });
                           content += nl + '=== SYSTEM LOGS ===' + nl;
                           content += '#' + sep + 'Timestamp' + sep + 'User' + sep + 'Role' + sep + 'Action' + sep + 'Entity' + sep + 'Details' + nl;
                           logs.forEach(l => { content += `${l.id}${sep}${l.timestamp}${sep}${l.userName}${sep}${l.userRole}${sep}${l.action}${sep}${l.entity}${sep}${l.details}${nl}`; });
-                          const columns = [t('Case ID'), t('Patient Name'), t('Age'), t('Barangay'), t('Disease'), t('Severity'), t('Status'), t('Vaccination'), t('Vaccine Expiry'), t('Date Reported')];
-                          const previewRows = cases.map(c => [c.case_id, c.patient_name||'', c.age||'', c.barangay_name||'', c.disease_name||'', c.severity||'', c.status||'', c.vaccination_status||'', c.vaccine_expiry_date||'', c.date_reported||'']);
+                          const columns = [t('Case ID'), t('Patient Name'), t('Age'), t('Barangay'), t('Disease'), t('Severity'), t('Status'), t('Vaccination'), t('Vaccine Expiry'), t('Intervention'), t('Action Plan'), t('Date Reported')];
+                          const previewRows = cases.map(c => [c.case_id, c.patient_name||'', c.age||'', c.barangay_name||'', c.disease_name||'', c.severity||'', c.status||'', c.vaccination_status||'', c.vaccine_expiry_date||'', c.intervention||'', c.action_plan||'', c.date_reported||'']);
                           setPreview({
                             title: t('Preview: CSV Export'),
                             columns,

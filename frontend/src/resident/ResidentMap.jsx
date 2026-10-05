@@ -11,6 +11,7 @@ import { onDiseasesChanged } from '../diseaseSignal';
 import { useI18n } from '../i18n';
 import DatePicker from '../components/DatePicker';
 import { precacheTiles } from '../mapTileCache';
+import { ACTION_TYPE_ICONS, hazardIcon, hazardDiseases, isDisasterActive, getDisasterWatch, WEATHER_ATTRIBUTION } from '../disasterRisk';
 
 const CABUYAO_CENTER = [14.2253, 121.1254];
 const CABUYAO_BOUNDS = [
@@ -564,6 +565,22 @@ export default function ResidentMap() {
   const [offlineMode, setOfflineMode]   = useState(false);
   const { t } = useI18n();
 
+  const [actions, setActions] = useState([]);
+  const [disasterEvents, setDisasterEvents] = useState([]);
+  const [weatherHazards, setWeatherHazards] = useState([]);
+
+  useEffect(() => {
+    let alive = true;
+    const load = () => {
+      axios.get(API_URL + '/api/barangay-actions').then(res => { if (alive) setActions(Array.isArray(res.data) ? res.data : []); }).catch(() => {});
+      axios.get(API_URL + '/api/disaster-events').then(res => { if (alive) setDisasterEvents(Array.isArray(res.data) ? res.data : []); }).catch(() => {});
+      axios.get(API_URL + '/api/weather/hazards').then(res => { if (alive) setWeatherHazards(Array.isArray(res.data) ? res.data : []); }).catch(() => {});
+    };
+    load();
+    const iv = setInterval(load, 30000);
+    return () => { alive = false; clearInterval(iv); };
+  }, []);
+
   const currentYear = new Date().getFullYear();
   const [filterDateFrom, setFilterDateFrom] = useState(() => `${currentYear}-01-01`);
   const [filterDateTo, setFilterDateTo]     = useState(() => `${currentYear}-12-31`);
@@ -989,10 +1006,10 @@ export default function ResidentMap() {
                       <div key={gender} style={{ flex: 1, background: 'var(--input-bg)', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
                         <div style={{ fontSize: '22px', fontWeight: '800', color }}>{count}</div>
                         <div style={{ fontSize: '16px', color: 'var(--text-muted)', fontWeight: '600' }}>{gender} ({pct}%)</div>
-                      </div>
-                    );
-                  })}
-                </div>
+</div>
+              );
+                })}
+            </div>
               </div>
             )}
 
@@ -1098,13 +1115,13 @@ export default function ResidentMap() {
             )}
           </div>
           <div style={{ flex: 1, minWidth: '170px' }}>
-            <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '600' }}>{t('From')}</div>
+            <div style={{ fontSize: '15px', color: 'var(--text-main)', marginBottom: '6px', fontWeight: '600' }}>{t('From')}</div>
             <DatePicker value={filterDateFrom} dateFormat="MM/DD/YY" placeholder={t('Start date')} clearable={true}
               onChange={v => { setFilterDateFrom(v); setFilterYear(''); }}
               style={{ width: '100%' }} />
           </div>
           <div style={{ flex: 1, minWidth: '170px' }}>
-            <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '600' }}>{t('To')}</div>
+            <div style={{ fontSize: '15px', color: 'var(--text-main)', marginBottom: '6px', fontWeight: '600' }}>{t('To')}</div>
             <DatePicker value={filterDateTo} dateFormat="MM/DD/YY" placeholder={t('End date')} clearable={true} anchorRight={true}
               onChange={v => { setFilterDateTo(v); setFilterYear(''); }}
               style={{ width: '100%' }} />
@@ -1385,6 +1402,59 @@ export default function ResidentMap() {
                   </div>
                 );
               })}
+
+              {(() => {
+                const bkey = (popup.barangay || popup.barangayName) || '';
+                const ongoing = actions.filter(a => a.barangay_name === bkey && a.status !== 'completed');
+                const watch = bkey ? getDisasterWatch(disasterEvents.filter(e => e.barangay_name === bkey)) : null;
+                const wx = bkey ? (Array.isArray(weatherHazards) ? weatherHazards.find(w => w.name === bkey) : null) : null;
+                const weatherLine = wx && wx.hazards && wx.hazards.length
+                  ? `${wx.hazards.map(h => `${hazardIcon(h)} ${h}`).join(' ')}${wx.hazards.length ? ' — ' + [...new Set(wx.hazards.flatMap(hazardDiseases))].join(', ') : ''}`
+                  : '';
+                if (ongoing.length === 0 && !watch && !weatherLine) return null;
+                return (
+                  <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
+                    {ongoing.length > 0 && (
+                      <div style={{ borderRadius: '8px', background: 'rgba(8,145,178,0.1)', border: '1px solid rgba(8,145,178,0.3)', padding: '10px 12px', marginBottom: watch || weatherLine ? '8px' : '0' }}>
+                        <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '6px' }}>
+                          {t('Ongoing Barangay Actions')}
+                        </div>
+                        {ongoing.map(a => (
+                          <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                            <span style={{ fontSize: '15px' }}>{ACTION_TYPE_ICONS[a.action_type] || '📋'}</span>
+                            <span style={{ fontSize: '16px', color: 'var(--text-muted)' }}>
+                              {t(a.action_type)}{a.target_disease ? ` · ${a.target_disease}` : ''}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {weatherLine && (
+                      <div style={{ borderRadius: '8px', background: 'rgba(37,99,235,0.1)', border: '1px solid rgba(37,99,235,0.3)', padding: '10px 12px', marginBottom: watch ? '8px' : '0' }}>
+                        <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '2px' }}>
+                          🌦 {t('Weather')}
+                        </div>
+                        <div style={{ fontSize: '16px', color: 'var(--text-muted)' }}>
+                          {weatherLine}
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                          {WEATHER_ATTRIBUTION}
+                        </div>
+                      </div>
+                    )}
+                    {watch && (
+                      <div style={{ borderRadius: '8px', background: 'rgba(37,99,235,0.1)', border: '1px solid rgba(37,99,235,0.3)', padding: '10px 12px' }}>
+                        <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '2px' }}>
+                          {t('Disaster Watch')}
+                        </div>
+                        <div style={{ fontSize: '16px', color: 'var(--text-muted)' }}>
+                          {watch.label}{watch.hint ? ` — ${watch.hint}` : ''}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>

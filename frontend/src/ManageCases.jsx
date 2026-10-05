@@ -450,11 +450,14 @@ const EMPTY_FORM = {
   patientName: '', diseaseType: '', age: '', severity: 'Mild', caseType: 'Probable', diseaseSubtype: '',
   gender: 'Male', status: 'Active', contact: '', onsetDate: '',
   address: '', purok: '', barangayId: '', symptoms: '', physician: '',
-  lat: '', lng: '', vaccinationStatus: '', vaccineExpiryDate: ''
+  lat: '', lng: '', vaccinationStatus: '', vaccineExpiryDate: '',
+  intervention: '', actionPlan: ''
 };
 
 const CATEGORIES_PER_PAGE = 8;
 const DISEASES_PER_PAGE = 12;
+
+const Req = () => <span style={{ color: '#dc2626', fontWeight: 700 }}> *</span>;
 
 export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, autoSave, confirmDelete, keyboardShortcuts, fontScale, compactMode, loggedUserId, loggedUser, loginRole, loginBarangay, sessionContext, initialView, onInitialViewConsumed, pendingOpenCaseId, onPendingCaseConsumed, pendingOpenAdd, onPendingOpenAddConsumed, pendingMcLanding, onMcLandingConsumed }) {
   const { t, translateStatus } = useI18n();
@@ -1291,6 +1294,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
         longitude: formData.lng,
         vaccination_status: formData.vaccinationStatus || null,
         vaccine_expiry_date: formData.vaccineExpiryDate || null,
+        intervention: formData.intervention || null,
+        action_plan: formData.actionPlan || null,
       },
     };
     if (!isOnline()) {
@@ -1370,6 +1375,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
             physician: (proposed && proposed.physician) || c.physician,
             latitude: (proposed && proposed.latitude) || c.latitude,
             longitude: (proposed && proposed.longitude) || c.longitude,
+            intervention: (proposed && proposed.intervention) || c.intervention || '',
+            action_plan: (proposed && proposed.action_plan) || c.action_plan || '',
           });
         } else {
           notify(t('Case found, but data not loaded yet. Please refresh.'), 'error');
@@ -1416,6 +1423,10 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       physician: req.physician || '',
       lat: req.latitude || '',
       lng: req.longitude || '',
+      vaccinationStatus: req.vaccination_status || '',
+      vaccineExpiryDate: req.vaccine_expiry_date ? String(req.vaccine_expiry_date).slice(0, 10) : '',
+      intervention: req.intervention || '',
+      actionPlan: req.action_plan || '',
     });
     setFormErrors({});
     setView('add');
@@ -2065,6 +2076,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       lng: caseItem.longitude || '',
       vaccinationStatus: caseItem.vaccination_status || '',
       vaccineExpiryDate: caseItem.vaccine_expiry_date ? caseItem.vaccine_expiry_date.split('T')[0] : '',
+      intervention: caseItem.intervention || '',
+      actionPlan: caseItem.action_plan || '',
     };
     setFormData(filledForm);
     setEditingCase(caseItem);
@@ -2359,6 +2372,8 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
       longitude: formData.lng || null,
       vaccination_status: formData.vaccinationStatus || null,
       vaccine_expiry_date: formData.vaccineExpiryDate || null,
+      intervention: formData.intervention || null,
+      action_plan: formData.actionPlan || null,
       user_id: loggedUserId || null,
     };
 
@@ -4293,6 +4308,9 @@ width: '90px', height: '195px', background: 'var(--bg-surface)',
           )}
 
           <form onSubmit={(e) => handleSave(e, false)}>
+            <div style={{ fontSize: '14px', color: 'var(--text-muted)', marginBottom: '14px' }}>
+              {t('Fields marked with * are required.')}
+            </div>
             <div className="cdms-case-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', marginBottom: '24px' }}>
 
               {/* LEFT: Patient Info */}
@@ -4302,7 +4320,7 @@ width: '90px', height: '195px', background: 'var(--bg-surface)',
                 </h4>
                 <div style={{ position: 'relative' }}>
                   <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>
-                    {t('Patient Full Name')}
+                    {t('Patient Full Name')}<Req />
                       <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '15px', marginLeft: '6px' }}>
                       {t('(Type surname to auto-fill past records)')}
                     </span>
@@ -4389,7 +4407,7 @@ width: '90px', height: '195px', background: 'var(--bg-surface)',
 
                 <div className="cdms-case-form-pair" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Age')} </label>
+                    <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Age')} <Req /></label>
                     <input type="number" min="0" max="120" placeholder="25" style={{ ...inputStyle, border: formErrors.age ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.age ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                       value={formData.age} onChange={e => setFormData({ ...formData, age: e.target.value })}
                       readOnly={isBhwReadOnly} />
@@ -4426,14 +4444,14 @@ width: '90px', height: '195px', background: 'var(--bg-surface)',
                   </div>
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Contact No.')}</label>
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Contact No.')}<Req /></label>
                   <input type="text" placeholder={t('0918-234-2331')} style={{ ...inputStyle, border: formErrors.contact ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.contact ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                     value={formData.contact} onChange={e => setFormData({ ...formData, contact: e.target.value })}
                     readOnly={isBhwReadOnly} />
                   {formErrors.contact && <span style={{ fontSize: '13px', color: '#ef4444', marginTop: '3px', display: 'block' }}>{t('Enter a valid PH number (e.g., 09123456789)')}</span>}
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Address')} </label>
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Address')} <Req /></label>
                   <input type="text" placeholder={t('123 Rizal St, San Isidro Cabuyao')} style={inputStyle}
                     value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })}
                     readOnly={isBhwReadOnly}
@@ -4714,7 +4732,7 @@ width: '90px', height: '195px', background: 'var(--bg-surface)',
                   </div>
                 ) : (
                   <div>
-                    <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Assigned Barangay</label>
+                    <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>Assigned Barangay<Req /></label>
                     {isBhwReadOnly ? (
                       <div style={{ padding: '8px 12px', background: 'var(--input-bg, #f1f5f9)', borderRadius: '6px', fontSize: '15px', color: 'var(--text-main)' }}>
                         {scopedBarangayList.find(b => String(b.id) === String(formData.barangayId))?.name || t('Not set')}
@@ -4787,7 +4805,7 @@ width: '90px', height: '195px', background: 'var(--bg-surface)',
                 )}
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Date of Onset')}</label>
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Date of Onset')}<Req /></label>
                   <DatePicker value={formData.onsetDate} dateFormat={dateFormat} clearable={false}
                     placeholder={t('Select date')} disabled={isBhwReadOnly} error={!!formErrors.onsetDate}
                     style={{ width: '100%' }}
@@ -4798,7 +4816,7 @@ width: '90px', height: '195px', background: 'var(--bg-surface)',
                     }} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Attending Physician')}</label>
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Attending Physician')}<Req /></label>
                   <input type="text" placeholder={t('Dr. Jose Reyes, MD')} style={{ ...inputStyle, border: formErrors.physician ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.physician ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                     value={formData.physician} onChange={e => setFormData({ ...formData, physician: e.target.value })}
                     readOnly={isBhwReadOnly} />
@@ -4812,7 +4830,7 @@ width: '90px', height: '195px', background: 'var(--bg-surface)',
                   {t('Clinical Information')}
                 </h4>
                 <div>
-                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Disease Type')}</label>
+                  <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Disease Type')}<Req /></label>
                   {isBhwReadOnly ? (
                     <div style={{ padding: '8px 12px', background: 'var(--input-bg, #f1f5f9)', borderRadius: '6px', fontSize: '15px', color: 'var(--text-main)' }}>
                       {formData.diseaseType || t('Not set')}
@@ -5100,9 +5118,27 @@ width: '90px', height: '195px', background: 'var(--bg-surface)',
               </div>
             </div>
 
+            {/* Intervention + Action Plan aligned pair (report management - CHO editable, BHW read-only) */}
+            <div className="cdms-case-form-pair" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', alignItems: 'start', marginBottom: '20px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Intervention')}</label>
+                <textarea placeholder={t('e.g. Referred to City Health Office for lab confirmation')} rows="3"
+                  style={{ ...inputStyle, resize: 'vertical' }}
+                  value={formData.intervention} onChange={e => setFormData({ ...formData, intervention: e.target.value })}
+                  readOnly={isBhwReadOnly} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Action Plan')}</label>
+                <textarea placeholder={t('e.g. Home visit in 48h, barangay fogging, health education')} rows="3"
+                  style={{ ...inputStyle, resize: 'vertical' }}
+                  value={formData.actionPlan} onChange={e => setFormData({ ...formData, actionPlan: e.target.value })}
+                  readOnly={isBhwReadOnly} />
+              </div>
+            </div>
+
             {/* Symptoms full width */}
             <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Symptoms & Observations')}</label>
+              <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>{t('Symptoms & Observations')}<Req /></label>
               <textarea placeholder={t('e.g. Fever (39.5°C), Severe Headache, Muscle and Joint Pain...')} rows="3"
                 style={{ ...inputStyle, resize: 'vertical', border: formErrors.symptoms ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.symptoms ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                 value={formData.symptoms} onChange={e => setFormData({ ...formData, symptoms: e.target.value })}
@@ -5124,13 +5160,13 @@ width: '90px', height: '195px', background: 'var(--bg-surface)',
                   )}
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <div style={{ flex: 1 }}>
-                      <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px' }}>{t('Latitude (N)')}</label>
+                      <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px' }}>{t('Latitude (N)')} <Req /></label>
                       <input type="text" placeholder={t('e.g. 14.2253')} style={{ ...inputStyle, border: formErrors.location ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.location ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                         value={formData.lat} onChange={e => setFormData({ ...formData, lat: e.target.value })}
                         readOnly={isBhwReadOnly} />
                     </div>
                     <div style={{ flex: 1 }}>
-                      <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px' }}>{t('Longitude (E)')}</label>
+                      <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px' }}>{t('Longitude (E)')} <Req /></label>
                       <input type="text" placeholder={t('e.g. 121.3025')} style={{ ...inputStyle, border: formErrors.location ? '2px solid #ef4444' : '1px solid var(--border-color)', background: formErrors.location ? 'rgba(239,68,68,0.1)' : 'var(--input-bg)' }}
                         value={formData.lng} onChange={e => setFormData({ ...formData, lng: e.target.value })}
                         readOnly={isBhwReadOnly} />
