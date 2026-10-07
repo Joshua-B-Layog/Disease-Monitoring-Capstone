@@ -99,7 +99,10 @@ export default defineConfig({
   ],
   server: {
     port: 3000,
-    host: true
+    host: true,
+    // Fail loudly if 3000 is taken instead of silently stepping up to 3001,
+    // which breaks every API/origin assumption that expects :3000.
+    strictPort: true
   },
   build: {
     chunkSizeWarningLimit: 2500

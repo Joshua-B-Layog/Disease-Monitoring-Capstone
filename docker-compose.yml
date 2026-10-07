@@ -1,9 +1,7 @@
-version: '3.8'
-
 services:
   db:
     image: mysql:8.0
-    restart: always
+    restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: cho_cabuyao
       MYSQL_DATABASE: cabuyao_cdms_db
@@ -11,24 +9,54 @@ services:
       - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+      # Seeds the 4 core tables + sample rows on FIRST start only.
+      # The other 21 tables are self-migrated by server.js at startup.
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 40s
 
   backend:
     build: .
+    restart: unless-stopped
     ports:
       - "5000:5000"
     depends_on:
-      - db
-    env_file:
-      - .env 
+      db:
+        condition: service_healthy
+    environment:
+      PORT: 5000
+      # Service name, not localhost - this is the compose network alias.
+      DB_HOST: db
+      DB_USER: root
+      DB_PASSWORD: cho_cabuyao
+      DB_NAME: cabuyao_cdms_db
+      # Email links (2FA / reset) must resolve from the host browser.
+      FRONTEND_URL: http://localhost:3000
+      # ${VAR:-default} reads your local .env if present, else falls back so a
+      # fresh clone runs with zero configuration. Drop .env.example -> .env to
+      # switch on Brevo email/SMS; without it the app still works, it just
+      # skips sending.
+      JWT_SECRET: ${JWT_SECRET:-dev-only-change-me}
+      BREVO_FROM: ${BREVO_FROM:-}
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
+    volumes:
+      # Live reload: edit server.js on the host, nodemon restarts in-container.
+      - ./:/app
+      # Keep the container's own node_modules instead of the host's.
+      - /app/node_modules
 
   frontend:
     build: ./frontend
+    restart: unless-stopped
     ports:
-      - "3000:5173"
+      - "3000:3000"
     volumes:
-    - ./frontend:/app        
-    - /app/node_modules
+      - ./frontend:/app
+      - /app/node_modules
     depends_on:
       - backend
 

@@ -1,0 +1,17 @@
+node_modules
+frontend/node_modules
+frontend/dist
+backups
+.git
+.gitignore
+*.log
+.env
+.env.local
+.env.*
+!.env.example
+AGENTS.md
+CAPSTONE_REFERENCE.md
+README.md
+PERFORMANCE_TEST_RESULTS.md
+Dockerfile
+docker-compose.yml
