@@ -502,6 +502,20 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const [routingTargetBarangay, setRoutingTargetBarangay] = useState('');
   const [crossUnit, setCrossUnit] = useState(null);
   const [carouselIndex, setCarouselIndex] = useState(0); // 0 = trello board, 1 = exclusive diseases, 2 = add disease form
+const categoriesScrollRef = useRef(null);
+
+useEffect(() => {
+  const el = categoriesScrollRef.current;
+  if (!el) return undefined;
+  const onWheel = (e) => {
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && !e.target.closest('[data-scroll-y]') && el.scrollWidth - el.clientWidth > 0) {
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+    }
+  };
+  el.addEventListener('wheel', onWheel, { passive: false });
+  return () => el.removeEventListener('wheel', onWheel);
+}, [carouselIndex]);
   const [boardOpen, setBoardOpen] = useState({});
   const shortcutConfig = getShortcutConfig(loggedUserId);
   const [newDiseaseName, setNewDiseaseName] = useState('');
@@ -2964,15 +2978,7 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
                     {t('Click any column header to expand that disease list. Use your mouse wheel to scroll sideways across the categories.')}
                   </p>
 
-                  <div onWheel={e => {
-                    if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && !e.target.closest('[data-scroll-y]')) {
-                      const el = e.currentTarget;
-                      if (el.scrollWidth - el.clientWidth > 0) {
-                        e.preventDefault();
-                        el.scrollLeft += e.deltaY;
-                      }
-                    }
-                  }} style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', textAlign: 'left', overflowX: 'auto', padding: '2px 2px 10px' }}>
+                  <div ref={categoriesScrollRef} style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', textAlign: 'left', overflowX: 'auto', padding: '2px 2px 10px' }}>
                     {trelloColumns('all', ALL_DISEASE_ENTRIES, t('All Diseases'), resolveIcon('svg:alldiseases'), '#121358', t('Click to view all 28 diseases'))}
                     {(() => {
                       const list = ALL_DISEASE_ENTRIES.filter(e => notifTypeForEntry(e, allDiseases) === 'immediate');
