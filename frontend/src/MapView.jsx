@@ -1809,7 +1809,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   //   zoom 18+ (address tier) -> every unit address + manual pin gets its weather pin
   const areaTier = mapZoom === PUROK_ZOOM_THRESHOLD;
   const pinSourceGroups = areaTier
-    ? buildAreaTierItems(purokData, pinnedBarangay)
+    ? buildAreaTierItems(purokData, pinnedBaranga)
     : (purokData || []);
 
   // Manual hazard pins sit wherever the admin clicked rather than on a unit centre,
