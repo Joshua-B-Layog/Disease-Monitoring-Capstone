@@ -17,6 +17,7 @@ import DatePicker from './components/DatePicker';
 import ExportPreviewModal from './components/ExportPreview';
 import { buildPdfDoc } from './exportPdf';
 import { useI18n } from './i18n';
+import { RISK_FACTOR_GROUPS, HAZARD_SUGGESTED_FACTORS, parseRiskFactors, riskFactorLabel } from './riskFactors';
 
 const AllDiseasesIcon = ({ color = '#121358', size = 28 }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
@@ -451,7 +452,7 @@ const EMPTY_FORM = {
   gender: 'Male', status: 'Active', contact: '', onsetDate: '',
   address: '', purok: '', barangayId: '', symptoms: '', physician: '',
   lat: '', lng: '', vaccinationStatus: '', vaccineExpiryDate: '',
-  intervention: '', actionPlan: ''
+  intervention: '', actionPlan: '', riskFactors: []
 };
 
 const CATEGORIES_PER_PAGE = 8;
@@ -817,6 +818,28 @@ useEffect(() => {
   const patientNameRef = useRef('');
   const lookupDropdownRef = useRef(null);
   const [formErrors, setFormErrors] = useState({});
+
+  // Contributing Risk Factors chip panel + active-hazard auto-suggest
+  const [factorsOpen, setFactorsOpen] = useState(false);
+  const factorsRef = useRef(null);
+  const [activeHazards, setActiveHazards] = useState([]);
+  useEffect(() => {
+    axios.get(`${API_URL}/api/disaster-events`)
+      .then(res => setActiveHazards(Array.isArray(res.data) ? res.data : []))
+      .catch(() => {});
+  }, []);
+
+  const suggestedFactorsForBarangay = (barangayIdStr) => {
+    if (!barangayIdStr) return [];
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const seen = new Set();
+    activeHazards.forEach(ev => {
+      if (ev.date_ended && String(ev.date_ended).slice(0, 10) < todayIso) return;
+      if (ev.barangay_id != null && String(ev.barangay_id) !== String(barangayIdStr)) return;
+      (HAZARD_SUGGESTED_FACTORS[ev.event_type] || []).forEach(f => seen.add(f));
+    });
+    return [...seen];
+  };
 
   // Add/Edit form
   const [formData, setFormData] = useState({ ...EMPTY_FORM });
@@ -1310,6 +1333,7 @@ useEffect(() => {
         vaccine_expiry_date: formData.vaccineExpiryDate || null,
         intervention: formData.intervention || null,
         action_plan: formData.actionPlan || null,
+        risk_factors: parseRiskFactors(formData.riskFactors).length ? JSON.stringify(parseRiskFactors(formData.riskFactors)) : null,
       },
     };
     if (!isOnline()) {
@@ -1391,6 +1415,7 @@ useEffect(() => {
             longitude: (proposed && proposed.longitude) || c.longitude,
             intervention: (proposed && proposed.intervention) || c.intervention || '',
             action_plan: (proposed && proposed.action_plan) || c.action_plan || '',
+            risk_factors: parseRiskFactors((proposed && proposed.risk_factors) || c.risk_factors),
           });
         } else {
           notify(t('Case found, but data not loaded yet. Please refresh.'), 'error');
@@ -1441,6 +1466,7 @@ useEffect(() => {
       vaccineExpiryDate: req.vaccine_expiry_date ? String(req.vaccine_expiry_date).slice(0, 10) : '',
       intervention: req.intervention || '',
       actionPlan: req.action_plan || '',
+      riskFactors: parseRiskFactors(req.risk_factors),
     });
     setFormErrors({});
     setView('add');
@@ -1633,6 +1659,9 @@ useEffect(() => {
       }
       if (browseYearRef.current && !browseYearRef.current.contains(e.target)) {
         setBrowseYearOpen(false);
+      }
+      if (factorsRef.current && !factorsRef.current.contains(e.target)) {
+        setFactorsOpen(false);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -2092,6 +2121,7 @@ useEffect(() => {
       vaccineExpiryDate: caseItem.vaccine_expiry_date ? caseItem.vaccine_expiry_date.split('T')[0] : '',
       intervention: caseItem.intervention || '',
       actionPlan: caseItem.action_plan || '',
+      riskFactors: parseRiskFactors(caseItem.risk_factors),
     };
     setFormData(filledForm);
     setEditingCase(caseItem);
@@ -2155,6 +2185,9 @@ useEffect(() => {
     setFormData(base);
     setEditingCase(null);
     setFormErrors({});
+    setFactorsOpen(false);
+    const suggested = suggestedFactorsForBarangay(base.barangayId);
+    if (suggested.length) setFormData(prev => ({ ...prev, riskFactors: suggested }));
     setView('add');
   };
 
@@ -2268,6 +2301,7 @@ useEffect(() => {
         latitude: payload.latitude,
         longitude: payload.longitude,
         user_id: payload.user_id,
+        risk_factors: payload.risk_factors || null,
         date_reported: new Date().toISOString(),
         _pendingSync: true,
       };
@@ -2294,6 +2328,7 @@ useEffect(() => {
         latitude: payload.latitude,
         longitude: payload.longitude,
         user_id: payload.user_id,
+        risk_factors: payload.risk_factors || existing.risk_factors || null,
         _pendingSync: true,
       };
       setAllCases(prev => prev.map(c => String(c.case_id) === String(existing.case_id) ? updated : c));
@@ -2388,6 +2423,7 @@ useEffect(() => {
       vaccine_expiry_date: formData.vaccineExpiryDate || null,
       intervention: formData.intervention || null,
       action_plan: formData.actionPlan || null,
+      risk_factors: parseRiskFactors(formData.riskFactors).length ? JSON.stringify(parseRiskFactors(formData.riskFactors)) : null,
       user_id: loggedUserId || null,
     };
 
@@ -5122,6 +5158,66 @@ width: '90px', height: '195px', background: 'var(--bg-surface)',
                   style={{ width: '100%' }}
                   onChange={v => setFormData({ ...formData, vaccineExpiryDate: v })} />
               </div>
+            </div>
+
+            {/* Contributing Risk Factors (optional epidemiology tagging) */}
+            <div ref={factorsRef} style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-h)', marginBottom: '5px', fontWeight: '500' }}>
+                {t('Contributing Risk Factors')}
+                <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '13px', marginLeft: '8px' }}>({t('optional')} - {t('feeds epidemiology insights')})</span>
+              </label>
+              <div style={{ ...inputStyle, height: 'auto', minHeight: '54px', padding: '10px 14px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'flex-start' }}>
+                {formData.riskFactors.length === 0 ? (
+                  <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>{t('No risk factors tagged yet')}</span>
+                ) : (
+                  formData.riskFactors.map(k => {
+                    const grp = RISK_FACTOR_GROUPS.find(g => g.factors.some(f => f.key === k));
+                    const c = grp ? grp.color : '#64748b';
+                    return (
+                      <span key={k}
+                        onClick={() => { if (isBhwReadOnly) return; setFormData(prev => ({ ...prev, riskFactors: prev.riskFactors.filter(x => x !== k) })); }}
+                        title={riskFactorLabel(k)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 10px', borderRadius: '999px', fontSize: '13px', fontWeight: 500, cursor: isBhwReadOnly ? 'default' : 'pointer', background: c + '1f', color: c, border: '1px solid ' + c + '55' }}>
+                        {riskFactorLabel(k)}
+                        {!isBhwReadOnly && <span style={{ opacity: 0.7 }}>✕</span>}
+                      </span>
+                    );
+                  })
+                )}
+                {!isBhwReadOnly && (
+                  <span
+                    onClick={() => setFactorsOpen(prev => !prev)}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 10px', borderRadius: '999px', fontSize: '13px', cursor: 'pointer', color: '#0d9488', border: '1px dashed var(--border-color)', background: 'transparent' }}>
+                    + {t('Tag factors')}
+                  </span>
+                )}
+              </div>
+              {factorsOpen && !isBhwReadOnly && (
+                <div style={{ marginTop: '8px', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'var(--input-bg)', padding: '12px 14px', maxHeight: '260px', overflowY: 'auto', boxShadow: '0 6px 18px rgba(0,0,0,0.12)' }}>
+                  {RISK_FACTOR_GROUPS.map(g => (
+                    <div key={g.id} style={{ marginBottom: '12px' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: g.color, marginBottom: '6px' }}>
+                        {g.icon} {g.label}
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        {g.factors.map(f => {
+                          const active = formData.riskFactors.includes(f.key);
+                          return (
+                            <button key={f.key} type="button"
+                              onClick={() => setFormData(prev => ({
+                                ...prev,
+                                riskFactors: active ? prev.riskFactors.filter(x => x !== f.key) : [...prev.riskFactors, f.key],
+                              }))}
+                              style={{ padding: '5px 12px', borderRadius: '999px', border: active ? '1px solid ' + g.color : '1px solid var(--border-color)', background: active ? g.color + '22' : 'var(--input-bg)', color: active ? g.color : 'var(--text-muted)', fontSize: '13px', cursor: 'pointer', fontWeight: active ? 600 : 400 }}>
+                              {f.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Intervention + Action Plan aligned pair (report management - CHO editable, BHW read-only) */}

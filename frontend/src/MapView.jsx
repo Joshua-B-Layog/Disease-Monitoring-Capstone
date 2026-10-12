@@ -15,6 +15,7 @@ import { useI18n } from './i18n';
 import { precacheTiles } from './mapTileCache';
 import EpiPanel from './epiStats';
 import { ACTION_TYPES, ACTION_TYPE_ICONS, ACTION_STATUSES, DISASTER_EVENT_TYPES, DISASTER_SEVERITIES, SEVERITY_COLORS, hazardIcon, hazardDiseases, hazardColor, hazardSvgMarkup, hazardSvgIcon, isDisasterActive, getDisasterWatch, WEATHER_ATTRIBUTION } from './disasterRisk';
+import { RISK_FACTOR_GROUPS, parseRiskFactors, riskFactorLabel } from './riskFactors';
 
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -786,6 +787,38 @@ function PulseMarkers({ barangayData, onHover, onLeave, onClick }) {
 // Unspecified) folds into its nearest named area.
 const NAMED_AREA_RE = /^(Mabitac\s+)?Phase\s+\d+$|^Southville\s+\S+$/;
 
+// Same folding as AreaPins: named areas (Phase/Mabitac/Southville) absorb every
+// loose unit (Purok/Blk/Lot/Unspecified). Used so the hazard layer at the phase
+// tier lines up exactly with the phase pins that are drawn.
+function buildAreaTierItems(groups, barangay) {
+  if (!groups || groups.length === 0 || !barangay) return [];
+  const named = groups.filter(g => NAMED_AREA_RE.test(g.purok || ''));
+  const loose = groups.filter(g => !NAMED_AREA_RE.test(g.purok || ''));
+  const areas = named.map(g => ({
+    purok: g.purok,
+    barangay,
+    barangayName: barangay,
+    coords: g.coords,
+    totalCases: g.totalCases,
+    diseases: { ...(g.diseases || {}) },
+  }));
+  loose.forEach(g => {
+    let best = null, bestD = Infinity;
+    areas.forEach(a => {
+      const d = (a.coords[0] - g.coords[0]) ** 2 + (a.coords[1] - g.coords[1]) ** 2;
+      if (d < bestD) { bestD = d; best = a; }
+    });
+    if (best) {
+      best.totalCases += g.totalCases;
+      Object.entries(g.diseases || {}).forEach(([d, n]) => { best.diseases[d] = (best.diseases[d] || 0) + n; });
+    }
+  });
+  if (areas.length > 0) return areas;
+  const total = groups.reduce((s, g) => s + g.totalCases, 0);
+  const c = findCoords(barangay);
+  return [{ purok: barangay, barangay, barangayName: barangay, coords: c || [0, 0], totalCases: total, diseases: {} }];
+}
+
 // T2 (zoom 17): one pin per named area (Phase/Mabitac/Southville),
 // each collecting the blk/lot/purok units nearest to it. Barangays without any
 // named area fall back to a single pin at the barangay's centre with the total.
@@ -1179,8 +1212,11 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const [filterSeverity, setFilterSeverity] = useState('All Severities');
   const [filterPurok, setFilterPurok] = useState('All Puroks');
   const [filterDisease, setFilterDisease] = useState('All Diseases');
+  const [filterRiskFactor, setFilterRiskFactor] = useState('All Factors');
   const [diseaseOpen, setDiseaseOpen] = useState(false);
   const diseaseRef = useRef(null);
+  const [riskFactorOpen, setRiskFactorOpen] = useState(false);
+  const riskFactorRef = useRef(null);
   const [tooltip, setTooltip] = useState(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [popup, setPopup] = useState(null);
@@ -1360,6 +1396,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       if (severityRef.current && !severityRef.current.contains(e.target)) setSeverityOpen(false);
       if (yearRef.current && !yearRef.current.contains(e.target)) setYearOpen(false);
       if (diseaseRef.current && !diseaseRef.current.contains(e.target)) setDiseaseOpen(false);
+      if (riskFactorRef.current && !riskFactorRef.current.contains(e.target)) setRiskFactorOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -1442,6 +1479,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       }
       if (filterPurok !== 'All Puroks' && !(c.address || '').toLowerCase().includes(filterPurok.toLowerCase())) return false;
       if (filterDisease !== 'All Diseases' && (c.disease_name || '') !== filterDisease) return false;
+      if (filterRiskFactor !== 'All Factors' && !parseRiskFactors(c.risk_factors).includes(filterRiskFactor)) return false;
       return true;
     });
 
@@ -1463,6 +1501,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         if (d && ((filterDateFrom && d < filterDateFrom) || (filterDateTo && d > filterDateTo))) return false;
       }
       if (filterDisease !== 'All Diseases' && (c.disease_name || '') !== filterDisease) return false;
+      if (filterRiskFactor !== 'All Factors' && !parseRiskFactors(c.risk_factors).includes(filterRiskFactor)) return false;
       return true;
     });
     const scopedHotspots = (loginRole === 'BHW' && loginBarangay)
@@ -1506,7 +1545,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     } else {
       setPurokData([]);
     }
-  }, [allCases, filterBarangay, filterStatus, filterCaseType, filterDateFrom, filterDateTo, filterSeverity, filterPurok, filterDisease, autoDetectedBrgy]);
+  }, [allCases, filterBarangay, filterStatus, filterCaseType, filterDateFrom, filterDateTo, filterSeverity, filterPurok, filterDisease, filterRiskFactor, autoDetectedBrgy]);
 
   const goToDisease = (barangayName, diseaseName, purok) => {
     if (setCaseFilter) setCaseFilter({ disease: diseaseName.trim(), barangay: barangayName, purok: purok || '' });
@@ -1544,11 +1583,12 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       }
       if (filterPurok !== 'All Puroks' && !(c.address || '').toLowerCase().includes(filterPurok.toLowerCase())) return false;
       if (filterDisease !== 'All Diseases' && (c.disease_name || '') !== filterDisease) return false;
+      if (filterRiskFactor !== 'All Factors' && !parseRiskFactors(c.risk_factors).includes(filterRiskFactor)) return false;
       if (loginRole === 'BHW' && loginBarangay)      return c.barangay_name === loginBarangay;
       if (loginRole === 'CHO' && choUnitBarangays.length > 0) return choUnitBarangays.includes(c.barangay_name);
       return true;
     });
-  }, [allCases, filterBarangay, filterStatus, filterCaseType, filterSeverity, filterDateFrom, filterDateTo, filterPurok, filterDisease, loginRole, loginBarangay, sessionContext]);
+  }, [allCases, filterBarangay, filterStatus, filterCaseType, filterSeverity, filterDateFrom, filterDateTo, filterPurok, filterDisease, filterRiskFactor, loginRole, loginBarangay, sessionContext]);
 
   const diseaseOptions = useMemo(() => {
     const s = new Set();
@@ -1631,6 +1671,14 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const actionBadgeItems = [];
   const ongoingActions = actions.filter(a => a.status !== 'completed');
   const wxKey = (n) => (n || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  // Phase/pin tier (zoom >= PUROK_ZOOM_THRESHOLD) is scoped to the single barangay
+  // in view so "the phases" light up with their weather circles and nothing else.
+  // Both manual hazard pins AND action count discs are narrowed to it so other
+  // barangays' discs never leak into the phase view (barangay-address tier keeps all).
+  const pinFocusKey = (loginRole === 'BHW' && loginBarangay) ? wxKey(loginBarangay)
+    : (filterBarangay !== 'All Barangays') ? wxKey(filterBarangay)
+    : (autoDetectedBrgy ? wxKey(autoDetectedBrgy) : null);
+  const pinTier = mapZoom >= PUROK_ZOOM_THRESHOLD;
   const actionsByName = {};
   const actionScopeList = (loginRole === 'BHW' && loginBarangay) ? [loginBarangay]
     : (loginRole === 'CHO' && sessionContext && CHO_UNIT_BARANGAYS[sessionContext]) ? CHO_UNIT_BARANGAYS[sessionContext]
@@ -1640,6 +1688,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     const name = a.barangay_name || (a.barangay_id ? '' : 'Citywide');
     if (!name) return;
     if (actionScopeKeys.size && !actionScopeKeys.has(wxKey(name))) return;
+    if (pinTier && pinFocusKey && wxKey(name) !== pinFocusKey) return;
     if (!actionsByName[name]) actionsByName[name] = [];
     actionsByName[name].push(a);
   });
@@ -1749,14 +1798,21 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     });
   });
 
-  // Pin tier (zoomed in): weather on the purok dots + manual pins at their exact lat/lng
-  // Manual hazard pins sit wherever the admin clicked rather than on a purok
-  // centre, so measure the pin that actually renders underneath and lift past
-  // that one. Falls back to a near-empty pin when nothing is close enough.
+  // Pin tier (zoomed in). Weather pins follow the same tiers as the case pins:
+  //   zoom 17 (phase tier)   -> ONLY the phases get weather pins (loose Purok/Blk/Lot
+  //                             are folded into their nearest phase, never shown alone)
+  //   zoom 18+ (address tier) -> every unit address + manual pin gets its weather pin
+  const areaTier = mapZoom === PUROK_ZOOM_THRESHOLD;
+  const pinSourceGroups = areaTier
+    ? buildAreaTierItems(purokData, pinnedBarangay)
+    : (purokData || []);
+
+  // Manual hazard pins sit wherever the admin clicked rather than on a unit centre,
+  // so measure the pin that actually renders underneath and lift past that one.
   const pinCountNear = (lat, lng) => {
     let best = null;
     let bestD = Infinity;
-    (purokData || []).forEach(g => {
+    pinSourceGroups.forEach(g => {
       if (!g || !g.coords) return;
       const d = (g.coords[0] - lat) ** 2 + (g.coords[1] - lng) ** 2;
       if (d < bestD) { bestD = d; best = g; }
@@ -1765,7 +1821,8 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   };
 
   const hazardPinItems = [];
-  (purokData || []).forEach(p => {
+  pinSourceGroups.forEach(p => {
+    if (pinFocusKey && wxKey(p.barangay) !== pinFocusKey) return;
     const w = weatherByName[wxKey(p.barangay)];
     if (!w || !w.hazards || !w.hazards.length) return;
     const diseases = [...new Set(w.hazards.flatMap(hazardDiseases))];
@@ -1782,15 +1839,27 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     });
   });
   manualPinEvents.forEach(ev => {
+    if (pinFocusKey && wxKey(ev.barangay_name) !== pinFocusKey) return;
     const diseases = hazardDiseases(ev.event_type);
+    let evCoords = [parseFloat(ev.latitude), parseFloat(ev.longitude)];
+    if (areaTier) {
+      // Phase tier: snap the manual pin onto the nearest phase pin; skip if there is none.
+      let best = null, bestD = Infinity;
+      pinSourceGroups.forEach(g => {
+        const d = (g.coords[0] - evCoords[0]) ** 2 + (g.coords[1] - evCoords[1]) ** 2;
+        if (d < bestD) { bestD = d; best = g; }
+      });
+      if (!best) return;
+      evCoords = best.coords;
+    }
     hazardPinItems.push({
       id: 'hzp-' + ev.id,
-      coords: [parseFloat(ev.latitude), parseFloat(ev.longitude)],
+      coords: evCoords,
       svg: hazardSvgIcon(ev.event_type, 32),
       color: hazardColor(ev.event_type),
       title: `${ev.event_type}${ev.purok ? ' · ' + ev.purok : ''} (${ev.severity})${diseases.length ? ` · Possible: ${diseases.join(', ')}` : ''}`,
       size: 32,
-      above: hazardBadgeLift(pinCountNear(parseFloat(ev.latitude), parseFloat(ev.longitude))),
+      above: hazardBadgeLift(pinCountNear(evCoords[0], evCoords[1])),
       z: 1400,
       onClick: () => openBarangayPopup(ev.barangay_name),
     });
@@ -2197,6 +2266,48 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                     onMouseLeave={e => { if (filterDisease !== d) e.currentTarget.style.background = 'transparent'; }}>
                     {t(d)}
                   </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ─── FILTER LAYER: CONTRIBUTING FACTOR ─── */}
+        <p style={sectionHeaderStyle}>{t('Filter by Contributing Factor')}</p>
+
+        {/* Risk factor */}
+        <div>
+          <label style={{ display: 'block', fontSize: '15px', color: 'var(--text-main)', marginBottom: '6px', fontWeight: '600' }}>{t('Contributing Factor')}</label>
+          <div style={{ position: 'relative' }} ref={riskFactorRef}>
+            <button type="button" onClick={() => setRiskFactorOpen(!riskFactorOpen)}
+              style={{ ...SEL, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' }}>
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{filterRiskFactor === 'All Factors' ? t(filterRiskFactor) : riskFactorLabel(filterRiskFactor)}</span>
+              <span style={{ fontSize: '13px', opacity: 0.6, transition: 'transform 0.2s', transform: riskFactorOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+            </button>
+            {riskFactorOpen && (
+              <div className="cdms-dropdown-panel" style={{ position: 'absolute', top: '105%', left: 0, width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', zIndex: 100, overflow: 'hidden', maxHeight: '260px', overflowY: 'auto' }}>
+                <button type="button"
+                  onClick={() => { setFilterRiskFactor('All Factors'); setRiskFactorOpen(false); }}
+                  style={{ display: 'block', width: '100%', padding: '10px 14px', background: filterRiskFactor === 'All Factors' ? 'var(--input-bg)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: filterRiskFactor === 'All Factors' ? '600' : '400' }}
+                  onMouseEnter={e => { if (filterRiskFactor !== 'All Factors') e.currentTarget.style.background = 'var(--input-bg)'; }}
+                  onMouseLeave={e => { if (filterRiskFactor !== 'All Factors') e.currentTarget.style.background = 'transparent'; }}>
+                  {t('All Factors')}
+                </button>
+                {RISK_FACTOR_GROUPS.map(g => (
+                  <div key={g.id} style={{ padding: '4px 14px 0', marginTop: '4px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: g.color, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>
+                      {g.icon} {t(g.label)}
+                    </div>
+                    {g.factors.map(f => (
+                      <button key={f.key} type="button"
+                        onClick={() => { setFilterRiskFactor(f.key); setRiskFactorOpen(false); }}
+                        style={{ display: 'block', width: '100%', padding: '9px 14px', background: filterRiskFactor === f.key ? 'var(--input-bg)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '14px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: filterRiskFactor === f.key ? '600' : '400', borderRadius: '6px' }}
+                        onMouseEnter={e => { if (filterRiskFactor !== f.key) e.currentTarget.style.background = 'var(--input-bg)'; }}
+                        onMouseLeave={e => { if (filterRiskFactor !== f.key) e.currentTarget.style.background = 'transparent'; }}>
+                        {riskFactorLabel(f.key)}
+                      </button>
+                    ))}
+                  </div>
                 ))}
               </div>
             )}
@@ -2870,7 +2981,10 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                           <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-main)' }}>{hz}</div>
                           {dis.length > 0 && (
                             <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                              {t('Possible diseases')}: {dis.join(', ')}
+                              {t('Possible diseases')}: {dis.map(dn => {
+                                const cnt = (popup.diseases || {})[dn] || 0;
+                                return `${dn}${cnt ? ` (${cnt} ${t('cases')})` : ''}`;
+                              }).join(', ')}
                             </div>
                           )}
                         </div>
@@ -3152,6 +3266,16 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                 <br />
                 {t('Add pins here for on-the-ground hazards weather can not detect, like a fire or flood phase in a purok.')}
               </p>
+
+              <div style={{ margin: '0 0 14px 0', padding: '10px 12px', fontSize: '12px', color: 'var(--text-muted)', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', lineHeight: 1.6 }}>
+                <strong style={{ color: 'var(--text-main)' }}>{t('Data Sources & References')}</strong>
+                <br />
+                🌦 {WEATHER_ATTRIBUTION} ({t('live API')})
+                <br />
+                🇵🇭 {t('PAGASA - official Philippine weather agency')} – <a href="https://www.pagasa.dost.gov.ph" target="_blank" rel="noreferrer" style={{ color: '#0891b2' }}>pagasa.dost.gov.ph</a>
+                <br />
+                📺 {t('MSN Weather - Cabuyao forecast')} – <a href="https://www.msn.com/en-ph/weather/forecast/in-Cabuyao,Calabarzon?loc=eyJsIjoiQ2FidXlhbyIsInIiOiJDYWxhYmFyem9uIiwiYyI6IlBoaWxpcHBpbmVzIiwiaSI6IlBIIiwiZyI6ImVuLXBoIiwieCI6IjEyMS4xNDg0Mjk4NzA2MDU0NyIsInkiOiIxNC4yNDAyMjc2OTkyNzk3ODV9&weadegreetype=C&ocid=msnheader&cvid=6acc43d5296042b1afd84b9adae70453" target="_blank" rel="noreferrer" style={{ color: '#0891b2' }}>MSN Weather</a>
+              </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
                 <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>

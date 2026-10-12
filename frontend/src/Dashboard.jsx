@@ -7,6 +7,7 @@ import { formatDate as formatDateStr } from './formatDate';
 import DatePicker from './components/DatePicker';
 import ExportPreviewModal from './components/ExportPreview';
 import { DISASTER_ICONS, SEVERITY_COLORS } from './disasterRisk';
+import { RISK_FACTOR_GROUPS, summarizeRiskFactors } from './riskFactors';
 
 // Counts up (or down) to `value` whenever it changes
 const AnimatedNumber = ({ value, style }) => {
@@ -316,6 +317,10 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       .sort((a, b) => b.count - a.count || (a.barangay.localeCompare(b.barangay)))
       .slice(0, 6);
   })();
+
+  // ── Epidemiology: contributing risk factors across the scoped/period cases ──
+  const riskFactorSummary = summarizeRiskFactors(displayCases);
+  const factorGroupFor = (key) => RISK_FACTOR_GROUPS.find(g => g.factors.some(f => f.key === key));
 
   // ── Same-period-last-year comparison (for period charts with a date range) ──
   const lastYearRange = (() => {
@@ -1517,6 +1522,46 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── EPIDEMIOLOGY: CONTRIBUTING RISK FACTORS ── */}
+      <div data-tour="dash-risk-factors" className="cdms-view-in" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', marginBottom: riskFactorSummary.ranked.length ? '14px' : '0' }}>
+          <h4 style={{ color: 'var(--text-main)', margin: 0, fontSize: '15px', fontWeight: '600' }}>
+            ⚕️ {t('Epidemiology')} - {t('Contributing Risk Factors')}
+          </h4>
+          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+            {riskFactorSummary.tagged > 0
+              ? `${riskFactorSummary.tagged}/${riskFactorSummary.total} ${t('cases tagged')}`
+              : t('Tag factors on case forms to surface patterns.')}
+          </span>
+        </div>
+        {riskFactorSummary.ranked.length === 0 ? (
+          <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-muted)' }}>
+            {t('No contributing risk factors recorded in this period.')}
+          </p>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '12px' }}>
+            {riskFactorSummary.ranked.map((f, i) => {
+              const grp = factorGroupFor(f.key);
+              const c = grp ? grp.color : '#64748b';
+              return (
+                <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '12px 14px', animationDelay: `${i * 45}ms` }}>
+                  <span style={{ width: '36px', height: '36px', borderRadius: '8px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: c + '22', color: c, fontWeight: '800', fontSize: '15px' }}>
+                    {f.count}×
+                  </span>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={f.label}>{f.label}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      {grp ? `${grp.icon} ${grp.label}` : t('Other')}
+                      {f.topDisease ? ` · ${f.topDisease} (${f.topDiseaseCount})` : ''}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

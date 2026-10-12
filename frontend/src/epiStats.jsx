@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { summarizeRiskFactors, riskFactorLabel } from './riskFactors';
 
 export function computeEpiStats(cases) {
   const stats = {
@@ -7,6 +8,8 @@ export function computeEpiStats(cases) {
     severity: {},
     status: {},
     vaccine: { Vaccinated: 0, Partially: 0, No: 0, Unknown: 0 },
+    factors: [],
+    factorTagged: 0,
   };
   (cases || []).forEach(c => {
     const ct = (c.case_type || '').trim();
@@ -21,6 +24,9 @@ export function computeEpiStats(cases) {
     else if (vs === 'Partially Vaccinated') stats.vaccine.Partially++;
     else stats.vaccine.No++;
   });
+  const rf = summarizeRiskFactors(cases || []);
+  stats.factors = rf.ranked.slice(0, 6);
+  stats.factorTagged = rf.tagged;
   return stats;
 }
 
@@ -57,6 +63,13 @@ export default function EpiPanel({ cases, t }) {
   if (stats.vaccine.No) vaccineRows.push(<Row key="no" label={t('Not Vaccinated')} value={stats.vaccine.No} />);
   if (stats.vaccine.Unknown) vaccineRows.push(<Row key="unk" label={t('Unknown')} value={stats.vaccine.Unknown} />);
 
+  const factorRows = stats.factors.map(f => (
+    <div key={f.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: '1px solid var(--border-color)' }}>
+      <span style={{ fontSize: '13px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: '8px' }} title={f.label}>{riskFactorLabel(f.key)}</span>
+      <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)', flexShrink: 0 }}>{f.count}</span>
+    </div>
+  ));
+
   return (
     <div style={{ marginTop: '14px', padding: '14px 14px 4px', borderRadius: '10px', background: 'var(--input-bg)', border: '1px solid var(--border-color)' }}>
       <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
@@ -66,6 +79,12 @@ export default function EpiPanel({ cases, t }) {
       <Section title={t('Severity')} rows={rowsFor(SEVERITY_ORDER, stats.severity)} />
       <Section title={t('Outcomes')} rows={rowsFor(STATUS_ORDER, stats.status)} />
       <Section title={t('Vaccination')} rows={vaccineRows} />
+      <Section title={stats.factorTagged ? `${t('Contributing Factors')} (${stats.factorTagged})` : t('Contributing Factors')} rows={factorRows} />
+      {!factorRows.length && (
+        <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '2px 0 6px' }}>
+          {t('Tag contributing risk factors on case forms to see patterns here.')}
+        </div>
+      )}
     </div>
   );
 }

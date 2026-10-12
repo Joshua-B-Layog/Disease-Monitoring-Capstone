@@ -224,6 +224,26 @@ function validateCasePayload(payload = {}) {
   return errors;
 }
 
+// Contributing risk-factor tags (epidemiology). Optional; stored as a JSON array of
+// short canonical keys defined in frontend/src/riskFactors.js. Unknown/oversized values are dropped.
+function sanitizeRiskFactors(input) {
+  let list = input;
+  if (typeof list === 'string') {
+    const s = list.trim();
+    if (!s) return null;
+    try { list = JSON.parse(s); } catch (e) { list = s.split(','); }
+  }
+  if (!Array.isArray(list)) return null;
+  const clean = [];
+  for (const item of list) {
+    if (item == null) continue;
+    const v = String(item).trim().slice(0, 60);
+    if (v && !clean.includes(v)) clean.push(v);
+    if (clean.length >= 10) break;
+  }
+  return clean.length ? JSON.stringify(clean) : null;
+}
+
 // Password policy: minimum complexity for all staff accounts
 // Optional denyTokens: substrings the password must NOT contain (e.g. first name, last name, role label).
 function validatePasswordStrength(password, denyTokens = []) {
@@ -512,6 +532,24 @@ db.query("SHOW COLUMNS FROM case_add_requests LIKE 'intervention'", (err, rows) 
         db.query("ALTER TABLE case_add_requests ADD COLUMN intervention TEXT NULL, ADD COLUMN action_plan TEXT NULL", (alterErr) => {
             if (alterErr) console.error('Migration error adding intervention/action_plan columns to case_add_requests:', alterErr.message);
             else console.log('Migration: added intervention/action_plan columns to case_add_requests table');
+        });
+    }
+});
+
+// Migration: contributing risk-factor tags (epidemiology) on disease_cases + case_add_requests
+db.query("SHOW COLUMNS FROM disease_cases LIKE 'risk_factors'", (err, rows) => {
+    if (!err && rows.length === 0) {
+        db.query('ALTER TABLE disease_cases ADD COLUMN risk_factors TEXT NULL', (alterErr) => {
+            if (alterErr) console.error('Migration error adding risk_factors to disease_cases:', alterErr.message);
+            else console.log('Migration: added risk_factors column to disease_cases table');
+        });
+    }
+});
+db.query("SHOW COLUMNS FROM case_add_requests LIKE 'risk_factors'", (err, rows) => {
+    if (!err && rows.length === 0) {
+        db.query('ALTER TABLE case_add_requests ADD COLUMN risk_factors TEXT NULL', (alterErr) => {
+            if (alterErr) console.error('Migration error adding risk_factors to case_add_requests:', alterErr.message);
+            else console.log('Migration: added risk_factors column to case_add_requests table');
         });
     }
 });
@@ -1577,6 +1615,7 @@ app.get('/api/disease_cases', (req, res) => {
             dc.vaccine_expiry_date,
             dc.intervention,
             dc.action_plan,
+            dc.risk_factors,
             d.name AS disease_name, 
             b.name AS barangay_name,
             dc.barangay_id,
@@ -1632,6 +1671,7 @@ app.post('/api/disease_cases', authenticate, (req, res) => {
         disease_type: pick('disease_type', 'diseaseSubtype') || null,
         vaccination_status: pick('vaccination_status', 'vaccinationStatus') || null,
         vaccine_expiry_date: pick('vaccine_expiry_date', 'vaccineExpiryDate') || null,
+        risk_factors: sanitizeRiskFactors(pick('risk_factors', 'riskFactors')),
     };
     const resolveDisease = (done) => {
         if (!draft.disease_name) return done(null, null);
@@ -1646,15 +1686,15 @@ app.post('/api/disease_cases', authenticate, (req, res) => {
             INSERT INTO disease_cases
             (patient_name, disease_id, age, severity, case_type, disease_type, gender, status, contact,
              onset_date, address, barangay_id, symptoms, physician, latitude, longitude, created_by,
-             vaccination_status, vaccine_expiry_date)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'Draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             vaccination_status, vaccine_expiry_date, risk_factors)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'Draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const vals = [
             draft.patient_name, diseaseId, draft.age, draft.severity, draft.case_type, draft.disease_type,
             draft.gender, draft.contact, draft.onset_date, draft.address, draft.barangay_id,
             draft.symptoms, draft.physician, draft.latitude, draft.longitude,
             req.user.user_id || req.body.user_id || null,
-            draft.vaccination_status, draft.vaccine_expiry_date,
+            draft.vaccination_status, draft.vaccine_expiry_date, draft.risk_factors,
         ];
         db.query(insertQuery, vals, (err, result) => {
             if (err) {
@@ -1695,6 +1735,7 @@ app.put('/api/disease_cases/:id', authenticate, (req, res) => {
             diseaseSubtype: 'disease_type', disease_type: 'disease_type',
             vaccinationStatus: 'vaccination_status', vaccination_status: 'vaccination_status',
             vaccineExpiryDate: 'vaccine_expiry_date', vaccine_expiry_date: 'vaccine_expiry_date',
+            riskFactors: 'risk_factors', risk_factors: 'risk_factors',
         };
         const sets = [];
         const vals = [];
@@ -1706,6 +1747,7 @@ app.put('/api/disease_cases/:id', authenticate, (req, res) => {
             const v = pick(key);
             if (v === undefined) continue;
             if (key === 'age') { sets.push(`${col} = ?`); vals.push(Number(v) || 0); }
+            else if (col === 'risk_factors') { sets.push('risk_factors = ?'); vals.push(sanitizeRiskFactors(v)); }
             else if (v === null && (col === 'case_type' || col === 'disease_type')) { sets.push(`${col} = NULL`); }
             else { sets.push(`${col} = ?`); vals.push(v); }
         }
@@ -2067,7 +2109,7 @@ app.post('/api/cases', authenticate, (req, res) => {
         status, contact, onset_date, address, barangay_id,
         symptoms, physician, latitude, longitude, case_type,
         disease_type, vaccination_status, vaccine_expiry_date,
-        intervention, action_plan,
+        intervention, action_plan, risk_factors,
     } = req.body;
 
     console.log("--- Add Case ---", { patient_name, disease_name, barangay_id });
@@ -2182,8 +2224,8 @@ function proceedToCheck() {
                 INSERT INTO disease_cases 
                 (patient_name, disease_id, age, severity, case_type, disease_type, gender, status, contact, 
                  onset_date, address, barangay_id, symptoms, physician, latitude, longitude, date_reported, created_by,
-                 vaccination_status, vaccine_expiry_date, intervention, action_plan)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, NOW()), ?, ?, ?, ?, ?)
+                 vaccination_status, vaccine_expiry_date, intervention, action_plan, risk_factors)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, NOW()), ?, ?, ?, ?, ?, ?)
             `;
             const vals = [
                 patient_name, dId, age || 0, severity, resolvedCaseType, resolvedDiseaseType, gender || 'Male',
@@ -2191,7 +2233,7 @@ function proceedToCheck() {
                 barangay_id || null, symptoms || null, physician || null,
                 latitude || null, longitude || null, reportTs, (req.user && req.user.user_id) || req.body.user_id || null,
                 vaccination_status || null, vaccine_expiry_date || null,
-                intervention || null, action_plan || null
+                intervention || null, action_plan || null, sanitizeRiskFactors(risk_factors)
             ];
 
             t.q(insertQuery, vals, (insertErr, result) => {
@@ -2321,7 +2363,7 @@ app.post('/api/cases/route-to-barangay-inbox', authenticate, (req, res) => {
         patient_name, disease_name, age, severity, gender, status, contact,
         onset_date, address, symptoms, physician, latitude, longitude,
         submitter_user_id, submitter_name, from_cho_unit, target_barangay_name, notes,
-        case_type, disease_type, vaccination_status, vaccine_expiry_date,
+        case_type, disease_type, vaccination_status, vaccine_expiry_date, risk_factors,
     } = req.body;
 
     db.query('SELECT id FROM barangays WHERE LOWER(name) = LOWER(?)', [target_barangay_name], (bErr, bResults) => {
@@ -2341,12 +2383,12 @@ app.post('/api/cases/route-to-barangay-inbox', authenticate, (req, res) => {
                 `INSERT INTO disease_cases
                 (patient_name, disease_id, age, severity, case_type, disease_type, gender, status, contact,
                  onset_date, address, barangay_id, symptoms, physician, latitude, longitude, date_reported,
-                 vaccination_status, vaccine_expiry_date)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, NOW(), ?, ?)`,
+                 vaccination_status, vaccine_expiry_date, risk_factors)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, NOW(), ?, ?, ?)`,
                 [patient_name, diseaseId, age || 0, severity, resolvedCaseType, resolvedDiseaseType, gender || 'Male', status || 'Pending',
                  contact || null, onset_date || null, address || null, symptoms || null,
                  physician || null, latitude || null, longitude || null,
-                 vaccination_status || null, vaccine_expiry_date || null],
+                 vaccination_status || null, vaccine_expiry_date || null, sanitizeRiskFactors(risk_factors)],
                 (insertErr, result) => {
                     if (insertErr) {
                         console.error('route-to-barangay-inbox insert error:', insertErr.message);
@@ -2777,7 +2819,7 @@ app.post('/api/cases/request-add', authenticate, (req, res) => {
     onset_date, address, barangay_id, symptoms, physician, latitude, longitude,
     requested_by, requested_by_name, from_barangay_name, submitter_cho_unit, note,
     case_type, disease_type, vaccination_status, vaccine_expiry_date,
-    intervention, action_plan,
+    intervention, action_plan, risk_factors,
   } = req.body;
 
   if (!requested_by || !patient_name || !disease_name) {
@@ -2820,12 +2862,12 @@ app.post('/api/cases/request-add', authenticate, (req, res) => {
         `INSERT INTO case_add_requests
           (patient_name, disease_name, age, severity, case_type, disease_type, gender, case_status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude,
            requested_by, requested_by_name, from_barangay_name, target_cho_unit, note,
-           vaccination_status, vaccine_expiry_date, intervention, action_plan)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           vaccination_status, vaccine_expiry_date, intervention, action_plan, risk_factors)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [patient_name, disease_name, age || 0, severity, resolvedCaseType, resolvedDiseaseType, gender || 'Male', case_status || 'Active', contact || null, onset_date || null, address || null,
           barangay_id || null, symptoms || null, physician || null, finalLat, finalLng,
           requested_by, requested_by_name || 'Unknown', from_barangay_name || null, targetChoUnit || null, note || null,
-          vaccination_status || null, vaccine_expiry_date || null, intervention || null, action_plan || null],
+          vaccination_status || null, vaccine_expiry_date || null, intervention || null, action_plan || null, sanitizeRiskFactors(risk_factors)],
         (err, result) => {
           if (err) {
             console.error('Add request insert error:', err.message);
@@ -2899,7 +2941,7 @@ app.put('/api/case-add-requests/:id/approve', authenticate, (req, res) => {
     patient_name, disease_name, age, severity, gender, case_status, contact,
     onset_date, address, barangay_id, symptoms, physician, latitude, longitude,
     case_type, disease_type, vaccination_status, vaccine_expiry_date,
-    intervention, action_plan,
+    intervention, action_plan, risk_factors,
   } = body;
 
   db.query('SELECT * FROM case_add_requests WHERE id = ? AND status = ?', [id, 'pending'], (qErr, rows) => {
@@ -2927,6 +2969,7 @@ app.put('/api/case-add-requests/:id/approve', authenticate, (req, res) => {
       vaccine_expiry_date: vaccine_expiry_date || reqRow.vaccine_expiry_date || null,
       intervention: (intervention !== undefined && intervention !== null && String(intervention).trim() !== '') ? String(intervention) : reqRow.intervention || null,
       action_plan: (action_plan !== undefined && action_plan !== null && String(action_plan).trim() !== '') ? String(action_plan) : reqRow.action_plan || null,
+      risk_factors: (risk_factors !== undefined && risk_factors !== null) ? sanitizeRiskFactors(risk_factors) : (reqRow.risk_factors || null),
     };
 
     // ── Server-side validation mirror (2.4) ──
@@ -2961,12 +3004,12 @@ app.put('/api/case-add-requests/:id/approve', authenticate, (req, res) => {
             withTransaction((t) => {
               t.q(
                 `INSERT INTO disease_cases
-                    (patient_name, disease_id, age, severity, case_type, disease_type, gender, status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude, created_by, vaccination_status, vaccine_expiry_date, intervention, action_plan)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    (patient_name, disease_id, age, severity, case_type, disease_type, gender, status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude, created_by, vaccination_status, vaccine_expiry_date, intervention, action_plan, risk_factors)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [final.patient_name, finalId, final.age || 0, final.severity, final.case_type, final.disease_type || null, final.gender, final.case_status,
                   final.contact || null, final.onset_date || null, final.address || null, final.barangay_id,
                   final.symptoms || null, final.physician || null, lat, lng, reqRow.requested_by || null,
-                  final.vaccination_status, final.vaccine_expiry_date, final.intervention, final.action_plan],
+                  final.vaccination_status, final.vaccine_expiry_date, final.intervention, final.action_plan, final.risk_factors],
               (insErr, insResult) => {
                 if (insErr) { t.rollback(); return console.error('Approve insert case error:', insErr.message); }
                 const newCaseId = insResult.insertId;
@@ -3290,7 +3333,7 @@ app.put('/api/cases/:id', authenticate, (req, res) => {
         status, contact, onset_date, address, barangay_id,
         symptoms, physician, latitude, longitude, case_type,
         disease_type, vaccination_status, vaccine_expiry_date,
-        intervention, action_plan,
+        intervention, action_plan, risk_factors,
     } = req.body;
 
     console.log("--- Update Case ---", { id, patient_name });
@@ -3321,7 +3364,7 @@ app.put('/api/cases/:id', authenticate, (req, res) => {
                     status = ?, contact = ?, onset_date = ?, address = ?,
                     barangay_id = ?, symptoms = ?, physician = ?,
                     latitude = ?, longitude = ?, vaccination_status = ?, vaccine_expiry_date = ?,
-                    intervention = ?, action_plan = ?
+                    intervention = ?, action_plan = ?, risk_factors = ?
                 WHERE case_id = ?
             `;
             const resolvedCaseType = ['Suspected', 'Probable', 'Confirmed'].includes(case_type)
@@ -3334,7 +3377,7 @@ app.put('/api/cases/:id', authenticate, (req, res) => {
                 barangay_id || null, symptoms || null, physician || null,
                 latitude || null, longitude || null,
                 vaccination_status || null, vaccine_expiry_date || null,
-                intervention || null, action_plan || null, id
+                intervention || null, action_plan || null, sanitizeRiskFactors(risk_factors), id
             ];
 
             withTransaction((t) => {
@@ -4406,14 +4449,14 @@ app.post('/api/sync', authenticate, (req, res) => {
                 withTransaction((t) => {
                 t.q(
                     `INSERT INTO disease_cases
-                        (patient_name, disease_id, age, severity, case_type, disease_type, gender, status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude, date_reported, created_by, vaccination_status, vaccine_expiry_date)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        (patient_name, disease_id, age, severity, case_type, disease_type, gender, status, contact, onset_date, address, barangay_id, symptoms, physician, latitude, longitude, date_reported, created_by, vaccination_status, vaccine_expiry_date, risk_factors)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `, [
                     p.patient_name, dId, p.age, p.severity || 'Moderate', resolvedCaseType, resolvedDiseaseType,
                     p.gender || 'Other', p.status || 'Active', p.contact,
                     p.onset_date, p.address, p.barangay_id, p.symptoms,
                     p.physician, p.latitude, p.longitude, ts, p._offlineUserId || null,
-                    p.vaccination_status || null, p.vaccine_expiry_date || null
+                    p.vaccination_status || null, p.vaccine_expiry_date || null, sanitizeRiskFactors(p.risk_factors)
                 ], (err, result) => {
                     if (err) {
                         console.error('[Sync] Create failed:', err.message);
@@ -4476,13 +4519,13 @@ app.post('/api/sync', authenticate, (req, res) => {
                     `UPDATE disease_cases SET
                         patient_name=?, disease_id=?, age=?, severity=?, case_type=?, disease_type=?, gender=?, status=?,
                         contact=?, onset_date=?, address=?, barangay_id=?, symptoms=?,
-                        physician=?, latitude=?, longitude=?, vaccination_status=?, vaccine_expiry_date=?, updated_at=NOW()
+                        physician=?, latitude=?, longitude=?, vaccination_status=?, vaccine_expiry_date=?, risk_factors=?, updated_at=NOW()
                     WHERE case_id=?
                 `, [
                     p.patient_name, dId, p.age, p.severity, resolvedCaseType, resolvedDiseaseType,
                     p.gender, p.status, p.contact, p.onset_date, p.address,
                     p.barangay_id, p.symptoms, p.physician, p.latitude, p.longitude,
-                    p.vaccination_status || null, p.vaccine_expiry_date || null, caseId
+                    p.vaccination_status || null, p.vaccine_expiry_date || null, sanitizeRiskFactors(p.risk_factors), caseId
                 ], (err) => {
                     if (err) {
                         results.push({ type, error: 'Internal database error. Please try again.' });
@@ -6323,6 +6366,7 @@ function notifyEpiAlert(alert) {
     count_threshold: 'Epidemiological Alert',
     surge: 'Rapid Surge Alert',
     mortality: 'Mortality Alert',
+    hazard_disease: 'Hazard Disease Risk Alert',
   };
   const title = titles[alert.alert_type] || 'Epidemiological Alert';
   const html = `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#fff7ed;border-radius:12px">
@@ -6437,6 +6481,63 @@ function runEpiAlerts() {
       });
     });
   });
+
+  runHazardDiseaseAlerts(weekStartIso, nextWeekIso);
+}
+
+const HAZARD_ALERT_MIN_CASES = 3; // active hazard + this many linked-disease cases in the same barangay this week
+
+// Epidemiology tie-in: an active hazard plus confirmed cases of its linked diseases in the
+// same barangay is a correlated risk. Fires at most once per week per (barangay, disease) via
+// the epi_alerts unique key, reusing the standard epi notification/email path.
+function runHazardDiseaseAlerts(weekStartIso, nextWeekIso) {
+  db.query(
+    "SELECT de.id, de.barangay_id, b.name AS barangay_name, de.event_type, de.severity FROM disaster_events de JOIN barangays b ON de.barangay_id = b.id WHERE (de.date_ended IS NULL OR de.date_ended >= CURDATE()) AND de.barangay_id IS NOT NULL",
+    (eErr, events) => {
+      if (eErr) { console.error('Hazard-disease event query error:', eErr.message); return; }
+      (events || []).forEach(ev => {
+        const diseases = linkedDiseasesFor(ev.event_type);
+        if (!diseases.length) return;
+        db.query(
+          `SELECT d.name AS disease_name, COUNT(*) AS cnt
+             FROM disease_cases dc
+             JOIN diseases d ON dc.disease_id = d.id
+            WHERE dc.is_archived = 0 AND dc.status != 'Draft'
+              AND dc.barangay_id = ? AND dc.date_reported >= ? AND dc.date_reported < ?
+              AND d.name IN (?)
+            GROUP BY d.name
+            HAVING cnt >= ${HAZARD_ALERT_MIN_CASES}`,
+          [ev.barangay_id, weekStartIso, nextWeekIso, diseases],
+          (cErr, cRows) => {
+            if (cErr) { console.error('Hazard-disease case query error:', cErr.message); return; }
+            (cRows || []).forEach(r => {
+              const alert = {
+                period_start: weekStartIso, barangay_id: ev.barangay_id, barangay_name: ev.barangay_name,
+                disease_name: r.disease_name, alert_type: 'hazard_disease', alert_value: r.cnt,
+                detail: `${r.cnt} ${r.disease_name} cases recorded in Barangay ${ev.barangay_name} during an active ${ev.event_type} (${ev.severity}). Linked disease risk - review response actions.`,
+              };
+              db.query(
+                'SELECT id FROM epi_alerts WHERE period_start = ? AND barangay_id = ? AND disease_name = ? AND alert_type = ? LIMIT 1',
+                [alert.period_start, alert.barangay_id, alert.disease_name, alert.alert_type],
+                (dErr, dRows) => {
+                  if (dErr || (dRows && dRows.length > 0)) return;
+                  db.query(
+                    'INSERT INTO epi_alerts (period_start, barangay_id, barangay_name, disease_name, alert_type, alert_value, detail) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    [alert.period_start, alert.barangay_id, alert.barangay_name, alert.disease_name, alert.alert_type, alert.alert_value, alert.detail],
+                    (iErr) => {
+                      if (iErr) { console.error('Hazard-disease alert insert error:', iErr.message); return; }
+                      console.log('Epi hazard-disease alert fired:', alert.detail);
+                      notifyEpiAlert(alert);
+                    }
+                  );
+                }
+              );
+            });
+          }
+        );
+      });
+    }
+  );
 }
 
 // Hourly epi alert sweep
