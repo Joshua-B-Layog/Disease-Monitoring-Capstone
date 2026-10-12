@@ -265,7 +265,7 @@ The schema is split in two:
 |-------|-------------|
 | `users` | CHO and BHW accounts (seeded demo logins) |
 | `barangays` | The 18 barangays of Cabuyao |
-| `diseases` | The 28 tracked communicable diseases |
+| `diseases` | The 26 tracked communicable diseases |
 | `disease_cases` | Patient case records |
 
 **Created automatically by `server.js` at startup (21 tables)**
