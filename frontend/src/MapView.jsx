@@ -16,6 +16,7 @@ import { precacheTiles } from './mapTileCache';
 import EpiPanel from './epiStats';
 import { ACTION_TYPES, ACTION_TYPE_ICONS, ACTION_STATUSES, DISASTER_EVENT_TYPES, DISASTER_SEVERITIES, SEVERITY_COLORS, hazardIcon, hazardDiseases, hazardColor, hazardSvgMarkup, hazardSvgIcon, isDisasterActive, getDisasterWatch, WEATHER_ATTRIBUTION } from './disasterRisk';
 import { RISK_FACTOR_GROUPS, parseRiskFactors, riskFactorLabel } from './riskFactors';
+import { seasonForMonth, seasonalDiseases } from './seasonalDiseases';
 
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -1246,6 +1247,10 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const [pagasa, setPagasa] = useState(null);
   const [showActionsLayer, setShowActionsLayer] = useState(true);
   const [showDisasterLayer, setShowDisasterLayer] = useState(true);
+  // Map mode: 'disaster' = hazards + actions + probable disease watch (replaces the old
+  // Actions/Hazards layers); 'hotspot' = case density only.
+  const [mapMode, setMapMode] = useState('disaster');
+  const isDisasterMap = mapMode === 'disaster';
   const [weatherOffline, setWeatherOffline] = useState(false);
   const [manageActionsOpen, setManageActionsOpen] = useState(false);
   const [actionForm, setActionForm] = useState({ id: null, barangay_id: '', barangay_name: '', hazard_id: '', action_type: ACTION_TYPES[0], description: '', target_disease: '', date_started: '', date_ended: '', status: 'planned' });
@@ -1869,6 +1874,31 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const popupActionsList = actions.filter(a => a.barangay_name === popupActionKey);
   const popupWeather = popupActionKey ? weatherByName[wxKey(popupActionKey)] : null;
   const popupManualEvents = popupActionKey ? (manualBarangayEvents[wxKey(popupActionKey)] || []) : [];
+
+  // Disaster Disease Map: the active hazard types for the inspected barangay.
+  const popupHazardTypes = useMemo(() => {
+    const set = new Set();
+    (popupWeather?.hazards || []).forEach(h => set.add(h));
+    popupManualEvents.forEach(ev => set.add(ev.event_type));
+    return [...set];
+  }, [popupWeather, popupManualEvents]);
+
+  // Probable diseases = the hazard's linked diseases + the in-season diseases for the
+  // current month + whatever is already ticking up in this barangay. Reasons are kept
+  // so the reader can see why each disease is on the watch list.
+  const popupSeason = seasonForMonth(new Date().getMonth());
+  const popupProbable = useMemo(() => {
+    if (!popup) return [];
+    const reasons = {};
+    const add = (d, why) => { if (!d) return; if (!reasons[d]) reasons[d] = new Set(); if (why) reasons[d].add(why); };
+    popupHazardTypes.forEach(hz => hazardDiseases(hz).forEach(d => add(d, 'Hazard')));
+    popupSeason.diseases.forEach(d => add(d, 'Seasonal'));
+    Object.entries(popup.diseases || {}).forEach(([d, n]) => { if (n > 0) add(d, 'Current'); });
+    return Object.entries(reasons)
+      .map(([name, why]) => ({ name, why: [...why], cases: (popup.diseases || {})[name] || 0 }))
+      .sort((a, b) => b.why.length - a.why.length || b.cases - a.cases || a.name.localeCompare(b.name))
+      .slice(0, 8);
+  }, [popup, popupHazardTypes, popupSeason]);
   const popupWxRaw = popupActionKey && Array.isArray(weatherHazards)
     ? weatherHazards.find(x => wxKey(x.name) === wxKey(popupActionKey))
     : null;
@@ -2660,9 +2690,9 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
             <AreaPins key="area-pins" groups={purokData} barangay={pinnedBarangay} onHover={setTooltip} onLeave={() => setTooltip(null)} onClick={setPopup} />
           )}
           {mapZoom < 17 && <BarangayPins key="barangay-pins" barangayData={barangayData} onHover={setTooltip} onLeave={() => setTooltip(null)} onClick={setPopup} loginRole={loginRole} />}
-          {showActionsLayer && <LayerBadgeMarkers key="layer-actions" items={actionBadgeItems} />}
-          {showDisasterLayer && mapZoom < 17 && <LayerBadgeMarkers key="layer-hazards-badges" items={hazardBadgeItems} />}
-          {showDisasterLayer && mapZoom >= 17 && <LayerBadgeMarkers key="layer-hazards-pins" items={hazardPinItems} />}
+          {isDisasterMap && showActionsLayer && <LayerBadgeMarkers key="layer-actions" items={actionBadgeItems} />}
+          {isDisasterMap && showDisasterLayer && mapZoom < 17 && <LayerBadgeMarkers key="layer-hazards-badges" items={hazardBadgeItems} />}
+          {isDisasterMap && showDisasterLayer && mapZoom >= 17 && <LayerBadgeMarkers key="layer-hazards-pins" items={hazardPinItems} />}
           <GeoJSON
               key="brgy-geojson"
               ref={geoJsonLayerRef}
@@ -2709,35 +2739,37 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
             />
         </MapContainer>
 
-        {/* F + H LAYER TOGGLES */}
+        {/* DISASTER vs HOTSPOT MAP MODE (replaces the old Actions / Hazards toggles) */}
         <div style={{
           position: 'absolute', bottom: '64px', left: '16px', zIndex: 1000,
           display: 'flex', gap: '4px', padding: '4px',
           background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
           borderRadius: '10px', boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
         }}>
-          <button onClick={() => setShowActionsLayer(!showActionsLayer)}
+          <button onClick={() => setMapMode('disaster')}
+            title={t('Hazards, barangay actions and probable disease watch')}
             style={{
               padding: '6px 14px', border: 'none', borderRadius: '7px', cursor: 'pointer',
               fontSize: '13px', fontWeight: '700',
-              background: showActionsLayer ? '#0891b2' : 'transparent',
-              color: showActionsLayer ? '#fff' : 'var(--text-muted)',
+              background: isDisasterMap ? '#2563eb' : 'transparent',
+              color: isDisasterMap ? '#fff' : 'var(--text-muted)',
             }}>
-            🗂 {t('Actions')}
+            🌦 {t('Disaster Disease Map')}
           </button>
-          <button onClick={() => setShowDisasterLayer(!showDisasterLayer)}
+          <button onClick={() => setMapMode('hotspot')}
+            title={t('Case density hotspots by disease and barangay')}
             style={{
               padding: '6px 14px', border: 'none', borderRadius: '7px', cursor: 'pointer',
               fontSize: '13px', fontWeight: '700',
-              background: showDisasterLayer ? '#2563eb' : 'transparent',
-              color: showDisasterLayer ? '#fff' : 'var(--text-muted)',
+              background: !isDisasterMap ? '#dc2626' : 'transparent',
+              color: !isDisasterMap ? '#fff' : 'var(--text-muted)',
             }}>
-            🌦 {t('Hazards')}
+            🔥 {t('Hotspot Disease Map')}
           </button>
         </div>
 
         {/* Weather attribution (Open-Meteo, CC BY 4.0) when the hazard layer is on */}
-        {showDisasterLayer && (
+        {isDisasterMap && showDisasterLayer && (
           <div style={{
             position: 'absolute', bottom: '118px', left: '16px', zIndex: 1000,
             fontSize: '10px', color: 'var(--text-muted)', background: 'var(--bg-surface)',
@@ -2963,7 +2995,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                 </div>
               )}
 
-              {popupWeather && popupWeather.hazards.length > 0 && (
+              {isDisasterMap && popupWeather && popupWeather.hazards.length > 0 && (
                 <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
                   <p style={{ margin: '0 0 10px 0', fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     🌦 {t('Weather & Hazards')}
@@ -3000,7 +3032,39 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                 </div>
               )}
 
-              {popupManualEvents.length > 0 && (
+              {isDisasterMap && popupProbable.length > 0 && (
+                <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    🧬 {t('Probable Diseases')}
+                  </p>
+                  <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+                    {popupHazardTypes.length > 0 ? `${popupHazardTypes.join(', ')} · ` : ''}{popupSeason.label}
+                  </p>
+                  {popupProbable.map(p => (
+                    <div key={p.name} style={{
+                      display: 'flex', alignItems: 'center', gap: '9px',
+                      padding: '9px 12px', marginBottom: '7px', borderRadius: '8px',
+                      background: 'var(--input-bg)', borderLeft: '3px solid #7c3aed',
+                    }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-main)' }}>{p.name}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                          {p.why.map(w => t(w)).join(' · ')}
+                        </div>
+                      </div>
+                      <span style={{
+                        flexShrink: 0, fontSize: '12px', fontWeight: '700', padding: '3px 9px', borderRadius: '10px',
+                        background: p.cases > 0 ? 'rgba(220,38,38,0.15)' : 'var(--bg-surface)',
+                        color: p.cases > 0 ? '#dc2626' : 'var(--text-muted)',
+                      }}>
+                        {p.cases > 0 ? `${p.cases} ${t('cases')}` : t('none yet')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {isDisasterMap && popupManualEvents.length > 0 && (
                 <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
                   <p style={{ margin: '0 0 10px 0', fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     {t('Active Hazard Pins')}
@@ -3050,7 +3114,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--border-color)', fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center' }}>
                 {t('Click "Go To →" to open Manage Cases filtered to that disease and barangay')}
               </div>
-              {loginRole === 'CHO' && (
+              {loginRole === 'CHO' && isDisasterMap && (
                 <button onClick={openManageActions}
                   style={{
                     marginTop: '12px', width: '100%', padding: '9px 14px', borderRadius: '8px',
@@ -3060,7 +3124,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                   🗂 {t('Manage Barangay Actions')}
                 </button>
               )}
-              {loginRole === 'CHO' && (
+              {loginRole === 'CHO' && isDisasterMap && (
                 <button onClick={openManageHazards}
                   style={{
                     marginTop: '8px', width: '100%', padding: '9px 14px', borderRadius: '8px',

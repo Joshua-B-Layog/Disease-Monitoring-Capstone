@@ -503,6 +503,13 @@ export default function ManageCases({ caseFilter, setCaseFilter, dateFormat, aut
   const [routingTargetBarangay, setRoutingTargetBarangay] = useState('');
   const [crossUnit, setCrossUnit] = useState(null);
   const [carouselIndex, setCarouselIndex] = useState(0); // 0 = trello board, 1 = exclusive diseases, 2 = add disease form
+  const [diseaseSearch, setDiseaseSearch] = useState('');
+  const [diseaseView, setDiseaseView] = useState('list'); // 'list' (trello one-line rows, default) | 'grid' (grid-pattern cards)
+  const [activeCat, setActiveCat] = useState(null);      // id of the expanded category card
+  const [notifFilter, setNotifFilter] = useState('all'); // 'all' | 'immediate' | 'weekly'
+  const [sortMode, setSortMode] = useState('cases');     // 'cases' | 'az'
+  const [categoryFilter, setCategoryFilter] = useState('all'); // 'all' | <category id>
+  const [filterOpen, setFilterOpen] = useState(false);
 const categoriesScrollRef = useRef(null);
 
 useEffect(() => {
@@ -2798,41 +2805,94 @@ useEffect(() => {
       return (
         <div key={entry.dbName || entry.name}
           onClick={() => boardNav(entry)}
-          style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', cursor: 'pointer', transition: 'box-shadow 0.12s' }}
+          title={`${entry.name}\n${count} ${t('cases')}\n${entry.desc || ''}`}
+          style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', cursor: 'pointer', transition: 'box-shadow 0.12s' }}
           onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.12)'; }}
           onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; }}>
-          <span style={{ fontSize: '17px', lineHeight: 1, flexShrink: 0 }}>{entry.icon}</span>
-          <span style={{ flex: 1, fontSize: '14px', fontWeight: '600', color: 'var(--text-main)', lineHeight: '1.25', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.name}</span>
-          <span style={{ background: entry.color, color: '#fff', borderRadius: '50%', minWidth: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', padding: '0 5px', flexShrink: 0, boxSizing: 'border-box' }}>{count}</span>
+          <span style={{ fontSize: '20px', lineHeight: 1, flexShrink: 0 }}>{entry.icon}</span>
+          <span style={{ flex: 1, fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', lineHeight: '1.25', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.name}</span>
+          <span style={{ background: entry.color, color: '#fff', borderRadius: '50%', minWidth: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '700', padding: '0 6px', flexShrink: 0, boxSizing: 'border-box' }}>{count}</span>
         </div>
       );
     };
 
-    const trelloColumns = (id, list, accentLabel, accentIcon, badgeColor, hint) => {
-      const open = !!boardOpen[id];
-      const activeCount = list.reduce((s, d) => s + (getCaseCount(d, browseYearSource) || 0), 0);
+    const gridQ = diseaseSearch.trim().toLowerCase();
+    const applyFilters = (list) => {
+      let l = list;
+      if (notifFilter !== 'all') l = l.filter(d => notifTypeForEntry(d, allDiseases) === notifFilter);
+      if (gridQ) l = l.filter(d => (d.name || '').toLowerCase().includes(gridQ));
+      return [...l].sort(sortMode === 'az'
+        ? (a, b) => a.name.localeCompare(b.name)
+        : (a, b) => getCaseCount(b, browseYearSource) - getCaseCount(a, browseYearSource));
+    };
+
+    const catDefs = [
+      { id: 'all', label: t('All Diseases'), icon: resolveIcon('svg:alldiseases'), color: '#121358', tip: t('Every tracked disease'), list: ALL_DISEASE_ENTRIES },
+      { id: 'imm', label: t('Immediate Diseases'), icon: '🕐', color: '#DC2626', tip: t('Report within 24 hours (Level 1 IDSR)'), list: ALL_DISEASE_ENTRIES.filter(e => notifTypeForEntry(e, allDiseases) === 'immediate') },
+      { id: 'wk', label: t('Weekly Diseases'), icon: '🗓️', color: '#129968', tip: t('Included in the weekly summary (Level 2 FHSIS)'), list: ALL_DISEASE_ENTRIES.filter(e => notifTypeForEntry(e, allDiseases) === 'weekly') },
+      ...gridCategories
+        .filter(c => c.id !== 'all' && c.id !== 'immediate' && c.id !== 'weekly')
+        .map(c => ({ id: c.id, label: c.name, icon: c.icon, color: c.color || '#121358', tip: c.desc || '', list: c.diseases || [] })),
+    ].map(def => ({ ...def, shown: applyFilters(def.list) }))
+     .filter(def => !(gridQ || notifFilter !== 'all') || def.shown.length > 0); // hide empty cards while filtering
+
+    // Category filter applies to the card grid: pick one category and only that card shows.
+    const visibleCatDefs = categoryFilter === 'all' ? catDefs : catDefs.filter(d => d.id === categoryFilter);
+    const searchResults = gridQ ? applyFilters(ALL_DISEASE_ENTRIES) : null;
+
+    // Cards expand IN PLACE (accordion): the dropdown below the header is the old trello
+    // one-line list by default, or a grid-pattern list when the Grid toggle is chosen.
+    const renderCatCard = (def) => {
+      const cases = def.shown.reduce((s, d) => s + (getCaseCount(d, browseYearSource) || 0), 0);
+      const selected = activeCat === def.id;
+      // Footer link: keep the category color, but blend dark ones (e.g. the navy
+      // "All Diseases") with the theme text color so "View/Hide diseases" stays readable.
+      const m = /^#?([0-9a-f]{6})$/i.exec(def.color || '');
+      const linkColor = (() => {
+        if (!m) return 'var(--text-main)';
+        const n = parseInt(m[1], 16);
+        const lum = (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+        return lum < 0.45 ? `color-mix(in srgb, ${def.color} 42%, var(--text-main))` : def.color;
+      })();
       return (
-        <div key={id} style={{ flex: '1 1 0', minWidth: '265px', maxWidth: '385px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden', textAlign: 'left' }}>
-          <div onClick={() => setBoardOpen(o => ({ ...o, [id]: !o[id] }))}
-            style={{ padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', background: open ? 'var(--input-bg)' : 'transparent', transition: 'background 0.15s' }}
-            onMouseEnter={e => { if (!open) e.currentTarget.style.background = 'var(--input-bg)'; }}
-            onMouseLeave={e => { if (!open) e.currentTarget.style.background = 'transparent'; }}>
-            <span style={{ fontSize: '18px', lineHeight: 1, flexShrink: 0 }}>{accentIcon}</span>
-            <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
-              <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{accentLabel}</div>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: '1.3', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{list.length} disease{list.length !== 1 ? 's' : ''}</div>
+        <div key={def.id}
+          style={{
+            minWidth: 0, alignSelf: 'start',
+            gridColumn: selected ? '1 / -1' : 'auto',
+            background: selected ? 'var(--input-bg)' : 'var(--bg-surface)',
+            border: selected ? `2px solid ${def.color}` : '1px solid var(--border-color)',
+            borderRadius: '14px', padding: '18px 20px',
+            transition: 'transform 0.15s, box-shadow 0.15s', textAlign: 'left',
+          }}>
+          <div
+            title={`${def.label}\n${def.shown.length} ${t('diseases')} · ${cases} ${t('cases')}\n${def.tip}`}
+            onClick={() => setActiveCat(selected ? null : def.id)}
+            style={{ cursor: 'pointer' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <span style={{ fontSize: '34px', lineHeight: 1, flexShrink: 0 }}>{def.icon}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{def.label}</div>
+                <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>{def.shown.length} disease{def.shown.length !== 1 ? 's' : ''}</div>
+              </div>
+              <span style={{ background: def.color, color: '#fff', borderRadius: '999px', minWidth: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '700', padding: '0 9px', flexShrink: 0, boxSizing: 'border-box' }}>{cases}</span>
             </div>
-            <span style={{ background: badgeColor, color: '#fff', borderRadius: '50%', minWidth: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', padding: '0 6px', flexShrink: 0, boxSizing: 'border-box' }}>{activeCount}</span>
-            <span style={{ fontSize: '13px', color: 'var(--text-muted)', flexShrink: 0, transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+            {def.tip && (
+              <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '14px', lineHeight: 1.5 }}>{def.tip}</div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', paddingTop: '13px', borderTop: '1px solid var(--border-color)', color: linkColor, fontSize: '14px', fontWeight: '600' }}>
+              <span>{selected ? t('Hide diseases') : t('View diseases')}</span>
+              <span style={{ fontSize: '15px', color: 'var(--text-muted)', transition: 'transform 0.2s', transform: selected ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+            </div>
           </div>
-          {open ? (
-            <div data-scroll-y style={{ maxHeight: '300px', overflowY: 'auto', padding: '8px', display: 'flex', flexDirection: 'column', gap: '4px', borderTop: '1px solid var(--border-color)' }}>
-              {list.length === 0 && <div style={{ padding: '10px 12px', fontSize: '13px', color: 'var(--text-muted)' }}>{t('No diseases')}</div>}
-              {list.map(d => renderBoardDiseaseRow(d, browseYearSource))}
-            </div>
-          ) : (
-            <div style={{ padding: '10px 14px', borderTop: '1px solid var(--border-color)', fontSize: '13px', color: 'var(--text-muted)' }}>
-              {hint || t('Click to view')}
+          {selected && (
+            <div className="cdms-view-in" style={{
+              marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border-color)',
+              maxHeight: '52vh', overflowY: 'auto', maxWidth: '1120px',
+              display: 'grid', gridTemplateColumns: diseaseView === 'list' ? '1fr' : 'repeat(auto-fill, minmax(260px, 1fr))', gap: '8px',
+            }}>
+              {def.shown.length === 0
+                ? <div style={{ padding: '10px', fontSize: '13px', color: 'var(--text-muted)' }}>{t('No diseases')}</div>
+                : def.shown.map(d => renderBoardDiseaseRow(d, browseYearSource))}
             </div>
           )}
         </div>
@@ -2973,21 +3033,78 @@ useEffect(() => {
         <div data-tour="mc-carousel" style={{ position: 'relative', marginBottom: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0px', minHeight: '220px' }}>
           {/* LEFT faded peek */}
           <div className="cdms-carousel-peek" style={{
-            width: '90px', height: '195px', background: 'var(--bg-surface)',
+            width: '90px', height: '450px', background: 'var(--bg-surface)',
             border: '1px solid var(--border-color)', borderRadius: '12px 0 0 12px',
             opacity: 0.35, flexShrink: 0, clipPath: 'polygon(0 0, 100% 10%, 100% 90%, 0 100%)',
           }} />
 
           {/* CENTER active card */}
           <div style={{
-            flex: '0 1 1120px', width: 'min(100%, 1120px)', minHeight: '285px',
+            flex: '0 1 1120px', width: 'min(100%, 1120px)', minHeight: 'min(680px, calc(100vh - 200px))',
             background: 'var(--bg-surface)', border: '2px solid var(--border-color)',
             borderRadius: '14px', padding: '26px', position: 'relative',
             boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
           }}>
             <div key={carouselIndex} className="cdms-carousel-slide" style={{ textAlign: 'center' }}>
               {carouselIndex !== 2 && (
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end', marginBottom: '10px' }}>
+                  {carouselIndex === 0 && (
+                    <>
+                      <input type="text" value={diseaseSearch} placeholder={t('Search diseases')}
+                        onChange={e => setDiseaseSearch(e.target.value)}
+                        style={{ flex: '1 1 200px', minWidth: '150px', maxWidth: '340px', padding: '7px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
+                      <div style={{ display: 'flex', gap: '2px', padding: '3px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--input-bg)' }}>
+                        {[['list', '☰', t('List')], ['grid', '▦', t('Grid')]].map(([val, icon, label]) => (
+                          <button key={val} type="button" title={label} onClick={() => setDiseaseView(val)}
+                            style={{ padding: '4px 11px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '14px', lineHeight: 1.2, background: diseaseView === val ? '#0d9488' : 'transparent', color: diseaseView === val ? '#fff' : 'var(--text-muted)' }}>
+                            {icon}
+                          </button>
+                        ))}
+                      </div>
+                      <div style={{ position: 'relative' }}>
+                        <button type="button" title={t('Filters')} onClick={() => setFilterOpen(o => !o)}
+                          style={{ padding: '7px 11px', borderRadius: '8px', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '15px', lineHeight: 1, background: (notifFilter !== 'all' || sortMode !== 'cases' || categoryFilter !== 'all') ? '#121358' : 'var(--input-bg)', color: (notifFilter !== 'all' || sortMode !== 'cases' || categoryFilter !== 'all') ? '#fff' : 'var(--text-muted)' }}>
+                          ⛛
+                        </button>
+                        {filterOpen && (
+                          <div style={{ position: 'absolute', top: '110%', right: 0, width: '262px', maxHeight: 'min(78vh, 620px)', overflowY: 'auto', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', zIndex: 130, padding: '12px', textAlign: 'left' }}>
+                            <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '6px' }}>{t('Report type')}</div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
+                              {[['all', t('All'), null], ['immediate', t('Immediate'), '#DC2626'], ['weekly', t('Weekly'), '#F59E0B']].map(([val, label, dot]) => (
+                                <button key={val} type="button" onClick={() => setNotifFilter(val)}
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '5px 11px', borderRadius: '999px', fontSize: '13px', cursor: 'pointer', border: notifFilter === val ? '1px solid #3B82F6' : '1px solid var(--border-color)', background: notifFilter === val ? 'rgba(59,130,246,0.15)' : 'transparent', color: 'var(--text-main)' }}>
+                                  {dot && <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: dot }} />}{label}
+                                </button>
+                              ))}
+                            </div>
+                            <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '6px' }}>{t('Disease Category')}</div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
+                              {[{ id: 'all', name: t('All Categories'), icon: '' }, ...gridCategories.filter(c => c.id !== 'all')].map(cat => (
+                                <button key={cat.id} type="button"
+                                  onClick={() => { setCategoryFilter(cat.id); setActiveCat(cat.id === 'all' ? null : cat.id); }}
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '5px 11px', borderRadius: '999px', fontSize: '13px', cursor: 'pointer', border: categoryFilter === cat.id ? '1px solid #3B82F6' : '1px solid var(--border-color)', background: categoryFilter === cat.id ? 'rgba(59,130,246,0.15)' : 'transparent', color: 'var(--text-main)' }}>
+                                  {cat.icon}{cat.name}
+                                </button>
+                              ))}
+                            </div>
+                            <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '6px' }}>{t('Sort by')}</div>
+                            <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
+                              {[['cases', t('Most cases')], ['az', 'A-Z']].map(([val, label]) => (
+                                <button key={val} type="button" onClick={() => setSortMode(val)}
+                                  style={{ padding: '5px 11px', borderRadius: '999px', fontSize: '13px', cursor: 'pointer', border: sortMode === val ? '1px solid #3B82F6' : '1px solid var(--border-color)', background: sortMode === val ? 'rgba(59,130,246,0.15)' : 'transparent', color: 'var(--text-main)' }}>
+                                  {label}
+                                </button>
+                              ))}
+                            </div>
+                            <button type="button" onClick={() => { setNotifFilter('all'); setSortMode('cases'); setCategoryFilter('all'); setActiveCat(null); setFilterOpen(false); }}
+                              style={{ width: '100%', padding: '6px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-muted)', fontSize: '13px', cursor: 'pointer' }}>
+                              {t('Reset')}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
                   <div style={{ position: 'relative' }} ref={browseYearRef}>
                     <button type="button" onClick={() => setBrowseYearOpen(o => !o)}
                       style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', fontSize: '14px', fontWeight: '600', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '8px', cursor: 'pointer' }}>
@@ -3008,26 +3125,47 @@ useEffect(() => {
                 </div>
               )}
               {carouselIndex === 0 && (
-                <div>
-                  <h3 style={{ margin: '0 0 6px 0', fontSize: '18px', color: 'var(--text-main)' }}>{t('📋 All Diseases & Categories')}</h3>
-                  <p style={{ margin: '0 0 14px 0', fontSize: '16px', color: 'var(--text-muted)' }}>
-                    {t('Click any column header to expand that disease list. Use your mouse wheel to scroll sideways across the categories.')}
-                  </p>
+                <div
+                  ref={categoriesScrollRef}
+                  data-scroll-y
+                  style={{ maxHeight: 'calc(100vh - 240px)', minHeight: 'min(600px, calc(100vh - 280px))', overflowY: 'auto', overflowX: 'hidden', padding: '2px 8px 12px 2px', textAlign: 'left' }}>
 
-                  <div ref={categoriesScrollRef} style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', textAlign: 'left', overflowX: 'auto', padding: '2px 2px 10px' }}>
-                    {trelloColumns('all', ALL_DISEASE_ENTRIES, t('All Diseases'), resolveIcon('svg:alldiseases'), '#121358', t('Click to view all 28 diseases'))}
-                    {(() => {
-                      const list = ALL_DISEASE_ENTRIES.filter(e => notifTypeForEntry(e, allDiseases) === 'immediate');
-                      return trelloColumns('imm', list, t('Immediate Diseases'), '🕐', '#DC2626', t('Click to view immediate-report diseases'));
-                    })()}
-                    {(() => {
-                      const list = ALL_DISEASE_ENTRIES.filter(e => notifTypeForEntry(e, allDiseases) === 'weekly');
-                      return trelloColumns('wk', list, t('Weekly Diseases'), '🗓️', '#129968', t('Click to view weekly-report diseases'));
-                    })()}
-                    {gridCategories.filter(c => c.id !== 'all' && c.id !== 'immediate' && c.id !== 'weekly').map(cat =>
-                      trelloColumns(cat.id, cat.diseases || [], cat.name, cat.icon, cat.color || '#121358', t('Click to view category diseases'))
-                    )}
+                  {/* Heading (restored) */}
+                  <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                    <h3 style={{ margin: '0 0 6px 0', fontSize: '18px', color: 'var(--text-main)' }}>{t('📋 All Diseases & Categories')}</h3>
+                    <p style={{ margin: 0, fontSize: '15px', color: 'var(--text-muted)' }}>
+                      {t('Click any column header to expand that disease list. Use your mouse wheel to scroll sideways across the categories.')}
+                    </p>
                   </div>
+
+                  {/* Search results card (shows at the top while typing) */}
+                  {searchResults && (
+                    <div className="cdms-view-in"
+                      style={{ marginBottom: '12px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                        <span style={{ fontSize: '18px' }}>🔍</span>
+                        <div style={{ flex: 1, fontSize: '15px', fontWeight: '700', color: 'var(--text-main)' }}>
+                          {t('Search results')} <span style={{ color: 'var(--text-muted)', fontWeight: '500', fontSize: '13px' }}>· {searchResults.length}</span>
+                        </div>
+                        <button type="button" title={t('Close')} onClick={() => setDiseaseSearch('')}
+                          style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '16px', lineHeight: 1 }}>✕</button>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: diseaseView === 'list' ? '1fr' : 'repeat(auto-fill, minmax(280px, 1fr))', gap: '10px' }}>
+                        {searchResults.length === 0
+                          ? <div style={{ padding: '10px', fontSize: '13px', color: 'var(--text-muted)' }}>{t('No diseases')}</div>
+                          : searchResults.map(d => renderBoardDiseaseRow(d, browseYearSource))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Category cards - each expands in place (accordion), like the old trello columns */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '22px', alignItems: 'start' }}>
+                    {visibleCatDefs.map(renderCatCard)}
+                  </div>
+
+                  {visibleCatDefs.length === 0 && (
+                    <div style={{ padding: '16px', fontSize: '15px', color: 'var(--text-muted)' }}>{t('No diseases')}</div>
+                  )}
                 </div>
               )}
               {carouselIndex === 1 && (() => {
@@ -3334,7 +3472,7 @@ useEffect(() => {
 
           {/* RIGHT faded peek */}
           <div className="cdms-carousel-peek" style={{
-width: '90px', height: '195px', background: 'var(--bg-surface)',
+width: '90px', height: '450px', background: 'var(--bg-surface)',
     border: '1px solid var(--border-color)', borderRadius: '0 12px 12px 0',
     opacity: 0.35, flexShrink: 0, clipPath: 'polygon(0 10%, 100% 0, 100% 100%, 0 90%)',
           }} />

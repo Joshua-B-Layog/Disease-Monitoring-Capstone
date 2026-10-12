@@ -7,32 +7,32 @@
 /* Headings */
 .resident-page h2 {
   font-family: var(--heading);
-  font-size: 28px;
+  font-size: 29.3px;
   font-weight: 700;
 }
 
 .resident-page h3 {
   font-family: var(--heading);
-  font-size: 18px;
+  font-size: 18.8px;
   font-weight: 600;
 }
 
 .resident-page h4 {
   font-family: var(--heading);
-  font-size: 16px;
+  font-size: 16.7px;
   font-weight: 600;
 }
 
 /* Body text */
 .resident-page p {
   font-family: var(--sans);
-  font-size: 17px;
+  font-size: 17.8px;
 }
 
 /* Buttons */
 .resident-page button {
   font-family: var(--heading);
-  font-size: 17px;
+  font-size: 17.8px;
   font-weight: 600;
 }
 
@@ -41,7 +41,7 @@
 .resident-page .badge,
 .resident-page .tag {
   font-family: var(--heading);
-  font-size: 17px;
+  font-size: 17.8px;
   font-weight: 600;
 }
 
@@ -50,7 +50,7 @@
 .resident-page textarea,
 .resident-page select {
   font-family: var(--sans);
-  font-size: 17px;
+  font-size: 17.8px;
 }
 
 /* =========================================================
@@ -82,13 +82,13 @@
 
 /* Hero heading */
 .resident-hero-title {
-  font-size: 36px;
+  font-size: 37.6px;
   font-weight: 800;
   letter-spacing: -0.02em;
 }
 
 .resident-hero-sub {
-  font-size: 16px;
+  font-size: 16.7px;
   max-width: 600px;
   margin: 0 auto;
   line-height: 1.6;
@@ -134,11 +134,11 @@
    BREAKPOINT: 1024px  (tablet / small laptop / MacBook)
    ========================================================= */
 @media (max-width: 1024px) {
-  .resident-page h2 { font-size: 24px; }
+  .resident-page h2 { font-size: 25px; }
 
   .resident-header { padding: 0 24px !important; }
 
-  .resident-hero-title { font-size: 28px; }
+  .resident-hero-title { font-size: 29.3px; }
 
   .resident-section { padding: 24px 20px; }
 
@@ -146,7 +146,7 @@
 
   .resident-stat-cards > div { flex: 1 1 140px; }
 
-  .resident-disease-label { width: 140px; font-size: 14px; }
+  .resident-disease-label { width: 140px; font-size: 14.6px; }
 }
 
 /* =========================================================
@@ -158,10 +158,10 @@
 
   .resident-header { padding: 0 16px !important; }
 
-  .resident-hero-title { font-size: 24px; }
-  .resident-hero-sub  { font-size: 14px; }
+  .resident-hero-title { font-size: 25px; }
+  .resident-hero-sub  { font-size: 14.6px; }
 
-  .resident-page h2 { font-size: 22px; }
+  .resident-page h2 { font-size: 22.9px; }
 
   .resident-section { padding: 20px 16px; }
 
@@ -169,7 +169,7 @@
 
   .resident-stat-cards > div { flex: 1 1 120px; }
 
-  .resident-disease-label { width: 110px; font-size: 13px; }
+  .resident-disease-label { width: 110px; font-size: 13.6px; }
 
   /* Tables: allow horizontal scroll */
   .resident-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -181,11 +181,11 @@
 @media (max-width: 480px) {
   .resident-header { padding: 0 12px !important; }
 
-  .resident-hero-title { font-size: 20px; }
-  .resident-hero-sub  { font-size: 13px; }
+  .resident-hero-title { font-size: 20.9px; }
+  .resident-hero-sub  { font-size: 13.6px; }
 
-  .resident-page h2 { font-size: 20px; }
-  .resident-page h3 { font-size: 16px; }
+  .resident-page h2 { font-size: 20.9px; }
+  .resident-page h3 { font-size: 16.7px; }
 
   .resident-section { padding: 16px 12px; border-radius: 8px; }
 
@@ -196,7 +196,7 @@
   }
   .resident-stat-cards > div { flex: 1 1 100%; }
 
-  .resident-disease-label { width: 90px; font-size: 12px; }
+  .resident-disease-label { width: 90px; font-size: 12.5px; }
 
   /* Full-width buttons and inputs on phone */
   .resident-page button { width: auto; }
@@ -210,12 +210,12 @@
    ========================================================= */
 @media (min-width: 2560px) {
   .resident-section { max-width: 1500px; padding: 32px 28px; }
-  .resident-hero-title { font-size: 42px; }
-  .resident-hero-sub { font-size: 18px; max-width: 700px; }
-  .resident-page h2 { font-size: 32px; }
-  .resident-page h3 { font-size: 20px; }
-  .resident-page p { font-size: 16px; }
-  .resident-page button { font-size: 16px; }
+  .resident-hero-title { font-size: 43.9px; }
+  .resident-hero-sub { font-size: 18.8px; max-width: 700px; }
+  .resident-page h2 { font-size: 33.4px; }
+  .resident-page h3 { font-size: 20.9px; }
+  .resident-page p { font-size: 16.7px; }
+  .resident-page button { font-size: 16.7px; }
 }
 
 /* =========================================================
@@ -224,7 +224,7 @@
 .mc-custom-dropdown-btn {
   padding: 8px 12px; background: var(--input-bg);
   border: 1px solid var(--border-color); border-radius: 6px;
-  color: var(--text-main); font-size: 17px; cursor: pointer;
+  color: var(--text-main); font-size: 17.8px; cursor: pointer;
   display: flex; align-items: center; justify-content: space-between;
   gap: 6px; white-space: nowrap; box-sizing: border-box;
 }
@@ -237,7 +237,7 @@
   animation: cdmsPopIn 0.15s ease;
 }
 .mc-custom-dropdown-item {
-  padding: 8px 12px; cursor: pointer; font-size: 17px;
+  padding: 8px 12px; cursor: pointer; font-size: 17.8px;
   color: var(--text-main);
 }
 .mc-custom-dropdown-item:hover { background: var(--input-bg); }

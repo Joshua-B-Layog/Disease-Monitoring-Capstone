@@ -246,16 +246,16 @@ function App() {
   // ── THEME (separate scopes: per-user app theme for CHO/BHW, plus the login screen theme) ──
   const [appTheme, setAppTheme] = useState(() => {
     if (savedSession?.id) {
-      return localStorage.getItem(`cdms_theme_${savedSession.id}`) || localStorage.getItem('cdms_theme') || 'dark';
+      return localStorage.getItem(`cdms_theme_${savedSession.id}`) || localStorage.getItem('cdms_theme') || 'light';
     }
-    return 'dark';
+    return localStorage.getItem('cdms_theme') || 'light';
   });
   const [loginTheme, setLoginTheme] = useState(() => {
     const lastId = localStorage.getItem('cdms_last_user');
     if (lastId) {
-      return localStorage.getItem(`cdms_theme_${lastId}`) || localStorage.getItem('cdms_theme') || 'dark';
+      return localStorage.getItem(`cdms_theme_${lastId}`) || localStorage.getItem('cdms_theme') || 'light';
     }
-    return localStorage.getItem('cdms_theme') || 'dark';
+    return localStorage.getItem('cdms_theme') || 'light';
   });
 
   const activeTheme = isLoggedIn ? appTheme : loginTheme;
@@ -570,7 +570,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
     setLoggedUser(sessionData.name || sessionData.username);
     setLoggedUserId(sessionData.id || null);
     setLoggedUserBarangay(sessionData.barangay || null);
-    setAppTheme(localStorage.getItem(`cdms_theme_${sessionData.id}`) || localStorage.getItem('cdms_theme') || 'dark');
+    setAppTheme(localStorage.getItem(`cdms_theme_${sessionData.id}`) || localStorage.getItem('cdms_theme') || 'light');
     if (sessionData.id) localStorage.setItem('cdms_last_user', String(sessionData.id));
     setAuthToken(sessionData.token || null);
     setMustChangePassword(!!sessionData.mustChangePassword);

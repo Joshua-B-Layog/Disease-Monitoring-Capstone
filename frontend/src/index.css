@@ -1,6 +1,7 @@
 :root {
   --text: #6b6375;
   --text-h: #08060d;
+  --font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --bg: #fff;
   --border: #e5e4e7;
   --code-bg: #f4f3ec;
@@ -17,7 +18,7 @@
   --table-header-padding: 10px 12px;
   --gap-size: 20px;
 
-  --sans: "Tw Cen MT", sans-serif;
+  --sans: "Inter", "Tw Cen MT", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --heading: "Bahnschrift SemiBold Condensed", "Bahnschrift", sans-serif;
   --black: "Bahnschrift SemiBold Condensed", "Bahnschrift", sans-serif;
   --mono: ui-monospace, Consolas, monospace;
@@ -32,7 +33,7 @@
   --text-3xl: 32px;
   --text-4xl: 64px;
 
-  font: calc(18px * var(--app-font-scale))/150% var(--sans);
+  font: calc(19px * var(--app-font-scale))/150% var(--sans);
   letter-spacing: 0.18px;
   color-scheme: light dark;
   color: var(--text);
@@ -43,7 +44,7 @@
   -moz-osx-font-smoothing: grayscale;
 
   @media (max-width: 1024px) {
-    font-size: calc(16px * var(--app-font-scale));
+    font-size: calc(17px * var(--app-font-scale));
   }
 }
 
@@ -88,7 +89,7 @@ body {
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  font-size: calc(18px * var(--app-font-scale));
+  font-size: calc(19px * var(--app-font-scale));
 }
 
 @media (min-width: 901px) {
