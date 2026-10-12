@@ -190,7 +190,7 @@ Open [http://localhost:3000](http://localhost:3000).
 - **Offline** — cases created without a network queue locally and sync on reconnect
 
 ### Resident Portal (`/Resident`)
-- **Prevention Tips** — 28 disease cards with prevention tips, YouTube videos, and a symptom-checker quiz
+- **Prevention Tips** — 26 disease cards with prevention tips, YouTube videos, and a symptom-checker quiz
 - **Interactive Map** — public disease map with barangay risk classification and health overview
 - **Contact Us** — submits concerns straight to the BHW inbox
 
@@ -321,7 +321,7 @@ The schema is split in two:
 
 Baclaran, Banay-Banay, Banlic, Barangay Dos (Poblacion), Barangay Tres (Poblacion), Barangay Uno (Poblacion), Bigaa, Butong, Casile, Diezmo, Gulod, Mamatid, Marinig, Niugan, Pittland, Pulo, Sala, San Isidro
 
-## 28 Communicable Diseases Tracked
+## 26 Communicable Diseases Tracked
 
 Acute Respiratory Infection, Avian Influenza, Chickenpox, Cholera, Covid-19, Dengue, Diarrhea, Diphtheria, Ebola, Hand Foot and Mouth Disease, Hepatitis A, Hepatitis B, Hepatitis C, HIV/AIDS, Influenza, Influenza A, Leprosy, Leptospirosis, Malaria, Measles, Meningococcemia, Pertussis, Poliomyelitis, Rabies, SARS, Sore Eyes, Tuberculosis, Typhoid Fever
 
