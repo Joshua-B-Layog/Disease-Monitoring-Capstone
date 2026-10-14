@@ -317,6 +317,8 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       .sort((a, b) => b.count - a.count || (a.barangay.localeCompare(b.barangay)))
       .slice(0, 6);
   })();
+  const recurringMax = recurringHotspots.length ? recurringHotspots[0].count : 0;
+  const recurringTotal = recurringHotspots.reduce((s, h) => s + h.count, 0);
 
   // ── Epidemiology: contributing risk factors across the scoped/period cases ──
   const riskFactorSummary = summarizeRiskFactors(displayCases);
@@ -1195,13 +1197,11 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       ${buildChartSectionHTML(t('Top Diseases'), topDiseases, topDiseaseMax)}
       ${buildStatusSectionHTML()}
 
-      ${repeatCases.length > 0 ? `<h3>${t('Repeat Cases')}</h3><table class="alt"><tbody>${repeatCases.map(g =>
-        `<tr><td style="font-weight:600;">${g.name}</td><td>${g.disease}</td><td style="text-align:right;font-weight:700;">${g.count}×</td><td style="color:#64748b;">${formatDateStr(g.dates[0], dateFormat)} → ${formatDateStr(g.dates[g.dates.length - 1], dateFormat)}</td></tr>`
-      ).join('')}</tbody></table>` : ''}
+      ${repeatCases.length > 0 ? buildChartSectionHTML(t('Repeat Cases'),
+        repeatCases.map(g => ({ label: `${g.name} · ${g.disease}`, count: g.count })), repeatMax) : ''}
 
-      ${recurringHotspots.length > 0 ? `<h3>${t('Recurring Hotspots')}</h3><table class="alt"><tbody>${recurringHotspots.map(h =>
-        `<tr><td style="font-weight:600;">${h.barangay}</td><td>${h.disease}</td><td style="text-align:right;font-weight:700;">${h.count}×</td><td style="color:#64748b;">${t('Last')} ${formatDateStr(h.lastReport, dateFormat)}</td></tr>`
-      ).join('')}</tbody></table>` : ''}
+      ${recurringHotspots.length > 0 ? buildChartSectionHTML(t('Recurring Hotspots'),
+        recurringHotspots.map(h => ({ label: `${h.barangay} · ${h.disease}`, count: h.count })), recurringMax) : ''}
 
       ${movingAvgData && movingAvgData.length > 0 ? `<h3>${t('7-Day Moving Average')}</h3><table class="alt"><tbody>${movingAvgData.map((p) => {
         const b = monthBars[p.idx];
@@ -1450,26 +1450,33 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             {t('No repeating cases in this period.')}
           </p>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px' }}>
-            {repeatCases.map((g, i) => (
-              <div key={`${g.name}-${g.disease}`} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '12px 14px', animationDelay: `${i * 45}ms` }}>
-                <span style={{ width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: getDiseaseColor(g.disease) + '22', color: getDiseaseColor(g.disease), fontWeight: '800', fontSize: '16px' }}>
-                  {g.count}
-                </span>
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={g.name}>{g.name}</div>
-                  <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                    <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: getDiseaseColor(g.disease), marginRight: '5px', verticalAlign: 'middle' }} />
-                    {g.disease}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: compactMode ? '8px' : '10px' }}>
+            {repeatCases.map((g, i) => {
+              const color = getDiseaseColor(g.disease);
+              const pct = repeatMax > 0 ? Math.round((g.count / repeatMax) * 100) : 0;
+              const range = g.dates.length > 0
+                ? `${formatDateStr(g.dates[0], dateFormat)} → ${formatDateStr(g.dates[g.dates.length - 1], dateFormat)}`
+                : t('No dates');
+              return (
+                <div
+                  key={`${g.name}-${g.disease}`}
+                  className="cdms-view-in"
+                  title={`${g.name} — ${g.disease}\n${g.count}×\n${range}`}
+                  style={{ display: 'grid', gridTemplateColumns: compactMode ? 'minmax(110px, 150px) 1fr auto' : 'minmax(150px, 240px) 1fr auto', alignItems: 'center', gap: compactMode ? '8px' : '12px', animationDelay: `${i * 45}ms` }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: compactMode ? '13px' : '14px', fontWeight: '600', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.name}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: color, marginRight: '5px', verticalAlign: 'middle' }} />
+                      {g.disease}
+                    </div>
                   </div>
+                  <div style={{ height: compactMode ? '18px' : '22px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
+                    <div style={{ width: chartMounted ? `${pct}%` : '0%', height: '100%', background: color, borderRadius: '5px', transition: 'width 0.7s cubic-bezier(0.22, 1, 0.36, 1)' }} />
+                  </div>
+                  <span style={{ fontSize: compactMode ? '13px' : '14px', fontWeight: '700', color: 'var(--text-main)', minWidth: '36px', textAlign: 'right' }}>{g.count}×</span>
                 </div>
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'right', flexShrink: 0, lineHeight: '1.5' }}>
-                  {g.dates.length > 0
-                    ? <>{formatDateStr(g.dates[0], dateFormat)}<br />→ {formatDateStr(g.dates[g.dates.length - 1], dateFormat)}</>
-                    : t('No dates')}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -1490,7 +1497,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       )}
 
       {/* ── RECURRING HOTSPOTS ── */}
-      <div data-tour="dash-hotspots" className="cdms-view-in" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px' }}>
+      <div data-tour="dash-hotspots" className="cdms-view-in" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', textAlign: 'left' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', marginBottom: recurringHotspots.length ? '14px' : '0' }}>
           <h4 style={{ color: 'var(--text-main)', margin: 0, fontSize: '15px', fontWeight: '600' }}>
             📍 {t('Recurring Hotspots')}
@@ -1503,27 +1510,97 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-muted)' }}>
             {t('No recurring hotspots in this period.')}
           </p>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px' }}>
-            {recurringHotspots.map((h, i) => (
-              <div key={`${h.barangay}-${h.disease}`} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '12px 14px', animationDelay: `${i * 45}ms` }}>
-                <span style={{ width: '36px', height: '36px', borderRadius: '8px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: getDiseaseColor(h.disease) + '22', color: getDiseaseColor(h.disease), fontWeight: '800', fontSize: '15px' }}>
-                  {h.count}×
-                </span>
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={h.barangay}>{h.barangay}</div>
-                  <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                    <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: getDiseaseColor(h.disease), marginRight: '5px', verticalAlign: 'middle' }} />
-                    {h.disease}
-                  </div>
-                </div>
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'right', flexShrink: 0 }}>
-                  {h.lastReport ? <>{t('Last')} {formatDateStr(h.lastReport, dateFormat)}</> : '-'}
+        ) : (() => {
+          // One distinct color per slice (matches the reference pie chart)
+          const HOTSPOT_COLORS = ['#0047AB', '#FFC000', '#92D050', '#FF93F0', '#FF8A50', '#E54B4B', '#4F6BED', '#A55EEA'];
+          const CX = 190, CY = 125, R = 88;
+          const polar = (deg, r) => {
+            const rad = (deg * Math.PI) / 180;
+            return [CX + r * Math.cos(rad), CY + r * Math.sin(rad)];
+          };
+          let acc = -90; // start at 12 o'clock, go clockwise
+          const slices = recurringHotspots.map((h, i) => {
+            const frac = recurringTotal > 0 ? h.count / recurringTotal : 0;
+            const sweep = frac * 360;
+            const startDeg = acc;
+            const endDeg = acc + sweep;
+            const midDeg = acc + sweep / 2;
+            acc = endDeg;
+            const [x1, y1] = polar(startDeg, R);
+            const [x2, y2] = polar(endDeg, R);
+            const large = sweep > 180 ? 1 : 0;
+            const d = frac >= 0.9999
+              ? null
+              : `M ${CX} ${CY} L ${x1} ${y1} A ${R} ${R} 0 ${large} 1 ${x2} ${y2} Z`;
+            const [lx1, ly1] = polar(midDeg, R);
+            const [lx2, ly2] = polar(midDeg, R + 14);
+            const rightSide = lx2 >= CX;
+            const lx3 = lx2 + (rightSide ? 16 : -16);
+            return {
+              h, frac, d, color: HOTSPOT_COLORS[i % HOTSPOT_COLORS.length],
+              pct: Math.round(frac * 100),
+              lx1, ly1, lx2, ly2, lx3, rightSide,
+            };
+          });
+          return (
+            <div style={{ display: 'flex', flexDirection: compactMode ? 'column' : 'row', alignItems: 'center', gap: compactMode ? '16px' : '30px', flexWrap: 'wrap' }}>
+              {/* ── Pie chart with outside % labels ── */}
+              <div style={{ flexShrink: 0, width: compactMode ? '300px' : '380px', maxWidth: '100%' }}>
+                <svg viewBox="0 0 380 250" width="100%" role="img" style={{ overflow: 'visible', display: 'block' }}>
+                  {slices.map((s) => (
+                    <g key={`${s.h.barangay}-${s.h.disease}`} style={{ opacity: chartMounted ? 1 : 0, transition: 'opacity 0.7s ease' }}>
+                      {s.d ? (
+                        <path d={s.d} fill={s.color} stroke="var(--bg-surface)" strokeWidth="2" strokeLinejoin="round">
+                          <title>{`${s.h.barangay} · ${s.h.disease} — ${s.h.count}× (${s.pct}%)`}</title>
+                        </path>
+                      ) : (
+                        <circle cx={CX} cy={CY} r={R} fill={s.color} stroke="var(--bg-surface)" strokeWidth="2">
+                          <title>{`${s.h.barangay} · ${s.h.disease} — ${s.h.count}× (100%)`}</title>
+                        </circle>
+                      )}
+                      {/* leader line */}
+                      <polyline
+                        points={`${s.lx1},${s.ly1} ${s.lx2},${s.ly2} ${s.lx3},${s.ly2}`}
+                        fill="none" stroke={s.color} strokeWidth="1.2" />
+                      {/* percentage label */}
+                      <text
+                        x={s.lx3 + (s.rightSide ? 4 : -4)} y={s.ly2}
+                        textAnchor={s.rightSide ? 'start' : 'end'} dominantBaseline="middle"
+                        fill={s.color} fontSize="15" fontWeight="600">
+                        {s.pct}%
+                      </text>
+                    </g>
+                  ))}
+                  {/* white center dot like the reference */}
+                  <circle cx={CX} cy={CY} r="3" fill="var(--bg-surface)" />
+                </svg>
+              </div>
+
+              {/* ── Legend (right side, left-aligned) ── */}
+              <div style={{ flex: 1, minWidth: '240px', display: 'flex', flexDirection: 'column', gap: compactMode ? '8px' : '11px', textAlign: 'left' }}>
+                {slices.map((s) => {
+                  const last = s.h.lastReport ? `${t('Last')} ${formatDateStr(s.h.lastReport, dateFormat)}` : '-';
+                  return (
+                    <div
+                      key={`${s.h.barangay}-${s.h.disease}`}
+                      title={`${s.h.barangay} — ${s.h.disease}\n${s.h.count}×\n${last}`}
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ width: '14px', height: '14px', borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+                      <span style={{ flex: 1, minWidth: 0, fontSize: compactMode ? '13px' : '14px', color: 'var(--text-main)', textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {s.h.barangay}
+                        <span style={{ color: 'var(--text-muted)' }}> · {s.h.disease}</span>
+                      </span>
+                      <span style={{ fontSize: compactMode ? '13px' : '14px', fontWeight: '700', color: 'var(--text-main)' }}>{s.h.count}×</span>
+                    </div>
+                  );
+                })}
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  {t('Total')}: {recurringTotal}×
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* ── EPIDEMIOLOGY: CONTRIBUTING RISK FACTORS ── */}
