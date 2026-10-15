@@ -2959,23 +2959,14 @@ useEffect(() => {
         <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>
           {t('Dashboard / Manage Cases')} {category ? `/ ${category.name}` : ''}
         </div>
-        <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-          {category ? (
-            <div>
-              <h2 style={{ margin: '0 0 4px 0', fontSize: '22px' }}>{category.icon} {category.name}</h2>
-              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '15px' }}>
-                {t('Select a disease to view, add, or manage cases')}
-              </p>
-            </div>
-          ) : (
-            <div>
-              <h2 style={{ margin: '0 0 4px 0', fontSize: '22px' }}>{t('Select a Disease to Manage')}</h2>
-              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '15px' }}>
-                {t('Choose a category then a disease program')}
-              </p>
-            </div>
-          )}
-        </div>
+        {category && (
+          <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+            <h2 style={{ margin: '0 0 4px 0', fontSize: '22px' }}>{category.icon} {category.name}</h2>
+            <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '15px' }}>
+              {t('Select a disease to view, add, or manage cases')}
+            </p>
+          </div>
+        )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start', marginBottom: '24px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -3002,28 +2993,6 @@ useEffect(() => {
                   style={{ padding: '7px 16px', background: diseasePage >= totalDiseasePages - 1 ? 'var(--input-bg)' : 'var(--primary-900, #000768)', color: diseasePage >= totalDiseasePages - 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: diseasePage >= totalDiseasePages - 1 ? 'not-allowed' : 'pointer', fontSize: '15px' }}>
                   {t('Next →')}
                 </button>
-              </div>
-            )}
-        {!category && (
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                {keyboardShortcuts && (
-                  <div style={{ position: 'relative' }} ref={shortcutsRef}>
-                    <button onClick={() => setShowShortcutsGuide(!showShortcutsGuide)}
-                      style={{ width: '30px', height: '30px', borderRadius: '50%', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '15px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      ?
-                    </button>
-                    {showShortcutsGuide && (
-                      <div style={{ position: 'absolute', top: '110%', right: 0, width: '240px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', padding: '14px', fontSize: '15px' }}>
-<div style={{ fontWeight: '700', marginBottom: '10px', color: 'var(--text-main)' }}>{t('Keyboard Shortcuts')}</div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>{t('New Case')}</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '15px', border: '1px solid var(--border-color)' }}>N</kbd></div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>{t('Save Form')}</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '15px', border: '1px solid var(--border-color)' }}>{shortcutConfig.saveCtrl ? 'Ctrl+' : ''}{String(shortcutConfig.save || 'S').toUpperCase()}</kbd></div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>{t('Close / Back')}</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '15px', border: '1px solid var(--border-color)' }}>Esc</kbd></div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             )}
           </div>
@@ -3122,6 +3091,24 @@ useEffect(() => {
                       </div>
                     )}
                   </div>
+                  {keyboardShortcuts && (
+                    <div style={{ position: 'relative' }} ref={shortcutsRef}>
+                      <button onClick={() => setShowShortcutsGuide(!showShortcutsGuide)} title={t('Keyboard Shortcuts')}
+                        style={{ width: '34px', height: '34px', borderRadius: '50%', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '15px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        ?
+                      </button>
+                      {showShortcutsGuide && (
+                        <div style={{ position: 'absolute', top: '115%', right: 0, width: '240px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', zIndex: 140, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', padding: '14px', fontSize: '15px', textAlign: 'left' }}>
+                          <div style={{ fontWeight: '700', marginBottom: '10px', color: 'var(--text-main)' }}>{t('Keyboard Shortcuts')}</div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>{t('New Case')}</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '15px', border: '1px solid var(--border-color)' }}>N</kbd></div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>{t('Save Form')}</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '15px', border: '1px solid var(--border-color)' }}>{shortcutConfig.saveCtrl ? 'Ctrl+' : ''}{String(shortcutConfig.save || 'S').toUpperCase()}</kbd></div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ color: 'var(--text-muted)' }}>{t('Close / Back')}</span><kbd style={{ background: 'var(--input-bg)', padding: '2px 8px', borderRadius: '4px', fontSize: '15px', border: '1px solid var(--border-color)' }}>Esc</kbd></div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
               {carouselIndex === 0 && (
