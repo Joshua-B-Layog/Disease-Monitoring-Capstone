@@ -103,7 +103,7 @@ export const DISEASES = [
     ],
   },
   {
-    name: 'Leptospirosis', icon: '🐀', color: '#129968', videoId: 'aqnpyMsvMbk',
+    name: 'Leptospirosis', icon: '🐀', color: 'var(--primary-600, #000ECB)', videoId: 'aqnpyMsvMbk',
     tips: [
       'Avoid wading or swimming in floodwaters.',
       'Wear protective boots and gloves when cleaning flood-damaged areas.',
@@ -852,9 +852,9 @@ export default function PreventionTips() {
             style={{
               padding: '6px 16px', borderRadius: '20px', fontSize: '15px', fontWeight: '600',
               cursor: 'pointer', transition: 'all 0.2s ease',
-              background: catFilter === cat ? '#129968' : 'transparent',
+              background: catFilter === cat ? 'var(--primary-600, #000ECB)' : 'transparent',
               color: catFilter === cat ? '#fff' : 'var(--text-muted)',
-              border: `1px solid ${catFilter === cat ? '#129968' : 'var(--border-color)'}`,
+              border: `1px solid ${catFilter === cat ? 'var(--primary-600, #000ECB)' : 'var(--border-color)'}`,
             }}
           >
             {cat}
@@ -936,7 +936,7 @@ export default function PreventionTips() {
                       margin: '12px 0',
                       padding: '10px 14px',
                       borderRadius: '8px',
-                      background: '#121358',
+                      background: 'var(--primary-900, #000768)',
                       color: '#fff',
                       fontSize: '17px',
                       fontWeight: 600,
@@ -949,7 +949,7 @@ export default function PreventionTips() {
                 <div style={{ marginTop: '8px', textAlign: 'right' }}>
                   <button onClick={(e) => { e.stopPropagation(); startQuiz(disease.name); }}
                     style={{
-                      padding: '6px 16px', background: '#129968', color: '#fff',
+                      padding: '6px 16px', background: 'var(--primary-600, #000ECB)', color: '#fff',
                       border: 'none', borderRadius: '6px', cursor: 'pointer',
                       fontSize: '17px', fontWeight: '600',
                     }}>
@@ -965,11 +965,11 @@ export default function PreventionTips() {
       {/* ── SYMPTOM CHECKER ── */}
       <div ref={quizRef} style={{
         marginTop: '40px', background: 'var(--bg-surface)',
-        border: '2px solid #129968', borderRadius: '14px',
+        border: '2px solid var(--primary-600, #000ECB)', borderRadius: '14px',
         overflow: 'hidden',
       }}>
         <div style={{
-          background: '#129968', padding: '16px 24px', color: '#fff',
+          background: 'var(--primary-600, #000ECB)', padding: '16px 24px', color: '#fff',
         }}>
           <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700' }}>
             Symptom Checker
@@ -1020,7 +1020,7 @@ export default function PreventionTips() {
                   {disease.symptoms.map((q, idx) => (
                     <div key={idx} style={{
                       padding: '12px 16px', background: 'var(--bg-main)', borderRadius: '8px',
-                      border: scAnswers[idx] !== undefined ? '1px solid #129968' : '1px solid var(--border-color)',
+                      border: scAnswers[idx] !== undefined ? '1px solid var(--primary-600, #000ECB)' : '1px solid var(--border-color)',
                     }}>
                       <div style={{ fontSize: '17px', color: 'var(--text-main)', marginBottom: '8px' }}>
                         {idx + 1}. {t(q)}
@@ -1029,9 +1029,9 @@ export default function PreventionTips() {
                         <button onClick={() => answerQuestion(idx, true)}
                           style={{
                             padding: '6px 20px', borderRadius: '6px', border: '1px solid',
-                            borderColor: scAnswers[idx] === true ? '#129968' : 'var(--border-color)',
-                            background: scAnswers[idx] === true ? 'rgba(18,153,104,0.12)' : 'var(--bg-surface)',
-                            color: scAnswers[idx] === true ? '#129968' : 'var(--text-muted)',
+                            borderColor: scAnswers[idx] === true ? 'var(--primary-600, #000ECB)' : 'var(--border-color)',
+                            background: scAnswers[idx] === true ? 'rgba(0,14,203,0.12)' : 'var(--bg-surface)',
+                            color: scAnswers[idx] === true ? 'var(--primary-600, #000ECB)' : 'var(--text-muted)',
                             fontWeight: scAnswers[idx] === true ? '600' : '400',
                             cursor: 'pointer', fontSize: '17px',
                           }}>
@@ -1056,7 +1056,7 @@ export default function PreventionTips() {
                   <button onClick={calculateResult}
                     disabled={answeredCount < disease.symptoms.length}
                     style={{
-                      padding: '12px 40px', background: answeredCount < disease.symptoms.length ? '#64748b' : '#129968',
+                      padding: '12px 40px', background: answeredCount < disease.symptoms.length ? '#64748b' : 'var(--primary-600, #000ECB)',
                       color: '#fff', border: 'none', borderRadius: '8px',
                       fontSize: '17px', fontWeight: '700', cursor: answeredCount < disease.symptoms.length ? 'not-allowed' : 'pointer',
                     }}>
@@ -1091,7 +1091,7 @@ export default function PreventionTips() {
                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
                   <button onClick={() => { resetQuiz(); }}
                     style={{
-                      padding: '10px 24px', background: '#129968', color: '#fff',
+                      padding: '10px 24px', background: 'var(--primary-600, #000ECB)', color: '#fff',
                       border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '17px', fontWeight: '600',
                     }}>
                     Try Another Disease

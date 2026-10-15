@@ -754,15 +754,15 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
   const renderCalendar = () => { const days = getDaysInMonth(calYear, calMonth); const first = getFirstDay(calYear, calMonth); const cells = []; for (let i = 0; i < first; i++) cells.push(null); for (let d = 1; d <= days; d++) cells.push(d); return cells; };
 
   const actionBadgeStyle = (action) => {
-    if (action === 'Created')   return { background: 'rgba(18,153,104,0.15)', color: '#16b877' };
+    if (action === 'Created')   return { background: 'rgba(18,153,104,0.15)', color: '#129968' };
     if (action === 'Updated')   return { background: 'rgba(37,99,235,0.15)', color: '#5b8def' };
     if (action === 'Archived')   return { background: 'rgba(245,158,11,0.15)', color: '#d97706' };
-    if (action === 'Restored')   return { background: 'rgba(18,153,104,0.15)', color: '#16b877' };
+    if (action === 'Restored')   return { background: 'rgba(18,153,104,0.15)', color: '#129968' };
     if (action === 'Deleted')   return { background: 'rgba(220,38,38,0.15)', color: '#ef4444' };
     if (action === 'Logged In')  return { background: 'rgba(124,58,237,0.15)', color: '#a78bfa' };
     if (action === 'Logged Out') return { background: 'rgba(239,68,68,0.15)', color: '#f87171' };
     if (action === 'Requested Edit') return { background: 'rgba(217,119,6,0.15)', color: '#fbbf24' };
-    if (action === 'Approved')  return { background: 'rgba(20,184,166,0.15)', color: '#2dd4bf' };
+    if (action === 'Approved')  return { background: 'rgba(20,184,166,0.15)', color: '#129968' };
     if (action === 'Rejected')  return { background: 'rgba(220,38,38,0.15)', color: '#f87171' };
     return { background: 'var(--input-bg)', color: 'var(--text-muted)' };
   };
@@ -914,7 +914,7 @@ export default function BarangayReports({ activeUser, fontScale, compactMode, da
                         </td>
                         <td style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '15px' }}>{l.entity}</td>
                         <td style={{ padding: '8px 12px', color: 'var(--text-muted)', fontSize: '15px' }}>{(l.details || '').replace(/\s*\(User ID:\s*\d+\)/gi, '').replace(/\s*\(Case ID:\s*\d+\)/gi, '')}</td>
-                        <td style={{ padding: '8px 12px', textAlign: 'center', fontSize: '15px', fontWeight: '600', color: l.user_role === 'CHO' ? '#2563eb' : '#129968' }}>
+                        <td style={{ padding: '8px 12px', textAlign: 'center', fontSize: '15px', fontWeight: '600', color: l.user_role === 'CHO' ? '#2563eb' : 'var(--primary-900, #000768)' }}>
                           {l.user_role === 'CHO' ? t('CHO Admin') : t('BHW')}
                         </td>
                       </tr>
@@ -983,7 +983,7 @@ style={{ padding: '5px 8px', border: '1px solid #2563eb', borderRadius: '4px', b
               <button onClick={() => handleDownloadWord(viewReport)}
                 style={{ padding: '8px 16px', background: 'rgba(37,99,235,0.15)', border: '1px solid rgba(37,99,235,0.35)', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#5b8def', cursor: 'pointer' }}>⬇ {t('Word')}</button>
               <button onClick={() => handleDownloadExcel(viewReport)}
-                style={{ padding: '8px 16px', background: 'rgba(18,153,104,0.15)', border: '1px solid rgba(18,153,104,0.35)', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#16b877', cursor: 'pointer' }}>⬇ {t('Excel')}</button>
+                style={{ padding: '8px 16px', background: 'rgba(18,153,104,0.15)', border: '1px solid rgba(18,153,104,0.35)', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#129968', cursor: 'pointer' }}>⬇ {t('Excel')}</button>
               <button onClick={() => handleDownloadCSV(viewReport)}
                 style={{ padding: '8px 16px', background: 'rgba(217,119,6,0.15)', border: '1px solid rgba(217,119,6,0.35)', borderRadius: '8px', fontSize: '14px', fontWeight: '600', color: '#fbbf24', cursor: 'pointer' }}>⬇ {t('CSV')}</button>
             </div>
@@ -1253,7 +1253,7 @@ style={{ padding: '5px 8px', border: '1px solid #2563eb', borderRadius: '4px', b
                   )}
                 </div>
                 <button onClick={() => { setViewReport(file); setShowDownloadMenu(null); }}
-                  style={{ padding: '6px 14px', background: 'rgba(18,153,104,0.15)', border: '1px solid rgba(18,153,104,0.35)', borderRadius: '6px', fontSize: '15px', cursor: 'pointer', color: '#16b877', fontWeight: '500' }}
+                  style={{ padding: '6px 14px', background: 'rgba(18,153,104,0.15)', border: '1px solid rgba(18,153,104,0.35)', borderRadius: '6px', fontSize: '15px', cursor: 'pointer', color: '#129968', fontWeight: '500' }}
                   onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                   onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
                   {t('View')}
@@ -1276,7 +1276,7 @@ style={{ padding: '5px 8px', border: '1px solid #2563eb', borderRadius: '4px', b
                 { label: t('Cases Added'),      value: casesAdded,      color: '#5b8def', bg: 'rgba(37,99,235,0.15)' },
                 { label: t('Cases Updated'),    value: casesUpdated,    color: '#38bdf8', bg: 'rgba(14,165,233,0.15)' },
                 { label: t('Cases Deleted'),    value: casesDeleted,    color: '#ef4444', bg: 'rgba(220,38,38,0.15)' },
-                { label: t('Accounts Created'), value: accountsCreated, color: '#16b877', bg: 'rgba(18,153,104,0.15)' },
+                { label: t('Accounts Created'), value: accountsCreated, color: '#129968', bg: 'rgba(18,153,104,0.15)' },
               ].map(stat => (
                 <div key={stat.label} style={{ background: stat.bg, borderRadius: '8px', padding: '14px', textAlign: 'center' }}>
                   <div style={{ fontSize: '26px', fontWeight: '800', color: stat.color }}>{stat.value}</div>
@@ -1329,15 +1329,15 @@ style={{ padding: '5px 8px', border: '1px solid #2563eb', borderRadius: '4px', b
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '16px' }}>
           {[
             { label: t('Total'), count: filteredAuditLogs.length, color: '#5b8def', bg: 'rgba(37,99,235,0.15)' },
-            { label: t('Created'), count: filteredAuditLogs.filter(l => l.action === 'Created').length, color: '#16b877', bg: 'rgba(18,153,104,0.15)' },
+            { label: t('Created'), count: filteredAuditLogs.filter(l => l.action === 'Created').length, color: '#129968', bg: 'rgba(18,153,104,0.15)' },
             { label: t('Updated'), count: filteredAuditLogs.filter(l => l.action === 'Updated').length, color: '#5b8def', bg: 'rgba(37,99,235,0.15)' },
             { label: t('Deleted'), count: filteredAuditLogs.filter(l => l.action === 'Deleted').length, color: '#ef4444', bg: 'rgba(220,38,38,0.15)' },
             { label: t('Archived'), count: filteredAuditLogs.filter(l => l.action === 'Archived').length, color: '#d97706', bg: 'rgba(245,158,11,0.15)' },
-            { label: t('Restored'), count: filteredAuditLogs.filter(l => l.action === 'Restored').length, color: '#16b877', bg: 'rgba(18,153,104,0.15)' },
+            { label: t('Restored'), count: filteredAuditLogs.filter(l => l.action === 'Restored').length, color: '#129968', bg: 'rgba(18,153,104,0.15)' },
             { label: t('Logged In'), count: filteredAuditLogs.filter(l => l.action === 'Logged In' || l.action === 'Logged In (2FA)').length, color: '#a78bfa', bg: 'rgba(124,58,237,0.15)' },
             { label: t('Logged Out'), count: filteredAuditLogs.filter(l => l.action === 'Logged Out').length, color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
             { label: t('Edit Requests'), count: filteredAuditLogs.filter(l => l.action === 'Requested Edit').length, color: '#fbbf24', bg: 'rgba(217,119,6,0.15)' },
-            { label: t('Registrations'), count: filteredAuditLogs.filter(l => l.action === 'Approved' || l.action === 'Rejected').length, color: '#2dd4bf', bg: 'rgba(20,184,166,0.15)' },
+            { label: t('Registrations'), count: filteredAuditLogs.filter(l => l.action === 'Approved' || l.action === 'Rejected').length, color: '#129968', bg: 'rgba(20,184,166,0.15)' },
           ].map(chip => (
             <span key={chip.label} style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 12px', borderRadius: '16px', fontSize: '13px', fontWeight: '600', color: chip.color, background: chip.bg }}>
               {t(chip.label)}: {chip.count}
@@ -1372,7 +1372,7 @@ style={{ padding: '5px 8px', border: '1px solid #2563eb', borderRadius: '4px', b
                     onMouseLeave={e => { if (filterAction !== a) e.target.style.background = 'transparent'; }}>
                     {a !== 'All Actions' && (
                       <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', marginRight: '8px',
-                        background: a === 'Created' ? '#129968' : a === 'Updated' ? '#2563eb' : a === 'Deleted' ? '#dc2626' : a === 'Archived' ? '#d97706' : a === 'Restored' ? '#16b877' : a === 'Requested Edit' ? '#fbbf24' : a === 'Approved' ? '#2dd4bf' : a === 'Rejected' ? '#ef4444' : a === 'Logged Out' ? '#ef4444' : '#7c3aed' }} />
+                        background: a === 'Created' ? 'var(--primary-600, #000ECB)' : a === 'Updated' ? '#2563eb' : a === 'Deleted' ? '#dc2626' : a === 'Archived' ? '#d97706' : a === 'Restored' ? '#129968' : a === 'Requested Edit' ? '#fbbf24' : a === 'Approved' ? '#129968' : a === 'Rejected' ? '#ef4444' : a === 'Logged Out' ? '#ef4444' : '#7c3aed' }} />
                     )}
                     {t(a)}
                   </button>
@@ -1575,7 +1575,7 @@ style={{ padding: '5px 8px', border: '1px solid #2563eb', borderRadius: '4px', b
         </div>
 
         {/* Table */}
-        <div style={{ overflowX: 'auto' }}>
+        <div className="cdms-table-scroll">
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border-color)' }}>
@@ -1603,8 +1603,8 @@ style={{ padding: '5px 8px', border: '1px solid #2563eb', borderRadius: '4px', b
                       <div style={{ marginTop: '3px' }}>
                         <span style={{
                           fontSize: '13px', fontWeight: '700', padding: '1px 7px', borderRadius: '10px',
-                          background: log.user_role === 'CHO' ? 'rgba(37,99,235,0.12)' : 'rgba(18,153,104,0.12)',
-                          color: log.user_role === 'CHO' ? '#2563eb' : '#129968',
+                          background: log.user_role === 'CHO' ? 'rgba(37,99,235,0.12)' : 'rgba(0,14,203,0.12)',
+                          color: log.user_role === 'CHO' ? '#2563eb' : 'var(--primary-900, #000768)',
                         }}>
                           {log.user_role === 'CHO'
                             ? (log.cho_unit || 'CHO')
@@ -1619,7 +1619,7 @@ style={{ padding: '5px 8px', border: '1px solid #2563eb', borderRadius: '4px', b
                     </td>
                     <td style={{ padding: compactMode ? '7px 8px' : '13px 14px', fontSize: '15px', color: 'var(--text-muted)', textAlign: 'center' }}>{log.entity}</td>
                     <td style={{ padding: compactMode ? '7px 8px' : '13px 14px', fontSize: '15px', color: 'var(--text-muted)', maxWidth: '320px', textAlign: 'center' }}>{(log.details || '').replace(/\s*\(User ID:\s*\d+\)/gi, '').replace(/\s*\(Case ID:\s*\d+\)/gi, '')}</td>
-                    <td style={{ padding: compactMode ? '7px 8px' : '13px 14px', textAlign: 'center', fontSize: '15px', fontWeight: '600', color: log.user_role === 'CHO' ? '#2563eb' : '#129968' }}>
+                    <td style={{ padding: compactMode ? '7px 8px' : '13px 14px', textAlign: 'center', fontSize: '15px', fontWeight: '600', color: log.user_role === 'CHO' ? '#2563eb' : 'var(--primary-900, #000768)' }}>
                       {log.user_role === 'CHO' ? t('CHO Admin') : t('BHW')}
                     </td>
                   </tr>
@@ -1715,7 +1715,7 @@ style={{ padding: '5px 8px', border: '1px solid #2563eb', borderRadius: '4px', b
           ) : archRecords.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)', fontSize: '15px' }}>{t('No archived records yet.')}</div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
+            <div className="cdms-table-scroll">
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14.5px' }}>
                 <thead>
                   <tr style={{ color: 'var(--text-muted)', textAlign: 'left', fontSize: '13.5px' }}>

@@ -39,7 +39,7 @@
 }
 
 .generate-report-btn {
-  background-color: #129968;
+  background-color: var(--primary-600, #000ECB);
   color: #fff;
   font-weight: 600;
   padding: 10px 28px;
@@ -132,7 +132,7 @@
 }
 
 .report-log-item .action-btn-group button:last-child:hover {
-  background-color: #dcf7eb;
+  background-color: var(--primary-100, #C3C7FF);
 }
 
 /* Quick Stats Grid */
@@ -249,7 +249,7 @@
   font-weight: 600;
   display: inline-block;
 }
-.badge-created { background-color: #dcf7eb; color: #129968 !important; }
+.badge-created { background-color: var(--primary-100, #C3C7FF); color: var(--primary-600, #000ECB) !important; }
 .badge-updated { background-color: #dbeafe; color: #2563eb !important; }
 .badge-deleted { background-color: #fee2e2; color: #dc2626 !important; }
 

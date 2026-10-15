@@ -60,41 +60,41 @@ export default function ResetPasswordLanding() {
 
   return (
     <div style={{
-      width: '100vw', height: '100vh', background: '#0B1120',
+      width: '100vw', minHeight: '100vh', background: 'var(--bg-main)', padding: '24px',
       display: 'flex', alignItems: 'center', justifyContent: 'center'
     }}>
       <div style={{
-        width: '420px', background: '#1E293B', borderRadius: '12px',
-        border: '1px solid #334155', padding: '40px',
-        boxShadow: '0 20px 40px rgba(0,0,0,0.4)'
+        width: '420px', maxWidth: '100%', background: 'var(--bg-surface)', borderRadius: '16px',
+        border: '1px solid var(--border-color)', padding: '40px',
+        boxShadow: '0 10px 30px rgba(0,7,104,.10)'
       }}>
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
-          <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#121358' }}></div>
-          <span style={{ color: '#ffffff', fontSize: '20px', fontWeight: 'bold' }}>Cabuyao Health</span>
+          <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--primary-900, #000768)' }}></div>
+          <span style={{ color: 'var(--text-main)', fontSize: '20px', fontWeight: 'bold' }}>Cabuyao Health</span>
         </div>
 
-        <h2 style={{ color: '#ffffff', fontSize: '26px', fontWeight: '700', margin: '0 0 8px 0' }}>
+        <h2 style={{ color: 'var(--text-main)', fontSize: '26px', fontWeight: '700', margin: '0 0 8px 0' }}>
           Set New Password
         </h2>
-        <p style={{ color: '#9CA3AF', fontSize: '15px', margin: '0 0 28px 0' }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: '15px', margin: '0 0 28px 0' }}>
           Enter your new password below for:
           <br />
-          <span style={{ color: '#129968', fontWeight: '500' }}>{email}</span>
+          <span style={{ color: 'var(--primary-600, #000ECB)', fontWeight: '500' }}>{email}</span>
         </p>
 
         {/* Status Messages */}
         {status.msg && (
           <div style={{
             padding: '12px 16px', borderRadius: '8px', marginBottom: '20px', fontSize: '15px',
-            background: status.type === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(18,153,104,0.1)',
-            border: `1px solid ${status.type === 'error' ? '#ef4444' : '#129968'}`,
-            color: status.type === 'error' ? '#ef4444' : '#129968'
+            background: status.type === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(0,14,203,0.1)',
+            border: `1px solid ${status.type === 'error' ? '#ef4444' : 'var(--primary-600, #000ECB)'}`,
+            color: status.type === 'error' ? '#ef4444' : 'var(--primary-600, #000ECB)'
           }}>
             {status.type === 'success' ? '✅ ' : '❌ '}{status.msg}
             {done && (
-              <span style={{ display: 'block', fontSize: '15px', marginTop: '4px', color: '#9CA3AF' }}>
+              <span style={{ display: 'block', fontSize: '15px', marginTop: '4px', color: 'var(--text-muted)' }}>
                 Redirecting to login...
               </span>
             )}
@@ -107,7 +107,7 @@ export default function ResetPasswordLanding() {
             {/* New Password */}
             <div style={{ marginBottom: '20px' }}>
               <label style={{
-                display: 'block', color: '#9CA3AF', fontSize: '15px',
+                display: 'block', color: 'var(--text-muted)', fontSize: '15px',
                 fontWeight: '500', marginBottom: '8px'
               }}>
                 New Password <span style={{ color: '#f87171' }}>*</span>
@@ -121,15 +121,15 @@ export default function ResetPasswordLanding() {
                   required
                   style={{
                     width: '100%', padding: '12px 44px 12px 14px',
-                    background: '#0F172A', border: '1px solid #334155',
-                    borderRadius: '8px', color: '#ffffff', fontSize: '15px',
+                    background: 'var(--input-bg)', border: '1px solid var(--border-color)',
+                    borderRadius: '8px', color: 'var(--text-main)', fontSize: '15px',
                     boxSizing: 'border-box', outline: 'none'
                   }}
                 />
                 <button type="button" onClick={() => setShowNew(!showNew)} style={{
                   position: 'absolute', right: '14px', top: '50%',
                   transform: 'translateY(-50%)', background: 'none',
-                  border: 'none', cursor: 'pointer', color: '#9CA3AF', fontSize: '16px'
+                  border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '16px'
                 }}>
                   {showNew ? (
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -149,7 +149,7 @@ export default function ResetPasswordLanding() {
             {/* Confirm Password */}
             <div style={{ marginBottom: '28px' }}>
               <label style={{
-                display: 'block', color: '#9CA3AF', fontSize: '15px',
+                display: 'block', color: 'var(--text-muted)', fontSize: '15px',
                 fontWeight: '500', marginBottom: '8px'
               }}>
                 Confirm New Password <span style={{ color: '#f87171' }}>*</span>
@@ -163,15 +163,15 @@ export default function ResetPasswordLanding() {
                   required
                   style={{
                     width: '100%', padding: '12px 44px 12px 14px',
-                    background: '#0F172A', border: '1px solid #334155',
-                    borderRadius: '8px', color: '#ffffff', fontSize: '15px',
+                    background: 'var(--input-bg)', border: '1px solid var(--border-color)',
+                    borderRadius: '8px', color: 'var(--text-main)', fontSize: '15px',
                     boxSizing: 'border-box', outline: 'none'
                   }}
                 />
                 <button type="button" onClick={() => setShowConfirm(!showConfirm)} style={{
                   position: 'absolute', right: '14px', top: '50%',
                   transform: 'translateY(-50%)', background: 'none',
-                  border: 'none', cursor: 'pointer', color: '#9CA3AF', fontSize: '16px'
+                  border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '16px'
                 }}>
                   {showConfirm ? (
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -203,7 +203,7 @@ export default function ResetPasswordLanding() {
               disabled={loading}
               style={{
                 width: '100%', padding: '14px',
-                background: loading ? '#0a5e42' : '#129968',
+                background: loading ? 'rgba(0,14,203,.55)' : 'var(--primary-600, #000ECB)',
                 color: '#ffffff', border: 'none', borderRadius: '8px',
                 fontSize: '15px', fontWeight: '600',
                 cursor: loading ? 'not-allowed' : 'pointer',

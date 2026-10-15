@@ -250,15 +250,10 @@ function App() {
     }
     return localStorage.getItem('cdms_theme') || 'light';
   });
-  const [loginTheme, setLoginTheme] = useState(() => {
-    const lastId = localStorage.getItem('cdms_last_user');
-    if (lastId) {
-      return localStorage.getItem(`cdms_theme_${lastId}`) || localStorage.getItem('cdms_theme') || 'light';
-    }
-    return localStorage.getItem('cdms_theme') || 'light';
-  });
+  // Auth screens (login / sign-up / account recovery / reset password / 2FA) are light-only by design.
+  const [loginTheme, setLoginTheme] = useState('light');
 
-  const activeTheme = isLoggedIn ? appTheme : loginTheme;
+  const activeTheme = isLoggedIn ? appTheme : 'light';
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', activeTheme);
@@ -272,12 +267,7 @@ function App() {
   }, [appTheme, isLoggedIn, loggedUserId]);
 
   const toggleTheme = () => setAppTheme(appTheme === 'dark' ? 'light' : 'dark');
-  const toggleLoginTheme = () => setLoginTheme(prev => {
-    const next = prev === 'dark' ? 'light' : 'dark';
-    const lastId = localStorage.getItem('cdms_last_user');
-    if (lastId && !isLoggedIn) localStorage.setItem(`cdms_theme_${lastId}`, next);
-    return next;
-  });
+  const toggleLoginTheme = () => setLoginTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
   // ── Apply font-scale globally ──
   useEffect(() => {
     document.documentElement.style.setProperty('--app-font-scale', fontScale);
@@ -508,7 +498,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
               <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
               <h2 style={{ fontSize: '22px', fontWeight: '700', color: 'var(--text-main)', margin: '0 0 8px' }}>Access Denied</h2>
               <p style={{ fontSize: '15px', color: 'var(--text-muted)', margin: '0 0 20px' }}>User Accounts management is restricted to CHO personnel.</p>
-              <button onClick={() => setActiveTab('Dashboard')} style={{ padding: '10px 24px', background: '#129968', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: '600' }}>← Back to Dashboard</button>
+              <button onClick={() => setActiveTab('Dashboard')} style={{ padding: '10px 24px', background: 'var(--primary-600, #000ECB)', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: '600' }}>← Back to Dashboard</button>
             </div>
           );
         }
@@ -655,7 +645,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
       setMustChangePassword(false);
       setIsGeneratorPassword(false);
       setPwRequestPending(false);
-      setLoginTheme(appTheme);
+      setLoginTheme('light');
       setIsLoggedIn(false); 
       setSessionContext('');
       setLoggedUser('');
@@ -813,7 +803,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <button type="button" disabled={firstLoginReqState === 'sending'} onClick={handleFirstLoginPwRequest}
-                      style={{ padding: '12px', borderRadius: '6px', border: 'none', background: 'var(--accent, #129968)', color: '#fff', fontSize: '16px', fontWeight: '700', cursor: firstLoginReqState === 'sending' ? 'not-allowed' : 'pointer', opacity: firstLoginReqState === 'sending' ? 0.6 : 1 }}>
+                      style={{ padding: '12px', borderRadius: '6px', border: 'none', background: 'var(--accent, var(--primary-600, #000ECB))', color: '#fff', fontSize: '16px', fontWeight: '700', cursor: firstLoginReqState === 'sending' ? 'not-allowed' : 'pointer', opacity: firstLoginReqState === 'sending' ? 0.6 : 1 }}>
                       {firstLoginReqState === 'sending' ? 'Sending Request...' : 'Yes, Request Password Change'}
                     </button>
                     <button type="button" onClick={dismissFirstLoginPrompt}
@@ -848,7 +838,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                   </div>
                   {forcePwMsg && <div style={{ fontSize: '15px', color: forcePwMsg.startsWith('❌') ? '#ef4444' : '#129968', fontWeight: '500' }}>{forcePwMsg}</div>}
                   <button type="button" disabled={forcePwLoading} onClick={handleForcedPasswordChange}
-                    style={{ padding: '12px', borderRadius: '6px', border: 'none', background: 'var(--accent, #129968)', color: '#fff', fontSize: '16px', fontWeight: '700', cursor: forcePwLoading ? 'not-allowed' : 'pointer', opacity: forcePwLoading ? 0.6 : 1 }}>
+                    style={{ padding: '12px', borderRadius: '6px', border: 'none', background: 'var(--accent, var(--primary-600, #000ECB))', color: '#fff', fontSize: '16px', fontWeight: '700', cursor: forcePwLoading ? 'not-allowed' : 'pointer', opacity: forcePwLoading ? 0.6 : 1 }}>
                     {forcePwLoading ? 'Saving...' : 'Save New Password'}
                   </button>
                 </div>
@@ -986,7 +976,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                               </span>
                               {n.is_read === 0 && (
                                 <button onClick={() => handleMarkRead(n.id)} style={{
-                                  background: 'none', border: 'none', color: '#121358',
+                                  background: 'none', border: 'none', color: 'var(--brand-text)',
                                   cursor: 'pointer', fontSize: '15px', fontWeight: '600', padding: 0
                                 }}>
                                   Mark read
@@ -1038,7 +1028,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                                    }
                                   setShowNotifications(false);
                                 }} style={{
-                                  background: 'none', border: 'none', color: '#129968',
+                                  background: 'none', border: 'none', color: 'var(--brand-text)',
                                   cursor: 'pointer', fontSize: '15px', fontWeight: '600', padding: 0
                                 }}>
                                   View →
@@ -1208,7 +1198,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             }}>
               <div style={{
                 width: '80px', height: '80px', borderRadius: '50%',
-                background: profilePhoto ? 'transparent' : '#129968',
+                background: profilePhoto ? 'transparent' : 'var(--primary-600, #000ECB)',
                 border: '3px solid rgba(255,255,255,0.4)',
                 overflow: 'hidden', flexShrink: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1257,7 +1247,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                 <button
                   onClick={() => { setShowProfileModal(false); setActiveTab('Settings'); setOpenProfileView(true); }}
                   style={{
-                    flex: 1, padding: '12px', background: '#129968', color: '#fff',
+                    flex: 1, padding: '12px', background: 'var(--primary-600, #000ECB)', color: '#fff',
                     border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: '600',
                     cursor: 'pointer',
                   }}
@@ -1287,7 +1277,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
             <div style={{ fontSize: '36px', marginBottom: '12px' }}>⏱️</div>
             <h3 style={{ fontSize: '20px', fontWeight: '700', margin: '0 0 8px', color: 'var(--text-main)' }}>Session Timeout Warning</h3>
             <p style={{ fontSize: '15px', color: 'var(--text-muted)', margin: '0 0 20px' }}>You will be logged out in 5 minutes due to inactivity. Move your mouse or press a key to stay signed in.</p>
-            <button onClick={() => setIdleWarning(false)} style={{ padding: '10px 28px', background: '#129968', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: '600' }}>
+            <button onClick={() => setIdleWarning(false)} style={{ padding: '10px 28px', background: 'var(--primary-600, #000ECB)', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: '600' }}>
               Stay Signed In
             </button>
           </div>

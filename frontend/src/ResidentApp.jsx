@@ -23,16 +23,7 @@ export default function ResidentApp() {
 
   const scrollRef = useRef(null);
   const isScrollingRef = useRef(false);
-  const [theme, setTheme] = useState(() => {
-    const own = localStorage.getItem('cdms_resident_theme');
-    if (own) return own;
-    const legacy = localStorage.getItem('cdms_theme');
-    if (legacy) {
-      localStorage.setItem('cdms_resident_theme', legacy);
-      return legacy;
-    }
-    return 'light';
-  });
+  const [theme, setTheme] = useState(() => localStorage.getItem('cdms_resident_theme') || 'light');
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -174,7 +165,7 @@ export default function ResidentApp() {
     }}>
       {/* ── STICKY HEADER ── */}
       <header className="resident-header" style={{
-        background: 'linear-gradient(90deg, #121358 100%)',
+        background: 'linear-gradient(90deg, var(--primary-900, #000768) 100%)',
         padding: '0 64px',
         position: 'sticky',
         top: 0,
@@ -307,7 +298,7 @@ export default function ResidentApp() {
 
       {/* ── HERO ── */}
       <div style={{
-        background: 'linear-gradient(0deg, #2F578A 0%, #121358 70%)',
+        background: 'linear-gradient(0deg, #2F578A 0%, var(--primary-900, #000768) 70%)',
         padding: '28px 24px 32px',
         textAlign: 'center',
       }}>
@@ -346,7 +337,7 @@ export default function ResidentApp() {
 
       {/* ── FOOTER ── */}
       <footer style={{
-        background: 'linear-gradient(0deg, #121358 100%)',
+        background: 'linear-gradient(0deg, var(--primary-900, #000768) 100%)',
         padding: '32px 24px 24px',
         top: 0,
         zIndex: 500,

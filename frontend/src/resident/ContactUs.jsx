@@ -168,7 +168,7 @@ export default function ContactUs() {
               </p>
               <button onClick={() => { setSent(false); setOfflineQueued(false); }}
                 style={{
-                  marginTop: '12px', padding: '8px 20px', background: '#129968',
+                  marginTop: '12px', padding: '8px 20px', background: 'var(--primary-600, #000ECB)',
                   color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '17px',
                 }}
                 onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
@@ -220,7 +220,7 @@ export default function ContactUs() {
                             style={{
                               padding: '10px 12px', cursor: 'pointer', fontSize: '17px',
                               color: 'var(--text-main)',
-                              background: form.targetBarangay === b ? 'rgba(18,153,104,0.18)' : 'transparent',
+                              background: form.targetBarangay === b ? 'rgba(0,14,203,0.18)' : 'transparent',
                             }}>
                             {b}
                           </div>
@@ -248,7 +248,7 @@ export default function ContactUs() {
                           style={{
                             padding: '10px 12px', cursor: 'pointer', fontSize: '17px',
                             color: 'var(--text-main)',
-                            background: form.disease === d ? 'rgba(18,153,104,0.18)' : 'transparent',
+                            background: form.disease === d ? 'rgba(0,14,203,0.18)' : 'transparent',
                           }}>
                           {d}
                         </div>
@@ -262,7 +262,7 @@ export default function ContactUs() {
                   {error && <div style={{ color: '#ef4444', fontSize: '17px' }}>{error}</div>}
                 <button type="submit" disabled={sending}
                   style={{
-                    padding: '12px', background: '#129968', color: '#fff',
+                    padding: '12px', background: 'var(--primary-600, #000ECB)', color: '#fff',
                     border: 'none', borderRadius: '8px', fontSize: '17px', fontWeight: '600',
                     cursor: sending ? 'not-allowed' : 'pointer', opacity: sending ? 0.7 : 1,
                   }}
@@ -322,8 +322,8 @@ export default function ContactUs() {
             <button onClick={() => setLocationView('cho1')}
               style={{
                 flex: 1, padding: '8px 12px', borderRadius: '6px', border: '1px solid',
-                borderColor: locationView === 'cho1' ? '#129968' : 'var(--border-color)',
-                background: locationView === 'cho1' ? 'rgba(18,153,104,0.18)' : 'var(--bg-surface)',
+                borderColor: locationView === 'cho1' ? 'var(--primary-600, #000ECB)' : 'var(--border-color)',
+                background: locationView === 'cho1' ? 'rgba(0,14,203,0.18)' : 'var(--bg-surface)',
                 color: locationView === 'cho1' ? '#3cb882' : 'var(--text-muted)',
                 fontWeight: locationView === 'cho1' ? '600' : '400',
                 cursor: 'pointer', fontSize: '17px',
@@ -333,8 +333,8 @@ export default function ContactUs() {
             <button onClick={() => setLocationView('cho2')}
               style={{
                 flex: 1, padding: '8px 12px', borderRadius: '6px', border: '1px solid',
-                borderColor: locationView === 'cho2' ? '#129968' : 'var(--border-color)',
-                background: locationView === 'cho2' ? 'rgba(18,153,104,0.18)' : 'var(--bg-surface)',
+                borderColor: locationView === 'cho2' ? 'var(--primary-600, #000ECB)' : 'var(--border-color)',
+                background: locationView === 'cho2' ? 'rgba(0,14,203,0.18)' : 'var(--bg-surface)',
                 color: locationView === 'cho2' ? '#3cb882' : 'var(--text-muted)',
                 fontWeight: locationView === 'cho2' ? '600' : '400',
                 cursor: 'pointer', fontSize: '17px',

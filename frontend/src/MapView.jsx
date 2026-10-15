@@ -2811,8 +2811,8 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           <div style={{
             position: 'absolute', bottom: '16px', left: '50%', transform: 'translateX(-50%)',
             zIndex: 1000, padding: '6px 12px', borderRadius: '8px',
-            background: 'rgba(18,153,104,0.15)', border: '1px solid rgba(18,153,104,0.3)',
-            fontSize: '12px', fontWeight: '600', color: '#129968',
+            background: 'rgba(0,14,203,0.15)', border: '1px solid rgba(0,14,203,0.3)',
+            fontSize: '12px', fontWeight: '600', color: 'var(--brand-text)',
           }}>
             {t('● Dots showing case placements - zoom to max for full details')}
           </div>
@@ -2936,7 +2936,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '9px', flex: 1, minWidth: 0 }}>
                         {isTop && (
-                          <span style={{ fontSize: '13px', background: '#121358', color: 'white', padding: '2px 6px', borderRadius: '10px', fontWeight: '700', flexShrink: 0 }}>
+                          <span style={{ fontSize: '13px', background: 'var(--primary-900, #000768)', color: 'white', padding: '2px 6px', borderRadius: '10px', fontWeight: '700', flexShrink: 0 }}>
                             {t('TOP ')}{i + 1}
                           </span>
                         )}

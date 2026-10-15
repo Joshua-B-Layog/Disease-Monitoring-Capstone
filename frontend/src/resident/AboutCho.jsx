@@ -67,9 +67,9 @@ export default function AboutCho() {
           <button key={u.id} onClick={() => setSelected(u)}
             style={{
               flex: 1, padding: '14px 20px', border: '2px solid',
-              borderColor: selected.id === u.id ? '#129968' : 'var(--border-color)',
-              borderRadius: '10px', background: selected.id === u.id ? 'rgba(18,153,104,0.15)' : 'var(--bg-surface)',
-              color: selected.id === u.id ? '#129968' : 'var(--text-muted)',
+              borderColor: selected.id === u.id ? 'var(--primary-600, #000ECB)' : 'var(--border-color)',
+              borderRadius: '10px', background: selected.id === u.id ? 'rgba(0,14,203,0.15)' : 'var(--bg-surface)',
+              color: selected.id === u.id ? 'var(--primary-600, #000ECB)' : 'var(--text-muted)',
               fontWeight: selected.id === u.id ? '700' : '500',
               fontSize: '17px', cursor: 'pointer', textAlign: 'center',
               transition: 'all 0.2s',
@@ -86,7 +86,7 @@ export default function AboutCho() {
       }}>
         {/* Header */}
         <div style={{
-          background: 'linear-gradient(180deg, #121358 0%, #2F578A 100%)',
+          background: 'linear-gradient(180deg, var(--primary-900, #000768) 0%, #2F578A 100%)',
           padding: '24px', color: '#fff',
         }}>
           <h3 style={{ margin: '0 0 4px', fontSize: '22px', fontWeight: '700' }}>{selected.name}</h3>
@@ -99,7 +99,7 @@ export default function AboutCho() {
           {/* Mission & Vision */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
             <div style={{ background: 'var(--input-bg)', borderRadius: '8px', padding: '16px', border: '1px solid var(--border-color)' }}>
-              <div style={{ fontSize: '17px', fontWeight: '700', color: '#129968', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--primary-600, #000ECB)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Our Mission
               </div>
               <p style={{ margin: 0, fontSize: '17px', lineHeight: '1.6', color: 'var(--text-main)' }}>
@@ -130,7 +130,7 @@ export default function AboutCho() {
                 }}>
                   <div style={{
                     width: '36px', height: '36px', borderRadius: '50%',
-                    background: '#129968', display: 'flex', alignItems: 'center',
+                    background: 'var(--primary-600, #000ECB)', display: 'flex', alignItems: 'center',
                     justifyContent: 'center', color: '#fff', fontWeight: '700', fontSize: '17px', flexShrink: 0,
                   }}>
                     {s.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}

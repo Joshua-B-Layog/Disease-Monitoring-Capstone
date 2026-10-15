@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&display=swap');
+
 /* =========================================================
    1. GLOBAL RESET & THEME VARIABLES
    ========================================================= */
@@ -9,7 +11,7 @@
 :root {
   /* DARK MODE VARIABLES */
   --font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --top-nav-bg: #121358;
+  --top-nav-bg: var(--primary-900, #000768);
   --top-nav-border: rgba(255,255,255,0.45);
   --top-nav-height: 76px;
   --bg-main: #0B1120;       
@@ -23,12 +25,19 @@
   --warning-bg: rgba(248,113,113,0.2);
   --warning-text: #FCA5A5;
   --warning-border: #FCA5A5;
+  /* Brand blue used as TEXT: the brand navy (#000768 / #000ECB) is
+     invisible on the dark surfaces, so text uses the same blue lightened
+     instead of the dark original. */
+  --brand-text: #93C5FD;
+  /* Settings tab (active) accent — the brand primary, lightened ~45%
+     toward white in dark mode so the label stays legible. */
+  --settings-tab-active: #737AE2;
   --info-bg: rgba(59,130,246,0.15);
   --info-text: #93C5FD;
   --info-border: #3B82F6;
-  --success-bg: rgba(52,211,153,0.2);
-  --success-text: #34D399;
-  --success-border: #34D399;
+  --success-bg: rgba(0,223,145,0.18);
+  --success-text: #32FFB7;
+  --success-border: #00DF91;
   color-scheme: dark;
   --scale: 1;
 }
@@ -49,9 +58,11 @@
   --info-bg: rgba(59,130,246,0.12);
   --info-text: #1d4ed8;
   --info-border: #3b82f6;
-  --success-bg: rgba(18,153,104,0.12);
-  --success-text: #129968;
-  --success-border: #129968;
+  --brand-text: var(--primary-600, #000ECB);
+  --settings-tab-active: var(--primary-600, #000ECB);
+  --success-bg: rgba(0,223,145,0.18);
+  --success-text: #00A86B;
+  --success-border: #00DF91;
   color-scheme: light;
   --scale: 1;
 }
@@ -85,7 +96,7 @@ html, body, #root {
   position: relative; 
   z-index: 0;
   overflow: hidden; 
-  background: linear-gradient(135deg, #121358 0%, var(--bg-main) 100%); 
+  background: linear-gradient(135deg, var(--primary-900, #000768) 0%, var(--bg-main) 100%); 
   padding-bottom: 48px;
 }
 
@@ -273,10 +284,10 @@ html, body, #root {
   border-bottom: none;
 }
 .brgy-option-card:hover {
-  background: rgba(18, 153, 104, 0.08);
+  background: rgba(0, 14, 203, 0.08);
 }
 .brgy-option-card.brgy-option-active {
-  background: #129968;
+  background: var(--primary-600, #000ECB);
   color: #ffffff;
 }
 .brgy-option-card .brgy-option-name {
@@ -343,7 +354,7 @@ html, body, #root {
   border: none;
   padding: 0;
   margin: 0 0 12px 0;
-  color: #129968;
+  color: var(--primary-600, #000ECB);
   font-size: 15.7px;
   font-weight: 500;
   cursor: pointer;
@@ -496,7 +507,7 @@ html, body, #root {
   justify-content: flex-end;
 }
 .cdms-policy-agree {
-  background-color: #129968;
+  background-color: var(--primary-600, #000ECB);
   color: #FFFFFF;
   border: none;
   padding: 9px 28px;
@@ -543,7 +554,7 @@ html, body, #root {
 
 /* Figma Active Role Color */
 .role-btn.active { 
-  background-color: #121358; 
+  background-color: var(--primary-900, #000768); 
   color: #FFFFFF; 
   box-shadow: 0 2px 4px rgba(0,0,0,0.2); 
 }
@@ -573,7 +584,7 @@ html, body, #root {
 }
 
 .form-input:focus { 
-  border-color: #121358; 
+  border-color: var(--primary-900, #000768); 
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
@@ -625,7 +636,7 @@ html, body, #root {
 .submit-btn { 
   width: 100%; 
   padding: 14px 16px; 
-  background-color: #129968; 
+  background-color: var(--primary-600, #000ECB); 
   color: #FFFFFF; 
   border: none; 
   border-radius: 8px; 
@@ -650,7 +661,7 @@ html, body, #root {
 
 .sidebar { 
   width: 260px; 
-  background-color: #121358; 
+  background-color: var(--primary-900, #000768); 
   border-right: 1px solid rgba(255,255,255,0.4); 
   display: flex; 
   flex-direction: column; 
@@ -858,7 +869,7 @@ html, body, #root {
 .user-role { color: rgba(255,255,255,0.7); font-size: 13.6px; }
 
 .avatar {
-  width: 35px; height: 35px;   background: #2F578A; border-radius: 50%;
+  width: 35px; height: 35px;   background: #129968; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   color: white; font-weight: bold; font-size: 13.6px;
 }
@@ -870,12 +881,19 @@ html, body, #root {
   padding: 10px; z-index: 1000;
 }
 
-.dropdown-item { padding: 10px; color: var(--text-muted); cursor: pointer; border-radius: 4px; }
+.dropdown-item { padding: 10px; color: var(--text-main); cursor: pointer; border-radius: 4px; }
 .dropdown-item:hover { background-color: var(--input-bg); color: var(--text-main); }
+/* Divider between "CHO/BHW Profile" and "Logout" so the two actions read as
+   separate clickable rows. */
+.dropdown-item + .dropdown-item {
+  border-top: 1px solid var(--border-color);
+  margin-top: 6px;
+  padding-top: 14px;
+}
 
 /* Status Badges */
 .status-pill { padding: 5px 12px; border-radius: 12px; font-size: 15.7px; font-weight: 500; display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-family, Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial); }
-.status-active { background: #121358; color: #93c5fd; }
+.status-active { background: var(--primary-900, #000768); color: #93c5fd; }
 .status-recovered { background: #083d2c; color: #3cb882; }
 .status-pending { background: #78350F; color: #FBBF24; }
 
@@ -966,7 +984,7 @@ html, body, #root {
 /* The Filled Colored Part */
 .chart-bar-fill {
   height: 100%;
-  background: #121358;
+  background: var(--primary-900, #000768);
   border-radius: 6px;
   transition: width 0.5s ease-in-out; 
 }
@@ -984,7 +1002,7 @@ html, body, #root {
   width: 50px;
   height: 50px;
   border-radius: 50%;
-  background: #121358;
+  background: var(--primary-900, #000768);
   color: #fff;
   display: flex;
   align-items: center;
@@ -1101,17 +1119,16 @@ button:active { transform: scale(0.97); }
 }
 
 /* City Health Office branding panel (login-left loop screen) */
+/* The stack must never be squeezed: it centres when it fits and scrolls
+   inside the panel when the viewport is short (clipping used to look like
+   the logo square and the "Decision Support" card overlapping). */
 .login-branding {
   position: absolute;
   inset: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  padding: 48px;
+  display: block;
+  padding: 0;
   box-sizing: border-box;
-  overflow: hidden;
-  background: linear-gradient(150deg, #0b0f3d 0%, #121358 45%, #1a1f6e 100%);
+  background: linear-gradient(150deg, #0b0f3d 0%, var(--primary-900, #000768) 45%, #1a1f6e 100%);
   overflow: hidden;
   color: #fff;
 }
@@ -1123,20 +1140,21 @@ button:active { transform: scale(0.97); }
   opacity: 0.55;
   pointer-events: none;
 }
-.login-branding-watermark {
-  position: absolute;
-  right: -24px;
-  bottom: -16px;
-  opacity: 0.08;
-  pointer-events: none;
-}
+/* (watermark removed: the 280px emblem sat behind the last feature card,
+   which read as the "Decision Support" box overlapping the logo square) */
+
 .login-branding-content {
   position: relative;
   z-index: 1;
-  max-width: 460px;
+  max-width: 520px;
   width: 100%;
+  min-height: 100%;
+  box-sizing: border-box;
+  padding: 24px 16px;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   align-items: center;
   text-align: center;
   animation: cdmsBrandingIn 0.7s ease both;
@@ -1149,20 +1167,20 @@ button:active { transform: scale(0.97); }
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 16px 6px 6px;
+  padding: 6px 18px 6px 6px;
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 999px;
   font-family: 'Franklin Gothic Demi Cond', 'Arial Narrow', system-ui, sans-serif;
-  font-size: 13.6px;
+  font-size: 13.5px;
   font-weight: 700;
   letter-spacing: 0.10em;
   color: #93c5fd;
-  margin-bottom: 30px;
+  margin-bottom: 22px;
 }
 .login-branding-badge-logo {
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   background: #fff;
   display: flex;
@@ -1172,66 +1190,68 @@ button:active { transform: scale(0.97); }
 }
 .login-branding-title {
   font-family: 'Franklin Gothic Demi Cond', 'Arial Narrow', system-ui, sans-serif;
-  font-size: 46px;
+  font-size: clamp(30px, 5vh, 58px);
   font-weight: normal;
-  line-height: 1.08;
+  line-height: 1.1;
   letter-spacing: -0.01em;
   color: #fff;
-  margin: 0 0 10px 0;
+  margin: 0 0 12px 0;
 }
 .login-branding-subtitle {
   font-family: 'Franklin Gothic Demi Cond', 'Arial Narrow', system-ui, sans-serif;
-  font-size: 19.9px;
+  font-size: 20px;
   font-weight: 600;
   color: #93c5fd;
-  margin: 0 0 26px 0;
-  padding-left: 12px;
-  border-left: 3px solid #dc2626;
+  margin: 0 0 18px 0;
+  padding-left: 16px;
+  border-left: 4px solid #dc2626;
 }
 .login-branding-desc {
   font-family: 'Franklin Gothic Demi Cond', 'Arial Narrow', system-ui, sans-serif;
-  font-size: 18.8px;
-  line-height: 1.7;
+  font-size: 17.5px;
+  line-height: 1.65;
   color: rgba(255, 255, 255, 0.75);
-  margin: 0 0 32px 0;
+  margin: 0 0 22px 0;
 }
+/* 2 x 2 so all four cards stay inside the navy square on a 100% window */
 .login-branding-features {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
   width: 100%;
 }
 .login-branding-feature {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 12px 16px;
+  padding: 14px 16px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
+  border-radius: 12px;
   text-align: left;
 }
 .login-branding-feature-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid;
-  font-size: 19.9px;
+  font-size: 21px;
   flex-shrink: 0;
 }
 .login-branding-feature-tile {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
   border: 1px solid;
-  font-size: 19.9px;
+  font-size: 21px;
   flex-shrink: 0;
 }
 .login-branding-feature-text {
@@ -1240,14 +1260,37 @@ button:active { transform: scale(0.97); }
   font-family: 'Franklin Gothic Demi Cond', 'Arial Narrow', system-ui, sans-serif;
 }
 .login-branding-feature-title {
-  font-size: 17.8px;
+  font-size: 17.5px;
   font-weight: 600;
+  line-height: 1.2;
   color: rgba(255, 255, 255, 0.95);
 }
+
 .login-branding-feature-sub {
-  font-size: 15.7px;
+  font-size: 14.5px;
+  line-height: 1.35;
   font-weight: 400;
   color: rgba(255, 255, 255, 0.62);
+}
+
+/* Short viewports: shed the description first, then the remaining extras,
+   so the badge and all four cards always stay inside the navy square. */
+@media (max-height: 640px) {
+  .login-branding-content { padding: 16px 12px; }
+  .login-branding-desc { display: none; }
+  .login-branding-title { font-size: 30px; }
+  .login-branding-subtitle { font-size: 17px; margin-bottom: 14px; }
+  .login-branding-badge { margin-bottom: 16px; }
+  .login-branding-features { gap: 10px; }
+  .login-branding-feature { padding: 11px 12px; gap: 12px; }
+  .login-branding-feature-icon,
+  .login-branding-feature-tile { width: 38px; height: 38px; font-size: 18px; }
+  .login-branding-feature-title { font-size: 15.5px; }
+  .login-branding-feature-sub { font-size: 13.5px; }
+}
+@media (max-height: 500px) {
+  .login-branding-subtitle { display: none; }
+  .login-branding-badge { display: none; }
 }
 
 /* Respect users who prefer reduced motion */
@@ -1891,4 +1934,161 @@ button:active { transform: scale(0.97); }
     flex: none !important;
     flex-grow: 1 !important;
   }
+}
+
+/* ===== UI v2 design tokens (APPENDED — do not merge into the theme :root above) ===== */
+:root {
+  --primary-900: #000768;
+  --primary-600: #000ECB;
+  --primary-100: #C3C7FF;
+  --success-500: #00DF91;
+  --success-300: #32FFB7;
+  --alert-500: #FF4444;
+  --ui-font: 'Inter', system-ui, sans-serif;
+}
+
+/* ===== Login / Sign-up v2 (single screen) ===== */
+/* NOTE: App.css:4-7 sets font-family on `*`, so inheritance can't reach descendants —
+   the v2 font must be applied to descendants explicitly or this is a no-op. */
+.login-screen.ui-v2,
+.login-screen.ui-v2 * { font-family: var(--ui-font); }
+[data-theme='light'] .login-screen.ui-v2 { background-color: #ffffff; }
+.ui-v2 .login-right { background: transparent; }
+.ui-v2 .login-left {
+  margin: 24px 0 72px 24px;
+  padding-bottom: 0;
+  border-radius: 16px;
+  background: var(--primary-900);
+}
+.ui-v2 .login-form-container {
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 32px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 10px 30px rgba(0,7,104,.10);
+  border-radius: 16px;
+}
+.ui-v2 .login-form-container h2 { font: 800 30px/1.15 var(--ui-font); text-align: center; margin: 12px 0 8px; }
+.ui-v2 .login-form-container h4 { font: 600 15px var(--ui-font); text-align: center; margin: 0 0 6px; }
+.ui-v2 .login-form-container .login-helper { font-size: 13px; text-align: center; color: var(--text-muted); }
+.ui-v2 .role-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 8px 0 18px; }
+.ui-v2 .role-grid.two-col { grid-template-columns: 1fr 1fr; }
+.ui-v2 .role-card {
+  background: var(--primary-900); color: #fff; border: 0; border-radius: 6px;
+  padding: 10px 8px; cursor: pointer; font: 700 15px var(--ui-font);
+  transition: background .15s, box-shadow .15s;
+}
+.ui-v2 .role-card small { display: block; font: 500 10px var(--ui-font); opacity: .85; margin-top: 2px; }
+.ui-v2 .role-card.is-selected { background: var(--primary-600); box-shadow: 0 0 14px rgba(0,14,203,.55); }
+.ui-v2 .login-form-container .form-input {
+  border: 1px solid var(--primary-900); border-radius: 8px; font-family: var(--ui-font);
+  background: #fff; color: #111827;
+}
+:root:not([data-theme='light']) .ui-v2 .login-form-container .form-input { background: var(--input-bg); color: var(--text-main); }
+.ui-v2 .login-form-container .form-input:focus { border-color: var(--primary-600); box-shadow: 0 0 0 2px rgba(0,14,203,.25); }
+.ui-v2 .login-form-container .submit-btn { background: var(--success-500); color: #000; font-weight: 700; border-radius: 8px; width: 100%; }
+.ui-v2 .login-form-container .submit-btn:hover { background: var(--success-300); }
+.ui-v2 .signup-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+/* Stacked layout (tablet/phone widths): the branding panel has no flow content
+   (everything is absolutely positioned), so it needs an explicit height or it
+   collapses to a sliver and clips the badge / feature cards. */
+@media (max-width: 900px) { .ui-v2 .login-left { margin: 12px; min-height: 640px; } }
+@media (max-width: 560px) { .ui-v2 .role-grid { grid-template-columns: 1fr; } }
+
+/* ===== Sidebar v2: desaturated default, color + solid white when active ===== */
+/* ICON_SELECTOR = .menu-item svg  (Sidebar.jsx renders each item's icon as an inline
+   <svg> with a per-role color prop straight inside .menu-item; the label is a bare text node). */
+.menu-item { color: rgba(255,255,255,.6); font-weight: 500; }
+.menu-item svg {
+  filter: grayscale(1) brightness(2);
+  opacity: .6;
+  transition: filter .2s, opacity .2s;
+}
+.menu-item:hover:not(.active) { background: rgba(255,255,255,.08); color: rgba(255,255,255,.85); }
+.menu-item:hover:not(.active) svg { opacity: .85; }
+.menu-item.active {
+  background-color: var(--primary-600);
+  color: #fff;
+  font-weight: 700;
+  border-left: 3px solid transparent;
+  box-shadow: none;
+  border-radius: 0 8px 8px 0;
+}
+.menu-item.active svg { filter: none; opacity: 1; }
+
+/* ===== v2 custom dropdown (login "Assigned Barangay") ===== */
+.ui-v2 .cdms-select-trigger {
+  width: 100%;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 11px 14px;
+  border: 1px solid var(--primary-900);
+  border-radius: 8px;
+  background: #fff;
+  color: #111827;
+  font: 500 15px var(--ui-font);
+  cursor: pointer;
+  text-align: left;
+}
+.ui-v2 .cdms-select-trigger:focus-visible { outline: 2px solid var(--primary-600); outline-offset: 1px; }
+.ui-v2 .cdms-select-caret { font-size: 10px; color: var(--primary-600); transition: transform .18s ease; }
+.ui-v2 .cdms-select-panel {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 60;
+  max-height: 260px; overflow-y: auto; padding: 6px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 0 12px 30px rgba(0,7,104,.18);
+}
+.ui-v2 .cdms-select-item {
+  width: 100%;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 9px 12px; border: 0; border-radius: 7px; background: transparent;
+  color: var(--text-main); font: 500 14px var(--ui-font);
+  cursor: pointer; text-align: left;
+}
+.ui-v2 .cdms-select-item:hover { background: rgba(0,14,203,.08); }
+.ui-v2 .cdms-select-item.is-selected { background: var(--primary-600); color: #fff; font-weight: 700; }
+.ui-v2 .cdms-select-badge {
+  font: 600 11px var(--ui-font);
+  color: var(--primary-600);
+  background: var(--primary-100);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+.ui-v2 .cdms-select-item.is-selected .cdms-select-badge { background: rgba(255,255,255,.25); color: #fff; }
+
+/* ===== v2 sign-up back pill (left aligned, colours invert on hover) ===== */
+.ui-v2 .cdms-back-pill {
+  background: transparent;
+  border: 1px solid var(--success-500);
+  color: var(--success-text);
+  border-radius: 999px;
+  padding: 8px 16px;
+  font: 600 14px var(--ui-font);
+  cursor: pointer;
+  transition: background .18s ease, color .18s ease, border-color .18s ease;
+}
+.ui-v2 .cdms-back-pill:hover {
+  background: var(--success-500);
+  border-color: var(--success-500);
+  color: #04231a;
+}
+
+/* ===== Glued table headers (case / account / audit / report tables) =====
+   The wrapper IS the scroll box, so the <th> row stays pinned to the top of
+   the table while the rows scroll under it — independent of whichever
+   ancestor scrolls the page. The bounded height is what makes it a
+   scrollport (without it nothing can stick). */
+.cdms-table-scroll { overflow: auto; max-height: 68vh; }
+.cdms-table-scroll > table { background: var(--bg-surface); }
+.cdms-table-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bg-surface);
+  box-shadow: 0 1px 0 var(--border-color);
+}
+@media (max-width: 820px) {
+  .cdms-table-scroll { max-height: 60vh; }
 }

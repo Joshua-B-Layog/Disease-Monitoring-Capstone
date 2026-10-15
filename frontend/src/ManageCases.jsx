@@ -19,7 +19,7 @@ import { buildPdfDoc } from './exportPdf';
 import { useI18n } from './i18n';
 import { RISK_FACTOR_GROUPS, HAZARD_SUGGESTED_FACTORS, parseRiskFactors, riskFactorLabel } from './riskFactors';
 
-const AllDiseasesIcon = ({ color = '#121358', size = 28 }) => (
+const AllDiseasesIcon = ({ color = 'var(--primary-900, #000768)', size = 28 }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
     <path d="m23.705,18.549c-.896-1.325-2.959-3.549-6.705-3.549s-5.81,2.224-6.705,3.549c-.391.577-.392,1.323,0,1.902.896,1.325,2.96,3.549,6.706,3.549s5.809-2.224,6.705-3.549c.391-.578.391-1.324,0-1.902Zm-6.705,2.951c-1.105,0-2-.895-2-2s.895-2,2-2,2,.895,2,2-.895,2-2,2Zm-8.362.072c-.852-1.262-.851-2.888.001-4.146,1.116-1.651,3.689-4.427,8.361-4.427,3.311,0,5.568,1.395,7,2.796V5c0-2.761-2.239-5-5-5H5C2.239,0,0,2.239,0,5v13c0,2.761,2.239,5,5,5h4.797c-.489-.506-.872-1.004-1.159-1.428Zm2.362-16.572h7c.552,0,1,.448,1,1s-.448,1-1,1h-7c-.552,0-1-.448-1-1s.448-1,1-1Zm0,5h7c.552,0,1,.448,1,1s-.448,1-1,1h-7c-.552,0-1-.448-1-1s.448-1,1-1Zm-4.5-5.5c.828,0,1.5.672,1.5,1.5s-.672,1.5-1.5,1.5-1.5-.672-1.5-1.5.672-1.5,1.5-1.5Zm0,5c.828,0,1.5.672,1.5,1.5s-.672,1.5-1.5,1.5-1.5-.672-1.5-1.5.672-1.5,1.5-1.5Zm0,8c-.828,0-1.5-.672-1.5-1.5s.672-1.5,1.5-1.5,1.5.672,1.5,1.5-.672,1.5-1.5,1.5Z"/>
   </svg>
@@ -37,7 +37,7 @@ const VectorborneIcon = ({ color = '#D97706', size = 28 }) => (
   </svg>
 );
 
-const VaccineIcon = ({ color = '#129968', size = 28 }) => (
+const VaccineIcon = ({ color = 'var(--primary-600, #000ECB)', size = 28 }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
     <path d="m20.499,9h-.002c-.936,0-1.837-.366-2.473-1.002-.66-.658-1.024-1.537-1.024-2.474s.361-1.812,1.019-2.468l2.481-2.428,2.467,2.414c.669.669,1.033,1.548,1.033,2.482s-.364,1.814-1.025,2.475c-.637.636-1.539,1.001-2.476,1.001ZM3.564,5.257l2.163,2.023-.844.844c-1.17,1.17-1.17,3.073,0,4.243l8.707,8.707h6s2.957,2.957,2.957,2.957l1.414-1.414-2.957-2.957v-6s-1.302-1.302-1.302-1.302l-3.207,3.207-1.414-1.414,3.207-3.207-1.586-1.586-3.207,3.207-1.414-1.414,3.207-3.207-1.586-1.586-3.207,3.207-1.414-1.414,3.206-3.206c-1.171-1.162-3.066-1.159-4.233.008l-.913.913-2.178-2.038,2.255-2.305L5.789.124.039,5.999l1.43,1.398,2.095-2.141Z"/>
   </svg>
@@ -48,13 +48,13 @@ const VaccineIcon = ({ color = '#129968', size = 28 }) => (
 const SVG_ICON_DEFS = [
   { token: 'svg:fever', name: 'Fever', render: () => <FeverIcon color="#ef4444" /> },
   { token: 'svg:flu-a', name: 'Influenza A', render: () => <InfluenzaAIcon color="#D97706" /> },
-  { token: 'svg:leptospirosis', name: 'Leptospirosis', render: () => <LeptospirosisIcon color="#129968" /> },
+  { token: 'svg:leptospirosis', name: 'Leptospirosis', render: () => <LeptospirosisIcon color="var(--primary-600, #000ECB)" /> },
   { token: 'svg:tuberculosis', name: 'Tuberculosis', render: () => <TuberculosisIcon color="#F97316" /> },
   { token: 'svg:typhoid', name: 'Typhoid', render: () => <TyphoidIcon color="#8B5CF6" /> },
-  { token: 'svg:alldiseases', name: 'All Diseases', render: () => <AllDiseasesIcon color="#121358" /> },
+  { token: 'svg:alldiseases', name: 'All Diseases', render: () => <AllDiseasesIcon color="var(--primary-900, #000768)" /> },
   { token: 'svg:waterborne', name: 'Water & Foodborne', render: () => <WaterborneIcon color="#0EA5E9" /> },
   { token: 'svg:vectorborne', name: 'Vector-borne', render: () => <VectorborneIcon color="#D97706" /> },
-  { token: 'svg:vaccine', name: 'Vaccine-Preventable', render: () => <VaccineIcon color="#129968" /> },
+  { token: 'svg:vaccine', name: 'Vaccine-Preventable', render: () => <VaccineIcon color="var(--primary-600, #000ECB)" /> },
   { token: 'svg:rabies', name: 'Rabies', render: () => <RabiesIcon color="#DC2626" /> },
   { token: 'svg:feces', name: 'Diarrhea', render: () => <FecesIcon color="#D97706" /> },
   { token: 'svg:avian', name: 'Avian Influenza / Chickenpox', render: () => <AvianIcon color="#F97316" /> },
@@ -193,7 +193,7 @@ const ALL_DISEASE_ENTRIES = [
   { id: 6,  name: 'Dengue Fever',                  dbName: 'Dengue', icon: <FeverIcon color="#ef4444" />, color: '#ef4444', desc: 'A viral infection transmitted by Aedes mosquitoes, causing high fever and severe body aches.' },
   { id: 7,  name: 'Diarrhea',                      dbName: 'Diarrhea', icon: <FecesIcon color="#D97706" />, color: '#D97706', desc: 'A gastrointestinal infection causing loose, watery stools, often leading to dehydration.' },
   { id: 8,  name: 'Diphtheria',                    dbName: 'Diphtheria', icon: <FeverIcon color="#A78BFA" />, color: '#A78BFA', desc: 'A serious bacterial infection affecting the mucous membranes of the nose and throat.' },
-  { id: 9,  name: 'Ebola',                         dbName: 'Ebola', icon: <InfluenzaAIcon color="#129968" />, color: '#129968', desc: 'A severe, often fatal viral hemorrhagic fever with high transmission risk.' },
+  { id: 9,  name: 'Ebola',                         dbName: 'Ebola', icon: <InfluenzaAIcon color="var(--primary-600, #000ECB)" />, color: 'var(--primary-600, #000ECB)', desc: 'A severe, often fatal viral hemorrhagic fever with high transmission risk.' },
   { id: 10, name: 'Hand Foot and Mouth Disease',   dbName: 'Hand Foot and Mouth Disease', icon: <FeverIcon color="#F472B6" />, color: '#F472B6', desc: 'A mild viral illness common in children, causing sores in the mouth and rash on hands and feet.' },
   { id: 11, name: 'Hepatitis A',                   dbName: 'Hepatitis A', icon: <ContactBloodborneIcon color="#CA8A04" />, color: '#CA8A04', desc: 'A viral liver infection spread through contaminated food and water or close contact.' },
   { id: 12, name: 'Hepatitis B',                   dbName: 'Hepatitis B', icon: <ContactBloodborneIcon color="#B45309" />, color: '#B45309', desc: 'A serious liver infection caused by the hepatitis B virus, transmitted through blood and bodily fluids.' },
@@ -202,7 +202,7 @@ const ALL_DISEASE_ENTRIES = [
   { id: 15, name: 'Influenza',                     dbName: 'Influenza', icon: <InfluenzaAIcon color="#F59E0B" />, color: '#F59E0B', desc: 'A common contagious respiratory viral infection causing fever, cough, and body aches.' },
   { id: 16, name: 'Influenza A',                   dbName: 'Influenza A', icon: <InfluenzaAIcon color="#D97706" />, color: '#D97706', desc: 'A highly contagious respiratory illness caused by influenza viruses, leading to seasonal outbreaks.' },
   { id: 17, name: 'Leprosy',                       dbName: 'Leprosy', icon: <ContactBloodborneIcon color="#A1A1AA" />, color: '#A1A1AA', desc: 'A chronic infectious disease affecting the skin and nerves, curable with multidrug therapy.' },
-  { id: 18, name: 'Leptospirosis',                 dbName: 'Leptospirosis', icon: <LeptospirosisIcon color="#129968" />, color: '#129968', desc: 'A bacterial disease spread through contaminated water, posing a high risk during flood seasons.' },
+  { id: 18, name: 'Leptospirosis',                 dbName: 'Leptospirosis', icon: <LeptospirosisIcon color="var(--primary-600, #000ECB)" />, color: 'var(--primary-600, #000ECB)', desc: 'A bacterial disease spread through contaminated water, posing a high risk during flood seasons.' },
   { id: 19, name: 'Malaria',                       dbName: 'Malaria', icon: <VectorborneIcon color="#84CC16" />, color: '#84CC16', desc: 'A life-threatening mosquito-borne disease causing fever, chills, and flu-like symptoms.' },
   { id: 20, name: 'Measles',                       dbName: 'Measles', icon: <FeverIcon color="#DC2626" />, color: '#DC2626', desc: 'A highly contagious viral disease causing fever and rash, preventable through vaccination.' },
   { id: 21, name: 'Meningococcemia',               dbName: 'Meningococcemia', icon: <ContactBloodborneIcon color="#8B5CF6" />, color: '#8B5CF6', desc: 'A serious bacterial bloodstream infection that can lead to meningitis and sepsis.' },
@@ -269,7 +269,7 @@ const findDiseaseEntry = (diseaseName) => {
 // ── Disease categories ──
 const DISEASE_CATEGORIES = [
   {
-    id: 'all', name: 'All Diseases', icon: resolveIcon('svg:alldiseases'), color: '#121358',
+    id: 'all', name: 'All Diseases', icon: resolveIcon('svg:alldiseases'), color: 'var(--primary-900, #000768)',
     desc: 'All 28 tracked communicable diseases in Cabuyao',
     diseases: ALL_DISEASE_ENTRIES,
   },
@@ -294,7 +294,7 @@ const DISEASE_CATEGORIES = [
     diseases: ALL_DISEASE_ENTRIES.filter(d => ['Acute Respiratory Infection', 'Avian Influenza', 'Covid-19', 'Influenza', 'Influenza A', 'SARS', 'Tuberculosis'].includes(d.name)),
   },
   {
-    id: 'vaccine', name: 'Vaccine-Preventable', icon: resolveIcon('svg:vaccine'), color: '#129968',
+    id: 'vaccine', name: 'Vaccine-Preventable', icon: resolveIcon('svg:vaccine'), color: 'var(--primary-600, #000ECB)',
     desc: 'Diseases that can be prevented through routine vaccination programs',
     diseases: ALL_DISEASE_ENTRIES.filter(d => ['Chickenpox', 'Diphtheria', 'Measles', 'Pertussis'].includes(d.name)),
   },
@@ -1923,7 +1923,7 @@ useEffect(() => {
     if (status === 'Active') return { background: 'rgba(245,158,11,0.15)', color: '#fbbf24' };
     if (status === 'Pending') return { background: 'rgba(37,99,235,0.15)', color: '#3B82F6' };
     if (status === 'Under Treatment') return { background: 'rgba(124,58,237,0.15)', color: '#a78bfa' };
-    if (status === 'Recovered') return { background: 'rgba(18,153,104,0.15)', color: '#3cb882' };
+    if (status === 'Recovered') return { background: 'rgba(0,14,203,0.15)', color: '#3cb882' };
     if (status === 'Deceased') return { background: 'rgba(220,38,38,0.15)', color: '#f87171' };
     if (status === 'Draft') return { background: 'var(--input-bg)', color: 'var(--text-muted)' };
     return { background: 'var(--input-bg)', color: 'var(--text-muted)' };
@@ -2684,7 +2684,7 @@ useEffect(() => {
 
     const category = selectedCategory
       ? ([{ id: 'notif-immediate', name: t('Immediate Diseases'), icon: '🕐', color: '#DC2626', desc: t('Report within 24 hours (Level 1 IDSR)'), diseases: ALL_DISEASE_ENTRIES.filter(e => notifTypeForEntry(e, allDiseases) === 'immediate') },
-          { id: 'notif-weekly', name: t('🗓️ Weekly Diseases'), icon: '🗓️', color: '#129968', desc: t('Included in the consolidated weekly summary (Level 2 FHSIS)'), diseases: ALL_DISEASE_ENTRIES.filter(e => notifTypeForEntry(e, allDiseases) === 'weekly') }].find(c => c.id === selectedCategory)
+          { id: 'notif-weekly', name: t('🗓️ Weekly Diseases'), icon: '🗓️', color: 'var(--primary-600, #000ECB)', desc: t('Included in the consolidated weekly summary (Level 2 FHSIS)'), diseases: ALL_DISEASE_ENTRIES.filter(e => notifTypeForEntry(e, allDiseases) === 'weekly') }].find(c => c.id === selectedCategory)
         || DISEASE_CATEGORIES.find(c => c.id === selectedCategory))
       : null;
     const diseaseEntries = category ? category.diseases : [];
@@ -2827,12 +2827,12 @@ useEffect(() => {
     };
 
     const catDefs = [
-      { id: 'all', label: t('All Diseases'), icon: resolveIcon('svg:alldiseases'), color: '#121358', tip: t('Every tracked disease'), list: ALL_DISEASE_ENTRIES },
+      { id: 'all', label: t('All Diseases'), icon: resolveIcon('svg:alldiseases'), color: 'var(--primary-900, #000768)', tip: t('Every tracked disease'), list: ALL_DISEASE_ENTRIES },
       { id: 'imm', label: t('Immediate Diseases'), icon: '🕐', color: '#DC2626', tip: t('Report within 24 hours (Level 1 IDSR)'), list: ALL_DISEASE_ENTRIES.filter(e => notifTypeForEntry(e, allDiseases) === 'immediate') },
-      { id: 'wk', label: t('Weekly Diseases'), icon: '🗓️', color: '#129968', tip: t('Included in the weekly summary (Level 2 FHSIS)'), list: ALL_DISEASE_ENTRIES.filter(e => notifTypeForEntry(e, allDiseases) === 'weekly') },
+      { id: 'wk', label: t('Weekly Diseases'), icon: '🗓️', color: 'var(--primary-600, #000ECB)', tip: t('Included in the weekly summary (Level 2 FHSIS)'), list: ALL_DISEASE_ENTRIES.filter(e => notifTypeForEntry(e, allDiseases) === 'weekly') },
       ...gridCategories
         .filter(c => c.id !== 'all' && c.id !== 'immediate' && c.id !== 'weekly')
-        .map(c => ({ id: c.id, label: c.name, icon: c.icon, color: c.color || '#121358', tip: c.desc || '', list: c.diseases || [] })),
+        .map(c => ({ id: c.id, label: c.name, icon: c.icon, color: c.color || 'var(--primary-900, #000768)', tip: c.desc || '', list: c.diseases || [] })),
     ].map(def => ({ ...def, shown: applyFilters(def.list) }))
      .filter(def => !(gridQ || notifFilter !== 'all') || def.shown.length > 0); // hide empty cards while filtering
 
@@ -2995,11 +2995,11 @@ useEffect(() => {
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                 <span style={{ color: 'var(--text-muted)', fontSize: '15px' }}>{t('Page ') + (diseasePage + 1) + ' / ' + totalDiseasePages}</span>
                 <button onClick={() => setDiseasePage(Math.max(0, diseasePage - 1))} disabled={diseasePage === 0}
-                  style={{ padding: '7px 16px', background: diseasePage === 0 ? 'var(--input-bg)' : '#121358', color: diseasePage === 0 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: diseasePage === 0 ? 'not-allowed' : 'pointer', fontSize: '15px' }}>
+                  style={{ padding: '7px 16px', background: diseasePage === 0 ? 'var(--input-bg)' : 'var(--primary-900, #000768)', color: diseasePage === 0 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: diseasePage === 0 ? 'not-allowed' : 'pointer', fontSize: '15px' }}>
                   {t('← Prev')}
                 </button>
                 <button onClick={() => setDiseasePage(Math.min(totalDiseasePages - 1, diseasePage + 1))} disabled={diseasePage >= totalDiseasePages - 1}
-                  style={{ padding: '7px 16px', background: diseasePage >= totalDiseasePages - 1 ? 'var(--input-bg)' : '#121358', color: diseasePage >= totalDiseasePages - 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: diseasePage >= totalDiseasePages - 1 ? 'not-allowed' : 'pointer', fontSize: '15px' }}>
+                  style={{ padding: '7px 16px', background: diseasePage >= totalDiseasePages - 1 ? 'var(--input-bg)' : 'var(--primary-900, #000768)', color: diseasePage >= totalDiseasePages - 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: diseasePage >= totalDiseasePages - 1 ? 'not-allowed' : 'pointer', fontSize: '15px' }}>
                   {t('Next →')}
                 </button>
               </div>
@@ -3063,7 +3063,7 @@ useEffect(() => {
                       </div>
                       <div style={{ position: 'relative' }}>
                         <button type="button" title={t('Filters')} onClick={() => setFilterOpen(o => !o)}
-                          style={{ padding: '7px 11px', borderRadius: '8px', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '15px', lineHeight: 1, background: (notifFilter !== 'all' || sortMode !== 'cases' || categoryFilter !== 'all') ? '#121358' : 'var(--input-bg)', color: (notifFilter !== 'all' || sortMode !== 'cases' || categoryFilter !== 'all') ? '#fff' : 'var(--text-muted)' }}>
+                          style={{ padding: '7px 11px', borderRadius: '8px', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '15px', lineHeight: 1, background: (notifFilter !== 'all' || sortMode !== 'cases' || categoryFilter !== 'all') ? 'var(--primary-900, #000768)' : 'var(--input-bg)', color: (notifFilter !== 'all' || sortMode !== 'cases' || categoryFilter !== 'all') ? '#fff' : 'var(--text-muted)' }}>
                           ⛛
                         </button>
                         {filterOpen && (
@@ -3201,7 +3201,7 @@ useEffect(() => {
                     {(exclusiveCat?.diseases || []).length >= 6 && (
                       <div style={{ textAlign: 'center', marginTop: '16px' }}>
                         <button onClick={() => { setBrowseAllExclusive(true); }}
-                          style={{ padding: '10px 20px', background: '#121358', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
+                          style={{ padding: '10px 20px', background: 'var(--primary-900, #000768)', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
                           {t('Other Exclusive Diseases')}
                         </button>
                       </div>
@@ -3214,7 +3214,7 @@ useEffect(() => {
                   <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '22px 24px', boxShadow: '0 2px 10px rgba(0,0,0,0.04)' }}>
                   <h3 style={{ margin: '0 0 12px 0', fontSize: '17px', color: 'var(--text-main)', textAlign: 'center' }}>{t('➕ Add New Disease')}</h3>
                   {addDiseaseMsg && (
-                    <div style={{ padding: '8px 12px', marginBottom: '10px', borderRadius: '6px', fontSize: '15px', background: addDiseaseMsg.startsWith('Error') ? '#fee2e2' : '#d1f5e9', color: addDiseaseMsg.startsWith('Error') ? '#991b1b' : '#0a5e42' }}>
+                    <div style={{ padding: '8px 12px', marginBottom: '10px', borderRadius: '6px', fontSize: '15px', background: addDiseaseMsg.startsWith('Error') ? '#fee2e2' : '#d1f5e9', color: addDiseaseMsg.startsWith('Error') ? '#991b1b' : 'rgba(0,14,203,.55)' }}>
                       {addDiseaseMsg}
                     </div>
                   )}
@@ -3342,7 +3342,7 @@ useEffect(() => {
                   )}
                   <div style={{ textAlign: 'center' }}>
                     <button onClick={handleAddNewDisease}
-                      style={{ padding: '10px 24px', background: '#129968', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
+                      style={{ padding: '10px 24px', background: 'var(--primary-600, #000ECB)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
                       {t('Save Disease')}
                     </button>
                   </div>
@@ -3352,7 +3352,7 @@ useEffect(() => {
                     <h3 style={{ margin: '0 0 6px 0', fontSize: '17px', color: 'var(--text-main)', textAlign: 'center' }}>{t('➕ Add / Edit Prevention Tips')}</h3>
                     <p style={{ margin: '0 0 14px 0', color: 'var(--text-muted)', fontSize: '14px', textAlign: 'center' }}>{t('Select a disease, then add or edit its prevention tips, symptom-checker questions, and video.')}</p>
                     {box2Msg && (
-                      <div style={{ padding: '8px 12px', marginBottom: '10px', borderRadius: '6px', fontSize: '15px', background: box2Msg.startsWith('Error') ? '#fee2e2' : '#d1f5e9', color: box2Msg.startsWith('Error') ? '#991b1b' : '#0a5e42' }}>
+                      <div style={{ padding: '8px 12px', marginBottom: '10px', borderRadius: '6px', fontSize: '15px', background: box2Msg.startsWith('Error') ? '#fee2e2' : '#d1f5e9', color: box2Msg.startsWith('Error') ? '#991b1b' : 'rgba(0,14,203,.55)' }}>
                         {box2Msg}
                       </div>
                     )}
@@ -3407,7 +3407,7 @@ useEffect(() => {
                     </div>
                     <div className="cdms-box2-btns" style={{ display: 'flex', gap: '0', marginTop: '16px' }}>
                       <button onClick={saveBox2Tips} disabled={box2Saving}
-                        style={{ flex: 1, padding: '12px', background: '#129968', border: 'none', borderRight: '1px solid var(--bg-main)', cursor: box2Saving ? 'not-allowed' : 'pointer', fontSize: '15px', fontWeight: '600', color: '#fff', borderRadius: '8px 0 0 8px' }}>
+                        style={{ flex: 1, padding: '12px', background: 'var(--primary-600, #000ECB)', border: 'none', borderRight: '1px solid var(--bg-main)', cursor: box2Saving ? 'not-allowed' : 'pointer', fontSize: '15px', fontWeight: '600', color: '#fff', borderRadius: '8px 0 0 8px' }}>
                         {box2Saving ? t('Saving...') : t('💾 Save Prevention Tips')}
                       </button>
                       <button onClick={openTipsManager}
@@ -3429,7 +3429,7 @@ useEffect(() => {
                             <p style={{ margin: '0 0 18px 0', color: 'var(--text-muted)', fontSize: '15px' }}>{t('You can add prevention tips now, or later from the "Add / Edit Prevention Tips" box below.')}</p>
                             <div style={{ display: 'flex', gap: '10px' }}>
                               <button onClick={() => { if (addTipsPrompt.id) { setBox2DiseaseId(String(addTipsPrompt.id)); loadBox2(addTipsPrompt.id); } setAddTipsPrompt(null); }}
-                                style={{ flex: 1, padding: '12px', background: '#129968', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
+                                style={{ flex: 1, padding: '12px', background: 'var(--primary-600, #000ECB)', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
                                 {t('Yes, add tips')}
                               </button>
                               <button onClick={() => setAddTipsPrompt(null)}
@@ -3451,7 +3451,7 @@ useEffect(() => {
             <button onClick={() => changeCarousel(-1)} title={t('Previous')} className="cdms-carousel-arrow"
               style={{
                 position: 'absolute', top: '50%', left: '-18px', transform: 'translateY(-50%)',
-                width: '36px', height: '36px', borderRadius: '50%', background: '#121358',
+                width: '36px', height: '36px', borderRadius: '50%', background: 'var(--primary-900, #000768)',
                 border: '2px solid var(--bg-main)', color: '#fff', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.3)', zIndex: 2,
@@ -3461,7 +3461,7 @@ useEffect(() => {
             <button onClick={() => changeCarousel(1)} title={t('Next')} className="cdms-carousel-arrow"
               style={{
                 position: 'absolute', top: '50%', right: '-18px', transform: 'translateY(-50%)',
-                width: '36px', height: '36px', borderRadius: '50%', background: '#121358',
+                width: '36px', height: '36px', borderRadius: '50%', background: 'var(--primary-900, #000768)',
                 border: '2px solid var(--bg-main)', color: '#fff', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.3)', zIndex: 2,
@@ -3495,7 +3495,7 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
                     <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: 'var(--text-main)' }}>{t('Edit Prevention - ')}{tipsEditor.name}</h3>
                   </div>
                   {tipsMsg && (
-                    <div style={{ padding: '10px 12px', marginBottom: '14px', borderRadius: '6px', fontSize: '15px', background: tipsMsg.startsWith('Error') ? 'var(--error-bg, #fee2e2)' : '#d1f5e9', color: tipsMsg.startsWith('Error') ? '#991b1b' : '#0a5e42' }}>{tipsMsg}</div>
+                    <div style={{ padding: '10px 12px', marginBottom: '14px', borderRadius: '6px', fontSize: '15px', background: tipsMsg.startsWith('Error') ? 'var(--error-bg, #fee2e2)' : '#d1f5e9', color: tipsMsg.startsWith('Error') ? '#991b1b' : 'rgba(0,14,203,.55)' }}>{tipsMsg}</div>
                   )}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     <div>
@@ -3543,7 +3543,7 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
                       {t('Back to list')}
                     </button>
                     <button onClick={saveTips} disabled={tipsSaving}
-                      style={{ flex: 2, padding: '13px', background: '#129968', border: 'none', cursor: tipsSaving ? 'not-allowed' : 'pointer', fontSize: '16px', fontWeight: '600', color: '#fff', borderRadius: '0 6px 6px 0' }}>
+                      style={{ flex: 2, padding: '13px', background: 'var(--primary-600, #000ECB)', border: 'none', cursor: tipsSaving ? 'not-allowed' : 'pointer', fontSize: '16px', fontWeight: '600', color: '#fff', borderRadius: '0 6px 6px 0' }}>
                       {tipsSaving ? t('Saving...') : t('Save Prevention Tips')}
                     </button>
                   </div>
@@ -3579,7 +3579,7 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
                           {d.active === 0 ? t('Un-hide') : t('Hide')}
                         </button>
                         <button onClick={() => openTipsEditor(d)}
-                          style={{ padding: '7px 14px', background: '#121358', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}>
+                          style={{ padding: '7px 14px', background: 'var(--primary-900, #000768)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}>
                           {t('Edit')}
                         </button>
                       </div>
@@ -3613,7 +3613,7 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
             style={{
               padding: '8px 20px', cursor: 'pointer', fontSize: '15px', fontWeight: inboxSubTab === 'referrals' ? '700' : '500',
               color: inboxSubTab === 'referrals' ? 'var(--text-main)' : 'var(--text-muted)',
-              borderBottom: inboxSubTab === 'referrals' ? '2px solid #129968' : '2px solid transparent',
+              borderBottom: inboxSubTab === 'referrals' ? '2px solid var(--primary-600, #000ECB)' : '2px solid transparent',
               transition: 'all 0.15s',
             }}>
             {loginRole === 'BHW' ? t('My Requests') : t('Referrals')} ({loginRole === 'BHW' ? myEditRequests.length + myAddRequests.length : inboxItems.length})
@@ -3623,7 +3623,7 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
               style={{
                 padding: '8px 20px', cursor: 'pointer', fontSize: '15px', fontWeight: inboxSubTab === 'messages' ? '700' : '500',
                 color: inboxSubTab === 'messages' ? 'var(--text-main)' : 'var(--text-muted)',
-                borderBottom: inboxSubTab === 'messages' ? '2px solid #129968' : '2px solid transparent',
+                borderBottom: inboxSubTab === 'messages' ? '2px solid var(--primary-600, #000ECB)' : '2px solid transparent',
                 transition: 'all 0.15s',
               }}>
               {t('Messages')} ({contactMessages.filter(m => m.status === 'new' || m.status === 'pending').length})
@@ -3757,7 +3757,7 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
                   </div>
                   <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
                     <button onClick={() => handleAcceptInboxItem(item)} title={t('Accept')}
-                      style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #129968', background: 'rgba(18,153,104,0.1)', color: '#129968', cursor: 'pointer', fontSize: '16px' }}>
+                      style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid var(--brand-text)', background: 'rgba(0,14,203,0.1)', color: 'var(--brand-text)', cursor: 'pointer', fontSize: '16px' }}>
                       ✓
                     </button>
                     <button onClick={() => handleRejectInboxItem(item)} title={t('Reject')}
@@ -3823,7 +3823,7 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
                     </div>
                     <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
                       <button onClick={() => req._type === 'password-change' ? handleAcceptPasswordRequest(req) : handleAcceptEditRequest(req)} title={t('Accept')}
-                        style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #129968', background: 'rgba(18,153,104,0.1)', color: '#129968', cursor: 'pointer', fontSize: '16px' }}>
+                        style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid var(--brand-text)', background: 'rgba(0,14,203,0.1)', color: 'var(--brand-text)', cursor: 'pointer', fontSize: '16px' }}>
                         ✓
                       </button>
                       <button onClick={() => req._type === 'password-change' ? handleRejectPasswordRequest(req) : handleRejectEditRequest(req)} title={t('Reject')}
@@ -3870,7 +3870,7 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
                   </div>
                   <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
                     <button onClick={() => openApprovalReview(req)} title={t('Review & Approve')}
-                      style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #129968', background: 'rgba(18,153,104,0.1)', color: '#129968', cursor: 'pointer', fontSize: '15px', fontWeight: '600' }}>
+                      style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid var(--brand-text)', background: 'rgba(0,14,203,0.1)', color: 'var(--brand-text)', cursor: 'pointer', fontSize: '15px', fontWeight: '600' }}>
                       {t('✓ Review')}
                     </button>
                     <button onClick={() => handleRejectAddRequest(req)} title={t('Reject')}
@@ -3914,7 +3914,7 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
                   </div>
                   <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
                     <button onClick={() => handleApproveRegistration(reg)} title={t('Approve')}
-                      style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #129968', background: 'rgba(18,153,104,0.1)', color: '#129968', cursor: 'pointer', fontSize: '16px' }}>
+                      style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid var(--brand-text)', background: 'rgba(0,14,203,0.1)', color: 'var(--brand-text)', cursor: 'pointer', fontSize: '16px' }}>
                       ✓
                     </button>
                     <button onClick={() => handleRejectRegistration(reg)} title={t('Reject')}
@@ -3943,7 +3943,7 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
                       {msg.status === 'pending' && <span style={{ marginLeft: '8px', color: '#D97706', fontWeight: '600' }}>· {t('Pending review')}</span>}
                     </div>
                     <div style={{ display: 'flex', gap: '8px', marginTop: '6px', alignItems: 'center' }}>
-                      <div className="inbox-avatar-circle" style={{ background: '#129968' }}>
+                      <div className="inbox-avatar-circle" style={{ background: 'var(--primary-600, #000ECB)' }}>
                         {msg.name.slice(0, 2).toUpperCase()}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -3962,7 +3962,7 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
                   {msg.status === 'new' ? (
                     <>
                       <button onClick={() => handlePendingContactMessage(msg)} title={t('Review')}
-                        style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid #129968', background: 'rgba(18,153,104,0.1)', color: '#129968', cursor: 'pointer', fontSize: '16px', flexShrink: 0 }}>
+                        style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid var(--brand-text)', background: 'rgba(0,14,203,0.1)', color: 'var(--brand-text)', cursor: 'pointer', fontSize: '16px', flexShrink: 0 }}>
                         ✓
                       </button>
                       <button onClick={() => handleRejectContactMessage(msg)} title={t('Reject')}
@@ -4081,7 +4081,7 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
               <p style={{ margin: '0 0 20px 0', color: 'var(--text-muted)', fontSize: '15px', lineHeight: '1.6' }}>
                   This will archive (soft-delete) the case record of:
                 </p>
-                <div style={{ background: 'var(--input-bg)', border: 'none', borderLeft: '4px solid #129968', borderRadius: '6px', padding: '14px 18px', marginBottom: '20px', textAlign: 'left' }}>
+                <div style={{ background: 'var(--input-bg)', border: 'none', borderLeft: '4px solid var(--primary-600, #000ECB)', borderRadius: '6px', padding: '14px 18px', marginBottom: '20px', textAlign: 'left' }}>
                   <div style={{ fontWeight: '700', color: 'var(--text-main)', fontSize: '15px', marginBottom: '4px' }}>
                     Case ID: D-{String(deleteTarget.case_id).padStart(4, '0')}
                   </div>
@@ -4099,7 +4099,7 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
                     Cancel
                   </button>
                   <button onClick={executeDelete} disabled={deleteLoading}
-                    style={{ flex: 1, padding: '14px', background: '#129968', border: 'none', cursor: deleteLoading ? 'not-allowed' : 'pointer', fontSize: '16px', fontWeight: '600', color: '#fff', borderRadius: '0 0 16px 0' }}>
+                    style={{ flex: 1, padding: '14px', background: 'var(--primary-600, #000ECB)', border: 'none', cursor: deleteLoading ? 'not-allowed' : 'pointer', fontSize: '16px', fontWeight: '600', color: '#fff', borderRadius: '0 0 16px 0' }}>
                     {deleteLoading ? 'Archiving...' : 'Archive'}
                   </button>
               </div>
@@ -4166,7 +4166,7 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
 
             <BackButton onClick={() => { setView('categories'); setSelectedDisease(null); setSearchQuery(''); }}>{t('Back')}</BackButton>
             <button onClick={openAdd}
-              style={{ padding: '8px 18px', background: '#129968', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
+              style={{ padding: '8px 18px', background: 'var(--primary-600, #000ECB)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
               {t('+ Add Case')}
             </button>
           </div>
@@ -4183,11 +4183,11 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
             {loginRole !== 'BHW' && (
               <div style={{ display: 'flex', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
                 <button onClick={() => { setShowArchived(false); showArchivedRef.current = false; fetchCases(false); setTablePage(1); }}
-                  style={{ padding: '8px 14px', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: '600', background: !showArchived ? '#121358' : 'transparent', color: !showArchived ? '#fff' : 'var(--text-muted)' }}>
+                  style={{ padding: '8px 14px', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: '600', background: !showArchived ? 'var(--primary-900, #000768)' : 'transparent', color: !showArchived ? '#fff' : 'var(--text-muted)' }}>
                   {t('Active')}
                 </button>
                 <button onClick={() => { setShowArchived(true); showArchivedRef.current = true; fetchCases(true); setTablePage(1); }}
-                  style={{ padding: '8px 14px', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: '600', background: showArchived ? '#121358' : 'transparent', color: showArchived ? '#fff' : 'var(--text-muted)' }}>
+                  style={{ padding: '8px 14px', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: '600', background: showArchived ? 'var(--primary-900, #000768)' : 'transparent', color: showArchived ? '#fff' : 'var(--text-muted)' }}>
                   {t('Archived')}
                 </button>
               </div>
@@ -4277,7 +4277,7 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
             </span>
           </div>
 
-          <div style={{ overflowX: 'auto' }}>
+          <div className="cdms-table-scroll">
           {loadingCases ? (
             <table style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse' }}>
               <tbody>
@@ -4354,7 +4354,7 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
                                 .then(() => { notify(`${t('Case #')}${c.case_id}${t(' restored.')}`, 'success'); fetchCases(true); })
                                 .catch(err => notify(t('Restore failed: ') + (err.response?.data?.error || err.message), 'error'));
                             }} title={t('Restore case')}
-                            style={{ padding: '5px 10px', background: 'transparent', border: '1px solid #129968', borderRadius: '4px', cursor: 'pointer', fontSize: '15px', color: '#129968' }}>
+                            style={{ padding: '5px 10px', background: 'transparent', border: '1px solid var(--brand-text)', borderRadius: '4px', cursor: 'pointer', fontSize: '15px', color: 'var(--brand-text)' }}>
                             {t('↩ Restore')}
                           </button>
                           ) : null
@@ -4402,11 +4402,11 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
               </span>
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 <button onClick={() => setTablePage(1)} disabled={tablePage === 1}
-                  style={{ padding: '5px 8px', background: tablePage === 1 ? 'var(--input-bg)' : '#121358', color: tablePage === 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: tablePage === 1 ? 'not-allowed' : 'pointer', fontSize: '15px', fontWeight: '700' }}>
+                  style={{ padding: '5px 8px', background: tablePage === 1 ? 'var(--input-bg)' : 'var(--primary-900, #000768)', color: tablePage === 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: tablePage === 1 ? 'not-allowed' : 'pointer', fontSize: '15px', fontWeight: '700' }}>
                   {'<<'}
                 </button>
                 <button onClick={() => setTablePage(p => Math.max(1, p - 1))} disabled={tablePage === 1}
-                  style={{ padding: '5px 12px', background: tablePage === 1 ? 'var(--input-bg)' : '#121358', color: tablePage === 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: tablePage === 1 ? 'not-allowed' : 'pointer', fontSize: '15px' }}>
+                  style={{ padding: '5px 12px', background: tablePage === 1 ? 'var(--input-bg)' : 'var(--primary-900, #000768)', color: tablePage === 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: tablePage === 1 ? 'not-allowed' : 'pointer', fontSize: '15px' }}>
                   {t('← Prev')}
                 </button>
                 {getVisiblePages(tablePage, totalTablePages).map((p, i) =>
@@ -4423,24 +4423,24 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
                               onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(tableEllipsisInput); if (v >= 1 && v <= totalTablePages) { setTablePage(v); setTableEllipsisOpen(false); setTableEllipsisInput(''); } } }}
                               style={{ flex: 1, padding: '5px 6px', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px', outline: 'none', width: '100%' }} />
                             <button onClick={() => { const v = parseInt(tableEllipsisInput); if (v >= 1 && v <= totalTablePages) { setTablePage(v); setTableEllipsisOpen(false); setTableEllipsisInput(''); } }}
-                              style={{ padding: '5px 8px', border: '1px solid #121358', borderRadius: '4px', background: '#121358', color: 'white', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>{t('Go')}</button>
+                              style={{ padding: '5px 8px', border: '1px solid var(--primary-900, #000768)', borderRadius: '4px', background: 'var(--primary-900, #000768)', color: 'white', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>{t('Go')}</button>
                           </div>
                         </div>
                       )}
                     </div>
                   ) : (
                     <button key={p} onClick={() => setTablePage(p)}
-                      style={{ padding: '5px 10px', background: p === tablePage ? '#121358' : 'transparent', color: p === tablePage ? 'white' : 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '15px', minWidth: '32px' }}>
+                      style={{ padding: '5px 10px', background: p === tablePage ? 'var(--primary-900, #000768)' : 'transparent', color: p === tablePage ? 'white' : 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '15px', minWidth: '32px' }}>
                       {p}
                     </button>
                   )
                 )}
                 <button onClick={() => setTablePage(p => Math.min(totalTablePages, p + 1))} disabled={tablePage === totalTablePages}
-                  style={{ padding: '5px 12px', background: tablePage === totalTablePages ? 'var(--input-bg)' : '#121358', color: tablePage === totalTablePages ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: tablePage === totalTablePages ? 'not-allowed' : 'pointer', fontSize: '15px' }}>
+                  style={{ padding: '5px 12px', background: tablePage === totalTablePages ? 'var(--input-bg)' : 'var(--primary-900, #000768)', color: tablePage === totalTablePages ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: tablePage === totalTablePages ? 'not-allowed' : 'pointer', fontSize: '15px' }}>
                   {t('Next →')}
                 </button>
                 <button onClick={() => setTablePage(totalTablePages)} disabled={tablePage === totalTablePages}
-                  style={{ padding: '5px 8px', background: tablePage === totalTablePages ? 'var(--input-bg)' : '#121358', color: tablePage === totalTablePages ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: tablePage === totalTablePages ? 'not-allowed' : 'pointer', fontSize: '15px', fontWeight: '700' }}>
+                  style={{ padding: '5px 8px', background: tablePage === totalTablePages ? 'var(--input-bg)' : 'var(--primary-900, #000768)', color: tablePage === totalTablePages ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: tablePage === totalTablePages ? 'not-allowed' : 'pointer', fontSize: '15px', fontWeight: '700' }}>
                   {'>>'}
                 </button>
               </div>
@@ -4611,7 +4611,7 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
                           {['Male', 'Female'].map(g => (
                             <button key={g} type="button"
                               onClick={() => { setFormData({ ...formData, gender: g }); setGenderOpen(false); }}
-                              style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.gender === g ? 'rgba(18,153,104,0.12)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: formData.gender === g ? '600' : '400' }}
+                              style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.gender === g ? 'rgba(0,14,203,0.12)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: formData.gender === g ? '600' : '400' }}
                               onMouseEnter={e => { if (formData.gender !== g) e.target.style.background = 'var(--input-bg)'; }}
                               onMouseLeave={e => { if (formData.gender !== g) e.target.style.background = 'transparent'; }}>
                               {t(g)}
@@ -5090,7 +5090,7 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
                         {['Critical', 'Severe', 'Moderate', 'Mild', 'Asymptomatic'].map(s => (
                           <button key={s} type="button"
                             onClick={() => { setFormData({ ...formData, severity: s }); setSeverityOpen(false); }}
-                            style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.severity === s ? 'rgba(18,153,104,0.12)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: formData.severity === s ? '600' : '400' }}
+                            style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.severity === s ? 'rgba(0,14,203,0.12)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: formData.severity === s ? '600' : '400' }}
                             onMouseEnter={e => { if (formData.severity !== s) e.target.style.background = 'var(--input-bg)'; }}
                             onMouseLeave={e => { if (formData.severity !== s) e.target.style.background = 'transparent'; }}>
                             {t(s)}
@@ -5119,7 +5119,7 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
                         {['Suspected', 'Probable', 'Confirmed'].map(s => (
                           <button key={s} type="button"
                             onClick={() => { setFormData({ ...formData, caseType: s }); setCaseTypeOpen(false); }}
-                            style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.caseType === s ? 'rgba(18,153,104,0.12)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: formData.caseType === s ? '600' : '400' }}
+                            style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.caseType === s ? 'rgba(0,14,203,0.12)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: formData.caseType === s ? '600' : '400' }}
                             onMouseEnter={e => { if (formData.caseType !== s) e.target.style.background = 'var(--input-bg)'; }}
                             onMouseLeave={e => { if (formData.caseType !== s) e.target.style.background = 'transparent'; }}>
                             {t(s)}
@@ -5174,7 +5174,7 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
                           {subtypeOptions.map(s => (
                             <button key={s} type="button"
                               onClick={() => { setFormData({ ...formData, diseaseSubtype: s }); setSubtypeOpen(false); }}
-                              style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.diseaseSubtype === s ? 'rgba(18,153,104,0.12)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: formData.diseaseSubtype === s ? '600' : '400' }}
+                              style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.diseaseSubtype === s ? 'rgba(0,14,203,0.12)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: formData.diseaseSubtype === s ? '600' : '400' }}
                               onMouseEnter={e => { if (formData.diseaseSubtype !== s) e.target.style.background = 'var(--input-bg)'; }}
                               onMouseLeave={e => { if (formData.diseaseSubtype !== s) e.target.style.background = 'transparent'; }}>
                               {s}
@@ -5216,7 +5216,7 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
                         {['Active', 'Pending', 'Under Treatment', 'Recovered', 'Deceased'].sort().map(s => (
                           <button key={s} type="button"
                             onClick={() => { setFormData({ ...formData, status: s }); setPatientStatusOpen(false); }}
-                            style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.status === s ? 'rgba(18,153,104,0.12)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: formData.status === s ? '600' : '400' }}
+                            style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.status === s ? 'rgba(0,14,203,0.12)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: formData.status === s ? '600' : '400' }}
                             onMouseEnter={e => { if (formData.status !== s) e.target.style.background = 'var(--input-bg)'; }}
                             onMouseLeave={e => { if (formData.status !== s) e.target.style.background = 'transparent'; }}>
                             {t(s)}
@@ -5235,13 +5235,13 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
                     <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
                       {statusHistory.map((entry, idx) => (
                         <div key={entry.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px', borderBottom: idx < statusHistory.length - 1 ? '1px solid var(--border-color)' : 'none', fontSize: '15px' }}>
-                          <div style={{ width: '9px', height: '9px', borderRadius: '50%', background: idx === statusHistory.length - 1 ? '#129968' : '#94a3b8', flexShrink: 0, marginTop: '6px' }}></div>
+                          <div style={{ width: '9px', height: '9px', borderRadius: '50%', background: idx === statusHistory.length - 1 ? 'var(--primary-600, #000ECB)' : '#94a3b8', flexShrink: 0, marginTop: '6px' }}></div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
                               <span style={{ color: 'var(--text-muted)' }}>{entry.old_status || t('Initial')} → </span>
                               <span style={{ fontWeight: '600', color: 'var(--text-main)' }}>{entry.new_status}</span>
                               {entry.changed_by_role && (
-                                <span style={{ fontSize: '12px', padding: '1px 8px', borderRadius: '10px', background: entry.changed_by_role === 'CHO' ? 'rgba(37,99,235,0.15)' : 'rgba(18,153,104,0.15)', color: entry.changed_by_role === 'CHO' ? 'var(--text-main)' : 'var(--text-main)', fontWeight: '600' }}>{entry.changed_by_role}</span>
+                                <span style={{ fontSize: '12px', padding: '1px 8px', borderRadius: '10px', background: entry.changed_by_role === 'CHO' ? 'rgba(37,99,235,0.15)' : 'rgba(0,14,203,0.15)', color: entry.changed_by_role === 'CHO' ? 'var(--text-main)' : 'var(--text-main)', fontWeight: '600' }}>{entry.changed_by_role}</span>
                               )}
                             </div>
                             <div style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
@@ -5278,7 +5278,7 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
                         {[['', t('Not specified')], ['Not Vaccinated', t('Not Vaccinated')], ['Partially Vaccinated', t('Partially Vaccinated')], ['Complete', t('Complete')], ['Unknown', t('Unknown')]].map(([val, label]) => (
                           <button key={val || 'ns'} type="button"
                             onClick={() => { setFormData({ ...formData, vaccinationStatus: val }); setVaccinationStatusOpen(false); }}
-                            style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.vaccinationStatus === val ? 'rgba(18,153,104,0.12)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: formData.vaccinationStatus === val ? '600' : '400' }}
+                            style={{ display: 'block', width: '100%', padding: '10px 14px', background: formData.vaccinationStatus === val ? 'rgba(0,14,203,0.12)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: formData.vaccinationStatus === val ? '600' : '400' }}
                             onMouseEnter={e => { if (formData.vaccinationStatus !== val) e.target.style.background = 'var(--input-bg)'; }}
                             onMouseLeave={e => { if (formData.vaccinationStatus !== val) e.target.style.background = 'transparent'; }}>
                             {label}
@@ -5461,7 +5461,7 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
                     </button>
                   )}
                   <button type="submit" disabled={submitLoading}
-                    style={{ padding: '10px 40px', borderRadius: '6px', border: 'none', background: submitLoading ? '#6fd4a2' : approvalRequest ? '#2563EB' : '#129968', color: 'white', cursor: submitLoading ? 'not-allowed' : 'pointer', fontWeight: '600', fontSize: '15px' }}>
+                    style={{ padding: '10px 40px', borderRadius: '6px', border: 'none', background: submitLoading ? 'rgba(0,14,203,.55)' : approvalRequest ? '#2563EB' : 'var(--primary-600, #000ECB)', color: 'white', cursor: submitLoading ? 'not-allowed' : 'pointer', fontWeight: '600', fontSize: '15px' }}>
                     {submitLoading ? t('Saving...') : (approvalRequest ? t('✓ Approve Case') : (isEdit ? t('Update Case') : (loginRole === 'BHW' ? t('Submit to CHO') : t('Save Case'))))}
                   </button>
                 </>
@@ -5487,13 +5487,13 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
                     {loginRole === 'BHW' ? (
                       <>
                         <button onClick={handleRoutingSendToDescription}
-                          style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#121358', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '15px' }}>
+                          style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: 'var(--primary-900, #000768)', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '15px' }}>
                           {`${t('→ Send to ')}${routingData?.targetUnit || 'CHO'}`}
                         </button>
                       </>
                     ) : (
                       <button onClick={handleRoutingSendToDescription}
-                        style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#121358', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '15px' }}>
+                        style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: 'var(--primary-900, #000768)', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '15px' }}>
                         {t('→ Send')}
                       </button>
                     )}
@@ -5518,7 +5518,7 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
                       {t('← Cancel')}
                     </button>
                     <button onClick={handleRoutingSend}
-                      style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#121358', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '15px' }}>
+                      style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: 'var(--primary-900, #000768)', color: '#fff', cursor: 'pointer', fontWeight: '500', fontSize: '15px' }}>
                       {t('Send')}
                     </button>
                   </div>
@@ -5549,7 +5549,7 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
                   {t('Cancel')}
                 </button>
                 <button onClick={() => performAddRequestSubmit(crossUnit.payload)}
-                  style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#129968', color: '#fff', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
+                  style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: 'var(--primary-600, #000ECB)', color: '#fff', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
                   {`${t('✓ Submit to ')}${crossUnit.targetUnit}`}
                 </button>
               </div>

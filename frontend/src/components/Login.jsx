@@ -86,8 +86,7 @@ const BRANDING_FEATURES = [
 // Footer contact / legal content (SVG icons matching the app's stroke style)
 const POLICY_TITLES = {
   privacy: 'Privacy Policy',
-  terms: 'Terms of Use',
-  disclaimer: 'Data Disclaimer',
+  terms: 'Terms and Conditions',
 };
 const POLICY_SECTIONS = {
   privacy: [
@@ -101,8 +100,6 @@ const POLICY_SECTIONS = {
     'User accounts are issued to accredited City Health Office staff and Barangay Health Workers. Account credentials are confidential and must not be shared.',
     'You are responsible for the accuracy of data you enter. Deliberate falsification or misuse of case records may result in account suspension or revocation.',
     'The system may be updated or taken offline for maintenance from time to time. Continued use of the system constitutes acceptance of these terms.',
-  ],
-  disclaimer: [
     'The information presented on this portal is for official City Health Office surveillance use and general public health awareness only.',
     'While every effort is made to keep data accurate and up to date, the City Health Office makes no guarantees regarding the completeness, accuracy, or timeliness of the information.',
     'This system does not provide medical advice. For personal medical concerns, please consult a licensed healthcare professional or visit your nearest health center.',
@@ -127,9 +124,6 @@ function CityHealthBranding({ brandingFeatures }) {
   return (
     <div className="login-branding">
       <div className="login-branding-dots" />
-      <div className="login-branding-watermark">
-        <ChoLogoIcon size={280} />
-      </div>
 
       <div className="login-branding-content">
         <div className="login-branding-badge">
@@ -200,15 +194,15 @@ function AnimatedMapView({ setFade, active, onSequenceComplete }) {
           const scene = ANIM_SCENES[idxRef.current];
           setSceneIdx(idxRef.current);
           setFade(0.35);
-          map.flyToBounds(L.latLngBounds(scene.bounds), { padding: [20, 20], maxZoom: 15, duration: 1.6 });
+          map.flyToBounds(L.latLngBounds(scene.bounds), { padding: [20, 20], maxZoom: 15, duration: 1.0 });
           setTimeout(() => {
             if (mountedRef.current) setFade(1);
-          }, 1000);
+          }, 600);
         }, 400);
       };
 
-      const first = setTimeout(advance, 3000);
-      const id = setInterval(advance, 7000);
+      const first = setTimeout(advance, 2000);
+      const id = setInterval(advance, 4500);
       return () => { clearTimeout(first); clearInterval(id); };
     }, [active, map]);
 
@@ -224,7 +218,7 @@ function AnimatedMapView({ setFade, active, onSequenceComplete }) {
             const isHighlighted = currentScene.highlight && name === currentScene.highlight;
             const isOverview = currentScene.highlight === null;
             if (isHighlighted) {
-              return { fillColor: '#121358', fillOpacity: 0.3, color: '#ffffff', weight: 2.5 };
+              return { fillColor: 'var(--primary-900, #000768)', fillOpacity: 0.3, color: '#ffffff', weight: 2.5 };
             }
             return {
               fillColor: isOverview ? '#94a3b8' : '#ffffff',
@@ -261,7 +255,7 @@ function AnimatedMapView({ setFade, active, onSequenceComplete }) {
   const Req = () => <span style={{ color: '#dc2626', fontWeight: 700 }}> *</span>;
 
   export default function Login({ onLoginSuccess, onForgotPassword, theme, toggleTheme }) {
-    const [step, setStep] = useState('role'); // 'role', 'cho_select', 'bhw_select', 'auth', 'forgot_password', 'signup', 'cho_contact', 'signup_role'
+    const [step, setStep] = useState('role'); // 'role', 'otp_login', 'forgot_password', 'signup', 'cho_contact'
     const [pendingUser, setPendingUser] = useState(null); // holds session data while waiting for OTP
     const { t } = useI18n();
     const BRANDING_FEATURES = [
@@ -274,7 +268,7 @@ function AnimatedMapView({ setFade, active, onSequenceComplete }) {
     const [otpError, setOtpError] = useState('');
     const [otpLoading, setOtpLoading] = useState(false);
     const [selectedRole, setSelectedRole] = useState('CHO'); 
-    const [selectedContext, setSelectedContext] = useState(''); 
+    const [selectedContext, setSelectedContext] = useState('CHO Unit I (Sala)'); 
     const [mapFade, setMapFade] = useState(1);
     const [leftPanel, setLeftPanel] = useState(0); // 0 = City Health branding, 1 = animated map
     const [policyModal, setPolicyModal] = useState(null); // null | 'privacy' | 'terms' | 'disclaimer'
@@ -306,6 +300,11 @@ function AnimatedMapView({ setFade, active, onSequenceComplete }) {
     const signupBarangayRef = useRef(null);
     const [showSignupConfirm, setShowSignupConfirm] = useState(false);
     const [barangayList, setBarangayList] = useState([]);
+
+    // Custom dropdown for the BHW "Assigned Barangay" on the login screen
+    const [loginBarangayOpen, setLoginBarangayOpen] = useState(false);
+    const loginBarangayRef = useRef(null);
+    const loginBarangayName = selectedContext ? selectedContext.replace(/^Brgy\.\s*/i, '') : '';
 
     const cabuyaoBarangays = [
       { name: 'Barangay Uno (Poblacion)', district: 'CHO I' },
@@ -352,11 +351,13 @@ function AnimatedMapView({ setFade, active, onSequenceComplete }) {
         if (signupBarangayRef.current && !signupBarangayRef.current.contains(e.target)) {
           setSignupBarangayOpen(false);
         }
+        if (loginBarangayRef.current && !loginBarangayRef.current.contains(e.target)) {
+          setLoginBarangayOpen(false);
+        }
       };
       document.addEventListener('mousedown', handler);
       return () => document.removeEventListener('mousedown', handler);
     }, []);
-
     // ── Toast notifications for login/splash feedback ──
     useEffect(() => { if (loginError) notify(loginError, 'error'); }, [loginError]);
     useEffect(() => { if (otpError) notify(otpError, 'error'); }, [otpError]);
@@ -367,7 +368,7 @@ function AnimatedMapView({ setFade, active, onSequenceComplete }) {
     // ── LEFT SIDE LOOP: City Health branding ↔ full map sequence ──
     useEffect(() => {
       if (leftPanel !== 0) return;
-      const id = setTimeout(() => setLeftPanel(1), 7000);
+      const id = setTimeout(() => setLeftPanel(1), 180000);
       return () => clearTimeout(id);
     }, [leftPanel]);
 
@@ -377,27 +378,20 @@ function AnimatedMapView({ setFade, active, onSequenceComplete }) {
 
 
 
-    const handleRoleSelection = (role) => {
-      setSelectedRole(role);
-      if (role === 'CHO') {
-        setStep('cho_select');
-      } else {
-        setStep('bhw_select');
-      }
+    const handleRoleCard = (key) => {
+      setLoginError('');
+      if (key === 'CHO1') { setSelectedRole('CHO'); setSelectedContext('CHO Unit I (Sala)'); }
+      else if (key === 'CHO2') { setSelectedRole('CHO'); setSelectedContext('CHO Unit II (Pulo)'); }
+      else { setSelectedRole('BHW'); setSelectedContext(''); }
     };
 
-    const handleChoSelection = (choUnit) => {
-      setSelectedContext(choUnit);
-      setStep('auth');
-    };
-
-    const handleBhwProceed = () => {
-      if (!selectedContext) {
+    const handleUnifiedSubmit = (e) => {
+      e.preventDefault();
+      if (selectedRole === 'BHW' && !selectedContext) {
         setLoginError('Please select your assigned barangay to proceed.');
         return;
       }
-      setLoginError('');
-      setStep('auth');
+      handleFormSubmit(e);
     };
 
     const handleFormSubmit = async (e) => {
@@ -622,7 +616,7 @@ const handleLoginOtpSubmit = async (e) => {
                 setSignupRole('CHO');
                 setSignupContext('');
                 setSignupSuccess('');
-                setSelectedContext('');
+                setSelectedContext('CHO Unit I (Sala)');
                 setSelectedRole('CHO');
                 setStep('role'); // ← back to the very beginning
             }, 3000);
@@ -671,42 +665,19 @@ const handleLoginOtpSubmit = async (e) => {
       setSignupError('');
       setRecoverySuccess('');
 
-
-      if (step === 'auth') {
-        if (!rememberMe) {
-          setEmail('');
-          setPassword('');
-        }
-      }
-      
-      if (step === 'signup_role') {
-        setStep('role');
-      } else if (step === 'signup') {
-        if (selectedContext) {
-          setStep('auth');
-        } else {
-          setStep('signup_role');
-        }
+      if (step === 'signup') {
         setSignupContext('');
+        setStep('role');
       } else if (step === 'cho_contact') {
-        setStep('role');
         setSignupContext('');
-      } else if (step === 'cho_select' || step === 'bhw_select') {
         setStep('role');
-        setSelectedContext('');
-      } else if (step === 'auth') {
-        setStep(selectedRole === 'CHO' ? 'cho_select' : 'bhw_select');
-        setSelectedContext('');
       } else if (step === 'forgot_password') {
-        setStep('auth');
+        setStep('role');
       }
     };
 
     return (
-      <div className="login-screen">
-        <button onClick={toggleTheme} className="theme-toggle-btn" style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 100 }}>
-          {theme === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode'}
-        </button>
+      <div className="login-screen ui-v2">
 
         <ToastHost />
 
@@ -793,130 +764,87 @@ const handleLoginOtpSubmit = async (e) => {
           <div className="login-column">
           <div key={step} className={step === 'role' ? 'login-form-container' : 'login-form-container cdms-login-step'}>
             
-            <div className="brand-logo" style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '30px' }}>
-              <div className="circle-logo" style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#121358', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}><ChoLogoIcon size={32} /></div>
-              <div className="brand-text" style={{ fontSize: '26px', fontWeight: 'bold', color: 'var(--text-main)' }}>
-                Cabuyao Health
-              </div>
+            <div className="brand-logo" style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: 'var(--primary-900)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px', boxShadow: '0 0 0 4px var(--primary-100)' }}>
+              <ChoLogoIcon size={46} />
             </div>
 
-            {/* STEP 1: PORTAL ROUTING */}
+            {/* STEP 1: ACCESS GROUP + CREDENTIALS (single screen) */}
             {step === 'role' && (
               <>
-                <div className="login-header" style={{ marginBottom: '28px', textAlign: 'left' }}>
-                  <h2>{t('Welcome back!')}</h2>
-                  <p style={{ color: 'var(--text-muted)' }}>{t('Select your system surveillance portal access group.')}</p>
-                  <div className="accent-bar" />
+                <h2>{t('Welcome to City Health Office Of Cabuyao')}</h2>
+                <h4>{t('Cabuyao Disease Monitoring and Mapping System')}</h4>
+                <p className="login-helper">{t('Select your system access group and assigned administrative/Locality station. Then, enter your account credentials to continue.')}</p>
+
+                <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500', textAlign: 'left' }}>{t('Select your access role')}</label>
+                <div className="role-grid">
+                  <button type="button" className={`role-card ${selectedContext === 'CHO Unit I (Sala)' ? 'is-selected' : ''}`} onClick={() => handleRoleCard('CHO1')}>CHO I<small>City Health Office Unit I (Main)</small></button>
+                  <button type="button" className={`role-card ${selectedContext === 'CHO Unit II (Pulo)' ? 'is-selected' : ''}`} onClick={() => handleRoleCard('CHO2')}>CHO II<small>City Health Office Unit II (Main)</small></button>
+                  <button type="button" className={`role-card ${selectedRole === 'BHW' ? 'is-selected' : ''}`} onClick={() => handleRoleCard('BHW')}>BHW<small>Barangay Health Worker</small></button>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    <button type="button" className="portal-card portal-card-cho" onClick={() => handleRoleSelection('CHO')} aria-label="Select City Health Office portal">
-                    <div className="portal-card-body">
-                      <span className="portal-card-title">{t('City Health Office (CHO)')}</span>
-                      <span className="portal-card-sub">{t('Central Systems & Analytics')}</span>
+                {selectedRole === 'BHW' && (
+                  <div style={{ textAlign: 'left', marginBottom: '16px' }}>
+                    <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>{t('Assigned Barangay')}</label>
+                    <div style={{ position: 'relative' }} ref={loginBarangayRef}>
+                      <button
+                        type="button"
+                        className="cdms-select-trigger"
+                        aria-haspopup="listbox"
+                        aria-expanded={loginBarangayOpen}
+                        onClick={() => setLoginBarangayOpen(o => !o)}
+                      >
+                        <span style={{ color: loginBarangayName ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                          {loginBarangayName || t('Select your barangay')}
+                        </span>
+                        <span className="cdms-select-caret" style={{ transform: loginBarangayOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                      </button>
+                      {loginBarangayOpen && (
+                        <div className="cdms-select-panel" role="listbox">
+                          {cabuyaoBarangays.map(b => (
+                            <button
+                              type="button"
+                              key={b.name}
+                              role="option"
+                              aria-selected={loginBarangayName === b.name}
+                              className={`cdms-select-item ${loginBarangayName === b.name ? 'is-selected' : ''}`}
+                              onClick={() => { setSelectedContext(`Brgy. ${b.name}`); setLoginBarangayOpen(false); }}
+                            >
+                              <span>{b.name}</span>
+                              <span className="cdms-select-badge">{b.district}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <span className="portal-card-arrow">→</span>
-                  </button>
+                  </div>
+                )}
 
-                  <button type="button" className="portal-card portal-card-bhw" onClick={() => handleRoleSelection('BHW')} aria-label="Select Barangay Health Worker portal">
-                    <div className="portal-card-body">
-                      <span className="portal-card-title">{t('Barangay Health Worker')}</span>
-                      <span className="portal-card-sub">{t('Community Surveillance Data Entry')}</span>
-                    </div>
-                    <span className="portal-card-arrow">→</span>
-                  </button>
-                </div>
-              </>
-            )}
-
-            {/* STEP 2A: CHO HUB LOCATIONS */}
-            {step === 'cho_select' && (
-              <>
-                <div className="login-header" style={{ marginBottom: '25px', textAlign: 'left' }}>
-                  <BackButton onClick={handleBackNavigation} color="#129968" style={{ marginBottom: '10px' }}>Back</BackButton>
-                  <h2>{t('Select Health Unit')}</h2>
-                  <p style={{ color: 'var(--text-muted)' }}>{t('Identify your current administrative station hub.')}</p>
-                  <div className="accent-bar" />
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  <button type="button" className="portal-card portal-card-cho" onClick={() => handleChoSelection('CHO Unit I (Sala)')} aria-label="Select CHO Unit I">
-                    <div className="portal-card-body">
-                      <span className="portal-card-title">{t('CHO Unit I (Main)')}</span>
-                      <span className="portal-card-sub">City Hall Complex, Brgy. Sala Cabuyao, Laguna</span>
-                    </div>
-                    <span className="portal-card-arrow">→</span>
-                  </button>
-
-                  <button type="button" className="portal-card portal-card-cho" onClick={() => handleChoSelection('CHO Unit II (Pulo)')} aria-label="Select CHO Unit II">
-                    <div className="portal-card-body">
-                      <span className="portal-card-title">{t('CHO Unit II (Main)')}</span>
-                      <span className="portal-card-sub">Pulo Health Center, Brgy. Pulo Cabuyao, Laguna</span>
-                    </div>
-                    <span className="portal-card-arrow">→</span>
-                  </button>
-                </div>
-              </>
-            )}
-
-            {/* STEP 2B: BHW REGISTRY BLOCK */}
-            {step === 'bhw_select' && (
-              <>
-                <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
-                  <BackButton onClick={handleBackNavigation} color="#129968" style={{ marginBottom: '10px' }}>{t('Back')}</BackButton>
-                  <h2 style={{ fontSize: '26px', color: 'var(--text-main)', marginBottom: '6px' }}>Assigned Locality</h2>
-                  <p style={{ color: 'var(--text-muted)' }}>Select your designated community operations sector.</p>
-                </div>
-
-                <div style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', maxHeight: '220px', overflowY: 'auto', marginBottom: '24px', textAlign: 'left' }}>
-                  {cabuyaoBarangays.map((b) => (
-                    <div key={b.name} onClick={() => { setSelectedContext(`Brgy. ${b.name}`); setLoginError(''); }} className={`brgy-option-card ${selectedContext === `Brgy. ${b.name}` ? 'brgy-option-active' : ''}`}>
-                      <span className="brgy-option-name">Brgy. {b.name}</span>
-                      <span className="brgy-option-badge">{b.district}</span>
-                    </div>
-                  ))}
-                </div>
-
-              <button type="button" className="submit-btn" onClick={handleBhwProceed}>{t('Confirm Barangay Block')}</button>
-              </>
-            )}
-
-            {/* STEP 3: API SECURED SIGN IN PANEL */}
-            {step === 'auth' && (
-              <>
-                <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
-                  <BackButton onClick={handleBackNavigation} color="#129968" style={{ marginBottom: '10px' }}>Scope: {selectedContext}</BackButton>
-                  <h2 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '8px' }}>Sign-In</h2>
-                  <p style={{ color: 'var(--text-muted)' }}>Please insert your account.</p>
-                </div>
-
-                <form onSubmit={handleFormSubmit}>
+                <form onSubmit={handleUnifiedSubmit}>
                   <div className="form-group" style={{ textAlign: 'left' }}>
                     <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Username or Email address<Req /></label>
-                    <input 
+                    <input
                       type="text"
-                      className="form-input" 
-                      placeholder="Enter your Username or Email" 
+                      className="form-input"
+                      placeholder="Enter your Username or Email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      required 
+                      required
                     />
                   </div>
-                  
+
                   <div className="form-group" style={{ marginTop: '20px', textAlign: 'left' }}>
                     <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Password<Req /></label>
-                    
                     <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                      <input 
-                        type={showPassword ? "text" : "password"} 
-                        className="form-input" 
-                        placeholder="••••••••" 
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        className="form-input"
+                        placeholder="••••••••"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        style={{ paddingRight: '45px' }} 
-                        required 
+                        style={{ paddingRight: '45px' }}
+                        required
                       />
-                      <button 
+                      <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
                         style={{
@@ -940,34 +868,38 @@ const handleLoginOtpSubmit = async (e) => {
                     </div>
                   </div>
 
-                    <div className="form-options" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '20px 0' }}>
+                  <div className="form-options" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '20px 0' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)', cursor: 'pointer', fontSize: '15px' }}>
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         checked={rememberMe}
                         onChange={(e) => setRememberMe(e.target.checked)}
-                        style={{ accentColor: '#129968', width: '16px', height: '16px' }} 
-                      /> 
-                      {t('Stay signed in')}
+                        style={{ accentColor: 'var(--primary-600)', width: '16px', height: '16px' }}
+                      />
+                      {t('Remember me')}
                     </label>
-                    <button type="button" 
+                    <button type="button"
                       onClick={() => setStep('forgot_password')}
                       style={{
                         background: 'none',
                         border: 'none',
-                        color: '#129968',
+                        color: 'var(--primary-600, #000ECB)',
                         cursor: 'pointer',
                         fontSize: '15px',
                         fontWeight: '500',
                         textDecoration: 'underline',
                         padding: 0
                       }}>
-                      {t('Forgot password?')}
+                      {t('Forgot Password?')}
                     </button>
                   </div>
 
-                  <button type="submit" className="submit-btn">{t('Sign In as')} {selectedRole}</button>
+                  <button type="submit" className="submit-btn">{t('Log In')}</button>
                 </form>
+
+                <div style={{ marginTop: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '15px' }}>
+                  {t("Don't have an account?")} <span onClick={() => { setSignupRole('BHW'); setStep('signup'); }} style={{ color: 'var(--primary-600, #000ECB)', cursor: 'pointer', fontWeight: '500' }}>{t('Sign up here')}</span>
+                </div>
               </>
             )}
 
@@ -1001,7 +933,7 @@ const handleLoginOtpSubmit = async (e) => {
         type="submit"
         disabled={otpLoading}
         className="submit-btn"
-        style={{ backgroundColor: '#129968', color: '#FFFFFF', marginTop: '20px' }}
+        style={{ backgroundColor: 'var(--primary-600, #000ECB)', color: '#FFFFFF', marginTop: '20px' }}
       >
         {otpLoading ? 'Verifying...' : 'Verify & Continue'}
       </button>
@@ -1022,7 +954,7 @@ const handleLoginOtpSubmit = async (e) => {
             notify('Failed to resend code. Please try again.', 'error');
           }
         }}
-        style={{ color: '#129968', cursor: 'pointer', fontSize: '15px', fontWeight: '500' }}
+        style={{ color: 'var(--primary-600, #000ECB)', cursor: 'pointer', fontSize: '15px', fontWeight: '500' }}
       >
         Resend Code
       </span>
@@ -1046,10 +978,10 @@ const handleLoginOtpSubmit = async (e) => {
                       CHO Unit I (Main - Sala)
                     </div>
                     <div style={{ fontSize: '15px', color: 'var(--text-main)', marginBottom: '6px' }}>
-                      📞 Contact Number: <span style={{ color: '#129968', fontWeight: '600' }}>09478891074</span>
+                      📞 Contact Number: <span style={{ color: 'var(--primary-600, #000ECB)', fontWeight: '600' }}>09478891074</span>
                     </div>
                     <div style={{ fontSize: '15px', color: 'var(--text-main)' }}>
-                      ✉️ Email: <span style={{ color: '#129968', fontWeight: '600' }}>idkwutishappen@gmail.com</span>
+                      ✉️ Email: <span style={{ color: 'var(--primary-600, #000ECB)', fontWeight: '600' }}>idkwutishappen@gmail.com</span>
                     </div>
                   </div>
 
@@ -1058,45 +990,15 @@ const handleLoginOtpSubmit = async (e) => {
                       CHO Unit II (Extension - Pulo)
                     </div>
                     <div style={{ fontSize: '15px', color: 'var(--text-main)', marginBottom: '6px' }}>
-                      📞 Contact Number: <span style={{ color: '#129968', fontWeight: '600' }}>09558411426</span>
+                      📞 Contact Number: <span style={{ color: 'var(--primary-600, #000ECB)', fontWeight: '600' }}>09558411426</span>
                     </div>
                     <div style={{ fontSize: '15px', color: 'var(--text-main)' }}>
-                      ✉️ Email: <span style={{ color: '#129968', fontWeight: '600' }}>jhon@gmail.com</span>
+                      ✉️ Email: <span style={{ color: 'var(--primary-600, #000ECB)', fontWeight: '600' }}>jhon@gmail.com</span>
                     </div>
                   </div>
                 </div>
 
-                <BackButton onClick={() => setStep('role')} className="back-btn-boxed" style={{ marginTop: '24px', width: '100%', justifyContent: 'center' }}>Back to Portal</BackButton>
-              </>
-            )}
-
-
-            {/* SIGNUP ROLE SELECTION */}
-            {step === 'signup_role' && (
-              <>
-                <div className="login-header" style={{ marginBottom: '30px', textAlign: 'left' }}>
-                  <BackButton onClick={handleBackNavigation} color="#129968" style={{ marginBottom: '10px' }}>Back</BackButton>
-                  <h2 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '8px' }}>Create Surveillance Account</h2>
-                  <p style={{ color: 'var(--text-muted)' }}>Register as an authorized health encoder or BHW for Cabuyao City.</p>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <button type="button" className="portal-card" onClick={() => { setSignupRole('BHW'); setStep('signup'); }}>
-                    <div className="portal-card-body">
-                      <span className="portal-card-title" style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '16px' }}>Barangay Health Worker</span>
-                      <span className="portal-card-sub" style={{ color: 'var(--text-muted)', fontSize: '15px', marginTop: '2px' }}>Community Surveillance Data Entry</span>
-                    </div>
-                    <span className="portal-card-arrow"></span>
-                  </button>
-
-                  <button type="button" className="portal-card" onClick={() => setStep('cho_contact')}>
-                    <div className="portal-card-body">
-                      <span className="portal-card-title" style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '16px' }}>City Health Office (CHO)</span>
-                      <span className="portal-card-sub" style={{ color: 'var(--text-muted)', fontSize: '15px', marginTop: '2px' }}>Central Systems &amp; Analytics</span>
-                    </div>
-                    <span className="portal-card-arrow"></span>
-                  </button>
-                </div>
+                <BackButton onClick={() => setStep('signup')} className="back-btn-boxed" style={{ marginTop: '24px', width: '100%', justifyContent: 'center' }}>← {t('Back to Sign-up')}</BackButton>
               </>
             )}
 
@@ -1105,7 +1007,7 @@ const handleLoginOtpSubmit = async (e) => {
             {step === 'forgot_password' && (
               <>
                 <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
-                  <BackButton onClick={handleBackNavigation} color="#129968" style={{ marginBottom: '10px' }}>Back to Login</BackButton>
+                  <BackButton onClick={handleBackNavigation} color="var(--primary-600, #000ECB)" style={{ marginBottom: '10px' }}>Back to Login</BackButton>
                   <h2 style={{ fontSize: '28px', color: 'var(--text-main)', marginBottom: '8px' }}>Account Recovery</h2>
                   <p style={{ color: 'var(--text-muted)' }}>Enter your registered email address to receive password reset instructions.</p>
                 </div>
@@ -1125,7 +1027,7 @@ const handleLoginOtpSubmit = async (e) => {
                     />
                   </div>
 
-                  <button type="submit" className="submit-btn" style={{ backgroundColor: '#129968', color: '#FFFFFF', marginTop: '25px', width: '100%' }}>
+                  <button type="submit" className="submit-btn" style={{ backgroundColor: 'var(--primary-600, #000ECB)', color: '#FFFFFF', marginTop: '25px', width: '100%' }}>
                     Send Recovery Link
                   </button>
                 </form>
@@ -1135,72 +1037,27 @@ const handleLoginOtpSubmit = async (e) => {
             {/* SIGN UP SECTION */}
             {step === 'signup' && (
                 <>
-                    <div className="login-header" style={{ marginBottom: '14px', textAlign: 'left' }}>
-                        <BackButton onClick={handleBackNavigation} color="#129968" style={{ marginBottom: '10px' }}>Back to Sign In</BackButton>
-                        <h2 style={{ fontSize: '26px', color: 'var(--text-main)', marginBottom: '6px', fontWeight: 'bold' }}>Create an Account</h2>
-                        <p style={{ color: 'var(--text-muted)' }}>Request authorization to access the Cabuyao surveillance portal.</p>
+                    <div style={{ textAlign: 'left', marginBottom: '10px' }}>
+                        <button
+                            type="button"
+                            onClick={handleBackNavigation}
+                            className="cdms-back-pill"
+                        >← {t('Back to Log-in')}</button>
                     </div>
+                    <h2 style={{ marginTop: 0 }}>{t('Sign up')}</h2>
 
-                    <div className="cdms-auth-notice cdms-auth-notice-signup">
-                        <span className="cdms-auth-notice-icon">ℹ</span>
-                        <span> Registrations require approval from the City Health Office administrator before account activation.</span>
+                    <p className="login-helper">{t('Create an Account. Registrations require approval from the City Health Office administrator before account activation.')}</p>
+
+                    <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500', textAlign: 'left' }}>{t('Select your access role')}</label>
+                    <div className="role-grid two-col">
+                      <button type="button" className="role-card" onClick={() => setStep('cho_contact')}>CHO<small>City Health Office Unit I &amp; II (Main) Registration</small></button>
+                      <button type="button" className="role-card is-selected">BHW<small>Barangay Health Worker Registration</small></button>
                     </div>
 
                     <form onSubmit={handleSignupSubmit}>
-                        {/* Full Name */}
-                        <div className="form-group" style={{ textAlign: 'left' }}>
-                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Full Name<Req /></label>
-                            <input
-                                type="text"
-                                className="form-input"
-                                placeholder="Juan Dela Cruz"
-                                value={signupName}
-                                onChange={(e) => setSignupName(e.target.value)}
-                                required
-                            />
-                        </div>
-
-                        {/* Username */}
-                        <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
-                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Username<Req /></label>
-                            <input
-                                type="text"
-                                className="form-input"
-                                placeholder="e.g. juandelacruz"
-                                value={signupUsername}
-                                onChange={(e) => setSignupUsername(e.target.value)}
-                                required
-                            />
-                        </div>
-
-                        {/* Email */}
-                        <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
-                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Email Address<Req /></label>
-                            <input
-                                type="email"
-                                className="form-input"
-                                placeholder="juan@example.com"
-                                value={signupEmail}
-                                onChange={(e) => setSignupEmail(e.target.value)}
-                                required
-                            />
-                        </div>
-
-                        {/* Mobile Number */}
-                        <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
-                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Mobile Number<Req /></label>
-                            <input
-                                type="text"
-                                className="form-input"
-                                placeholder="09123456789"
-                                value={signupMobile}
-                                onChange={(e) => setSignupMobile(e.target.value.replace(/\D/g, '').slice(0, 11))}
-                                maxLength={11}
-                            />
-                        </div>
-
+                        <div className="signup-two-col">
                         {/* Assigned Station */}
-                        <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
+                        <div className="form-group" style={{ textAlign: 'left' }}>
                             <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>
                                 Assigned Barangay<Req />
                             </label>
@@ -1236,12 +1093,12 @@ const handleLoginOtpSubmit = async (e) => {
                                                 onClick={() => { setSignupContext(String(b.id)); setSignupBarangayOpen(false); }}
                                                 style={{
                                                     padding: '9px 12px', cursor: 'pointer', fontSize: '15px', borderRadius: '6px',
-                                                    background: String(signupContext) === String(b.id) ? 'rgba(18,153,104,0.15)' : 'transparent',
-                                                    color: String(signupContext) === String(b.id) ? '#129968' : 'var(--text-main)',
+                                                    background: String(signupContext) === String(b.id) ? 'rgba(0,14,203,0.15)' : 'transparent',
+                                                    color: String(signupContext) === String(b.id) ? 'var(--primary-600, #000ECB)' : 'var(--text-main)',
                                                     fontWeight: String(signupContext) === String(b.id) ? '600' : '400'
                                                 }}
                                                 onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
-                                                onMouseLeave={e => { e.currentTarget.style.background = String(signupContext) === String(b.id) ? 'rgba(18,153,104,0.15)' : 'transparent'; }}
+                                                onMouseLeave={e => { e.currentTarget.style.background = String(signupContext) === String(b.id) ? 'rgba(0,14,203,0.15)' : 'transparent'; }}
                                             >
                                                 {b.name}
                                             </div>
@@ -1249,6 +1106,59 @@ const handleLoginOtpSubmit = async (e) => {
                                     </div>
                                 )}
                             </div>
+                        </div>
+
+                        {/* Mobile Number */}
+                        <div className="form-group" style={{ textAlign: 'left' }}>
+                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Mobile Number<Req /></label>
+                            <input
+                                type="text"
+                                className="form-input"
+                                placeholder="09123456789"
+                                value={signupMobile}
+                                onChange={(e) => setSignupMobile(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                                maxLength={11}
+                            />
+                        </div>
+                        </div>
+
+                        {/* Full Name */}
+                        <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
+                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Full Name<Req /></label>
+                            <input
+                                type="text"
+                                className="form-input"
+                                placeholder="Juan Dela Cruz"
+                                value={signupName}
+                                onChange={(e) => setSignupName(e.target.value)}
+                                required
+                            />
+                        </div>
+
+                        {/* Email */}
+                        <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
+                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Email Address<Req /></label>
+                            <input
+                                type="email"
+                                className="form-input"
+                                placeholder="juan@example.com"
+                                value={signupEmail}
+                                onChange={(e) => setSignupEmail(e.target.value)}
+                                required
+                            />
+                        </div>
+
+                        {/* Username */}
+                        <div className="form-group" style={{ marginTop: '14px', textAlign: 'left' }}>
+                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500' }}>Username<Req /></label>
+                            <input
+                                type="text"
+                                className="form-input"
+                                placeholder="e.g. juandelacruz"
+                                value={signupUsername}
+                                onChange={(e) => setSignupUsername(e.target.value)}
+                                required
+                            />
                         </div>
 
                         {/* Password */}
@@ -1331,39 +1241,32 @@ const handleLoginOtpSubmit = async (e) => {
                                 return <p style={{ fontSize: '15px', marginTop: '5px', color: s.color }}>{s.text}</p>;
                             })()}
                         </div>
-                    <button type="submit" className="submit-btn" style={{ backgroundColor: '#129968', color: '#FFFFFF', marginTop: '20px', width: '100%' }}>Submit Account Registration</button>
+                    <button type="submit" className="submit-btn" style={{ marginTop: '20px' }}>Submit Registration Request</button>
+
+                    <div style={{ marginTop: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '15px' }}>
+                      Already have an account? <span onClick={() => setStep('role')} style={{ color: 'var(--primary-600, #000ECB)', cursor: 'pointer', fontWeight: '500' }}>Log-in here</span>
+                    </div>
                     </form>
                 </>
             )}
 
             {/* SHARED FOOTER ROUTING */}
-              {step !== 'signup' && step !== 'forgot_password' && step !== 'cho_contact' && step !== 'signup_role' ? (
+            {step === 'otp_login' && (
               <div style={{ marginTop: '30px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '15px' }}>
                 Don't have an account? <span onClick={() => {
-                  if (step === 'role') {
-                    setStep('signup_role');
-                    return;
-                  }
                   if (selectedRole === 'CHO') {
                     setStep('cho_contact');
                     return;
                   }
-                  if (selectedRole === 'BHW' && selectedContext) {
-                    const barangayName = selectedContext.replace(/^Brgy\.\s*/i, '').trim();
-                    const matched = barangayList.find(b => b.name === barangayName);
-                    if (matched) {
-                      setSignupContext(String(matched.id));
-                    }
-                  }
+                  setSignupRole('BHW');
                   setStep('signup');
-                }} style={{ color: '#129968', cursor: 'pointer', fontWeight: '500' }}>Sign Up</span>
+                }} style={{ color: 'var(--primary-600, #000ECB)', cursor: 'pointer', fontWeight: '500' }}>Sign Up</span>
               </div>
-            ) : (
-              step !== 'role' && step !== 'cho_contact' && (
-                <div style={{ marginTop: '30px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '15px' }}>
-                  Already have an account? <span onClick={() => setStep('role')} style={{ color: '#129968', cursor: 'pointer', fontWeight: '500' }}>Sign In</span>
-                </div>
-              )
+            )}
+            {(step === 'forgot_password') && (
+              <div style={{ marginTop: '30px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '15px' }}>
+                Already have an account? <span onClick={() => setStep('role')} style={{ color: 'var(--primary-600, #000ECB)', cursor: 'pointer', fontWeight: '500' }}>Sign In</span>
+              </div>
             )}
             </div>
           </div>
@@ -1382,11 +1285,9 @@ const handleLoginOtpSubmit = async (e) => {
             <span className="cdms-global-footer-contact"><FooterIcon type="pin" />Sala Health Center, Brgy. Sala, Cabuyao, Laguna</span>
           </div>
           <div className="cdms-global-footer-right">
-            <a href="#" onClick={(e) => { e.preventDefault(); setPolicyModal('privacy'); }}>Privacy Policy</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); setPolicyModal('privacy'); }}>{t('Privacy Policy')}</a>
             <span className="cdms-global-footer-sep">|</span>
-            <a href="#" onClick={(e) => { e.preventDefault(); setPolicyModal('terms'); }}>Terms of Use</a>
-            <span className="cdms-global-footer-sep">|</span>
-            <a href="#" onClick={(e) => { e.preventDefault(); setPolicyModal('disclaimer'); }}>Data Disclaimer</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); setPolicyModal('terms'); }}>{t('Terms and Conditions')}</a>
           </div>
         </div>
 

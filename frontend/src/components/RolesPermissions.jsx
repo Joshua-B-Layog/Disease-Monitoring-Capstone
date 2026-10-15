@@ -46,7 +46,7 @@ export default function RolesPermissions({ compactMode, loginRole = 'CHO', onBac
           <button
             onClick={() => onBack && onBack()}
             style={{
-              padding: '8px 18px', marginBottom: '16px', background: '#129968', color: '#fff',
+              padding: '8px 18px', marginBottom: '16px', background: 'var(--primary-600, #000ECB)', color: '#fff',
               border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: '600',
             }}
             onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
@@ -70,9 +70,9 @@ export default function RolesPermissions({ compactMode, loginRole = 'CHO', onBac
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '20px', alignItems: 'center' }}>
             <span style={{
               padding: '4px 14px', borderRadius: '12px', fontSize: '15px', fontWeight: '700',
-              background: isCho ? 'rgba(37,99,235,0.15)' : 'rgba(18,153,104,0.15)',
-              color: isCho ? '#2563eb' : '#129968',
-              border: `1px solid ${isCho ? 'rgba(37,99,235,0.4)' : 'rgba(18,153,104,0.4)'}`,
+              background: isCho ? 'rgba(37,99,235,0.15)' : 'rgba(0,14,203,0.15)',
+              color: isCho ? '#2563eb' : 'var(--primary-900, #000768)',
+              border: `1px solid ${isCho ? 'rgba(37,99,235,0.4)' : 'rgba(0,14,203,0.4)'}`,
             }}>{roleLabel}</span>
             <button onClick={() => onShowTour && onShowTour()}
               title="Show Guide"
@@ -85,12 +85,12 @@ export default function RolesPermissions({ compactMode, loginRole = 'CHO', onBac
             </button>
           </div>
 
-          <div data-tour="roles-table" style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+          <div data-tour="roles-table" className="cdms-table-scroll" style={{ borderRadius: '8px', border: '1px solid var(--border-color)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '15px' }}>
               <thead>
                 <tr style={{ background: 'var(--input-bg)' }}>
                   <th style={{ padding: '11px 14px', textAlign: 'center', fontWeight: '700', color: 'var(--text-main)', borderBottom: '2px solid var(--border-color)', fontSize: '15px' }}>Feature / Permission</th>
-                  <th style={{ padding: '11px 14px', textAlign: 'center', fontWeight: '700', color: isCho ? '#2563eb' : '#129968', borderBottom: '2px solid var(--border-color)', whiteSpace: 'nowrap' }}>{isCho ? 'CHO' : 'BHW'}</th>
+                  <th style={{ padding: '11px 14px', textAlign: 'center', fontWeight: '700', color: isCho ? '#2563eb' : 'var(--primary-900, #000768)', borderBottom: '2px solid var(--border-color)', whiteSpace: 'nowrap' }}>{isCho ? 'CHO' : 'BHW'}</th>
                 </tr>
               </thead>
               <tbody>

@@ -85,7 +85,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
 
   const getStatusBadge = (status) => {
     const map = {
-      Active: { bg: '#121358', color: '#93c5fd' },
+      Active: { bg: 'var(--primary-900, #000768)', color: '#93c5fd' },
       Pending: { bg: '#1e3a8a', color: '#93c5fd' },
       'Under Treatment': { bg: '#3b0764', color: '#c4b5fd' },
       Recovered: { bg: '#083d2c', color: '#3cb882' },
@@ -103,7 +103,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
   const getActionBadge = (action) => {
     const map = {
       Created: { bg: '#083d2c', color: '#3cb882' },
-      Updated: { bg: '#121358', color: '#93c5fd' },
+      Updated: { bg: 'var(--primary-900, #000768)', color: '#93c5fd' },
       Deleted: { bg: '#7f1d1d', color: '#fca5a5' },
       'Logged In': { bg: '#374151', color: '#d1d5db' },
       Routed: { bg: '#4c1d95', color: '#c4b5fd' },
@@ -138,7 +138,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
         <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;font-size:13px">${d.count}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;width:40%">
           <div style="background:#e5e7eb;border-radius:4px;height:18px;overflow:hidden">
-            <div style="width:${(d.count / maxDCount) * 100}%;background:#121358;height:100%;border-radius:4px"></div>
+            <div style="width:${(d.count / maxDCount) * 100}%;background:var(--primary-900, #000768);height:100%;border-radius:4px"></div>
           </div>
         </td>
       </tr>`).join('');
@@ -263,7 +263,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
     const maxDCount = Math.max(...byDisease.map(d => d.count), 1);
 
     const barangayRows = byBarangay.map(b => `<tr><td>${b.barangay_name}</td><td style="text-align:right;font-weight:600">${b.count}</td><td style="width:40%"><div style="background:#e5e7eb;height:16px;border-radius:3px"><div style="width:${(b.count/maxBCount)*100}%;background:${getRiskColor(b.count)};height:16px;border-radius:3px"></div></div></td><td style="text-align:center"><span style="padding:2px 8px;border-radius:10px;font-size:11px;background:${getRiskColor(b.count)}22;color:${getRiskColor(b.count)}">${t(getRiskLabel(b.count))}</span></td></tr>`).join('');
-    const diseaseRows = byDisease.filter(d => d.count > 0).map(d => `<tr><td>${d.disease_name}</td><td style="text-align:right;font-weight:600">${d.count}</td><td style="width:40%"><div style="background:#e5e7eb;height:16px;border-radius:3px"><div style="width:${(d.count/maxDCount)*100}%;background:#121358;height:16px;border-radius:3px"></div></div></td></tr>`).join('');
+    const diseaseRows = byDisease.filter(d => d.count > 0).map(d => `<tr><td>${d.disease_name}</td><td style="text-align:right;font-weight:600">${d.count}</td><td style="width:40%"><div style="background:#e5e7eb;height:16px;border-radius:3px"><div style="width:${(d.count/maxDCount)*100}%;background:var(--primary-900, #000768);height:16px;border-radius:3px"></div></div></td></tr>`).join('');
     const sevRows = bySeverity.map(s => `<tr><td>${s.severity}</td><td style="text-align:right;font-weight:600">${s.count}</td></tr>`).join('');
     const newCaseRows = newCases.map(c => `<tr><td>#${String(c.case_id).padStart(3,'0')}</td><td>${c.patient_name||''}</td><td>${c.age||'--'}</td><td>${c.disease_name||''}</td><td>${c.barangay_name||''}</td><td>${c.severity||'N/A'}</td><td>${c.status||''}</td></tr>`).join('');
 
@@ -337,7 +337,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
   if (error) return (
     <div style={{ padding: '40px', textAlign: 'center' }}>
       <div style={{ fontSize: '15px', color: '#DC2626' }}>{t('Error')}: {error}</div>
-      <button onClick={fetchData} style={{ marginTop: '12px', padding: '8px 20px', background: '#121358', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>{t('Retry')}</button>
+      <button onClick={fetchData} style={{ marginTop: '12px', padding: '8px 20px', background: 'var(--primary-900, #000768)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>{t('Retry')}</button>
     </div>
   );
 
@@ -390,8 +390,8 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
 
       {/* ── Key Metrics ── */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
-        <div style={{ ...cardStyle, borderLeft: '3px solid #121358' }}>
-          <div style={{ fontSize: '28px', fontWeight: '700', color: '#121358' }}>{summary.total_cases}</div>
+        <div style={{ ...cardStyle, borderLeft: '3px solid var(--primary-900, #000768)' }}>
+          <div style={{ fontSize: '28px', fontWeight: '700', color: 'var(--primary-900, #000768)' }}>{summary.total_cases}</div>
           <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '2px' }}>{t('Total Cases')}</div>
         </div>
         <div style={{ ...cardStyle, borderLeft: '3px solid #DC2626' }}>
@@ -401,7 +401,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
               <span title={`${t('Previous period (')}${fmtDate(data.previousPeriod?.start)} to ${fmtDate(data.previousPeriod?.end)}${t('): ')}${comparison.newCases.previous}`} style={{
                 fontSize: '13px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px',
                 background: comparison.newCases.up ? 'rgba(220,38,38,0.15)' : 'rgba(18,153,104,0.15)',
-                color: comparison.newCases.up ? '#ef4444' : '#16b877',
+                color: comparison.newCases.up ? '#ef4444' : '#129968',
               }}>
                 {comparison.newCases.up ? '▲' : '▼'} {Math.abs(comparison.newCases.pct)}%
               </span>
@@ -427,8 +427,8 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
         </div>
         {rates && (
           <>
-            <div style={{ ...cardStyle, borderLeft: '3px solid #16b877' }}>
-              <div style={{ fontSize: '28px', fontWeight: '700', color: '#16b877' }}>{rates.recoveryRate}%</div>
+            <div style={{ ...cardStyle, borderLeft: '3px solid #129968' }}>
+              <div style={{ fontSize: '28px', fontWeight: '700', color: '#129968' }}>{rates.recoveryRate}%</div>
               <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginTop: '2px' }}>{t('Recovery Rate')}</div>
             </div>
             <div style={{ ...cardStyle, borderLeft: '3px solid #991b1b' }}>
@@ -655,7 +655,7 @@ export default function WeeklySummary({ userId, loginRole, compactMode, fontScal
                   <td style={{ padding: '10px 16px', fontSize: '15px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{fmtDateTime(log.created_at)}</td>
                   <td style={{ padding: '10px 16px', fontSize: '15px' }}>{log.user_full_name || log.user_name || 'System'}</td>
                   <td style={{ padding: '10px 16px', textAlign: 'center' }}>
-                    <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '15px', fontWeight: '600', background: log.user_role === 'CHO' ? '#12135822' : log.user_role === 'BHW' ? '#7c3aed22' : '#37415122', color: log.user_role === 'CHO' ? '#121358' : log.user_role === 'BHW' ? '#7c3aed' : '#6b7280' }}>
+                    <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '15px', fontWeight: '600', background: log.user_role === 'CHO' ? 'rgba(0,7,104,.13)' : log.user_role === 'BHW' ? '#7c3aed22' : '#37415122', color: log.user_role === 'CHO' ? 'var(--primary-900, #000768)' : log.user_role === 'BHW' ? '#7c3aed' : '#6b7280' }}>
                       {log.user_role || 'System'}
                     </span>
                   </td>

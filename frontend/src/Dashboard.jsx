@@ -456,7 +456,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           <h2 style={{ margin: 0, fontSize: '22px', color: 'var(--text-main)' }}>{t('All Disease Count')}</h2>
           <button
             onClick={() => setShowAllDiseases(false)}
-            style={{ padding: '8px 18px', background: '#121358', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: '600' }}
+            style={{ padding: '8px 18px', background: 'var(--primary-900, #000768)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: '600' }}
             onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
             onMouseLeave={e => e.currentTarget.style.opacity = '1'}
           >
@@ -473,7 +473,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                 onClick={() => { setAllPeriod(p); setAllDateRange(getPeriodRange(p, allQuarter, allYear)); }}
                 style={{
                   padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '15px', fontWeight: '500', textTransform: 'capitalize',
-                  background: allPeriod === p ? '#121358' : 'var(--input-bg)',
+                  background: allPeriod === p ? 'var(--primary-900, #000768)' : 'var(--input-bg)',
                   color: allPeriod === p ? 'white' : 'var(--text-muted)',
                   border: '1px solid var(--border-color)',
                 }}
@@ -908,16 +908,33 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     return points;
   })();
 
-  // ── THRESHOLD ALERT BADGES ──
+  // ── THRESHOLD ALERT CARDS ──
+  // Each alert is clickable and opens the matching case list (see render below).
+  const alertColumns = [t('Case ID'), t('Patient'), t('Age / Sex'), t('Barangay'), t('Disease'), t('Status'), t('Date Reported')];
+  const alertRow = (c) => [
+    c.case_id,
+    c.patient_name || '',
+    c.age ? `${c.age}${c.gender ? ' / ' + c.gender : ''}` : (c.gender || ''),
+    c.barangay_name || '',
+    c.disease_name || '',
+    translateStatus(c.status) || c.status || '',
+    formatDateStr(c.date_reported, dateFormat),
+  ];
+  const openAlertCases = (title, detail, list) => setExportPreview({
+    title: `${title} · ${detail}`,
+    columns: alertColumns,
+    rows: (list || []).map(alertRow),
+    actions: [],
+  });
   const thresholdAlerts = (() => {
     const alerts = [];
-    if (deathCases > 0) alerts.push({ label: t('Mortality Alert'), detail: `${deathCases} death(s) recorded`, color: '#DC2626', bg: 'rgba(220,38,38,0.1)', border: 'rgba(220,38,38,0.3)' });
-    if (activeCases > 5) alerts.push({ label: t('High Active Cases'), detail: `${activeCases} cases under monitoring`, color: '#D97706', bg: 'rgba(217,119,6,0.1)', border: 'rgba(217,119,6,0.3)' });
+    if (deathCases > 0) alerts.push({ label: t('Mortality Alert'), detail: `${deathCases} death(s) recorded`, color: '#DC2626', border: 'rgba(220,38,38,0.3)', cases: displayCases.filter(c => c.status === 'Deceased') });
+    if (activeCases > 5) alerts.push({ label: t('High Active Cases'), detail: `${activeCases} cases under monitoring`, color: '#D97706', border: 'rgba(217,119,6,0.3)', cases: displayCases.filter(c => ['Active', 'Pending', 'Under Treatment'].includes(c.status)) });
     const totalPrev = prevTotal;
     if (totalCases > 0 && totalPrev > 0) {
       const growth = ((totalCases - totalPrev) / totalPrev) * 100;
-      if (growth >= 50) alerts.push({ label: t('Rapid Surge'), detail: `+${Math.round(growth)}% vs previous period`, color: '#DC2626', bg: 'rgba(220,38,38,0.1)', border: 'rgba(220,38,38,0.3)' });
-      else if (growth >= 20) alerts.push({ label: t('Rising Trend'), detail: `+${Math.round(growth)}% vs previous period`, color: '#D97706', bg: 'rgba(217,119,6,0.1)', border: 'rgba(217,119,6,0.3)' });
+      if (growth >= 50) alerts.push({ label: t('Rapid Surge'), detail: `+${Math.round(growth)}% vs previous period`, color: '#DC2626', border: 'rgba(220,38,38,0.3)', cases: displayCases });
+      else if (growth >= 20) alerts.push({ label: t('Rising Trend'), detail: `+${Math.round(growth)}% vs previous period`, color: '#D97706', border: 'rgba(217,119,6,0.3)', cases: displayCases });
     }
     // Server-side epidemiological alerts (per barangay × disease, hourly cron + dedupe)
     if (epiAlerts.length > 0) {
@@ -929,8 +946,8 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           label,
           detail: `${a.disease_name} · ${a.barangay_name} (${a.alert_value})`,
           color: a.alert_type === 'surge' ? '#D97706' : '#DC2626',
-          bg: 'rgba(220,38,38,0.08)',
           border: a.alert_type === 'surge' ? 'rgba(217,119,6,0.3)' : 'rgba(220,38,38,0.3)',
+          cases: displayCases.filter(c => c.disease_name === a.disease_name && c.barangay_name === a.barangay_name),
         });
       });
     }
@@ -942,12 +959,12 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           label: `${DISASTER_ICONS[a.event_type] || '⚠️'} ${t('Disaster Alert')}`,
           detail: `${a.barangay_name}${a.purok ? ' · ' + a.purok : ''}${(a.latitude != null && a.longitude != null) ? ' (' + a.latitude + ',' + a.longitude + ')' : ''}: ${a.event_type} (${a.severity})`,
           color,
-          bg: 'rgba(37,99,235,0.08)',
           border: 'rgba(37,99,235,0.3)',
+          cases: displayCases.filter(c => c.barangay_name === a.barangay_name),
         });
       });
     }
-    return alerts;
+    return alerts.map(a => ({ ...a, onClick: () => openAlertCases(a.label, a.detail, a.cases) }));
   })();
 
   const gridLines = (() => {
@@ -1124,7 +1141,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     const monthLabel = MONTH_FULL[new Date(dateRange.start || Date.now()).getMonth()] || dashYear;
     const headCSS = isSlide ? `
       body { font-family: 'Segoe UI', Arial, sans-serif; background:#0B1120; color:white; padding:40px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-      h1 { color: #129968; margin-bottom: 4px; font-size: 26px; }
+      h1 { color: #32FFB7; margin-bottom: 4px; font-size: 26px; }
       h2 { color: #3b82f6; margin-top: 34px; font-size: 20px; border-bottom: 1px solid #1e293b; padding-bottom: 8px; }
       p.meta { color: #94a3b8; margin: 0 0 18px 0; font-size: 13px; }
       .title-line { color:#e2e8f0; font-size:15px; font-weight:600; margin: 0 0 4px 0; }
@@ -1179,7 +1196,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     return `
       <html><head><meta charset="utf-8"><title>CDMS Dashboard Report</title>
       <style>${headCSS}</style></head><body>
-      <h1 style="${isSlide ? 'color:#129968;margin:0 0 4px 0;' : 'color:#1e3a8a;margin:0 0 4px 0;'}" ${isSlide ? '' : ''}>${t('Cabuyao Disease Monitoring System')}</h1>
+      <h1 style="${isSlide ? 'color:#32FFB7;margin:0 0 4px 0;' : 'color:#1e3a8a;margin:0 0 4px 0;'}" ${isSlide ? '' : ''}>${t('Cabuyao Disease Monitoring System')}</h1>
       ${isSlide ? '' : `<h2>${t('Dashboard Export')}</h2>`}
       <p class="meta">${t('Generated:')} ${formatDateStr(new Date(), dateFormat)} &nbsp;|&nbsp; ${t('Date Range:')} ${rangeLine} &nbsp;|&nbsp; ${t('Cases:')} ${totalCases}</p>
 
@@ -1355,7 +1372,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
   // --- STATUS BADGE STYLE ---
   const getStatusStyle = (status) => {
-    if (status === 'Active') return { background: '#121358', color: '#93c5fd' };
+    if (status === 'Active') return { background: 'var(--primary-900, #000768)', color: '#93c5fd' };
     if (status === 'Pending') return { background: '#1e3a8a', color: '#93c5fd' };
     if (status === 'Under Treatment') return { background: '#3b0764', color: '#c4b5fd' };
     if (status === 'Recovered') return { background: '#083d2c', color: '#3cb882' };
@@ -1417,20 +1434,38 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         ))}
       </div>
 
-      {/* ── THRESHOLD ALERT BADGES ── */}
+      {/* ── THRESHOLD ALERT CARDS (clickable → matching case list) ── */}
       {thresholdAlerts.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+        <div className="cdms-dash-alerts" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: compactMode ? '10px' : '16px' }}>
           {thresholdAlerts.map((alert, i) => (
-            <div key={i} style={{
-              display: 'flex', alignItems: 'center', gap: '8px',
-              padding: '8px 14px', borderRadius: '8px',
-              background: alert.bg, border: `1px solid ${alert.border}`,
-              fontSize: '13px', fontWeight: '600',
-            }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: alert.color, flexShrink: 0 }} />
-              <span style={{ color: alert.color }}>{alert.label}</span>
-              <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>{alert.detail}</span>
-            </div>
+            <button
+              key={i}
+              type="button"
+              className="cdms-view-in"
+              onClick={alert.onClick}
+              title={t('Click to view the related cases')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '12px',
+                textAlign: 'left', cursor: 'pointer', width: '100%',
+                padding: compactMode ? '12px' : '20px', minHeight: '88px',
+                background: 'var(--bg-surface)', borderRadius: '10px',
+                border: '1px solid var(--border-color)',
+                borderLeft: `4px solid ${alert.color}`,
+                fontFamily: 'inherit', animationDelay: `${i * 80}ms`,
+                transition: 'transform .15s, box-shadow .15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
+            >
+              <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: alert.color, flexShrink: 0 }} />
+              <span style={{ minWidth: 0, flex: 1 }}>
+                <span style={{ display: 'block', fontSize: '15px', fontWeight: '700', color: alert.color }}>{alert.label}</span>
+                <span style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{alert.detail}</span>
+                <span style={{ display: 'block', fontSize: '12px', color: 'var(--brand-text)', fontWeight: '600', marginTop: '4px' }}>
+                  {alert.cases.length} {alert.cases.length === 1 ? t('case') : t('cases')} · {t('View')} →
+                </span>
+              </span>
+            </button>
           ))}
         </div>
       )}
@@ -1656,7 +1691,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                 ✏️ {t('Edit')}
               </button>
               <button onClick={sendAdvisory}
-                style={{ padding: '6px 12px', borderRadius: '20px', background: '#129968', border: 'none', color: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: '600', whiteSpace: 'nowrap' }}>
+                style={{ padding: '6px 12px', borderRadius: '20px', background: 'var(--primary-600, #000ECB)', border: 'none', color: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: '600', whiteSpace: 'nowrap' }}>
                 📣 {t('Notify Staff')}
               </button>
             </div>
@@ -1700,7 +1735,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                 style={{ width: '100%', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '10px 12px', fontSize: '15px', resize: 'vertical' }} />
             </div>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <button onClick={saveAdvisory} style={{ padding: '8px 18px', background: '#129968', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
+              <button onClick={saveAdvisory} style={{ padding: '8px 18px', background: 'var(--primary-600, #000ECB)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}>
                 ✓ {t('Save')}
               </button>
               <button onClick={() => { setAdvisoryEditing(false); setAdvisoryDraft(null); setAdvisoryNotice(''); }}
@@ -1994,7 +2029,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                   style={{
                     flex: 1, padding: '6px 4px', borderRadius: '6px', cursor: 'pointer',
                     fontSize: '15px', fontWeight: '500', textTransform: 'capitalize', minWidth: '56px',
-                    background: dashPeriod === p ? '#121358' : 'var(--input-bg)',
+                    background: dashPeriod === p ? 'var(--primary-900, #000768)' : 'var(--input-bg)',
                     color: dashPeriod === p ? 'white' : 'var(--text-muted)',
                     border: '1px solid var(--border-color)',
                   }}
@@ -2128,11 +2163,11 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           <div style={{ position: 'relative' }} ref={exportRef}>
             <button
               onClick={() => setShowExportMenu(!showExportMenu)}
-              style={{ width: '100%', padding: '8px', background: '#121358', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '15px', fontWeight: '500', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+              style={{ width: '100%', padding: '8px', background: 'var(--primary-900, #000768)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '15px', fontWeight: '500', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
               onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
               onMouseLeave={e => e.currentTarget.style.opacity = '1'}
             >
-              📤 {t('Export Data')} <span style={{ transition: 'transform 0.2s', display: 'inline-block', transform: showExportMenu ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+              {t('Export Data')} <span style={{ transition: 'transform 0.2s', display: 'inline-block', transform: showExportMenu ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
             </button>
             {showExportMenu && (
               <div style={{ position: 'absolute', bottom: '110%', left: 0, width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
@@ -2159,11 +2194,11 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           {/* PRINT */}
           <button
             onClick={handlePrint}
-            style={{ width: '100%', padding: '8px', background: '#0a5e42', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '15px', fontWeight: '500' }}
+            style={{ width: '100%', padding: '8px', background: '#129968', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '15px', fontWeight: '500' }}
             onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
             onMouseLeave={e => e.currentTarget.style.opacity = '1'}
           >
-            🖨️ {t('Print Report')}
+          {t('Print Report')}
           </button>
 
           <div style={{ fontSize: '15px', color: 'var(--text-muted)', textAlign: 'center', paddingTop: '4px' }}>
@@ -2240,7 +2275,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                 </h4>
                 <button
                   onClick={() => setShowAllDiseases(true)}
-                  style={{ padding: '4px 12px', background: '#121358', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '500', whiteSpace: 'nowrap' }}
+                  style={{ padding: '4px 12px', background: 'var(--primary-900, #000768)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '500', whiteSpace: 'nowrap' }}
                   onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                   onMouseLeave={e => e.currentTarget.style.opacity = '1'}
                 >
@@ -2458,7 +2493,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           </h4>
           <button
             onClick={() => setActiveTab('Manage Cases')}
-            style={{ padding: '6px 14px', background: '#129968', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '15px', fontWeight: '500' }}
+            style={{ padding: '6px 14px', background: 'var(--primary-600, #000ECB)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '15px', fontWeight: '500' }}
             onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
             onMouseLeave={e => e.currentTarget.style.opacity = '1'}
           >
@@ -2467,7 +2502,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         </div>
 
         {/* ── FIX: All headers centered, all cells centered ── */}
-        <div style={{ overflowX: 'auto' }}>
+        <div className="cdms-table-scroll">
         <table style={{ width: '100%', minWidth: '760px', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
@@ -2512,7 +2547,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             <button
               onClick={() => setCurrentPage(1)}
               disabled={currentPage === 1}
-              style={{ padding: '5px 8px', background: currentPage === 1 ? 'var(--input-bg)' : '#121358', color: currentPage === 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontSize: '15px', fontWeight: '700' }}
+              style={{ padding: '5px 8px', background: currentPage === 1 ? 'var(--input-bg)' : 'var(--primary-900, #000768)', color: currentPage === 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontSize: '15px', fontWeight: '700' }}
               onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
               onMouseLeave={e => e.currentTarget.style.opacity = '1'}
             >
@@ -2521,7 +2556,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             <button
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              style={{ padding: '5px 12px', background: currentPage === 1 ? 'var(--input-bg)' : '#121358', color: currentPage === 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontSize: '15px' }}
+              style={{ padding: '5px 12px', background: currentPage === 1 ? 'var(--input-bg)' : 'var(--primary-900, #000768)', color: currentPage === 1 ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontSize: '15px' }}
               onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
               onMouseLeave={e => e.currentTarget.style.opacity = '1'}
             >
@@ -2541,7 +2576,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                           onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(ellipsisPageInput); if (v >= 1 && v <= totalPages) { setCurrentPage(v); setEllipsisOpen(false); setEllipsisPageInput(''); } } }}
                           style={{ flex: 1, padding: '5px 6px', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px', outline: 'none', width: '100%' }} />
                         <button onClick={() => { const v = parseInt(ellipsisPageInput); if (v >= 1 && v <= totalPages) { setCurrentPage(v); setEllipsisOpen(false); setEllipsisPageInput(''); } }}
-                          style={{ padding: '5px 8px', border: '1px solid #121358', borderRadius: '4px', background: '#121358', color: 'white', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>{t('Go')}</button>
+                          style={{ padding: '5px 8px', border: '1px solid var(--primary-900, #000768)', borderRadius: '4px', background: 'var(--primary-900, #000768)', color: 'white', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>{t('Go')}</button>
                       </div>
                     </div>
                   )}
@@ -2550,7 +2585,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                 <button
                   key={p}
                   onClick={() => setCurrentPage(p)}
-                  style={{ padding: '5px 10px', background: p === currentPage ? '#121358' : 'transparent', color: p === currentPage ? 'white' : 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '15px', minWidth: '32px' }}
+                  style={{ padding: '5px 10px', background: p === currentPage ? 'var(--primary-900, #000768)' : 'transparent', color: p === currentPage ? 'white' : 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '15px', minWidth: '32px' }}
                   onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                   onMouseLeave={e => e.currentTarget.style.opacity = '1'}
                 >
@@ -2561,7 +2596,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             <button
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              style={{ padding: '5px 12px', background: currentPage === totalPages ? 'var(--input-bg)' : '#121358', color: currentPage === totalPages ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontSize: '15px' }}
+              style={{ padding: '5px 12px', background: currentPage === totalPages ? 'var(--input-bg)' : 'var(--primary-900, #000768)', color: currentPage === totalPages ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontSize: '15px' }}
               onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
               onMouseLeave={e => e.currentTarget.style.opacity = '1'}
             >
@@ -2570,7 +2605,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
             <button
               onClick={() => setCurrentPage(totalPages)}
               disabled={currentPage === totalPages}
-              style={{ padding: '5px 8px', background: currentPage === totalPages ? 'var(--input-bg)' : '#121358', color: currentPage === totalPages ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontSize: '15px', fontWeight: '700' }}
+              style={{ padding: '5px 8px', background: currentPage === totalPages ? 'var(--input-bg)' : 'var(--primary-900, #000768)', color: currentPage === totalPages ? 'var(--text-muted)' : 'white', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontSize: '15px', fontWeight: '700' }}
               onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
               onMouseLeave={e => e.currentTarget.style.opacity = '1'}
             >

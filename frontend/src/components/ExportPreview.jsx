@@ -61,7 +61,7 @@ export default function ExportPreviewModal({ preview, onClose }) {
             style={{ flex: 1, border: 'none', background: '#fff', minHeight: '420px' }}
           />
         ) : (
-          <div style={{ flex: 1, overflow: 'auto', background: '#fff', padding: '16px 20px' }}>
+          <div style={{ flex: 1, minHeight: 0, overflow: 'auto', background: '#fff', padding: '16px 20px' }}>
             <div className="ep-preview-count" style={{ fontSize: '13px', color: '#6b7280', marginBottom: '10px' }}>
               {preview.rows.length} {preview.rows.length === 1 ? 'row' : 'rows'}
             </div>
@@ -71,7 +71,8 @@ export default function ExportPreviewModal({ preview, onClose }) {
                   {(preview.columns || []).map((col, i) => (
                     <th key={i} style={{
                       background: '#1e3a8a', color: '#fff', padding: '8px 10px',
-                      textAlign: 'center', fontSize: '12px', border: '1px solid #1e3a8a', position: 'sticky', top: 0,
+                      textAlign: 'center', fontSize: '12px', border: '1px solid #1e3a8a',
+                      position: 'sticky', top: 0, zIndex: 2,
                     }}>{col}</th>
                   ))}
                 </tr>

@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API_URL } from './config';
-import BackButton from './components/BackButton';
 import ExportPreviewModal from './components/ExportPreview';
 import { getAllQueueItems, clearCompleted, getSyncHistory, clearSyncHistory } from './syncEngine';
 import { cacheUserProfile, getCachedUserProfile, getCachedBarangays, isOnline, getCachedAtMap } from './offlineSync';
@@ -203,7 +202,7 @@ export default function CHOSettings({
 }) {
   const navigate = useNavigate();
   const { t, translateStatus } = useI18n();
-  const [currentView, setCurrentView] = useState('menu');
+  const [currentView, setCurrentView] = useState('profile');
   useEffect(() => {
     if (openProfileView) {
       setCurrentView('profile');
@@ -336,6 +335,7 @@ export default function CHOSettings({
   // ── Notifications ──
   const [notifications, setNotifications] = useState({
     emailNotifications: false, pushNotifications: false,
+    smsNotifications: false,
     newCaseReported: false, caseStatusUpdated: false,
     updatedCaseReported: false,
     weeklySummary: false, systemMaintenance: false,
@@ -630,12 +630,80 @@ export default function CHOSettings({
       });
       if (setLoggedUser) setLoggedUser(res.data.fullName);
       setSaveMsg(t('✅ Profile saved successfully!'));
-      setTimeout(() => { setSaveMsg(''); setCurrentView('menu'); }, 1500);
+      setTimeout(() => { setSaveMsg(''); }, 1500);
     } catch (err) {
       setSaveMsg(t('❌ ') + (err.response?.data?.error || t('Failed to save profile.')));
     } finally {
       setSaving(false);
     }
+  };
+
+  // ── Settings tabs: per-tab save + reversible System Preferences ──
+  const revertSystemPrefs = () => {
+    if (systemPrefsSnapshot) {
+      if (theme !== systemPrefsSnapshot.theme) toggleTheme();
+      if (systemPrefs.fontSize !== systemPrefsSnapshot.fontSize) {
+        const scale = systemPrefsSnapshot.fontSize === 'Small' ? '0.9' : systemPrefsSnapshot.fontSize === 'Large' ? '1.15' : '1';
+        if (onFontSizeChange) onFontSizeChange(scale);
+      }
+      if (systemPrefs.compactView !== systemPrefsSnapshot.compactView) {
+        if (onCompactChange) onCompactChange(systemPrefsSnapshot.compactView);
+      }
+      setSystemPrefs({
+        ...systemPrefs,
+        fontSize: systemPrefsSnapshot.fontSize,
+        compactView: systemPrefsSnapshot.compactView,
+        displayLanguage: systemPrefsSnapshot.displayLanguage,
+        timeZone: systemPrefsSnapshot.timeZone,
+        dateFormat: systemPrefsSnapshot.dateFormat,
+        autoSave: systemPrefsSnapshot.autoSave,
+        confirmDelete: systemPrefsSnapshot.confirmDelete,
+        keyboardShortcuts: systemPrefsSnapshot.keyboardShortcuts,
+      });
+    }
+  };
+  const handleSaveSystemPrefs = () => {
+    setSystemPrefsSnapshot(takeSystemSnapshot());
+    setSystemPrefsSaveMsg(t('Preferences saved!'));
+  };
+  const handleSaveNotifications = async () => {
+    setNotifSaveMsg('');
+    try {
+      const res = await fetch(`${API_URL}/api/notification-preferences/${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({
+          push_notifications: notifications.pushNotifications,
+          email_notifications: notifications.emailNotifications,
+          sms_notifications: notifications.smsNotifications,
+          new_case_reported: notifications.newCaseReported,
+          case_status_updated: notifications.caseStatusUpdated,
+          updated_case_reported: notifications.updatedCaseReported,
+          weekly_summary: notifications.weeklySummary,
+          system_maintenance: notifications.systemMaintenance,
+          vaccine_advisories: notifications.vaccineAdvisories,
+        }),
+      });
+      if (res.ok) {
+        setNotifSaveMsg(t('Preferences saved!'));
+      } else {
+        setNotifSaveMsg(t('Failed to save.'));
+      }
+    } catch {
+      setNotifSaveMsg(t('Save error. Try again.'));
+    }
+  };
+  const SAVE_TABS = ['profile', 'notifications', 'system'];
+  const handleTopSave = () => {
+    if (currentView === 'profile') handleSaveProfile();
+    else if (currentView === 'notifications') handleSaveNotifications();
+    else if (currentView === 'system') handleSaveSystemPrefs();
+  };
+  const switchTab = (view) => {
+    if (currentView === 'system' && view !== 'system') revertSystemPrefs();
+    setSaveMsg(''); setPasswordMsg(''); setTwoFaMsg('');
+    setNotifSaveMsg(''); setSystemPrefsSaveMsg('');
+    setCurrentView(view);
   };
 
   // ── Change Password ──
@@ -933,11 +1001,13 @@ if (security.newPassword !== security.confirmPassword) {
       ...prev,
       pushNotifications: false,
       emailNotifications: false,
+      smsNotifications: false,
       newCaseReported: false,
       caseStatusUpdated: false,
       updatedCaseReported: false,
       weeklySummary: false,
       systemMaintenance: false,
+      vaccineAdvisories: false,
     }));
   } else if (key === 'pushNotifications' && value) {
     // When push is turned ON, auto-enable the two case-report toggles
@@ -985,17 +1055,6 @@ if (security.newPassword !== security.confirmPassword) {
     return displayName.slice(0, 2).toUpperCase();
   })();
 
-  // ── Navigation Card ──
-  const NavigationCard = ({ title, icon, view, isFullWidth = false }) => (
-    <div className={`nav-box ${isFullWidth ? 'full-width' : ''}`} onClick={() => setCurrentView(view)}>
-      <div className="box-content-left">
-        <div className="box-icon-wrapper">{icon}</div>
-        <h3 className="box-title-text">{title}</h3>
-      </div>
-      <span className="box-arrow-right">➔</span>
-    </div>
-  );
-
   return (
     <div className="settings-wrapper">
       {toastMsg && (
@@ -1010,34 +1069,28 @@ if (security.newPassword !== security.confirmPassword) {
       )}
       <div className="settings-container">
 
-        {/* ── MENU VIEW ── */}
-        {currentView === 'menu' && (
-          <div>
-            <h1 className="settings-title">{t('Settings')} Module</h1>
-            {offlineMode && (
-              <div style={{ padding: '10px 14px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '17px', color: '#D97706', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '16px' }}>⚠</span>
-                {t('Offline - settings changes require an internet connection.')}
-              </div>
-            )}
-            <p className="settings-subtitle">
-              {t('Manage your account credentials, notifications, and core configuration behaviors.')}
-            </p>
-            <div className="menu-grid">
-              <NavigationCard title={t('Profile Settings')} icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="#121358"><path d="m23.58 8.536-3.362-5.4-4.945 3.08v-6.216h-6.546v6.216l-4.945-3.08-3.362 5.4 5.563 3.464-5.563 3.464 3.362 5.4 4.945-3.08v6.216h6.546v-6.216l4.945 3.08 3.362-5.4-5.563-3.464z"/></svg>} view="profile" />
-              <NavigationCard title={t('Account Security')} icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="#2563EB"><path d="M19.944,2.642,12,.009,4.056,2.643A3,3,0,0,0,2,5.49V12c0,7.524,9.2,11.679,9.594,11.852l.354.157.368-.122C12.711,23.755,22,20.577,22,12V5.49A3,3,0,0,0,19.944,2.642Z"/></svg>} view="security" />
-              <NavigationCard title={t('Notifications')} icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="#D97706"><path d="M20,8c-2.21,0-4-1.79-4-4S17.79,0,20,0s4,1.79,4,4-1.79,4-4,4Zm-8,7.42c.77,0,1.54-.29,2.12-.88l4.67-4.67c-2.73-.56-4.79-2.98-4.79-5.88,0-.34,.04-.67,.09-1H5c-1.81,0-3.38,.97-4.26,2.41L9.88,14.55c.58,.58,1.35,.88,2.12,.88Zm9.76-5.69l-6.23,6.23c-.97,.97-2.26,1.46-3.54,1.46s-2.56-.49-3.54-1.46L.05,7.54c-.01,.15-.05,.3-.05,.46v11c0,2.76,2.24,5,5,5h14c2.76,0,5-2.24,5-5l-.02-10.53c-.64,.57-1.39,1-2.22,1.26Z"/></svg>} view="notifications" />
-              <NavigationCard title={t('System Preferences')} icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="#475569"><path d="M21,12a9.143,9.143,0,0,0-.15-1.645L23.893,8.6l-3-5.2L17.849,5.159A9,9,0,0,0,15,3.513V0H9V3.513A9,9,0,0,0,6.151,5.159L3.107,3.4l-3,5.2L3.15,10.355a9.1,9.1,0,0,0,0,3.29L.107,15.4l3,5.2,3.044-1.758A9,9,0,0,0,9,20.487V24h6V20.487a9,9,0,0,0,2.849-1.646L20.893,20.6l3-5.2L20.85,13.645A9.143,9.143,0,0,0,21,12Zm-6,0a3,3,0,1,1-3-3A3,3,0,0,1,15,12Z"/></svg>} view="system" />
-              <NavigationCard title={t('Data Management')} icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="#0891B2"><path d="M2 20h20v-4H2v4zm2-3h2v2H4v-2zm-2-3h20v-4H2v4zm2-3h2V9H4v2zm-2-3h20V4H2v4zm2-3h2V5H4v2z"/></svg>} view="data" isFullWidth />
-            </div>
+        {/* ── TABS HEADER ── */}
+        {offlineMode && (
+          <div style={{ padding: '10px 14px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '17px', color: '#D97706', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '16px' }}>⚠</span>
+            {t('Offline - settings changes require an internet connection.')}
           </div>
         )}
+        <div className="settings-header-row">
+          <div>
+            <h1 className="settings-title">{t('Settings')}</h1>
+            <p className="settings-subtitle">{t('Manage your account credentials, notifications, and core configuration behaviors.')}</p>
+          </div>
+        </div>
+        <div className="settings-tabs">
+          {[['profile','Profile'],['security','Security'],['notifications','Notifications'],['system','System Preferences'],['data','Data Management']].map(([v, label]) => (
+            <button key={v} className={`settings-tab ${currentView === v ? 'active' : ''}`} onClick={() => switchTab(v)}>{t(label)}</button>
+          ))}
+        </div>
 
         {/* ── PROFILE SETTINGS VIEW ── */}
         {currentView === 'profile' && (
           <div className="detail-view-container">
-            <BackButton onClick={() => { setCurrentView('menu'); setSaveMsg(''); }} style={{ marginBottom: '24px' }}>{t('Back to Settings')}</BackButton>
-
             {profileLoading ? (
               <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('Loading profile...')}</div>
             ) : (
@@ -1058,7 +1111,7 @@ if (security.newPassword !== security.confirmPassword) {
                     </div>
                     <div onClick={() => fileInputRef.current.click()} style={{
                       position: 'absolute', bottom: '0', right: '4px', width: '32px', height: '32px',
-                      borderRadius: '50%', background: '#2563eb', display: 'flex', alignItems: 'center',
+                      borderRadius: '50%', background: '#129968', display: 'flex', alignItems: 'center',
                       justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
                     }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1077,7 +1130,7 @@ if (security.newPassword !== security.confirmPassword) {
                       }
                     </p>
                     <button onClick={() => fileInputRef.current.click()}
-                      style={{ background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '8px 18px', fontSize: '17px', fontWeight: '500', cursor: 'pointer', marginTop: '6px', width: 'fit-content' }}>
+                      style={{ background: '#129968', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '8px 18px', fontSize: '17px', fontWeight: '500', cursor: 'pointer', marginTop: '6px', width: 'fit-content' }}>
                       {t('Change Photo')}
                     </button>
                     {profilePhoto && (
@@ -1093,7 +1146,7 @@ if (security.newPassword !== security.confirmPassword) {
                 <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '24px 0' }} />
 
                 {saveMsg && (
-                  <div className={`cdms-msg-in ${saveMsg.startsWith('✅') ? '' : 'cdms-msg-shake'}`} style={{ background: 'var(--input-bg)', color: saveMsg.startsWith('✅') ? '#0a5e42' : '#991b1b', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px', fontSize: '17px', fontWeight: '500' }}>
+                  <div className={`cdms-msg-in ${saveMsg.startsWith('✅') ? '' : 'cdms-msg-shake'}`} style={{ background: 'var(--input-bg)', color: saveMsg.startsWith('✅') ? 'rgba(18,153,104,.55)' : '#991b1b', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px', fontSize: '17px', fontWeight: '500' }}>
                     {saveMsg}
                   </div>
                 )}
@@ -1161,12 +1214,12 @@ if (security.newPassword !== security.confirmPassword) {
                 </div>
 
                 <div style={{ display: 'flex', gap: '16px', marginTop: '24px' }}>
-                  <button onClick={() => { setCurrentView('menu'); setSaveMsg(''); }}
+                  <button onClick={() => { setCurrentView('profile'); setSaveMsg(''); }}
                     style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '12px', padding: '12px 48px', fontSize: '17px', fontWeight: '500', cursor: 'pointer' }}>
                     {t('Cancel')}
                   </button>
                   <button onClick={handleSaveProfile} disabled={saving}
-                    style={{ background: saving ? '#6fd4a2' : '#129968', border: 'none', color: '#ffffff', borderRadius: '12px', padding: '12px', fontSize: '17px', fontWeight: '500', cursor: saving ? 'not-allowed' : 'pointer', flexGrow: 1 }}>
+                    style={{ background: saving ? 'rgba(0,14,203,.55)' : 'var(--primary-600, #000ECB)', border: 'none', color: '#ffffff', borderRadius: '12px', padding: '12px', fontSize: '17px', fontWeight: '500', cursor: saving ? 'not-allowed' : 'pointer', flexGrow: 1 }}>
                     {saving ? t('Saving...') : t('Save Changes')}
                   </button>
                 </div>
@@ -1178,7 +1231,6 @@ if (security.newPassword !== security.confirmPassword) {
         {/* ── ACCOUNT SECURITY VIEW ── */}
         {currentView === 'security' && (
           <div className="detail-view-container security-view-view">
-            <BackButton onClick={() => { setCurrentView('menu'); setPasswordMsg(''); setTwoFaMsg(''); }}>{t('Back to Settings')}</BackButton>
 
             {/* ── 1. CHANGE PASSWORD ── */}
             <div className="security-section-card">
@@ -1196,7 +1248,7 @@ if (security.newPassword !== security.confirmPassword) {
                 <div style={{
                   margin: '0 0 16px 0', padding: '10px 14px', borderRadius: '8px', fontSize: '17px', fontWeight: '500',
                   background: 'var(--input-bg)',
-                  color: passwordMsg.startsWith('✅') ? '#0a5e42' : '#991b1b',
+                  color: passwordMsg.startsWith('✅') ? 'rgba(18,153,104,.55)' : '#991b1b',
                 }}>
                   {passwordMsg}
                 </div>
@@ -1206,7 +1258,7 @@ if (security.newPassword !== security.confirmPassword) {
                 <div style={{
                   margin: '0 0 16px 0', padding: '10px 14px', borderRadius: '8px', fontSize: '17px', fontWeight: '500',
                   background: 'var(--input-bg)',
-                  color: pwRequestMsg.startsWith('✅') ? '#0a5e42' : '#991b1b',
+                  color: pwRequestMsg.startsWith('✅') ? 'rgba(18,153,104,.55)' : '#991b1b',
                 }}>
                   {pwRequestMsg}
                 </div>
@@ -1280,7 +1332,7 @@ if (security.newPassword !== security.confirmPassword) {
                           {t('To change your password, send a request to the City Health Office for approval.')}
                         </p>
                         <button onClick={handleRequestPasswordChange} disabled={pwRequestLoading || offlineMode}
-                          style={{ padding: '10px 28px', borderRadius: '8px', border: 'none', background: '#129968', color: '#fff', fontSize: '17px', fontWeight: '600', cursor: pwRequestLoading ? 'not-allowed' : 'pointer', opacity: offlineMode ? 0.5 : 1 }}>
+                          style={{ padding: '10px 28px', borderRadius: '8px', border: 'none', background: 'var(--primary-600, #000ECB)', color: '#fff', fontSize: '17px', fontWeight: '600', cursor: pwRequestLoading ? 'not-allowed' : 'pointer', opacity: offlineMode ? 0.5 : 1 }}>
                           {pwRequestLoading ? t('Sending...') : t('Request Password Change')}
                         </button>
                       </div>
@@ -1358,20 +1410,20 @@ if (security.newPassword !== security.confirmPassword) {
                 <div style={{
                   padding: '12px 16px', borderRadius: '8px', fontSize: '17px', fontWeight: '500', marginTop: '12px',
                   background: 'var(--input-bg)',
-                  color: twoFaMsg.startsWith('✅') ? '#0a5e42' : twoFaMsg.startsWith('📧') ? '#1e40af' : '#991b1b',
+                  color: twoFaMsg.startsWith('✅') ? 'rgba(0,14,203,.55)' : twoFaMsg.startsWith('📧') ? '#1e40af' : '#991b1b',
                 }}>
                   {twoFaMsg}
                 </div>
               )}
 
               {twoFaStep === 'email_sent' && !isTwoFactorEnabled && (
-                <div style={{ marginTop: '14px', padding: '14px 16px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '17px', color: '#1e40af' }}>
+                <div style={{ marginTop: '14px', padding: '14px 16px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '17px', color: 'var(--brand-text)' }}>
                   {t('📧 Check your email and click ')}<strong>{t('"Verify Email"')}</strong>{t(' to complete 2FA setup. Once verified, 2FA will be active on your next login.')}
                 </div>
               )}
 
               {twoFaFallbackLink && (
-                <div style={{ marginTop: '14px', padding: '14px 16px', background: 'rgba(16,185,129,0.08)', border: '1px solid #129968', borderRadius: '8px', fontSize: '17px', color: 'var(--text-main)' }}>
+                <div style={{ marginTop: '14px', padding: '14px 16px', background: 'rgba(18,153,104,0.08)', border: '1px solid #129968', borderRadius: '8px', fontSize: '17px', color: 'var(--text-main)' }}>
                   <div style={{ fontWeight: '600', marginBottom: '8px', color: '#129968' }}>🔑 Fallback link (email blocked)</div>
                   <a href={twoFaFallbackLink} style={{ color: '#129968', textDecoration: 'underline', wordBreak: 'break-all' }}>
                     {twoFaFallbackLink}
@@ -1531,7 +1583,7 @@ if (security.newPassword !== security.confirmPassword) {
                     <div style={{
                       padding: '12px 16px', borderRadius: '8px', fontSize: '17px', fontWeight: '500', marginBottom: '12px',
                       background: 'var(--input-bg)',
-                      color: sessionsMsg.startsWith('✅') ? '#0a5e42' : '#991b1b',
+                      color: sessionsMsg.startsWith('✅') ? 'rgba(18,153,104,.55)' : '#991b1b',
                     }}>
                       {sessionsMsg}
                     </div>
@@ -1619,7 +1671,6 @@ if (security.newPassword !== security.confirmPassword) {
         {/* ── NOTIFICATIONS VIEW ── */}
         {currentView === 'notifications' && (
           <div className="detail-view-container security-view-view">
-            <BackButton onClick={() => setCurrentView('menu')}>Back to Settings</BackButton>
 
             {[
               {
@@ -1702,39 +1753,6 @@ if (security.newPassword !== security.confirmPassword) {
               </div>
             ))}
 
-            <div className="notifications-action-container">
-              {notifLoading && <span style={{ fontSize: '17px', color: 'var(--text-muted)', marginRight: '12px' }}>{t('Loading...')}</span>}
-              {notifSaveMsg && <span style={{ fontSize: '17px', color: 'var(--text-muted)', marginRight: '12px' }}>{notifSaveMsg}</span>}
-              <button className="notifications-save-btn" disabled={offlineMode} style={offlineBtnStyle} title={offlineMode ? t('Unavailable offline') : ''} onClick={async () => {
-                setNotifSaveMsg('');
-                try {
-                  const res = await fetch(`${API_URL}/api/notification-preferences/${userId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-                    body: JSON.stringify({
-                      push_notifications: notifications.pushNotifications,
-                      email_notifications: notifications.emailNotifications,
-                      sms_notifications: notifications.smsNotifications,
-                      new_case_reported: notifications.newCaseReported,
-                      case_status_updated: notifications.caseStatusUpdated,
-                      updated_case_reported: notifications.updatedCaseReported,
-                      weekly_summary: notifications.weeklySummary,
-                      system_maintenance: notifications.systemMaintenance,
-                      vaccine_advisories: notifications.vaccineAdvisories,
-                    }),
-                  });
-                  if (res.ok) {
-                    setNotifSaveMsg(t('Preferences saved!'));
-                    setTimeout(() => setCurrentView('menu'), 800);
-                  } else {
-                    setNotifSaveMsg(t('Failed to save.'));
-                  }
-                } catch {
-                  setNotifSaveMsg(t('Save error. Try again.'));
-                }
-              }}>{t('Save Preferences')}</button>
-            </div>
-
             {/* Send Maintenance Notice - only for CHO */}
             {activeUser?.role === 'CHO' && notifications.systemMaintenance && (
               <div className="security-section-card" style={{ marginTop: '24px', borderColor: '#fde68a' }}>
@@ -1783,37 +1801,20 @@ if (security.newPassword !== security.confirmPassword) {
                 </div>
               </div>
             )}
+
+            <div className="notifications-action-container">
+              {notifLoading && <span style={{ fontSize: '17px', color: 'var(--text-muted)' }}>{t('Loading...')}</span>}
+              {notifSaveMsg && <span style={{ fontSize: '17px', color: 'var(--text-muted)' }}>{notifSaveMsg}</span>}
+              <button type="button" className="notifications-save-btn" onClick={handleSaveNotifications} disabled={offlineMode}>
+                {t('Save Changes')}
+              </button>
+            </div>
           </div>
         )}
 
         {/* ── SYSTEM PREFERENCES VIEW ── */}
         {currentView === 'system' && (
           <div className="detail-view-container security-view-view">
-            <BackButton onClick={() => {
-              if (systemPrefsSnapshot) {
-                if (theme !== systemPrefsSnapshot.theme) toggleTheme();
-                if (systemPrefs.fontSize !== systemPrefsSnapshot.fontSize) {
-                  const scale = systemPrefsSnapshot.fontSize === 'Small' ? '0.9' : systemPrefsSnapshot.fontSize === 'Large' ? '1.15' : '1';
-                  if (onFontSizeChange) onFontSizeChange(scale);
-                }
-                if (systemPrefs.compactView !== systemPrefsSnapshot.compactView) {
-                  if (onCompactChange) onCompactChange(systemPrefsSnapshot.compactView);
-                }
-                setSystemPrefs({
-                  ...systemPrefs,
-                  fontSize: systemPrefsSnapshot.fontSize,
-                  compactView: systemPrefsSnapshot.compactView,
-                  displayLanguage: systemPrefsSnapshot.displayLanguage,
-                  timeZone: systemPrefsSnapshot.timeZone,
-                  dateFormat: systemPrefsSnapshot.dateFormat,
-                  autoSave: systemPrefsSnapshot.autoSave,
-                  confirmDelete: systemPrefsSnapshot.confirmDelete,
-                  keyboardShortcuts: systemPrefsSnapshot.keyboardShortcuts,
-                });
-              }
-              setCurrentView('menu');
-            }}>Back to Settings</BackButton>
-
             <div className="security-section-card">
               <div className="security-card-header">
                 <div className="security-icon-box">
@@ -1969,12 +1970,10 @@ if (security.newPassword !== security.confirmPassword) {
             </div>
 
             <div className="notifications-action-container">
-              {systemPrefsSaveMsg && <span style={{ fontSize: '17px', color: 'var(--text-muted)', marginRight: '12px' }}>{systemPrefsSaveMsg}</span>}
-              <button className="notifications-save-btn" onClick={() => {
-                setSystemPrefsSnapshot(takeSystemSnapshot());
-                setSystemPrefsSaveMsg(t('Preferences saved!'));
-                setTimeout(() => setCurrentView('menu'), 1200);
-              }}>{t('Save Preferences')}</button>
+              {systemPrefsSaveMsg && <span style={{ fontSize: '17px', color: 'var(--text-muted)' }}>{systemPrefsSaveMsg}</span>}
+              <button type="button" className="notifications-save-btn" onClick={handleSaveSystemPrefs}>
+                {t('Save Changes')}
+              </button>
             </div>
           </div>
         )}
@@ -1982,7 +1981,6 @@ if (security.newPassword !== security.confirmPassword) {
         {/* ── DATA MANAGEMENT VIEW ── */}
         {currentView === 'data' && (
           <div className="detail-view-container security-view-view">
-            <BackButton onClick={() => setCurrentView('menu')}>Back to Settings</BackButton>
 
             {/* Storage Overview */}
             <div className="security-section-card">
@@ -2321,7 +2319,7 @@ if (security.newPassword !== security.confirmPassword) {
               {/* Sync History */}
               <div className="security-section-card" style={{ borderColor: 'var(--border-color)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(18,153,104,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(0,14,203,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="#2563EB"><path d="M0,7v-3c0-.552,.448-1,1-1s1,.448,1,1v1.412C4.21,2.067,7.966,0,12,0c6.253,0,11.391,4.69,11.951,10.91,.05,.55-.356,1.036-.906,1.086-.03,.002-.061,.004-.091,.004-.512,0-.948-.391-.995-.91-.467-5.182-4.748-9.09-9.959-9.09-3.559,0-6.878,1.916-8.662,5h1.662c.552,0,1,.448,1,1s-.448,1-1,1H2c-1.103,0-2-.897-2-2ZM22,15h-3c-.553,0-1,.447-1,1s.447,1,1,1h1.662c-1.785,3.084-5.104,5-8.662,5-5.21,0-9.492-3.908-9.959-9.09-.049-.549-.523-.944-1.086-.906C.405,12.054,0,12.54,.049,13.09c.561,6.22,5.699,10.91,11.951,10.91,4.033,0,7.79-2.068,10-5.413v1.413c0,.553,.447,1,1,1s1-.447,1-1v-3c0-1.103-.897-2-2-2ZM14,7c1.105,0,2,.895,2,2v6c0,1.105-.895,2-2,2h-4c-1.105,0-2-.895-2-2v-6c0-1.105,.895-2,2-2h4Zm-1,7c0-.552-.448-1-1-1h-1c-.552,0-1,.448-1,1s.448,1,1,1h1c.552,0,1-.448,1-1Zm1-4c0-.552-.448-1-1-1h-2c-.552,0-1,.448-1,1s.448,1,1,1h2c.552,0,1-.448,1-1Z"/></svg>
                   </div>
                   <div>

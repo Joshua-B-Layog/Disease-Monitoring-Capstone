@@ -432,7 +432,7 @@
 }
 
 .figma-toggle-switch input:checked + .figma-slider {
-  border-color: #129968;
+  border-color: var(--primary-600, #000ECB);
   background-color: #d1f5e9;
 }
 
@@ -502,7 +502,9 @@
 /* --- Notifications Save Actions Footer --- */
 .notifications-action-container {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: 14px;
   width: 100%;
   margin-top: 8px;
   margin-bottom: 24px;
@@ -519,6 +521,11 @@
   cursor: pointer;
   box-shadow: 0 1px 3px rgba(16, 24, 40, 0.1);
   transition: background-color 0.15s ease;
+}
+
+.notifications-save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .notifications-save-btn:hover {
@@ -736,4 +743,17 @@
   .cdms-storage-grid {
     grid-template-columns: 1fr !important;
   }
+}
+
+/* ===== Settings v2: tabs on top, per-tab save ===== */
+.settings-header-row { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; }
+.settings-tabs { display:flex; gap:24px; border-bottom:1px solid var(--border-color); margin:16px 0 24px; overflow-x:auto; }
+.settings-tab { background:none; border:none; padding:10px 2px; font:600 14px var(--ui-font, inherit); color:var(--text-muted); cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap; }
+.settings-tab.active { color:var(--settings-tab-active); border-bottom-color:var(--settings-tab-active); }
+/* Dark mode: same brand blue on the active label, lightened (see
+   --settings-tab-active). Declared with higher specificity so the
+   inactive-tab colour can never swallow it. */
+:root:not([data-theme='light']) .settings-tab.active {
+  color: var(--settings-tab-active);
+  border-bottom-color: var(--settings-tab-active);
 }

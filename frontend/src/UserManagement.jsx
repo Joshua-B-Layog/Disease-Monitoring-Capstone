@@ -638,7 +638,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
         {loading ? (
           <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('Loading accounts from database...')}</div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
+          <div className="cdms-table-scroll">
           <table style={{ width: '100%', minWidth: '760px', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '15px' }}>
@@ -680,7 +680,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                       ) : (
                         <span style={{
                           padding: '4px 12px', borderRadius: '20px', fontSize: '15px', fontWeight: '500',
-                          background: user.is_active ? '#121358' : 'var(--input-bg)',
+                          background: user.is_active ? 'var(--primary-900, #000768)' : 'var(--input-bg)',
                           color: user.is_active ? '#93c5fd' : 'var(--text-muted)'
                         }}>
                           {user.is_active ? t('Active') : t('Inactive')}
@@ -709,7 +709,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                             onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                             onMouseLeave={e => e.currentTarget.style.opacity = '1'}
                             style={{ padding: '6px 10px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', borderRadius: '6px', cursor: offlineMode ? 'not-allowed' : 'pointer', opacity: offlineMode ? 0.4 : 1 }}>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#129968" strokeWidth="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary-600, #000ECB)" strokeWidth="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
                           </button>
                         ) : (
                           <button onClick={() => {
@@ -761,14 +761,14 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                           onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(ellipsisPageInput); if (v >= 1 && v <= totalPages) { setCurrentPage(v); setEllipsisOpen(false); setEllipsisPageInput(''); } } }}
                           style={{ flex: 1, padding: '5px 6px', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '15px', outline: 'none', width: '100%' }} />
                         <button onClick={() => { const v = parseInt(ellipsisPageInput); if (v >= 1 && v <= totalPages) { setCurrentPage(v); setEllipsisOpen(false); setEllipsisPageInput(''); } }}
-                          style={{ padding: '5px 8px', border: '1px solid #121358', borderRadius: '4px', background: '#121358', color: 'white', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>{t('Go')}</button>
+                          style={{ padding: '5px 8px', border: '1px solid var(--primary-900, #000768)', borderRadius: '4px', background: 'var(--primary-900, #000768)', color: 'white', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>{t('Go')}</button>
                       </div>
                     </div>
                   )}
                 </div>
               ) : (
                 <button key={p} onClick={() => setCurrentPage(p)}
-                  style={{ width: '32px', height: '32px', border: '1px solid var(--border-color)', borderRadius: '6px', background: p === currentPage ? '#121358' : 'var(--bg-surface)', color: p === currentPage ? 'white' : 'var(--text-main)', cursor: 'pointer', fontSize: '15px' }}>{p}</button>
+                  style={{ width: '32px', height: '32px', border: '1px solid var(--border-color)', borderRadius: '6px', background: p === currentPage ? 'var(--primary-900, #000768)' : 'var(--bg-surface)', color: p === currentPage ? 'white' : 'var(--text-main)', cursor: 'pointer', fontSize: '15px' }}>{p}</button>
               )
             )}
             <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
@@ -787,7 +787,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
             </h3>
 
             {submitMsg && (
-              <div style={{ background: submitMsg.startsWith('Error') ? '#fee2e2' : '#d1f5e9', color: submitMsg.startsWith('Error') ? '#991b1b' : '#0a5e42', padding: '10px 14px', borderRadius: '8px', marginBottom: '18px', fontSize: '15px', fontWeight: '500' }}>
+              <div style={{ background: submitMsg.startsWith('Error') ? '#fee2e2' : '#d1f5e9', color: submitMsg.startsWith('Error') ? '#991b1b' : 'rgba(0,14,203,.55)', padding: '10px 14px', borderRadius: '8px', marginBottom: '18px', fontSize: '15px', fontWeight: '500' }}>
                 {submitMsg.startsWith('Error') ? '❌' : '✅'} {submitMsg}
               </div>
             )}
@@ -960,7 +960,7 @@ export default function UserManagement({ confirmDelete, fontScale, compactMode, 
                   {t('Cancel')}
                 </button>
                 <button type="submit" disabled={submitLoading}
-                  style={{ padding: '10px 28px', background: submitLoading ? '#6fd4a2' : '#129968', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: '600', color: 'white', cursor: submitLoading ? 'not-allowed' : 'pointer' }}
+                  style={{ padding: '10px 28px', background: submitLoading ? 'rgba(0,14,203,.55)' : 'var(--primary-600, #000ECB)', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: '600', color: 'white', cursor: submitLoading ? 'not-allowed' : 'pointer' }}
                   onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                   onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
                   {submitLoading ? t('Saving...') : (editingUser ? t('Update User') : t('Add User'))}
