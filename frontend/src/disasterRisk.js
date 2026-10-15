@@ -13,10 +13,12 @@ export const HAZARD_CONFIG = {
   'Fire':          { icon: '🔥',  color: '#dc2626', diseases: ['Acute Respiratory Infection'] },
 };
 
-export const ACTION_TYPES = ['Fogging', 'Vaccination Drive', 'Info Campaign', 'Active Case Finding', 'Home Visits', 'Sanitation'];
+export const ACTION_TYPES = ['Fogging', 'Spraying', 'Community Cleaning', 'Vaccination Drive', 'Info Campaign', 'Active Case Finding', 'Home Visits', 'Sanitation'];
 
 export const ACTION_TYPE_ICONS = {
   'Fogging': '💨',
+  'Spraying': '🚿',
+  'Community Cleaning': '🧼',
   'Vaccination Drive': '💉',
   'Info Campaign': '📢',
   'Active Case Finding': '🔍',

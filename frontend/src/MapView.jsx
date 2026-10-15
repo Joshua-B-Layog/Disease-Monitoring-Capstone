@@ -11,6 +11,8 @@ import cabuyaoBoundaries from './data/cabuyao_barangays.geojson.json';
 import cabuyaoGeoJSON from './data/cabuyao_barangays.geojson';
 import { getPointInBarangay, pointInFeature } from './data/coordinates';
 import DatePicker from './components/DatePicker';
+import InterventionModal from './components/InterventionModal';
+import { formatDate as formatDateStr } from './formatDate';
 import { useI18n } from './i18n';
 import { precacheTiles } from './mapTileCache';
 import EpiPanel from './epiStats';
@@ -729,6 +731,15 @@ const hazardBadgeLift = (count, size = 32, hasPill = false) => {
   return pinH + badgeH + HAZARD_BADGE_GAP - discCentre;
 };
 
+// Human labels for the server epi_alerts.alert_type values shown on the popup
+// warning banner and on any intervention that answers one.
+const ALERT_KIND_LABELS = {
+  count_threshold: 'Case count warning',
+  surge: 'Rapid surge warning',
+  mortality: 'Mortality warning',
+  hazard_disease: 'Hazard-linked disease warning',
+};
+
 const createPinIcon = ({ count, color, label = null, className = '' }) => {
   const size = getPinSize(count);
   const w = size;
@@ -1255,6 +1266,13 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const [manageActionsOpen, setManageActionsOpen] = useState(false);
   const [actionForm, setActionForm] = useState({ id: null, barangay_id: '', barangay_name: '', hazard_id: '', action_type: ACTION_TYPES[0], description: '', target_disease: '', date_started: '', date_ended: '', status: 'planned' });
   const [actionsSaving, setActionsSaving] = useState(false);
+  // Disease-warning layer: server epi alerts (same rows the Dashboard warning
+  // cards use) + the option to show only warning-linked interventions on the map
+  // + the context handed to the shared InterventionModal.
+  const [epiAlerts, setEpiAlerts] = useState([]);
+  const [interventionsOnly, setInterventionsOnly] = useState(false);
+  const [warnActions, setWarnActions] = useState([]);
+  const [interventionCtx, setInterventionCtx] = useState(null);
   const [barangayIdMap, setBarangayIdMap] = useState({});
   const [manageHazardsOpen, setManageHazardsOpen] = useState(false);
   const [hazardForm, setHazardForm] = useState({ id: null, barangay_id: '', barangay_name: '', event_type: DISASTER_EVENT_TYPES[0], severity: DISASTER_SEVERITIES[1], purok: '', latitude: '', longitude: '', date_started: '', date_ended: '', notes: '' });
@@ -1266,6 +1284,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     let alive = true;
     const load = () => {
       axios.get(API_URL + '/api/barangay-actions').then(res => { if (alive) setActions(Array.isArray(res.data) ? res.data : []); }).catch(() => {});
+      axios.get(API_URL + '/api/epi-alerts').then(res => { if (alive) setEpiAlerts(Array.isArray(res.data) ? res.data : []); }).catch(() => {});
       axios.get(API_URL + '/api/disaster-events').then(res => { if (alive) setDisasterEvents(Array.isArray(res.data) ? res.data : []); }).catch(() => {});
       axios.get(API_URL + '/api/weather/hazards').then(res => {
         if (alive) { setWeatherHazards(Array.isArray(res.data) ? res.data : []); setWeatherOffline(false); }
@@ -1286,6 +1305,54 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     const iv = setInterval(load, 30000);
     return () => { alive = false; clearInterval(iv); };
   }, []);
+
+  // "Show interventions only" - the server already filters warning-linked rows
+  // via ?interventions=1, so the map layer just consumes that payload instead of
+  // re-implementing the rule on the client.
+  useEffect(() => {
+    if (!interventionsOnly) return undefined;
+    let alive = true;
+    const load = () => {
+      axios.get(API_URL + '/api/barangay-actions?interventions=1')
+        .then(res => { if (alive) setWarnActions(Array.isArray(res.data) ? res.data : []); })
+        .catch(() => {});
+    };
+    load();
+    const iv = setInterval(load, 30000);
+    return () => { alive = false; clearInterval(iv); };
+  }, [interventionsOnly]);
+
+  // Refetch both action views after an intervention is logged from the map.
+  const reloadMapActions = () => {
+    setInterventionCtx(null);
+    axios.get(API_URL + '/api/barangay-actions')
+      .then(res => setActions(Array.isArray(res.data) ? res.data : []))
+      .catch(() => {});
+    if (interventionsOnly) {
+      axios.get(API_URL + '/api/barangay-actions?interventions=1')
+        .then(res => setWarnActions(Array.isArray(res.data) ? res.data : []))
+        .catch(() => {});
+    }
+    axios.get(API_URL + '/api/epi-alerts')
+      .then(res => setEpiAlerts(Array.isArray(res.data) ? res.data : []))
+      .catch(() => {});
+  };
+
+  // Opens the shared InterventionModal for a server-computed disease warning.
+  const openWarningIntervention = (alert) => {
+    if (!alert) return;
+    const name = alert.barangay_name || '';
+    const idFromMap = Number(Object.keys(barangayIdMap).find(id => barangayIdMap[id] === name) || 0);
+    setInterventionCtx({
+      barangay: name,
+      barangay_id: alert.barangay_id || idFromMap || null,
+      disease: alert.disease_name || '',
+      count: alert.alert_value || null,
+      alert_id: alert.id || null,
+      alert_kind: alert.alert_type || 'epi_count',
+      kind_label: t(ALERT_KIND_LABELS[alert.alert_type] || 'Disease warning'),
+    });
+  };
   const geoJsonLayerRef = useRef(null);
   const bordersOnly = loginRole === 'BHW';
   const barangayDataRef = useRef(barangayData);
@@ -1674,7 +1741,12 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   };
 
   const actionBadgeItems = [];
-  const ongoingActions = actions.filter(a => a.status !== 'completed');
+  // `mapActions` = what the map draws. When "Show interventions only" is on it is
+  // the server-filtered warning-linked set; otherwise it is every action. The
+  // manage modal always reads the full `actions` list so records stay editable.
+  const mapActions = interventionsOnly ? warnActions : actions;
+  const isWarningIntervention = (a) => !!(a && (a.epi_alert_id || a.alert_kind));
+  const ongoingActions = mapActions.filter(a => a.status !== 'completed');
   const wxKey = (n) => (n || '').trim().toLowerCase().replace(/\s+/g, ' ');
   // Phase/pin tier (zoom >= PUROK_ZOOM_THRESHOLD) is scoped to the single barangay
   // in view so "the phases" light up with their weather circles and nothing else.
@@ -1803,6 +1875,62 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     });
   });
 
+  // ── Disease-warning badges (panelist intervention flow) ──
+  // A barangay carrying a flagged disease count with NO intervention logged yet
+  // gets an amber ⚠ disc stacked clear above its hazard disc, so the CHO can see
+  // at a glance which warnings still have no answer. The matching intervention is
+  // resolved by epi_alert_id first (exact row) and by barangay + disease as the
+  // fallback - the same two-tier match the Dashboard warning cards use.
+  const alertsByBarangay = {};
+  (epiAlerts || []).forEach(a => {
+    if (!a || !a.barangay_name) return;
+    const k = wxKey(a.barangay_name);
+    const prev = alertsByBarangay[k];
+    if (!prev || (Number(a.alert_value) || 0) > (Number(prev.alert_value) || 0)) alertsByBarangay[k] = a;
+  });
+  const interventionMatchesWarning = (alert) => {
+    if (!alert) return null;
+    const byId = actions.find(x => isWarningIntervention(x) && x.epi_alert_id && String(x.epi_alert_id) === String(alert.id));
+    if (byId) return byId;
+    return actions.find(x => isWarningIntervention(x)
+      && wxKey(x.barangay_name) === wxKey(alert.barangay_name)
+      && (x.target_disease || x.alert_disease || '') === (alert.disease_name || '')) || null;
+  };
+  const warningBadgeItems = [];
+  if (mapZoom < PUROK_ZOOM_THRESHOLD) {
+    hazardScopeList.forEach(name => {
+      const alert = alertsByBarangay[wxKey(name)];
+      if (!alert) return;
+      if (interventionMatchesWarning(alert)) return; // answered -> nothing to chase
+      const coords = findCoords(name);
+      if (!coords) return;
+      const k = wxKey(name);
+      const w = weatherByName[k];
+      const man = manualBarangayEvents[k] || [];
+      const pillCount = (weatherPinsByBarangay[k] || 0) + man.filter(e => e.latitude && e.longitude).length;
+      // The hazard disc only renders its count pill when it has a hazard to count,
+      // so the stack height has to follow the same rule or the warning disc drifts.
+      const hazardPill = !!((w || man.length > 0) && pillCount > 0);
+      // Stack above the hazard disc when that layer is drawn, otherwise take the
+      // normal pin lift. Both come from the shared badge geometry.
+      const hazardStack = (isDisasterMap && showDisasterLayer)
+        ? hazardBadgeLift(barangayCaseCount[k] || 0, 38, hazardPill) + (hazardPill ? 50 : 38) + 2
+        : 0;
+      warningBadgeItems.push({
+        id: 'warn-' + name,
+        coords,
+        svg: hazardSvgMarkup('⚠️', '#D97706', 34, 'Warn'),
+        count: 0,
+        color: '#D97706',
+        title: `${name} — ${alert.disease_name} warning (${alert.alert_value} cases): no intervention logged yet`,
+        size: 34,
+        z: 1600,
+        above: hazardStack || hazardBadgeLift(barangayCaseCount[k] || 0, 34, false),
+        onClick: () => openBarangayPopup(name),
+      });
+    });
+  }
+
   // Pin tier (zoomed in). Weather pins follow the same tiers as the case pins:
   //   zoom 17 (phase tier)   -> ONLY the phases get weather pins (loose Purok/Blk/Lot
   //                             are folded into their nearest phase, never shown alone)
@@ -1871,7 +1999,11 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   });
 
   const popupActionKey = (popup && (popup.barangay || popup.barangayName)) || '';
-  const popupActionsList = actions.filter(a => a.barangay_name === popupActionKey);
+  const popupActionsList = mapActions.filter(a => a.barangay_name === popupActionKey);
+  // The flagged disease count for the inspected barangay (if any) and the
+  // intervention that answers it - drives the popup warning banner.
+  const popupWarning = popupActionKey ? (alertsByBarangay[wxKey(popupActionKey)] || null) : null;
+  const popupWarningIntervention = interventionMatchesWarning(popupWarning);
   const popupWeather = popupActionKey ? weatherByName[wxKey(popupActionKey)] : null;
   const popupManualEvents = popupActionKey ? (manualBarangayEvents[wxKey(popupActionKey)] || []) : [];
 
@@ -1930,6 +2062,15 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const responseCoveredCount = hazardBarangays.filter(bid =>
     actions.some(a => String(a.barangay_id) === bid && a.hazard_id && a.status !== 'completed')
   ).length;
+
+  // Disease-warning coverage (panelist intervention flow): flagged counts from
+  // `/api/epi-alerts` in the user's scope, and whether an intervention with the
+  // mandatory remarks already answers each one.
+  const warningBarangays = hazardScopeList
+    .map(n => alertsByBarangay[wxKey(n)])
+    .filter(Boolean)
+    .sort((a, b) => (Number(b.alert_value) || 0) - (Number(a.alert_value) || 0));
+  const warningAnsweredCount = warningBarangays.filter(a => interventionMatchesWarning(a)).length;
 
   // Historical comparison for the open popup: the same calendar week one year ago
   useEffect(() => {
@@ -2596,6 +2737,55 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           )}
         </div>
 
+        {/* Disease Warning Interventions - flagged counts (panelist requirement)
+            and whether an intervention with remarks has answered each one. The
+            checkbox filters the map down to the interventions themselves. */}
+        <div style={{ paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
+          <p style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('Disease Warning Interventions')}</p>
+          {warningBarangays.length === 0 ? (
+            <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>{t('No flagged disease counts in this scope.')}</p>
+          ) : (
+            <>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '6px' }}>
+                <span style={{ fontSize: '22px', fontWeight: '800', color: 'var(--text-main)' }}>{warningAnsweredCount}</span>
+                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{t('of')}{` ${warningBarangays.length} `}{t('warnings answered')}</span>
+              </div>
+              <div style={{ height: '7px', background: 'var(--input-bg)', borderRadius: '4px', overflow: 'hidden', marginBottom: '8px' }}>
+                <div style={{
+                  width: `${warningBarangays.length ? Math.round((warningAnsweredCount / warningBarangays.length) * 100) : 0}%`,
+                  height: '100%',
+                  background: warningAnsweredCount === warningBarangays.length ? '#10b981' : warningAnsweredCount > 0 ? '#f59e0b' : '#dc2626',
+                  borderRadius: '4px',
+                }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                {warningBarangays.slice(0, 6).map(a => {
+                  const ans = interventionMatchesWarning(a);
+                  return (
+                    <button key={a.id || a.barangay_name} onClick={() => openBarangayPopup(a.barangay_name)}
+                      title={`${a.barangay_name} · ${a.disease_name}`}
+                      style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '6px 9px', borderRadius: '7px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', cursor: 'pointer', textAlign: 'left', font: 'inherit' }}>
+                      <span>{ans ? '✔' : '⚠️'}</span>
+                      <span style={{ flex: 1, fontSize: '13px', fontWeight: '600', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.barangay_name} · {a.disease_name}</span>
+                      <span style={{ fontSize: '12px', fontWeight: '700', color: ans ? '#10b981' : '#D97706' }}>{a.alert_value}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                {warningAnsweredCount === 0
+                  ? t('Flagged barangays with no intervention logged yet.')
+                  : t('Flagged barangays with at least one intervention logged.')}
+              </p>
+            </>
+          )}
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--text-main)', cursor: 'pointer' }}>
+            <input type="checkbox" checked={interventionsOnly} onChange={e => setInterventionsOnly(e.target.checked)}
+              style={{ width: '15px', height: '15px', accentColor: '#0891b2' }} />
+            {t('Show interventions only')}
+          </label>
+        </div>
+
         <button
           onClick={() => { setAutoDetectedBrgy(null); setFilterBarangay('All Barangays'); setFilterStatus('All Status'); setFilterCaseType('All Case Types'); setFilterDateFrom(`${currentYear}-01-01`); setFilterDateTo(`${currentYear}-12-31`); setFilterYear(String(currentYear)); setFilterSeverity('All Severities'); setFilterDisease('All Diseases'); setFilterPurok('All Puroks'); }}
           style={{ padding: '11px', background: '#DC2626', color: 'white', border: 'none', borderRadius: '7px', cursor: 'pointer', fontWeight: '600', fontSize: '15px', marginTop: 'auto' }}>
@@ -2691,6 +2881,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           )}
           {mapZoom < 17 && <BarangayPins key="barangay-pins" barangayData={barangayData} onHover={setTooltip} onLeave={() => setTooltip(null)} onClick={setPopup} loginRole={loginRole} />}
           {isDisasterMap && showActionsLayer && <LayerBadgeMarkers key="layer-actions" items={actionBadgeItems} />}
+          {isDisasterMap && <LayerBadgeMarkers key="layer-warnings" items={warningBadgeItems} />}
           {isDisasterMap && showDisasterLayer && mapZoom < 17 && <LayerBadgeMarkers key="layer-hazards-badges" items={hazardBadgeItems} />}
           {isDisasterMap && showDisasterLayer && mapZoom >= 17 && <LayerBadgeMarkers key="layer-hazards-pins" items={hazardPinItems} />}
           <GeoJSON
@@ -2957,6 +3148,43 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
 
               <EpiPanel cases={popup.cases} t={t} />
 
+              {/* Disease warning for this barangay + its intervention (required
+                  remarks). CHO logs one straight from the map popup. */}
+              {popupWarning && (
+                <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
+                  <p style={{ margin: '0 0 10px 0', fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {t('Disease Warning')}
+                  </p>
+                  <div style={{ padding: '10px 12px', borderRadius: '8px', background: 'rgba(217,119,6,0.12)', border: '1px solid rgba(217,119,6,0.45)' }}>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>
+                      ⚠️ {popupWarning.disease_name} · {popupWarning.alert_value} {popupWarning.alert_value === 1 ? t('case') : t('cases')}
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      {t(ALERT_KIND_LABELS[popupWarning.alert_type] || 'Disease warning')}
+                      {popupWarning.period_start ? ` · ${t('week of')} ${formatDateStr(popupWarning.period_start, dateFormat)}` : ''}
+                    </div>
+                    {popupWarningIntervention ? (
+                      <div style={{ marginTop: '8px', fontSize: '12px', color: '#10b981', fontWeight: '700' }}>
+                        ✔ {t('Intervention logged')}: {ACTION_TYPE_ICONS[popupWarningIntervention.action_type] || '🗂'} {t(popupWarningIntervention.action_type)} · {t(popupWarningIntervention.status)}
+                        {popupWarningIntervention.description ? (
+                          <div style={{ marginTop: '3px', color: 'var(--text-muted)', fontWeight: '400', fontStyle: 'italic' }}>“{popupWarningIntervention.description}”</div>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <div style={{ marginTop: '8px', fontSize: '12px', color: '#D97706', fontWeight: '700' }}>
+                        ⚠ {t('No intervention recorded for this warning yet')}
+                      </div>
+                    )}
+                    {loginRole === 'CHO' && (
+                      <button onClick={() => openWarningIntervention(popupWarning)}
+                        style={{ marginTop: '10px', padding: '6px 14px', borderRadius: '7px', border: '1px solid #129968', background: 'transparent', color: '#129968', cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>
+                        ＋ {popupWarningIntervention ? t('Add Intervention') : t('Log Intervention')}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {popupActionsList.length > 0 && (
                 <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
                   <p style={{ margin: '0 0 10px 0', fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -2976,6 +3204,12 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                         <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                           {a.description || ''}{a.date_started ? ` · from ${a.date_started}` : ''}
                         </div>
+                        {isWarningIntervention(a) && (
+                          <div style={{ fontSize: '12px', color: '#D97706', fontWeight: '600', marginTop: '2px' }}>
+                            ⚠ {t('Answers')}: {a.alert_disease || a.target_disease || t('Disease warning')}
+                            {a.alert_value ? ` (${a.alert_value} ${t('cases')})` : ''}
+                          </div>
+                        )}
                         {a.hazard_type && (
                           <div style={{ fontSize: '12px', color: 'var(--text-main)', opacity: 0.85, marginTop: '2px' }}>
                             ↳ {t('Responding to')} {hazardIcon(a.hazard_type)} {t(a.hazard_type)}
@@ -3284,6 +3518,12 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                     <span style={{ fontSize: '15px' }}>{ACTION_TYPE_ICONS[a.action_type] || '📋'}</span>
                     <span style={{ flex: 1, fontSize: '13px', color: 'var(--text-main)' }}>
                       {t(a.action_type)} · <span style={{ textTransform: 'capitalize' }}>{t(a.status)}</span>
+                      {isWarningIntervention(a) && (
+                        <span style={{ display: 'block', fontSize: '12px', color: '#D97706', fontWeight: '600' }}>
+                          ⚠ {t('Answers')}: {a.alert_disease || a.target_disease || t('Disease warning')}
+                          {a.alert_value ? ` (${a.alert_value} ${t('cases')})` : ''}
+                        </span>
+                      )}
                       {a.hazard_type && (
                         <span style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)' }}>
                           ↳ {t('Responding to')} {hazardIcon(a.hazard_type)} {t(a.hazard_type)}
@@ -3478,6 +3718,18 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
             </div>
           </div>
         )}
+
+        {/* ── LOG INTERVENTION MODAL ── answers a disease warning with the
+            mandatory remarks (shared with the Dashboard warning cards). */}
+        <InterventionModal
+          open={!!interventionCtx}
+          context={interventionCtx}
+          barangays={Object.entries(barangayIdMap).map(([id, name]) => ({ id: Number(id), name }))}
+          diseases={diseaseOptions.filter(d => d && d !== 'All Diseases')}
+          dateFormat={dateFormat}
+          onClose={() => setInterventionCtx(null)}
+          onSaved={reloadMapActions}
+        />
       </div>
     </div>
   );

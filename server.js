@@ -6580,6 +6580,8 @@ db.query(`CREATE TABLE IF NOT EXISTS barangay_actions (
   id INT AUTO_INCREMENT PRIMARY KEY,
   barangay_id INT NULL,
   hazard_id INT NULL,
+  epi_alert_id INT NULL,
+  alert_kind VARCHAR(30) NULL,
   action_type VARCHAR(50) NOT NULL,
   description TEXT,
   target_disease VARCHAR(100),
@@ -6602,30 +6604,51 @@ db.query(`CREATE TABLE IF NOT EXISTS barangay_actions (
       });
     }
   });
+  // Self-migration for installs created before actions could answer a disease
+  // warning (panelist requirement: an intervention on a flagged count needs
+  // its remarks). Same soft-reference pattern as hazard_id.
+  db.query("SHOW COLUMNS FROM barangay_actions LIKE 'epi_alert_id'", (colErr, colRows) => {
+    if (!colErr && (!colRows || colRows.length === 0)) {
+      db.query("ALTER TABLE barangay_actions ADD COLUMN epi_alert_id INT NULL, ADD COLUMN alert_kind VARCHAR(30) NULL, ADD INDEX idx_ba_alert (epi_alert_id)", (altErr) => {
+        if (altErr) console.error('Error migrating barangay_actions.epi_alert_id:', altErr.message);
+        else console.log('barangay_actions epi_alert_id/alert_kind columns added');
+      });
+    }
+  });
 });
 
-const ACTION_TYPES = ['Fogging', 'Vaccination Drive', 'Info Campaign', 'Active Case Finding', 'Home Visits', 'Sanitation'];
+const ACTION_TYPES = ['Fogging', 'Spraying', 'Community Cleaning', 'Vaccination Drive', 'Info Campaign', 'Active Case Finding', 'Home Visits', 'Sanitation'];
 const ACTION_STATUSES = ['planned', 'ongoing', 'completed'];
 // Mirrors ACTION_TYPE_ICONS in frontend/src/disasterRisk.js
 const ACTION_TYPE_GLYPH = {
-  'Fogging': '💨', 'Vaccination Drive': '💉', 'Info Campaign': '📢',
+  'Fogging': '💨', 'Spraying': '🚿', 'Community Cleaning': '🧼', 'Vaccination Drive': '💉', 'Info Campaign': '📢',
   'Active Case Finding': '🔍', 'Home Visits': '🏠', 'Sanitation': '🧹',
 };
+
+// Disease-warning kinds an intervention can answer: the epi_* values come from
+// a real epi_alerts row, the rest tag Dashboard-computed warning cards (a
+// hotspot or a threshold card has no row of its own). Declared with the rest of
+// the barangay-action validators further down.
 
 app.get('/api/barangay-actions', (req, res) => {
   // LEFT JOIN disaster_events so the client gets the hazard pairing in the same
   // payload - no extra round trip just to label an action as a response.
   let sql = `SELECT ba.*, b.name AS barangay_name,
        de.event_type AS hazard_type, de.severity AS hazard_severity,
-       de.date_started AS hazard_date_started, de.date_ended AS hazard_date_ended
+       de.date_started AS hazard_date_started, de.date_ended AS hazard_date_ended,
+       ea.disease_name AS alert_disease, ea.alert_type AS alert_type,
+       ea.alert_value AS alert_value, ea.period_start AS alert_period,
+       ea.barangay_name AS alert_barangay
     FROM barangay_actions ba
     LEFT JOIN barangays b ON ba.barangay_id = b.id
     LEFT JOIN disaster_events de ON ba.hazard_id = de.id
+    LEFT JOIN epi_alerts ea ON ba.epi_alert_id = ea.id
     WHERE 1=1`;
   const params = [];
   if (req.query.barangay_id) { sql += ' AND ba.barangay_id = ?'; params.push(req.query.barangay_id); }
   if (req.query.status) { sql += ' AND ba.status = ?'; params.push(req.query.status); }
   if (req.query.active === '1') { sql += " AND ba.status != 'completed'"; }
+  if (req.query.interventions === '1') { sql += ' AND (ba.epi_alert_id IS NOT NULL OR ba.alert_kind IS NOT NULL)'; }
   sql += ' ORDER BY ba.created_at DESC';
   db.query(sql, params, (err, rows) => {
     if (err) return res.status(500).json({ error: 'Internal database error. Please try again.' });
@@ -6655,69 +6678,156 @@ function verifyActionHazard(hazardId, cb) {
   });
 }
 
+// ── Disease-warning link (intervention + required remarks) ──
+// `epi_alert_id` points at a real epi_alerts row (the server-computed warning).
+// `alert_kind` tags the Dashboard-only warnings that have no row of their own
+// (a recurring hotspot or a threshold card), so both routes carry the
+// "this answers a warning" flag that makes the remarks field mandatory.
+const ALERT_KINDS = ['epi_count', 'count_threshold', 'surge', 'mortality', 'hazard_disease', 'high_active', 'mortality_card', 'rapid_surge', 'rising_trend', 'hotspot', 'disaster'];
+
+function resolveActionAlertId(alertId, res) {
+  if (alertId === undefined || alertId === null || alertId === '' || alertId === 'null') return null;
+  const id = Number(alertId);
+  if (!Number.isInteger(id) || id <= 0) {
+    res.status(400).json({ error: 'Invalid disease alert reference.' });
+    return undefined;
+  }
+  return id;
+}
+
+function normalizeAlertKind(rawKind) {
+  if (!rawKind) return null;
+  return ALERT_KINDS.includes(String(rawKind)) ? String(rawKind) : null;
+}
+
+function verifyActionAlert(alertId, cb) {
+  if (!alertId) return cb(null, null);
+  db.query('SELECT id, disease_name, barangay_name, alert_type, alert_value, period_start FROM epi_alerts WHERE id = ?', [alertId], (err, rows) => {
+    if (err) return cb(err);
+    if (!rows || !rows.length) return cb(null, null, 'Linked disease alert not found.');
+    cb(null, rows[0]);
+  });
+}
+
+// Human-readable warning context for the audit trail + BHW notice.
+function alertContextLabel(alert, kind) {
+  if (alert) {
+    return `${alert.disease_name} warning (${alert.alert_value} cases)${alert.barangay_name ? ' in ' + alert.barangay_name : ''}`;
+  }
+  const kindLabels = {
+    count_threshold: 'case count warning',
+    epi_count: 'case count warning',
+    mortality_card: 'mortality warning',
+    high_active: 'High Active Cases warning',
+    rapid_surge: 'Rapid Surge warning',
+    rising_trend: 'Rising Trend warning',
+    hotspot: 'recurring hotspot warning',
+    disaster: 'disaster alert',
+  };
+  return kind ? (kindLabels[kind] || 'disease warning') : null;
+}
+
 app.post('/api/barangay-actions', authenticate, (req, res) => {
   if (req.user.role !== 'CHO') return res.status(403).json({ error: 'Only CHO can add a barangay action.' });
-  const { barangay_id, action_type, description, target_disease, date_started, date_ended, status, hazard_id } = req.body;
+  const { barangay_id, action_type, description, target_disease, date_started, date_ended, status, hazard_id, epi_alert_id, alert_kind } = req.body;
   if (!action_type || !ACTION_TYPES.includes(action_type)) return res.status(400).json({ error: 'A valid action type is required.' });
   const st = status || 'planned';
   if (!ACTION_STATUSES.includes(st)) return res.status(400).json({ error: 'Invalid action status.' });
   const hazardId = resolveActionHazardId(hazard_id, res);
   if (hazardId === undefined) return;
+  const alertId = resolveActionAlertId(epi_alert_id, res);
+  if (alertId === undefined) return;
+  const alertKind = normalizeAlertKind(alert_kind);
+  const remarks = (description === undefined || description === null) ? '' : String(description).trim();
+  // An intervention logged against a flagged disease count MUST say what was
+  // done (fogging / spraying / community cleaning).
+  if ((alertId || alertKind) && !remarks) {
+    return res.status(400).json({ error: 'Remarks are required for an intervention on a disease warning.' });
+  }
   verifyActionHazard(hazardId, (hErr, hazard, hMsg) => {
     if (hErr) return res.status(500).json({ error: 'Internal database error. Please try again.' });
     if (hMsg) return res.status(400).json({ error: hMsg });
-    db.query(
-      'INSERT INTO barangay_actions (barangay_id, hazard_id, action_type, description, target_disease, date_started, date_ended, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [barangay_id || null, hazardId, action_type, description || null, target_disease || null, date_started || null, date_ended || null, st, req.user.user_id],
-      (err, result) => {
-        if (err) return res.status(500).json({ error: 'Internal database error. Please try again.' });
-        createAuditLog(req.user.user_id, req.user.name, req.user.role, result.insertId, req.user.barangay || null, 'Barangay Action', 'Add', `${action_type} action added`);
-        // Field workers do the actual work - tell the affected barangay's BHW.
-        notifyBhwOfAction({
-          action_type, hazard, barangay_id: barangay_id || null, status: st,
-          verb: 'logged',
-        });
-        res.status(201).json({ id: result.insertId });
-      }
-    );
+    verifyActionAlert(alertId, (aErr, alert, aMsg) => {
+      if (aErr) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+      if (aMsg) return res.status(400).json({ error: aMsg });
+      const ctx = alertContextLabel(alert, alertKind);
+      db.query(
+        'INSERT INTO barangay_actions (barangay_id, hazard_id, epi_alert_id, alert_kind, action_type, description, target_disease, date_started, date_ended, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [barangay_id || null, hazardId, alertId, alertKind, action_type, remarks || null, target_disease || null, date_started || null, date_ended || null, st, req.user.user_id],
+        (err, result) => {
+          if (err) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+          createAuditLog(
+            req.user.user_id, req.user.name, req.user.role, result.insertId, req.user.barangay || null,
+            'Barangay Action', 'Add',
+            ctx ? `${action_type} intervention logged - ${ctx}` : `${action_type} action added`
+          );
+          // Field workers do the actual work - tell the affected barangay's BHW.
+          notifyBhwOfAction({
+            action_type, hazard, barangay_id: barangay_id || null, status: st,
+            verb: 'logged', alertLabel: ctx,
+          });
+          res.status(201).json({ id: result.insertId });
+        }
+      );
+    });
   });
 });
 
 app.put('/api/barangay-actions/:id', authenticate, (req, res) => {
   if (req.user.role !== 'CHO') return res.status(403).json({ error: 'Only CHO can update a barangay action.' });
-  const { barangay_id, action_type, description, target_disease, date_started, date_ended, status, hazard_id } = req.body;
+  const { barangay_id, action_type, description, target_disease, date_started, date_ended, status, hazard_id, epi_alert_id, alert_kind } = req.body;
   if (status && !ACTION_STATUSES.includes(status)) return res.status(400).json({ error: 'Invalid action status.' });
   const hazardId = resolveActionHazardId(hazard_id, res);
   if (hazardId === undefined) return;
-  verifyActionHazard(hazardId, (hErr, hazard, hMsg) => {
-    if (hErr) return res.status(500).json({ error: 'Internal database error. Please try again.' });
-    if (hMsg) return res.status(400).json({ error: hMsg });
-    // Read the row as it stands before writing, so the status-change test uses
-    // the real prior value rather than something the client claims.
-    db.query('SELECT status, hazard_id FROM barangay_actions WHERE id = ?', [req.params.id], (gErr, existing) => {
-      if (gErr) return res.status(500).json({ error: 'Internal database error. Please try again.' });
-      if (!existing || !existing.length) return res.status(404).json({ error: 'Barangay action not found.' });
-      const previousStatus = existing[0].status;
-      const newStatus = status || previousStatus || 'planned';
-      db.query(
-        'UPDATE barangay_actions SET barangay_id = ?, hazard_id = ?, action_type = ?, description = ?, target_disease = ?, date_started = ?, date_ended = ?, status = ? WHERE id = ?',
-        [barangay_id || null, hazardId, action_type, description || null, target_disease || null, date_started || null, date_ended || null, newStatus, req.params.id],
-        (err, result) => {
-          if (err) return res.status(500).json({ error: 'Internal database error. Please try again.' });
-          if (!result.affectedRows) return res.status(404).json({ error: 'Barangay action not found.' });
-          createAuditLog(req.user.user_id, req.user.name, req.user.role, req.params.id, req.user.barangay || null, 'Barangay Action', 'Update', `${action_type} action updated`);
-          // Notify only when the status genuinely moved. Editing a description or
-          // a date is not news, and notifying on those would spam the BHW with
-          // echoes of the CHO's own typo fixes.
-          if (newStatus !== previousStatus) {
-            notifyBhwOfAction({
-              action_type, hazard, barangay_id: barangay_id || null, status: newStatus,
-              verb: newStatus === 'completed' ? 'completed' : `now ${newStatus}`,
-            });
+  // Read the row as it stands before writing, so the status-change test uses
+  // the real prior value rather than something the client claims.
+  db.query('SELECT status, hazard_id, epi_alert_id, alert_kind FROM barangay_actions WHERE id = ?', [req.params.id], (gErr, existing) => {
+    if (gErr) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+    if (!existing || !existing.length) return res.status(404).json({ error: 'Barangay action not found.' });
+    const row = existing[0];
+    // An omitted alert link keeps whatever the row already had, so a client that
+    // does not send these fields can never silently unlink a warning.
+    const alertId = (epi_alert_id === undefined) ? (row.epi_alert_id || null) : resolveActionAlertId(epi_alert_id, res);
+    if (alertId === undefined) return;
+    const alertKind = (alert_kind === undefined) ? normalizeAlertKind(row.alert_kind) : normalizeAlertKind(alert_kind);
+    const remarks = (description === undefined || description === null) ? '' : String(description).trim();
+    if ((alertId || alertKind) && !remarks) {
+      return res.status(400).json({ error: 'Remarks are required for an intervention on a disease warning.' });
+    }
+    verifyActionHazard(hazardId, (hErr, hazard, hMsg) => {
+      if (hErr) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+      if (hMsg) return res.status(400).json({ error: hMsg });
+      verifyActionAlert(alertId, (aErr, alert, aMsg) => {
+        if (aErr) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+        if (aMsg) return res.status(400).json({ error: aMsg });
+        const previousStatus = row.status;
+        const newStatus = status || previousStatus || 'planned';
+        const ctxLabel = alertContextLabel(alert, alertKind);
+        db.query(
+          'UPDATE barangay_actions SET barangay_id = ?, hazard_id = ?, epi_alert_id = ?, alert_kind = ?, action_type = ?, description = ?, target_disease = ?, date_started = ?, date_ended = ?, status = ? WHERE id = ?',
+          [barangay_id || null, hazardId, alertId, alertKind, action_type, remarks || null, target_disease || null, date_started || null, date_ended || null, newStatus, req.params.id],
+          (err, result) => {
+            if (err) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+            if (!result.affectedRows) return res.status(404).json({ error: 'Barangay action not found.' });
+            createAuditLog(
+              req.user.user_id, req.user.name, req.user.role, req.params.id, req.user.barangay || null,
+              'Barangay Action', 'Update',
+              ctxLabel ? `${action_type} intervention updated - ${ctxLabel}` : `${action_type} action updated`
+            );
+            // Notify only when the status genuinely moved. Editing a description or
+            // a date is not news, and notifying on those would spam the BHW with
+            // echoes of the CHO's own typo fixes.
+            if (newStatus !== previousStatus) {
+              notifyBhwOfAction({
+                action_type, hazard, barangay_id: barangay_id || null, status: newStatus,
+                verb: newStatus === 'completed' ? 'completed' : `now ${newStatus}`,
+                alertLabel: ctxLabel,
+              });
+            }
+            res.json({ message: 'Barangay action updated.' });
           }
-          res.json({ message: 'Barangay action updated.' });
-        }
-      );
+        );
+      });
     });
   });
 });
@@ -6885,17 +6995,20 @@ const sendWeatherAlert = (opts, done) => deliverNotice({ recipients: 'staff', ..
 // severity is intentionally left undefined: an action is not safety-critical,
 // so it always honours the user's own notification toggles.
 // A citywide action has no single affected barangay, so every active BHW is told.
-const notifyBhwOfAction = ({ action_type, hazard, barangay_id, status, verb }) => {
+const notifyBhwOfAction = ({ action_type, hazard, barangay_id, status, verb, alertLabel }) => {
   const glyph = ACTION_TYPE_GLYPH[action_type] || '🗂';
   const linked = hazard ? ` Responding to ${hazardGlyph(hazard.event_type)} ${hazard.event_type}.` : '';
+  // Intervention logged against a flagged disease count (the panelist workflow):
+  // the BHW needs to know which warning the field work answers.
+  const forAlert = alertLabel ? ` For ${alertLabel}.` : '';
   const st = status ? ` Status: ${status}.` : '';
   const send = (placeLabel) => {
     // "citywide" only when there is genuinely no barangay attached. A failed
     // name lookup must not claim citywide - the notice is still barangay-scoped.
     const where = barangay_id ? (placeLabel ? ` in ${placeLabel}` : '') : ' citywide';
     deliverNotice({
-      title: 'Barangay Action',
-      message: `${glyph} ${action_type} ${verb}${where}.` + linked + st,
+      title: alertLabel ? 'Disease Intervention' : 'Barangay Action',
+      message: `${glyph} ${action_type} ${verb}${where}.` + linked + forAlert + st,
       barangay_id: barangay_id || null,
       recipients: 'barangay',
     });

@@ -2,11 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useI18n } from './i18n';
 import axios from 'axios';
 import { API_URL } from './config';
-import { cacheCases, getCachedCases, isOnline } from './offlineSync';
+import { cacheCases, getCachedCases, isOnline, cacheBarangays, getCachedBarangays } from './offlineSync';
 import { formatDate as formatDateStr } from './formatDate';
 import DatePicker from './components/DatePicker';
 import ExportPreviewModal from './components/ExportPreview';
-import { DISASTER_ICONS, SEVERITY_COLORS } from './disasterRisk';
+import InterventionModal from './components/InterventionModal';
+import { DISASTER_ICONS, SEVERITY_COLORS, ACTION_TYPE_ICONS } from './disasterRisk';
 import { RISK_FACTOR_GROUPS, summarizeRiskFactors } from './riskFactors';
 
 // Counts up (or down) to `value` whenever it changes
@@ -117,6 +118,11 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   const [hoveredCard, setHoveredCard] = useState(null);
   const [epiAlerts, setEpiAlerts] = useState([]);
   const [disasterEvents, setDisasterEvents] = useState([]);
+  // Warning-linked interventions (barangay_actions rows answering a flagged
+  // disease count). CHO logs them from the alert cards below; BHW reads them.
+  const [interventions, setInterventions] = useState([]);
+  const [barangayList, setBarangayList] = useState([]);
+  const [interventionCtx, setInterventionCtx] = useState(null);
 
   // Fetch server-side epidemiological alerts (fired hourly by the backend cron)
   useEffect(() => {
@@ -129,6 +135,19 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       axios.get(API_URL + '/api/disaster-events?active=1')
         .then(res => { if (alive) setDisasterEvents(Array.isArray(res.data) ? res.data : []); })
         .catch(() => {});
+      axios.get(API_URL + '/api/barangay-actions')
+        .then(res => { if (alive) setInterventions(Array.isArray(res.data) ? res.data : []); })
+        .catch(() => {});
+      axios.get(API_URL + '/api/barangays')
+        .then(res => {
+          const list = Array.isArray(res.data) ? res.data : [];
+          if (alive) setBarangayList(list);
+          cacheBarangays(list).catch(() => {});
+        })
+        .catch(async () => {
+          const cached = await getCachedBarangays();
+          if (alive && cached) setBarangayList(cached);
+        });
     };
     load();
     const iv = setInterval(load, 60000);
@@ -926,15 +945,83 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     rows: (list || []).map(alertRow),
     actions: [],
   });
+  // ── Warning-linked interventions (required remarks - panelist item 2/3) ──
+  // A warning card / hotspot row is matched to its intervention log by
+  // barangay + disease, so an intervention logged from the Dashboard, the map
+  // or the case form all show up on the same warning.
+  const warnKey = (barangay, disease) => `${String(barangay || '').trim().toLowerCase()}|${String(disease || '').trim().toLowerCase()}`;
+  const interventionIndex = (() => {
+    const map = {};
+    (interventions || []).forEach(a => {
+      if (!a.epi_alert_id && !a.alert_kind) return; // only warning-answering records
+      const disease = a.target_disease || a.alert_disease || '';
+      const key = warnKey(a.barangay_name || a.alert_barangay, disease);
+      if (key === '|') return;
+      (map[key] = map[key] || []).push(a);
+    });
+    return map;
+  })();
+  const interventionsFor = (barangay, disease) => {
+    const key = warnKey(barangay, disease);
+    if (interventionIndex[key]) return interventionIndex[key];
+    // A disaster alert carries no disease of its own, so fall back to every
+    // intervention logged in that barangay.
+    if (!disease) {
+      const prefix = warnKey(barangay, '');
+      return Object.values(interventionIndex).flat().filter(a => warnKey(a.barangay_name || a.alert_barangay, a.target_disease || a.alert_disease || '').startsWith(prefix));
+    }
+    return [];
+  };
+  const barangayIdByName = (() => {
+    const map = {};
+    (barangayList || []).forEach(b => { map[String(b.name || '').trim().toLowerCase()] = b.id; });
+    return map;
+  })();
+  const alertKindLabel = (kind) => ({
+    count_threshold: t('Case count warning'),
+    epi_count: t('Case count warning'),
+    surge: t('Rapid surge warning'),
+    mortality: t('Mortality warning'),
+    hazard_disease: t('Hazard-linked disease warning'),
+    high_active: t('High active cases warning'),
+    mortality_card: t('Mortality warning'),
+    rapid_surge: t('Rapid surge warning'),
+    rising_trend: t('Rising trend warning'),
+    hotspot: t('Recurring hotspot warning'),
+    disaster: t('Disaster alert'),
+  }[kind] || t('Disease warning'));
+
+  // Opens the "Log Intervention" modal already pointed at the warning.
+  const openIntervention = (warn, label) => {
+    if (!warn) return;
+    const nameKey = String(warn.barangay || '').trim().toLowerCase();
+    setInterventionCtx({
+      barangay: warn.barangay || '',
+      barangay_id: warn.barangay_id || barangayIdByName[nameKey] || null,
+      disease: warn.disease || '',
+      count: warn.count || null,
+      alert_id: warn.alert_id || null,
+      alert_kind: warn.alert_kind || null,
+      kind_label: warn.alert_kind ? alertKindLabel(warn.alert_kind) : (label || ''),
+    });
+  };
+
+  const reloadInterventions = () => {
+    axios.get(API_URL + '/api/barangay-actions')
+      .then(res => setInterventions(Array.isArray(res.data) ? res.data : []))
+      .catch(() => {});
+    setInterventionCtx(null);
+  };
+
   const thresholdAlerts = (() => {
     const alerts = [];
-    if (deathCases > 0) alerts.push({ label: t('Mortality Alert'), detail: `${deathCases} death(s) recorded`, color: '#DC2626', border: 'rgba(220,38,38,0.3)', cases: displayCases.filter(c => c.status === 'Deceased') });
-    if (activeCases > 5) alerts.push({ label: t('High Active Cases'), detail: `${activeCases} cases under monitoring`, color: '#D97706', border: 'rgba(217,119,6,0.3)', cases: displayCases.filter(c => ['Active', 'Pending', 'Under Treatment'].includes(c.status)) });
+    if (deathCases > 0) alerts.push({ label: t('Mortality Alert'), detail: `${deathCases} death(s) recorded`, color: '#DC2626', border: 'rgba(220,38,38,0.3)', cases: displayCases.filter(c => c.status === 'Deceased'), warn: { barangay: '', barangay_id: null, disease: '', count: deathCases, alert_id: null, alert_kind: 'mortality_card' } });
+    if (activeCases > 5) alerts.push({ label: t('High Active Cases'), detail: `${activeCases} cases under monitoring`, color: '#D97706', border: 'rgba(217,119,6,0.3)', cases: displayCases.filter(c => ['Active', 'Pending', 'Under Treatment'].includes(c.status)), warn: { barangay: '', barangay_id: null, disease: '', count: activeCases, alert_id: null, alert_kind: 'high_active' } });
     const totalPrev = prevTotal;
     if (totalCases > 0 && totalPrev > 0) {
       const growth = ((totalCases - totalPrev) / totalPrev) * 100;
-      if (growth >= 50) alerts.push({ label: t('Rapid Surge'), detail: `+${Math.round(growth)}% vs previous period`, color: '#DC2626', border: 'rgba(220,38,38,0.3)', cases: displayCases });
-      else if (growth >= 20) alerts.push({ label: t('Rising Trend'), detail: `+${Math.round(growth)}% vs previous period`, color: '#D97706', border: 'rgba(217,119,6,0.3)', cases: displayCases });
+      if (growth >= 50) alerts.push({ label: t('Rapid Surge'), detail: `+${Math.round(growth)}% vs previous period`, color: '#DC2626', border: 'rgba(220,38,38,0.3)', cases: displayCases, warn: { barangay: '', barangay_id: null, disease: '', count: totalCases, alert_id: null, alert_kind: 'rapid_surge' } });
+      else if (growth >= 20) alerts.push({ label: t('Rising Trend'), detail: `+${Math.round(growth)}% vs previous period`, color: '#D97706', border: 'rgba(217,119,6,0.3)', cases: displayCases, warn: { barangay: '', barangay_id: null, disease: '', count: totalCases, alert_id: null, alert_kind: 'rising_trend' } });
     }
     // Server-side epidemiological alerts (per barangay × disease, hourly cron + dedupe)
     if (epiAlerts.length > 0) {
@@ -948,6 +1035,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           color: a.alert_type === 'surge' ? '#D97706' : '#DC2626',
           border: a.alert_type === 'surge' ? 'rgba(217,119,6,0.3)' : 'rgba(220,38,38,0.3)',
           cases: displayCases.filter(c => c.disease_name === a.disease_name && c.barangay_name === a.barangay_name),
+          warn: { barangay: a.barangay_name || '', barangay_id: a.barangay_id || null, disease: a.disease_name || '', count: a.alert_value, alert_id: a.id || null, alert_kind: a.alert_type || 'epi_count' },
         });
       });
     }
@@ -961,6 +1049,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
           color,
           border: 'rgba(37,99,235,0.3)',
           cases: displayCases.filter(c => c.barangay_name === a.barangay_name),
+          warn: { barangay: a.barangay_name || '', barangay_id: a.barangay_id || null, disease: '', count: null, alert_id: null, alert_kind: 'disaster' },
         });
       });
     }
@@ -1102,6 +1191,39 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     ).join('')}`;
   };
 
+  // Intervention trail for the export: every warning-linked action with its
+  // mandatory remarks, so a printed/PDF report shows the flagged count was
+  // answered and what was done about it.
+  const buildInterventionsSectionHTML = () => {
+    const logged = (interventions || []).filter(a => a.epi_alert_id || a.alert_kind);
+    if (logged.length === 0) return '';
+    const rows = logged.map(a => {
+      const where = a.barangay_name || a.alert_barangay || t('Citywide');
+      const disease = a.target_disease || a.alert_disease || '-';
+      const when = a.date_started ? formatDateStr(a.date_started, dateFormat) : '-';
+      return `<tr>
+        <td style="padding:6px 10px;font-size:13px;">${ACTION_TYPE_ICONS[a.action_type] || '🗂'} ${a.action_type}</td>
+        <td style="padding:6px 10px;font-size:13px;">${where}</td>
+        <td style="padding:6px 10px;font-size:13px;">${disease}</td>
+        <td style="padding:6px 10px;font-size:13px;">${a.status || '-'}</td>
+        <td style="padding:6px 10px;font-size:13px;white-space:nowrap;">${when}</td>
+        <td style="padding:6px 10px;font-size:13px;">${(a.description || '-').replace(/</g, '&lt;')}</td>
+      </tr>`;
+    }).join('');
+    return `<h3>${t('Interventions & Remarks')}</h3>
+      <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;">
+        <thead><tr style="background:#f1f5f9;">
+          <th style="padding:6px 10px;font-size:12px;text-align:left;">${t('Intervention')}</th>
+          <th style="padding:6px 10px;font-size:12px;text-align:left;">${t('Barangay')}</th>
+          <th style="padding:6px 10px;font-size:12px;text-align:left;">${t('Disease')}</th>
+          <th style="padding:6px 10px;font-size:12px;text-align:left;">${t('Status')}</th>
+          <th style="padding:6px 10px;font-size:12px;text-align:left;">${t('Date started')}</th>
+          <th style="padding:6px 10px;font-size:12px;text-align:left;">${t('Remarks')}</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  };
+
   // Full-dashboard report for Word / PDF(Print) / PPT slide exports
   const buildDashboardReportHTML = (variant) => {
     const isSlide = variant === 'slide';
@@ -1204,6 +1326,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       ${statCardsHTML}
 
       ${buildAlertsSectionHTML()}
+      ${buildInterventionsSectionHTML()}
 
       <h3>${t('Weekly Trend')}</h3>
       ${weekBars.length === 0 ? `<p style="color:#64748b;font-size:14px;">${t('No cases found.')}</p>` : buildBarChartHTML(weekBars, t('Weekly Trend'), weekMax)}
@@ -1437,36 +1560,89 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       {/* ── THRESHOLD ALERT CARDS (clickable → matching case list) ── */}
       {thresholdAlerts.length > 0 && (
         <div className="cdms-dash-alerts" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: compactMode ? '10px' : '16px' }}>
-          {thresholdAlerts.map((alert, i) => (
-            <button
-              key={i}
-              type="button"
-              className="cdms-view-in"
-              onClick={alert.onClick}
-              title={t('Click to view the related cases')}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '12px',
-                textAlign: 'left', cursor: 'pointer', width: '100%',
-                padding: compactMode ? '12px' : '20px', minHeight: '88px',
-                background: 'var(--bg-surface)', borderRadius: '10px',
-                border: '1px solid var(--border-color)',
-                borderLeft: `4px solid ${alert.color}`,
-                fontFamily: 'inherit', animationDelay: `${i * 80}ms`,
-                transition: 'transform .15s, box-shadow .15s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
-            >
-              <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: alert.color, flexShrink: 0 }} />
-              <span style={{ minWidth: 0, flex: 1 }}>
-                <span style={{ display: 'block', fontSize: '15px', fontWeight: '700', color: alert.color }}>{alert.label}</span>
-                <span style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{alert.detail}</span>
-                <span style={{ display: 'block', fontSize: '12px', color: 'var(--brand-text)', fontWeight: '600', marginTop: '4px' }}>
-                  {alert.cases.length} {alert.cases.length === 1 ? t('case') : t('cases')} · {t('View')} →
-                </span>
-              </span>
-            </button>
-          ))}
+          {thresholdAlerts.map((alert, i) => {
+            const loggedList = alert.warn ? interventionsFor(alert.warn.barangay, alert.warn.disease) : [];
+            const latest = loggedList[0];
+            return (
+              <div
+                key={i}
+                className="cdms-view-in"
+                style={{
+                  display: 'flex', flexDirection: 'column', width: '100%',
+                  background: 'var(--bg-surface)', borderRadius: '10px',
+                  border: '1px solid var(--border-color)',
+                  borderLeft: `4px solid ${alert.color}`,
+                  overflow: 'hidden', animationDelay: `${i * 80}ms`,
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={alert.onClick}
+                  title={t('Click to view the related cases')}
+                  style={{
+                    flex: 1, display: 'flex', alignItems: 'center', gap: '12px',
+                    textAlign: 'left', cursor: 'pointer', width: '100%',
+                    padding: compactMode ? '12px' : '18px', minHeight: compactMode ? '76px' : '86px',
+                    background: 'transparent', border: 'none',
+                    fontFamily: 'inherit', color: 'inherit',
+                    transition: 'transform .15s, box-shadow .15s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
+                >
+                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: alert.color, flexShrink: 0 }} />
+                  <span style={{ minWidth: 0, flex: 1 }}>
+                    <span style={{ display: 'block', fontSize: '15px', fontWeight: '700', color: alert.color }}>{alert.label}</span>
+                    <span style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{alert.detail}</span>
+                    <span style={{ display: 'block', fontSize: '12px', color: 'var(--brand-text)', fontWeight: '600', marginTop: '4px' }}>
+                      {alert.cases.length} {alert.cases.length === 1 ? t('case') : t('cases')} · {t('View')} →
+                    </span>
+                  </span>
+                </button>
+
+                {/* Intervention trail: proves a flagged count was acted on, and
+                    shows the required remarks. CHO can add one from here. */}
+                {alert.warn && (
+                  <div style={{ borderTop: '1px solid var(--border-color)', background: 'var(--input-bg)', padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {loggedList.length > 0 ? (
+                      <>
+                        <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <span style={{ color: 'var(--success, #129968)', fontWeight: '700' }}>
+                            ✔ {loggedList.length} {loggedList.length === 1 ? t('intervention logged') : t('interventions logged')}
+                          </span>
+                          {latest && (
+                            <span style={{ color: 'var(--text-muted)' }}>
+                              · {ACTION_TYPE_ICONS[latest.action_type] || '🗂'} {latest.action_type} · {latest.status}
+                              {latest.date_started ? ` · ${formatDateStr(latest.date_started, dateFormat)}` : ''}
+                            </span>
+                          )}
+                        </div>
+                        {latest?.description && (
+                          <div
+                            title={`${latest.description}${latest.date_ended ? ` (${t('ended')}: ${formatDateStr(latest.date_ended, dateFormat)})` : ''}`}
+                            style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            “{latest.description}”
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div style={{ fontSize: '12px', fontWeight: '600', color: '#D97706' }}>
+                        ⚠ {t('No intervention recorded for this warning yet')}
+                      </div>
+                    )}
+                    {loginRole === 'CHO' && (
+                      <button
+                        type="button"
+                        onClick={() => openIntervention(alert.warn, alert.label)}
+                        style={{ alignSelf: 'flex-start', padding: '5px 12px', borderRadius: '7px', border: '1px solid var(--success, #129968)', background: 'transparent', color: 'var(--success, #129968)', cursor: 'pointer', fontSize: '12px', fontWeight: '700', fontFamily: 'inherit' }}>
+                        ＋ {loggedList.length > 0 ? t('Add Intervention') : t('Log Intervention')}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -1615,17 +1791,49 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
               <div style={{ flex: 1, minWidth: '240px', display: 'flex', flexDirection: 'column', gap: compactMode ? '8px' : '11px', textAlign: 'left' }}>
                 {slices.map((s) => {
                   const last = s.h.lastReport ? `${t('Last')} ${formatDateStr(s.h.lastReport, dateFormat)}` : '-';
+                  const hotspotLogged = interventionsFor(s.h.barangay, s.h.disease);
+                  const hotspotLatest = hotspotLogged[0];
                   return (
                     <div
                       key={`${s.h.barangay}-${s.h.disease}`}
                       title={`${s.h.barangay} — ${s.h.disease}\n${s.h.count}×\n${last}`}
-                      style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ width: '14px', height: '14px', borderRadius: '50%', background: s.color, flexShrink: 0 }} />
-                      <span style={{ flex: 1, minWidth: 0, fontSize: compactMode ? '13px' : '14px', color: 'var(--text-main)', textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {s.h.barangay}
-                        <span style={{ color: 'var(--text-muted)' }}> · {s.h.disease}</span>
-                      </span>
-                      <span style={{ fontSize: compactMode ? '13px' : '14px', fontWeight: '700', color: 'var(--text-main)' }}>{s.h.count}×</span>
+                      style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ width: '14px', height: '14px', borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+                        <span style={{ flex: 1, minWidth: 0, fontSize: compactMode ? '13px' : '14px', color: 'var(--text-main)', textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {s.h.barangay}
+                          <span style={{ color: 'var(--text-muted)' }}> · {s.h.disease}</span>
+                        </span>
+                        <span style={{ fontSize: compactMode ? '13px' : '14px', fontWeight: '700', color: 'var(--text-main)' }}>{s.h.count}×</span>
+                      </div>
+                      {/* Intervention trail for this hotspot (required remarks) */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', paddingLeft: '24px' }}>
+                        {hotspotLogged.length > 0 ? (
+                          <>
+                            <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--success, #129968)' }}>
+                              ✔ {hotspotLogged.length} {hotspotLogged.length === 1 ? t('intervention logged') : t('interventions logged')}
+                            </span>
+                            {hotspotLatest && (
+                              <span style={{ fontSize: '12px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+                                · {ACTION_TYPE_ICONS[hotspotLatest.action_type] || '🗂'} {hotspotLatest.action_type}
+                                {hotspotLatest.description ? ` — “${hotspotLatest.description}”` : ''}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span style={{ fontSize: '12px', fontWeight: '600', color: '#D97706' }}>
+                            ⚠ {t('No intervention recorded for this warning yet')}
+                          </span>
+                        )}
+                        {loginRole === 'CHO' && (
+                          <button
+                            type="button"
+                            onClick={() => openIntervention({ barangay: s.h.barangay, barangay_id: null, disease: s.h.disease, count: s.h.count, alert_id: null, alert_kind: 'hotspot' }, t('Recurring Hotspots'))}
+                            style={{ padding: '3px 10px', borderRadius: '7px', border: '1px solid var(--success, #129968)', background: 'transparent', color: 'var(--success, #129968)', cursor: 'pointer', fontSize: '12px', fontWeight: '700', fontFamily: 'inherit' }}>
+                            ＋ {t('Log Intervention')}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -2616,6 +2824,16 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       </div>
 
       <ExportPreviewModal preview={exportPreview} onClose={() => setExportPreview(null)} />
+
+      <InterventionModal
+        open={!!interventionCtx}
+        context={interventionCtx}
+        barangays={barangayList}
+        diseases={ALL_DISEASES}
+        dateFormat={dateFormat}
+        onClose={() => setInterventionCtx(null)}
+        onSaved={reloadInterventions}
+      />
     </div>
   );
 };

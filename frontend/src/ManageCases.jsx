@@ -3082,9 +3082,9 @@ useEffect(() => {
                     </button>
                     {browseYearOpen && (
                       <div style={{ position: 'absolute', top: '105%', right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', zIndex: 120, overflow: 'hidden', minWidth: '150px' }}>
-                        {browseYearOptions.map(opt => (
+                        {browseYearOptions.map((opt, i) => (
                           <button key={opt} type="button" onClick={() => { setBrowseYear(opt); setBrowseYearOpen(false); }}
-                            style={{ display: 'block', width: '100%', padding: '9px 14px', background: browseYear === opt ? 'var(--input-bg)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '14px', color: browseYear === opt ? 'var(--accent)' : 'var(--text-main)', cursor: 'pointer', fontWeight: browseYear === opt ? '600' : '400' }}>
+                            style={{ display: 'block', width: '100%', padding: '9px 14px', background: browseYear === opt ? 'var(--info-bg)' : 'transparent', border: 'none', borderBottom: i < browseYearOptions.length - 1 ? '1px solid var(--border-color)' : 'none', textAlign: 'left', fontSize: '14px', color: browseYear === opt ? 'var(--info-text)' : 'var(--text-main)', cursor: 'pointer', fontWeight: browseYear === opt ? '600' : '400' }}>
                             {opt === 'All Years' ? t('All Years') : opt}
                           </button>
                         ))}
