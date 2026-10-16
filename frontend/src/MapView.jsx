@@ -1206,7 +1206,7 @@ function ChoroplethLayer({ barangayData, onHover, onLeave, onClick }) {
 }
 
 export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginBarangay, sessionContext, compactMode, dateFormat = 'MM/DD/YY' }) {
-  const { t, translateStatus } = useI18n();
+  const { t, translateStatus, translateActionStatus } = useI18n();
   const currentYear = new Date().getFullYear();
   const [allCases, setAllCases] = useState([]);
   const [barangayData, setBarangayData] = useState([]);
@@ -1896,6 +1896,19 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       && wxKey(x.barangay_name) === wxKey(alert.barangay_name)
       && (x.target_disease || x.alert_disease || '') === (alert.disease_name || '')) || null;
   };
+  // Warning-linked interventions grouped by barangay. A Dashboard-computed warning
+  // (High Active Cases, a Recurring Hotspot, ...) has no `epi_alerts` row of its
+  // own, so the logged intervention is the only evidence of it the map can see -
+  // without this the "Disease Warning Interventions" card and the popup banner went
+  // blank for every warning that was not a real epi_alerts row.
+  const warnActionsByBarangay = {};
+  actions.forEach(a => {
+    if (!isWarningIntervention(a)) return;
+    const name = a.barangay_name || a.alert_barangay || '';
+    if (!name) return;
+    const k = wxKey(name);
+    (warnActionsByBarangay[k] = warnActionsByBarangay[k] || []).push(a);
+  });
   const warningBadgeItems = [];
   if (mapZoom < PUROK_ZOOM_THRESHOLD) {
     hazardScopeList.forEach(name => {
@@ -2004,6 +2017,10 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   // intervention that answers it - drives the popup warning banner.
   const popupWarning = popupActionKey ? (alertsByBarangay[wxKey(popupActionKey)] || null) : null;
   const popupWarningIntervention = interventionMatchesWarning(popupWarning);
+  // Warning-linked interventions for the inspected barangay. When the warning came
+  // from the Dashboard (no epi_alerts row) `popupWarning` is null, so this is what
+  // shows the CHO that the field work for that warning is on record.
+  const popupLoggedWarnings = popupActionKey ? (warnActionsByBarangay[wxKey(popupActionKey)] || []) : [];
   const popupWeather = popupActionKey ? weatherByName[wxKey(popupActionKey)] : null;
   const popupManualEvents = popupActionKey ? (manualBarangayEvents[wxKey(popupActionKey)] || []) : [];
 
@@ -2064,13 +2081,48 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   ).length;
 
   // Disease-warning coverage (panelist intervention flow): flagged counts from
-  // `/api/epi-alerts` in the user's scope, and whether an intervention with the
-  // mandatory remarks already answers each one.
+  // `/api/epi-alerts` in the user's scope, plus any warning-linked intervention
+  // whose warning the Dashboard computed (those have no epi_alerts row, so the
+  // intervention itself is the map's only evidence of the warning).
   const warningBarangays = hazardScopeList
     .map(n => alertsByBarangay[wxKey(n)])
     .filter(Boolean)
     .sort((a, b) => (Number(b.alert_value) || 0) - (Number(a.alert_value) || 0));
-  const warningAnsweredCount = warningBarangays.filter(a => interventionMatchesWarning(a)).length;
+  const warningItems = (() => {
+    const items = warningBarangays.map(alert => {
+      const intervention = interventionMatchesWarning(alert);
+      return {
+        key: 'alert-' + (alert.id != null ? alert.id : `${wxKey(alert.barangay_name)}-${alert.disease_name || ''}`),
+        barangay_name: alert.barangay_name,
+        disease_name: alert.disease_name,
+        alert_value: alert.alert_value,
+        alert_type: alert.alert_type,
+        answered: !!intervention,
+        intervention,
+      };
+    });
+    const inScope = new Set(hazardScopeList.map(wxKey));
+    Object.keys(warnActionsByBarangay).forEach(k => {
+      if (alertsByBarangay[k]) return; // a live epi_alert already represents this warning
+      if (inScope.size && !inScope.has(k)) return;
+      const list = warnActionsByBarangay[k].slice().sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0));
+      const latest = list[0];
+      const name = latest.barangay_name || latest.alert_barangay || '';
+      if (!name) return;
+      items.push({
+        key: `logged-${k}-${wxKey(latest.target_disease || latest.alert_disease || '')}`,
+        barangay_name: name,
+        disease_name: latest.target_disease || latest.alert_disease || '',
+        alert_value: Number(latest.alert_value) || null,
+        alert_type: latest.alert_kind || null,
+        answered: true,
+        intervention: latest,
+        loggedCount: list.length,
+      });
+    });
+    return items.sort((a, b) => (Number(b.alert_value) || 0) - (Number(a.alert_value) || 0));
+  })();
+  const warningAnsweredCount = warningItems.filter(w => w.answered).length;
 
   // Historical comparison for the open popup: the same calendar week one year ago
   useEffect(() => {
@@ -2742,35 +2794,32 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
             checkbox filters the map down to the interventions themselves. */}
         <div style={{ paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
           <p style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('Disease Warning Interventions')}</p>
-          {warningBarangays.length === 0 ? (
+          {warningItems.length === 0 ? (
             <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>{t('No flagged disease counts in this scope.')}</p>
           ) : (
             <>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '6px' }}>
                 <span style={{ fontSize: '22px', fontWeight: '800', color: 'var(--text-main)' }}>{warningAnsweredCount}</span>
-                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{t('of')}{` ${warningBarangays.length} `}{t('warnings answered')}</span>
+                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{t('of')}{` ${warningItems.length} `}{t('warnings answered')}</span>
               </div>
               <div style={{ height: '7px', background: 'var(--input-bg)', borderRadius: '4px', overflow: 'hidden', marginBottom: '8px' }}>
                 <div style={{
-                  width: `${warningBarangays.length ? Math.round((warningAnsweredCount / warningBarangays.length) * 100) : 0}%`,
+                  width: `${warningItems.length ? Math.round((warningAnsweredCount / warningItems.length) * 100) : 0}%`,
                   height: '100%',
-                  background: warningAnsweredCount === warningBarangays.length ? '#10b981' : warningAnsweredCount > 0 ? '#f59e0b' : '#dc2626',
+                  background: warningAnsweredCount === warningItems.length ? '#10b981' : warningAnsweredCount > 0 ? '#f59e0b' : '#dc2626',
                   borderRadius: '4px',
                 }} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
-                {warningBarangays.slice(0, 6).map(a => {
-                  const ans = interventionMatchesWarning(a);
-                  return (
-                    <button key={a.id || a.barangay_name} onClick={() => openBarangayPopup(a.barangay_name)}
-                      title={`${a.barangay_name} · ${a.disease_name}`}
-                      style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '6px 9px', borderRadius: '7px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', cursor: 'pointer', textAlign: 'left', font: 'inherit' }}>
-                      <span>{ans ? '✔' : '⚠️'}</span>
-                      <span style={{ flex: 1, fontSize: '13px', fontWeight: '600', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.barangay_name} · {a.disease_name}</span>
-                      <span style={{ fontSize: '12px', fontWeight: '700', color: ans ? '#10b981' : '#D97706' }}>{a.alert_value}</span>
-                    </button>
-                  );
-                })}
+                {warningItems.slice(0, 6).map(w => (
+                  <button key={w.key} onClick={() => openBarangayPopup(w.barangay_name)}
+                    title={`${w.barangay_name} · ${w.disease_name || t('Disease warning')}`}
+                    style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '6px 9px', borderRadius: '7px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', cursor: 'pointer', textAlign: 'left', font: 'inherit' }}>
+                    <span>{w.answered ? '✔' : '⚠️'}</span>
+                    <span style={{ flex: 1, fontSize: '13px', fontWeight: '600', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.barangay_name} · {w.disease_name || t(ALERT_KIND_LABELS[w.alert_type] || 'Disease warning')}</span>
+                    <span style={{ fontSize: '12px', fontWeight: '700', color: w.answered ? '#10b981' : '#D97706' }}>{w.alert_value != null ? w.alert_value : '✔'}</span>
+                  </button>
+                ))}
               </div>
               <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
                 {warningAnsweredCount === 0
@@ -3165,7 +3214,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                     </div>
                     {popupWarningIntervention ? (
                       <div style={{ marginTop: '8px', fontSize: '12px', color: '#10b981', fontWeight: '700' }}>
-                        ✔ {t('Intervention logged')}: {ACTION_TYPE_ICONS[popupWarningIntervention.action_type] || '🗂'} {t(popupWarningIntervention.action_type)} · {t(popupWarningIntervention.status)}
+                        ✔ {t('Intervention logged')}: {ACTION_TYPE_ICONS[popupWarningIntervention.action_type] || '🗂'} {t(popupWarningIntervention.action_type)} · {translateActionStatus(popupWarningIntervention.status)}
                         {popupWarningIntervention.description ? (
                           <div style={{ marginTop: '3px', color: 'var(--text-muted)', fontWeight: '400', fontStyle: 'italic' }}>“{popupWarningIntervention.description}”</div>
                         ) : null}
@@ -3182,6 +3231,35 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                       </button>
                     )}
                   </div>
+                </div>
+              )}
+
+              {/* A warning the Dashboard computed has no epi_alerts row, so there is
+                  nothing for the banner above to render. The logged intervention is
+                  the record of that warning on the map. */}
+              {!popupWarning && popupLoggedWarnings.length > 0 && (
+                <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
+                  <p style={{ margin: '0 0 10px 0', fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {t('Disease Warning Interventions')}
+                  </p>
+                  {popupLoggedWarnings.slice(0, 3).map(a => (
+                    <div key={a.id} style={{ padding: '10px 12px', marginBottom: '7px', borderRadius: '8px', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.45)' }}>
+                      <div style={{ fontSize: '14px', fontWeight: '700', color: '#10b981' }}>
+                        ✔ {t('Intervention logged')}
+                      </div>
+                      <div style={{ fontSize: '13px', color: 'var(--text-main)', marginTop: '2px' }}>
+                        {ACTION_TYPE_ICONS[a.action_type] || '🗂'} {t(a.action_type)}
+                        {a.target_disease ? ` · ${a.target_disease}` : ''}
+                        {a.status ? ` · ${translateActionStatus(a.status)}` : ''}
+                      </div>
+                      {a.description ? (
+                        <div style={{ marginTop: '3px', fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>“{a.description}”</div>
+                      ) : null}
+                    </div>
+                  ))}
+                  {popupLoggedWarnings.length > 3 && (
+                    <p style={{ margin: '0', fontSize: '12px', color: 'var(--text-muted)' }}>+{popupLoggedWarnings.length - 3}</p>
+                  )}
                 </div>
               )}
 
@@ -3222,7 +3300,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                         color: a.status === 'completed' ? '#10b981' : a.status === 'ongoing' ? '#0891b2' : '#d97706',
                         textTransform: 'capitalize',
                       }}>
-                        {t(a.status)}
+                        {translateActionStatus(a.status)}
                       </span>
                     </div>
                   ))}
@@ -3477,7 +3555,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                     value={actionForm.status}
                     onChange={e => setActionForm({ ...actionForm, status: e.target.value })}
                     style={{ padding: '8px 10px', borderRadius: '7px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '14px' }}>
-                    {ACTION_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                    {ACTION_STATUSES.map(s => <option key={s} value={s}>{translateActionStatus(s)}</option>)}
                   </select>
                 </label>
               </div>
@@ -3517,7 +3595,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                   }}>
                     <span style={{ fontSize: '15px' }}>{ACTION_TYPE_ICONS[a.action_type] || '📋'}</span>
                     <span style={{ flex: 1, fontSize: '13px', color: 'var(--text-main)' }}>
-                      {t(a.action_type)} · <span style={{ textTransform: 'capitalize' }}>{t(a.status)}</span>
+                      {t(a.action_type)} · {translateActionStatus(a.status)}
                       {isWarningIntervention(a) && (
                         <span style={{ display: 'block', fontSize: '12px', color: '#D97706', fontWeight: '600' }}>
                           ⚠ {t('Answers')}: {a.alert_disease || a.target_disease || t('Disease warning')}

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
-import { dictionaries, CASE_STATUSES, langNames } from './dictionaries';
+import { dictionaries, CASE_STATUSES, ACTION_STATUS_LABELS, langNames } from './dictionaries';
 
 const I18nContext = createContext(null);
 
@@ -44,6 +44,16 @@ export function I18nProvider({ children, scope = 'app' }) {
     return dictionaries[lang]?.[match] ?? match;
   }, [lang]);
 
+  // Barangay-action status (planned / ongoing / completed) is stored lowercase, so
+  // t(status) finds no key and prints 'ongoing'. Look the label up in its
+  // capitalised form instead: EN shows 'Ongoing', FIL shows 'Isinasagawa'.
+  const translateActionStatus = useCallback((status) => {
+    const s = (status || '').toLowerCase();
+    const match = ACTION_STATUS_LABELS.find(a => a.toLowerCase() === s);
+    if (!match) return status;
+    return dictionaries[lang]?.[match] ?? match;
+  }, [lang]);
+
   const translateServerError = useCallback((error) => {
     const map = {
       'User already exists': 'May account na',
@@ -70,7 +80,7 @@ export function I18nProvider({ children, scope = 'app' }) {
     return map[error] || error;
   }, []);
 
-  const value = useMemo(() => ({ t, lang, setLang, translateStatus, translateServerError }), [t, lang, setLang, translateStatus, translateServerError]);
+  const value = useMemo(() => ({ t, lang, setLang, translateStatus, translateActionStatus, translateServerError }), [t, lang, setLang, translateStatus, translateActionStatus, translateServerError]);
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }
 

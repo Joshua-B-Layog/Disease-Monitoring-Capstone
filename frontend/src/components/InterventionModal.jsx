@@ -11,10 +11,6 @@ import '../ManageCases.css';
 // Shared field styles, hoisted so the dropdown below can use them too.
 const fieldLabel = { display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' };
 
-// ACTION_STATUSES is stored lowercase ('ongoing'); the control shows the label
-// the panelist expects - Ongoing / Planned / Completed.
-const capLabel = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '');
-
 // The same custom dropdown used across Manage Cases, dropped into a label-style
 // field: button + absolutely-positioned item panel, closed by an outside click.
 const CustomDropdown = ({ label, value, display, options, onSelect, placeholder, disabled }) => {
@@ -73,7 +69,7 @@ const CustomDropdown = ({ label, value, display, options, onSelect, placeholder,
 // alert_id is only set for real epi_alerts rows; Dashboard-computed warnings
 // (recurring hotspot, high active cases, surge) pass alert_kind instead.
 const InterventionModal = ({ open, context, barangays = [], diseases = [], dateFormat, onClose, onSaved }) => {
-  const { t } = useI18n();
+  const { t, translateActionStatus } = useI18n();
   const today = new Date().toISOString().slice(0, 10);
   const [form, setForm] = useState({ barangay_id: '', disease: '', action_type: 'Fogging', status: 'ongoing', date_started: today, date_ended: '' });
   const [remarks, setRemarks] = useState('');
@@ -88,7 +84,7 @@ const InterventionModal = ({ open, context, barangays = [], diseases = [], dateF
       barangay_id: context?.barangay_id ? String(context.barangay_id) : '',
       disease: context?.disease || '',
       action_type: 'Fogging',
-      status: 'ongoing',
+      status: 'Ongoing',
       date_started: today,
       date_ended: '',
     });
@@ -201,8 +197,8 @@ const InterventionModal = ({ open, context, barangays = [], diseases = [], dateF
           <CustomDropdown
             label={t('Status')}
             value={form.status}
-            display={capLabel(form.status)}
-            options={ACTION_STATUSES.map(s => ({ value: s, label: capLabel(s) }))}
+            display={translateActionStatus(form.status)}
+            options={ACTION_STATUSES.map(s => ({ value: s, label: translateActionStatus(s) }))}
             onSelect={v => setForm({ ...form, status: v })}
           />
           <label style={fieldLabel}>

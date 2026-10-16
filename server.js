@@ -6717,6 +6717,9 @@ function alertContextLabel(alert, kind) {
   const kindLabels = {
     count_threshold: 'case count warning',
     epi_count: 'case count warning',
+    surge: 'rapid surge warning',
+    mortality: 'mortality warning',
+    hazard_disease: 'hazard-linked disease warning',
     mortality_card: 'mortality warning',
     high_active: 'High Active Cases warning',
     rapid_surge: 'Rapid Surge warning',

@@ -123,3 +123,8 @@ export const langNames = {
 };
 
 export const CASE_STATUSES = ['Active', 'Pending', 'Under Treatment', 'Recovered', 'Deceased', 'Draft'];
+
+// Barangay-action statuses are STORED lowercase ('ongoing') but the capitalised
+// form is the dictionary key (see the Barangay Actions block in `fil`), so display
+// always goes through translateActionStatus() - never t(a.status).
+export const ACTION_STATUS_LABELS = ['Planned', 'Ongoing', 'Completed'];

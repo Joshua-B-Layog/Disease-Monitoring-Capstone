@@ -95,7 +95,7 @@ const getPeriodRange = (period, quarter, year) => {
 };
 
 const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMode, loginRole, loginBarangay, sessionContext, selectedDisease, setSelectedDisease, dateRange, setDateRange, dashPeriod, setDashPeriod, dashQuarter, setDashQuarter, dashYear, setDashYear }) => {
-  const { t, translateStatus } = useI18n();
+  const { t, translateStatus, translateActionStatus } = useI18n();
   const [cases, setCases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -961,15 +961,44 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     });
     return map;
   })();
-  const interventionsFor = (barangay, disease) => {
+  // A real epi_alerts row is the most precise link, so index by id as well.
+  const interventionsById = (() => {
+    const map = {};
+    (interventions || []).forEach(a => {
+      if (!a.epi_alert_id) return;
+      const k = String(a.epi_alert_id);
+      (map[k] = map[k] || []).push(a);
+    });
+    return map;
+  })();
+  // The citywide threshold cards (Mortality Alert / High Active Cases / Rapid
+  // Surge / Rising Trend) are computed from the case list and have no epi_alerts
+  // row AND no barangay/disease of their own, so `alert_kind` is the only thing
+  // that identifies them. Without this index an intervention logged from one of
+  // those cards could never be matched back to it.
+  const interventionsByKind = (() => {
+    const map = {};
+    (interventions || []).forEach(a => {
+      if (!a.alert_kind) return;
+      (map[a.alert_kind] = map[a.alert_kind] || []).push(a);
+    });
+    return map;
+  })();
+  // `warn` is the card's warning object: { barangay, disease, alert_id, alert_kind }.
+  // Matching order mirrors the Map View popup: real alert id -> barangay+disease
+  // -> barangay (a disaster alert carries no disease of its own) -> warning kind.
+  const interventionsFor = (warn) => {
+    const barangay = warn?.barangay || '';
+    const disease = warn?.disease || '';
+    if (warn?.alert_id && interventionsById[String(warn.alert_id)]) return interventionsById[String(warn.alert_id)];
     const key = warnKey(barangay, disease);
     if (interventionIndex[key]) return interventionIndex[key];
-    // A disaster alert carries no disease of its own, so fall back to every
-    // intervention logged in that barangay.
-    if (!disease) {
+    if (!disease && barangay) {
       const prefix = warnKey(barangay, '');
-      return Object.values(interventionIndex).flat().filter(a => warnKey(a.barangay_name || a.alert_barangay, a.target_disease || a.alert_disease || '').startsWith(prefix));
+      const scoped = Object.values(interventionIndex).flat().filter(a => warnKey(a.barangay_name || a.alert_barangay, a.target_disease || a.alert_disease || '').startsWith(prefix));
+      if (scoped.length) return scoped;
     }
+    if (!barangay && !disease && warn?.alert_kind && interventionsByKind[warn.alert_kind]) return interventionsByKind[warn.alert_kind];
     return [];
   };
   const barangayIdByName = (() => {
@@ -1205,7 +1234,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
         <td style="padding:6px 10px;font-size:13px;">${ACTION_TYPE_ICONS[a.action_type] || '🗂'} ${a.action_type}</td>
         <td style="padding:6px 10px;font-size:13px;">${where}</td>
         <td style="padding:6px 10px;font-size:13px;">${disease}</td>
-        <td style="padding:6px 10px;font-size:13px;">${a.status || '-'}</td>
+        <td style="padding:6px 10px;font-size:13px;">${translateActionStatus(a.status) || '-'}</td>
         <td style="padding:6px 10px;font-size:13px;white-space:nowrap;">${when}</td>
         <td style="padding:6px 10px;font-size:13px;">${(a.description || '-').replace(/</g, '&lt;')}</td>
       </tr>`;
@@ -1561,7 +1590,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       {thresholdAlerts.length > 0 && (
         <div className="cdms-dash-alerts" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: compactMode ? '10px' : '16px' }}>
           {thresholdAlerts.map((alert, i) => {
-            const loggedList = alert.warn ? interventionsFor(alert.warn.barangay, alert.warn.disease) : [];
+            const loggedList = alert.warn ? interventionsFor(alert.warn) : [];
             const latest = loggedList[0];
             return (
               <div
@@ -1612,7 +1641,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                           </span>
                           {latest && (
                             <span style={{ color: 'var(--text-muted)' }}>
-                              · {ACTION_TYPE_ICONS[latest.action_type] || '🗂'} {latest.action_type} · {latest.status}
+                              · {ACTION_TYPE_ICONS[latest.action_type] || '🗂'} {latest.action_type} · {translateActionStatus(latest.status)}
                               {latest.date_started ? ` · ${formatDateStr(latest.date_started, dateFormat)}` : ''}
                             </span>
                           )}
@@ -1791,7 +1820,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
               <div style={{ flex: 1, minWidth: '240px', display: 'flex', flexDirection: 'column', gap: compactMode ? '8px' : '11px', textAlign: 'left' }}>
                 {slices.map((s) => {
                   const last = s.h.lastReport ? `${t('Last')} ${formatDateStr(s.h.lastReport, dateFormat)}` : '-';
-                  const hotspotLogged = interventionsFor(s.h.barangay, s.h.disease);
+                  const hotspotLogged = interventionsFor(s.h);
                   const hotspotLatest = hotspotLogged[0];
                   return (
                     <div
