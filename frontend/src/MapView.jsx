@@ -1120,7 +1120,9 @@ function LayerBadgeMarkers({ items }) {
       const icon = L.divIcon({ className: '', html, iconSize: [w, h], iconAnchor: [w / 2, anchorY] });
       const coords = it.dy ? [it.coords[0] + it.dy, it.coords[1]] : it.coords;
       const m = L.marker(coords, { icon, zIndexOffset: it.z != null ? it.z : 800 }).addTo(map);
-      m.bindTooltip(it.title || '', { direction: 'top', offset: [0, -12] });
+      // Keep the tooltip just above whatever was actually rendered (disc size and
+      // any `above` lift included) so a big badge never has its label on top of it.
+      m.bindTooltip(it.title || '', { direction: 'top', offset: [0, -(anchorY + 6)] });
       m.on('click', () => it.onClick && it.onClick());
       markersRef.current.push(m);
     });
@@ -2292,6 +2294,10 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   // action count discs already follow (`findCoords('Citywide')` resolves to nothing).
   // Position is barangay-level, and the sidebar card says so.
   const INTERVENTION_STATUS_COLORS = { planned: '#f59e0b', ongoing: '#0891b2', completed: '#10b981' };
+  // The intervention discs are deliberately the largest badge on the map (the
+  // CHO/BHW field crews must spot a logged intervention at a glance): 46px vs the
+  // 38px hazard disc and the 34px warning disc. Also drives the fan-out radius.
+  const INTERVENTION_PIN_SIZE = 46;
   const interventionRows = [];
   if (interventionsOnly) {
     const byOwnBarangay = {};
@@ -2311,7 +2317,11 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       const ring = barangayRing(name);
       const sorted = list.slice().sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0));
       const n = sorted.length;
-      const radius = n <= 3 ? 0.0035 : n <= 6 ? 0.0048 : 0.0060;
+      // Ring spacing keeps its tuned ratio to the disc size: the pins grew from
+      // 30px to INTERVENTION_PIN_SIZE so the ring grows with them, otherwise the
+      // bigger discs would merge into one blob. The border clamp below still
+      // guarantees containment, so a narrow barangay just tightens the ring.
+      const radius = (n <= 3 ? 0.0035 : n <= 6 ? 0.0048 : 0.0060) * (INTERVENTION_PIN_SIZE / 30);
       const lngRadius = radius / Math.max(0.2, Math.cos((base[0] * Math.PI) / 180));
       sorted.forEach((a, i) => {
         // A lone intervention sits on the centroid; several spread evenly from the top.
@@ -2339,13 +2349,16 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     const glyph = ACTION_TYPE_ICONS[a.action_type] || '🗂';
     const color = INTERVENTION_STATUS_COLORS[a.status] || INTERVENTION_STATUS_COLORS.planned;
     const disease = a.target_disease || a.alert_disease || '';
+    // Deliberately the largest badge on the map (the CHO/BHW field crews need to
+    // spot a logged intervention at a glance): 46px disc vs the 38px hazard disc
+    // and 34px warning disc, and it draws above both.
     return {
       id: `iv-${a.id}`,
       coords,
-      svg: hazardSvgMarkup(glyph, color, 30, 'iv' + a.id),
-      size: 30,
+      svg: hazardSvgMarkup(glyph, color, INTERVENTION_PIN_SIZE, 'iv' + a.id),
+      size: INTERVENTION_PIN_SIZE,
       color,
-      z: 1500,
+      z: 1700,
       title: `${glyph} ${a.action_type} · ${translateActionStatus(a.status)}${disease ? ` · ${disease}` : ''}${a.description ? ` — ${a.description}` : ''}`,
       onClick: () => openBarangayPopup(name),
     };
@@ -3544,11 +3557,11 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           {!interventionsOnly && mapZoom < 17 && <BarangayPins key="barangay-pins" barangayData={barangayData} onHover={setTooltip} onLeave={() => setTooltip(null)} onClick={setPopup} loginRole={loginRole} />}
           {isDisasterMap && showActionsLayer && !interventionsOnly && <LayerBadgeMarkers key="layer-actions" items={actionBadgeItems} />}
           {isDisasterMap && !interventionsOnly && <LayerBadgeMarkers key="layer-warnings" items={warningBadgeItems} />}
-          {/* Weather + hazard layers deliberately stay ON while filtering: during
-              rainy season the rain/flood warnings must not vanish just because you
-              are reviewing interventions. Only the CASE layers are hidden. */}
-          {isDisasterMap && showDisasterLayer && mapZoom < 17 && <LayerBadgeMarkers key="layer-hazards-badges" items={hazardBadgeItems} />}
-          {isDisasterMap && showDisasterLayer && mapZoom >= 17 && <LayerBadgeMarkers key="layer-hazards-pins" items={hazardPinItems} />}
+          {/* "Show interventions only" is an isolation mode: the weather/hazard
+              pins are hidden too so the map shows nothing but the intervention
+              discs (barangay outlines stay for orientation). */}
+          {isDisasterMap && showDisasterLayer && !interventionsOnly && mapZoom < 17 && <LayerBadgeMarkers key="layer-hazards-badges" items={hazardBadgeItems} />}
+          {isDisasterMap && showDisasterLayer && !interventionsOnly && mapZoom >= 17 && <LayerBadgeMarkers key="layer-hazards-pins" items={hazardPinItems} />}
           {interventionsOnly && <LayerBadgeMarkers key="layer-interventions" items={interventionPinItems} />}
           {zoneBreakdownItems.length > 0 && <ZoneBreakdownMarkers key="zone-breakdown" items={zoneBreakdownItems} />}
           <GeoJSON
@@ -3647,7 +3660,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         </div>
 
         {/* Weather attribution (Open-Meteo, CC BY 4.0) when the hazard layer is on */}
-        {isDisasterMap && showDisasterLayer && (
+        {isDisasterMap && showDisasterLayer && !interventionsOnly && (
           <div style={{
             position: 'absolute', bottom: '118px', left: '16px', zIndex: 1000,
             fontSize: '10px', color: 'var(--text-muted)', background: 'var(--bg-surface)',

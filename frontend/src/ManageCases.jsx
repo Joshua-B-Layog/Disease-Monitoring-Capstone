@@ -305,6 +305,21 @@ const DISEASE_CATEGORIES = [
   },
 ];
 
+// Query → category-name matcher for the Manage Cases disease search. Matches a
+// WORD PREFIX of the category name (ignoring the generic word "diseases") so
+// "vector" finds "Vector-borne" and "food" finds "Water & Foodborne", while a
+// single letter (e.g. "d" for Dengue) never matches every "... Diseases" category.
+// Needs at least 2 characters so a one-letter type-ahead cannot surface a whole category.
+const CATEGORY_MATCH_STOPWORDS = new Set(['disease', 'diseases', 'and', 'the', 'of']);
+const categoryMatchesQuery = (label, rawQuery) => {
+  const q = (rawQuery || '').trim().toLowerCase();
+  if (q.length < 2) return false;
+  return String(label || '').toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean)
+    .some(word => !CATEGORY_MATCH_STOPWORDS.has(word) && word.startsWith(q));
+};
+
 const ALL_DISEASE_OPTIONS = ALL_DISEASE_ENTRIES.map(d => d.name).sort();
 
 // Merge DB diseases into ALL_DISEASE_ENTRIES so added diseases persist in the UI after refresh
@@ -2817,10 +2832,10 @@ useEffect(() => {
     };
 
     const gridQ = diseaseSearch.trim().toLowerCase();
-    const applyFilters = (list) => {
+    const applyFilters = (list, skipNameMatch = false) => {
       let l = list;
       if (notifFilter !== 'all') l = l.filter(d => notifTypeForEntry(d, allDiseases) === notifFilter);
-      if (gridQ) l = l.filter(d => (d.name || '').toLowerCase().includes(gridQ));
+      if (gridQ && !skipNameMatch) l = l.filter(d => (d.name || '').toLowerCase().includes(gridQ));
       return [...l].sort(sortMode === 'az'
         ? (a, b) => a.name.localeCompare(b.name)
         : (a, b) => getCaseCount(b, browseYearSource) - getCaseCount(a, browseYearSource));
@@ -2833,12 +2848,44 @@ useEffect(() => {
       ...gridCategories
         .filter(c => c.id !== 'all' && c.id !== 'immediate' && c.id !== 'weekly')
         .map(c => ({ id: c.id, label: c.name, icon: c.icon, color: c.color || 'var(--primary-900, #000768)', tip: c.desc || '', list: c.diseases || [] })),
-    ].map(def => ({ ...def, shown: applyFilters(def.list) }))
+    ].map(def => {
+      // A query can match a CATEGORY name (e.g. "vector" → Vector-borne) as well
+      // as a disease name. A category hit keeps its card and shows ALL of its
+      // diseases; otherwise only name-matching diseases stay.
+      const catHit = categoryMatchesQuery(def.label, gridQ);
+      return { ...def, categoryHit: catHit, shown: applyFilters(def.list, catHit) };
+    })
      .filter(def => !(gridQ || notifFilter !== 'all') || def.shown.length > 0); // hide empty cards while filtering
 
     // Category filter applies to the card grid: pick one category and only that card shows.
     const visibleCatDefs = categoryFilter === 'all' ? catDefs : catDefs.filter(d => d.id === categoryFilter);
-    const searchResults = gridQ ? applyFilters(ALL_DISEASE_ENTRIES) : null;
+    const exclusiveCat = DISEASE_CATEGORIES.find(c => c.id === 'exclusive');
+    // Categories whose NAME matches the query (shown as chips in the results header).
+    const matchedCategoryLabels = gridQ
+      ? catDefs.filter(def => def.categoryHit).map(def => def.label)
+      : [];
+    // Search results: disease-name matches PLUS every disease of a category whose
+    // name matches, so searching a category surfaces its whole disease list.
+    const searchResults = gridQ ? (() => {
+      const results = applyFilters(ALL_DISEASE_ENTRIES);
+      const seen = new Set(results.map(d => d.name));
+      const sources = [
+        ...catDefs.map(def => ({ label: def.label, list: def.list })),
+        exclusiveCat ? { label: exclusiveCat.name, list: exclusiveCat.diseases } : null,
+      ].filter(Boolean);
+      sources.forEach(src => {
+        if (!categoryMatchesQuery(src.label, gridQ)) return;
+        (src.list || []).forEach(d => {
+          if (seen.has(d.name)) return;
+          if (notifFilter !== 'all' && notifTypeForEntry(d, allDiseases) !== notifFilter) return;
+          seen.add(d.name);
+          results.push(d);
+        });
+      });
+      return [...results].sort(sortMode === 'az'
+        ? (a, b) => a.name.localeCompare(b.name)
+        : (a, b) => getCaseCount(b, browseYearSource) - getCaseCount(a, browseYearSource));
+    })() : null;
 
     // Cards expand IN PLACE (accordion): the dropdown below the header is the old trello
     // one-line list by default, or a grid-pattern list when the Grid toggle is chosen.
@@ -3137,6 +3184,14 @@ useEffect(() => {
                         <button type="button" title={t('Close')} onClick={() => setDiseaseSearch('')}
                           style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '16px', lineHeight: 1 }}>✕</button>
                       </div>
+                      {matchedCategoryLabels.length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+                          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{t('Categories')}:</span>
+                          {matchedCategoryLabels.map(lbl => (
+                            <span key={lbl} style={{ fontSize: '12px', fontWeight: '600', padding: '2px 9px', borderRadius: '999px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)' }}>{lbl}</span>
+                          ))}
+                        </div>
+                      )}
                       <div style={{ display: 'grid', gridTemplateColumns: diseaseView === 'list' ? '1fr' : 'repeat(auto-fill, minmax(280px, 1fr))', gap: '10px' }}>
                         {searchResults.length === 0
                           ? <div style={{ padding: '10px', fontSize: '13px', color: 'var(--text-muted)' }}>{t('No diseases')}</div>

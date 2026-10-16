@@ -76,6 +76,11 @@ const ANIM_SCENES = [
   { bounds: FEATURE_BOUNDS['Sala'],                 highlight: 'Sala',                 label: 'Sala' },
 ];
 
+// Left-panel story timing: the branding slide holds, then the map sequence plays
+// and returns to branding (AnimatedMapView calls onSequenceComplete).
+const BRANDING_MS = 180000;                                   // 3-minute branding hold (documented behaviour)
+const MAP_MS = 2000 + 4500 * (ANIM_SCENES.length - 1) + 1000; // full map sequence ≈ 34.5 s
+
 const BRANDING_FEATURES = [
   { icon: '🛰️', title: 'Continuous Disease Surveillance ', subtitle: 'Real-time monitoring & early detection', color: '#3b82f6' },
   { icon: '🗺️', title: 'Barangay & Purok Mapping', subtitle: 'Localized clusters across 18 barangays', color: '#dc2626' },
@@ -121,6 +126,7 @@ const FooterIcon = ({ type }) => {
 };
 
 function CityHealthBranding({ brandingFeatures }) {
+  const { t } = useI18n();
   return (
     <div className="login-branding">
       <div className="login-branding-dots" />
@@ -131,8 +137,8 @@ function CityHealthBranding({ brandingFeatures }) {
           <span>CITY HEALTH OFFICE</span>
         </div>
 
-        <h1 className="login-branding-title">{brandingFeatures[0]?.title}</h1>
-        <p className="login-branding-subtitle">{brandingFeatures[0]?.subtitle}</p>
+        <h1 className="login-branding-title">{t('Cabuyao Disease Monitoring and Mapping System')}</h1>
+        <p className="login-branding-subtitle">{t('Early Monitoring & Detection')}</p>
 
         <div className="login-branding-desc">
           Real-time communicable disease surveillance across all 18 barangays, mapping every case down to
@@ -259,7 +265,7 @@ function AnimatedMapView({ setFade, active, onSequenceComplete }) {
     const [pendingUser, setPendingUser] = useState(null); // holds session data while waiting for OTP
     const { t } = useI18n();
     const BRANDING_FEATURES = [
-      { icon: '🛰️', title: t('Cabuyao Disease Monitoring and Mapping System'), subtitle: t('Early Monitoring & Detection'), color: '#3b82f6' },
+      { icon: '🛰️', title: t('Continuous Disease Surveillance'), subtitle: t('Real-time monitoring & early detection'), color: '#3b82f6' },
       { icon: '🗺️', title: t('Barangay & Purok Mapping'), subtitle: t('Localized clusters across 18 barangays'), color: '#dc2626' },
       { icon: '🔔', title: t('Automated Alerts'), subtitle: t('Timely updates and outbreak warnings'), color: '#3b82f6' },
       { icon: '📊', title: t('Decision Support'), subtitle: t('Accurate reports for CHO health response'), color: '#dc2626' },
@@ -269,6 +275,7 @@ function AnimatedMapView({ setFade, active, onSequenceComplete }) {
     const [otpLoading, setOtpLoading] = useState(false);
     const [selectedRole, setSelectedRole] = useState('CHO'); 
     const [selectedContext, setSelectedContext] = useState('CHO Unit I (Sala)'); 
+    const [roleChosen, setRoleChosen] = useState(false); // false = login default view (no role glowing, submit blocked)
     const [mapFade, setMapFade] = useState(1);
     const [leftPanel, setLeftPanel] = useState(0); // 0 = City Health branding, 1 = animated map
     const [policyModal, setPolicyModal] = useState(null); // null | 'privacy' | 'terms' | 'disclaimer'
@@ -291,6 +298,7 @@ function AnimatedMapView({ setFade, active, onSequenceComplete }) {
     const [signupPassword, setSignupPassword] = useState('');
     const [signupConfirmPassword, setSignupConfirmPassword] = useState('');
     const [signupRole, setSignupRole] = useState('BHW');
+    const [signupRolePicked, setSignupRolePicked] = useState(false); // false = sign-up default role view
     const [signupContext, setSignupContext] = useState('');
     const [signupError, setSignupError] = useState('');
     const [signupSuccess, setSignupSuccess] = useState('');
@@ -368,7 +376,7 @@ function AnimatedMapView({ setFade, active, onSequenceComplete }) {
     // ── LEFT SIDE LOOP: City Health branding ↔ full map sequence ──
     useEffect(() => {
       if (leftPanel !== 0) return;
-      const id = setTimeout(() => setLeftPanel(1), 180000);
+      const id = setTimeout(() => setLeftPanel(1), BRANDING_MS);
       return () => clearTimeout(id);
     }, [leftPanel]);
 
@@ -380,6 +388,7 @@ function AnimatedMapView({ setFade, active, onSequenceComplete }) {
 
     const handleRoleCard = (key) => {
       setLoginError('');
+      setRoleChosen(true);
       if (key === 'CHO1') { setSelectedRole('CHO'); setSelectedContext('CHO Unit I (Sala)'); }
       else if (key === 'CHO2') { setSelectedRole('CHO'); setSelectedContext('CHO Unit II (Pulo)'); }
       else { setSelectedRole('BHW'); setSelectedContext(''); }
@@ -387,6 +396,10 @@ function AnimatedMapView({ setFade, active, onSequenceComplete }) {
 
     const handleUnifiedSubmit = (e) => {
       e.preventDefault();
+      if (!roleChosen) {
+        setLoginError('Please select your access role to proceed.');
+        return;
+      }
       if (selectedRole === 'BHW' && !selectedContext) {
         setLoginError('Please select your assigned barangay to proceed.');
         return;
@@ -618,6 +631,8 @@ const handleLoginOtpSubmit = async (e) => {
                 setSignupSuccess('');
                 setSelectedContext('CHO Unit I (Sala)');
                 setSelectedRole('CHO');
+                setRoleChosen(false);
+                setSignupRolePicked(false);
                 setStep('role'); // ← back to the very beginning
             }, 3000);
 
@@ -667,6 +682,7 @@ const handleLoginOtpSubmit = async (e) => {
 
       if (step === 'signup') {
         setSignupContext('');
+        setSignupRolePicked(false);
         setStep('role');
       } else if (step === 'cho_contact') {
         setSignupContext('');
@@ -705,6 +721,27 @@ const handleLoginOtpSubmit = async (e) => {
                 <AnimatedMapView setFade={setMapFade} active={leftPanel === 1} onSequenceComplete={() => setLeftPanel(0)} />
               </MapContainer>
             </div>
+          </div>
+
+          <div className="story-pills" role="tablist" aria-label="Left panel slides">
+            <button
+              type="button"
+              className={`story-pill ${leftPanel === 0 ? 'is-active' : ''}`}
+              role="tab"
+              aria-selected={leftPanel === 0}
+              aria-label="Branding"
+              style={{ '--story-ms': `${BRANDING_MS}ms` }}
+              onClick={() => setLeftPanel(0)}
+            />
+            <button
+              type="button"
+              className={`story-pill ${leftPanel === 1 ? 'is-active' : ''}`}
+              role="tab"
+              aria-selected={leftPanel === 1}
+              aria-label="Map sequence"
+              style={{ '--story-ms': `${MAP_MS}ms` }}
+              onClick={() => setLeftPanel(1)}
+            />
           </div>
         </div>
 
@@ -764,7 +801,7 @@ const handleLoginOtpSubmit = async (e) => {
           <div className="login-column">
           <div key={step} className={step === 'role' ? 'login-form-container' : 'login-form-container cdms-login-step'}>
             
-            <div className="brand-logo" style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: 'var(--primary-900)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px', boxShadow: '0 0 0 4px var(--primary-100)' }}>
+            <div className="brand-logo" style={{ width: '64px', height: '64px', borderRadius: '8px', backgroundColor: 'var(--primary-900)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px' }}>
               <ChoLogoIcon size={46} />
             </div>
 
@@ -777,9 +814,9 @@ const handleLoginOtpSubmit = async (e) => {
 
                 <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500', textAlign: 'left' }}>{t('Select your access role')}</label>
                 <div className="role-grid">
-                  <button type="button" className={`role-card ${selectedContext === 'CHO Unit I (Sala)' ? 'is-selected' : ''}`} onClick={() => handleRoleCard('CHO1')}>CHO I<small>City Health Office Unit I (Main)</small></button>
-                  <button type="button" className={`role-card ${selectedContext === 'CHO Unit II (Pulo)' ? 'is-selected' : ''}`} onClick={() => handleRoleCard('CHO2')}>CHO II<small>City Health Office Unit II (Main)</small></button>
-                  <button type="button" className={`role-card ${selectedRole === 'BHW' ? 'is-selected' : ''}`} onClick={() => handleRoleCard('BHW')}>BHW<small>Barangay Health Worker</small></button>
+                  <button type="button" className={`role-card ${roleChosen && selectedContext === 'CHO Unit I (Sala)' ? 'is-selected' : ''}`} onClick={() => handleRoleCard('CHO1')}>CHO I<small>City Health Office Unit I (Main)</small></button>
+                  <button type="button" className={`role-card ${roleChosen && selectedContext === 'CHO Unit II (Pulo)' ? 'is-selected' : ''}`} onClick={() => handleRoleCard('CHO2')}>CHO II<small>City Health Office Unit II (Main)</small></button>
+                  <button type="button" className={`role-card ${roleChosen && selectedRole === 'BHW' ? 'is-selected' : ''}`} onClick={() => handleRoleCard('BHW')}>BHW<small>Barangay Health Worker</small></button>
                 </div>
 
                 {selectedRole === 'BHW' && (
@@ -793,7 +830,7 @@ const handleLoginOtpSubmit = async (e) => {
                         aria-expanded={loginBarangayOpen}
                         onClick={() => setLoginBarangayOpen(o => !o)}
                       >
-                        <span style={{ color: loginBarangayName ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                        <span className={loginBarangayName ? '' : 'cdms-select-placeholder'} style={{ color: loginBarangayName ? 'var(--text-main)' : undefined }}>
                           {loginBarangayName || t('Select your barangay')}
                         </span>
                         <span className="cdms-select-caret" style={{ transform: loginBarangayOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
@@ -838,7 +875,7 @@ const handleLoginOtpSubmit = async (e) => {
                       <input
                         type={showPassword ? "text" : "password"}
                         className="form-input"
-                        placeholder="••••••••"
+                        placeholder="Enter your password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         style={{ paddingRight: '45px' }}
@@ -883,7 +920,7 @@ const handleLoginOtpSubmit = async (e) => {
                       style={{
                         background: 'none',
                         border: 'none',
-                        color: 'var(--primary-600, #000ECB)',
+                        color: 'var(--text-main)',
                         cursor: 'pointer',
                         fontSize: '15px',
                         fontWeight: '500',
@@ -898,7 +935,7 @@ const handleLoginOtpSubmit = async (e) => {
                 </form>
 
                 <div style={{ marginTop: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '15px' }}>
-                  {t("Don't have an account?")} <span onClick={() => { setSignupRole('BHW'); setStep('signup'); }} style={{ color: 'var(--primary-600, #000ECB)', cursor: 'pointer', fontWeight: '500' }}>{t('Sign up here')}</span>
+                  {t("Don't have an account?")} <span onClick={() => { setSignupRole('BHW'); setSignupRolePicked(false); setStep('signup'); }} style={{ color: 'var(--text-main)', cursor: 'pointer', fontWeight: '500', textDecoration: 'underline' }}>{t('Sign up here')}</span>
                 </div>
               </>
             )}
@@ -998,7 +1035,7 @@ const handleLoginOtpSubmit = async (e) => {
                   </div>
                 </div>
 
-                <BackButton onClick={() => setStep('signup')} className="back-btn-boxed" style={{ marginTop: '24px', width: '100%', justifyContent: 'center' }}>← {t('Back to Sign-up')}</BackButton>
+                <BackButton onClick={() => setStep('signup')} className="back-btn-boxed" style={{ marginTop: '24px', width: '100%', justifyContent: 'center' }}>{t('Back to Sign-up')}</BackButton>
               </>
             )}
 
@@ -1046,6 +1083,23 @@ const handleLoginOtpSubmit = async (e) => {
                     </div>
                     <h2 style={{ marginTop: 0 }}>{t('Sign up')}</h2>
 
+                    {!signupRolePicked ? (
+                        <>
+                            <p className="login-helper">{t('Choose your access role to get started with registration.')}</p>
+
+                            <div className="signup-notice">
+                                <div className="signup-notice-title"><span className="signup-notice-icon">!</span> {t('Before you register')}</div>
+                                <p>{t('Select your access role to view the applicable registration instructions. BHW applicants must submit their details for approval by the City Health Office administrator. CHO personnel must request an account directly from their assigned CHO unit.')}</p>
+                            </div>
+
+                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500', textAlign: 'left' }}>{t('Select your access role')}</label>
+                            <div className="role-grid two-col">
+                              <button type="button" className="role-card" onClick={() => setStep('cho_contact')}>CHO<small>City Health Office Unit I &amp; II (Main) Registration</small></button>
+                              <button type="button" className="role-card" onClick={() => { setSignupRole('BHW'); setSignupRolePicked(true); }}>BHW<small>Barangay Health Worker Registration</small></button>
+                            </div>
+                        </>
+                    ) : (
+                        <>
                     <p className="login-helper">{t('Create an Account. Registrations require approval from the City Health Office administrator before account activation.')}</p>
 
                     <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500', textAlign: 'left' }}>{t('Select your access role')}</label>
@@ -1072,7 +1126,7 @@ const handleLoginOtpSubmit = async (e) => {
                                         cursor: 'pointer', textAlign: 'left', fontSize: '15px'
                                     }}
                                 >
-                                    <span>{barangayList.find(b => String(b.id) === String(signupContext))?.name || '- Select your barangay -'}</span>
+                                    <span className={barangayList.find(b => String(b.id) === String(signupContext))?.name ? '' : 'cdms-select-placeholder'}>{barangayList.find(b => String(b.id) === String(signupContext))?.name || '- Select your barangay -'}</span>
                                     <span style={{
                                         fontSize: '26px', opacity: 0.6, marginLeft: '8px',
                                         transition: 'transform 0.2s', display: 'inline-block',
@@ -1247,6 +1301,8 @@ const handleLoginOtpSubmit = async (e) => {
                       Already have an account? <span onClick={() => setStep('role')} style={{ color: 'var(--primary-600, #000ECB)', cursor: 'pointer', fontWeight: '500' }}>Log-in here</span>
                     </div>
                     </form>
+                        </>
+                    )}
                 </>
             )}
 
@@ -1259,6 +1315,7 @@ const handleLoginOtpSubmit = async (e) => {
                     return;
                   }
                   setSignupRole('BHW');
+                  setSignupRolePicked(false);
                   setStep('signup');
                 }} style={{ color: 'var(--primary-600, #000ECB)', cursor: 'pointer', fontWeight: '500' }}>Sign Up</span>
               </div>
