@@ -12,10 +12,15 @@ import cabuyaoGeoJSON from './data/cabuyao_barangays.geojson';
 import { getPointInBarangay, pointInFeature } from './data/coordinates';
 import DatePicker from './components/DatePicker';
 import InterventionModal from './components/InterventionModal';
+// Same custom-dropdown classes the manage-modal fields use (.mc-custom-dropdown-*).
+import './ManageCases.css';
 import { formatDate as formatDateStr } from './formatDate';
 import { useI18n } from './i18n';
 import { precacheTiles } from './mapTileCache';
 import EpiPanel from './epiStats';
+// Phase 1 zone (purok-level) hotspots: the 3x2 grid cell a case already snaps to
+// is treated as a "zone" so flooding can be related to case clustering.
+import { buildZoneHotspots, zonesToFeatureCollection, ZONE_KINDS, FLOOD_EVENT_TYPES, RAINY_SEASON_DISEASES, zonesForBarangay, zoneIndexForUnit, resolveZoneIdx, ZONE_PRESETS, DEFAULT_ZONE_SENSITIVITY, purokRowsToAreas, purokIdxForUnit } from './zoneHotspots';
 import { ACTION_TYPES, ACTION_TYPE_ICONS, ACTION_STATUSES, DISASTER_EVENT_TYPES, DISASTER_SEVERITIES, SEVERITY_COLORS, hazardIcon, hazardDiseases, hazardColor, hazardSvgMarkup, hazardSvgIcon, isDisasterActive, getDisasterWatch, WEATHER_ATTRIBUTION } from './disasterRisk';
 import { RISK_FACTOR_GROUPS, parseRiskFactors, riskFactorLabel } from './riskFactors';
 import { seasonForMonth, seasonalDiseases } from './seasonalDiseases';
@@ -401,6 +406,16 @@ function extractLocationUnit(address) {
   return null;
 }
 
+// Cabuyao has no "summer / winter" in the temperate sense - PAGASA splits the
+// Philippine year into the rainy season (Tag-ulan), the cool dry season
+// (Tag-lamig) and the hot dry / summer season (Tag-init). `months` are 0-based JS
+// month indexes, so the map highlights whichever season today falls in.
+const PH_SEASONS = [
+  { key: 'rainy', icon: '🌧️', label: 'Rainy Season', monthsLabel: 'June to November', months: [5, 6, 7, 8, 9, 10], color: '#0891b2' },
+  { key: 'summer', icon: '☀️', label: 'Summer (Hot Dry Season)', monthsLabel: 'March to May', months: [2, 3, 4], color: '#f59e0b' },
+  { key: 'cooldry', icon: '🌬️', label: 'Cool Dry Season', monthsLabel: 'December to February', months: [11, 0, 1], color: '#64748b' },
+];
+
 const findCoords = (name) => {
   if (!name) return null;
   const n = norm(name);
@@ -424,6 +439,47 @@ const findCoords = (name) => {
   }
   return null;
 };
+
+// Outer ring of a barangay polygon (largest ring for a MultiPolygon, same walk as
+// getPolygonCentroid), cached. Needed because `findCoords` returns the centroid -
+// which IS inside the barangay - but any point offset from it is not guaranteed to
+// stay inside: Niugan's centroid sits off-centre, so a 0.0045 deg fan-out landed
+// outside its border. Offsets are pulled back in with pointInRing below.
+const BARANGAY_RING_CACHE = new Map();
+function barangayRing(name) {
+  const n = norm(name);
+  if (BARANGAY_RING_CACHE.has(n)) return BARANGAY_RING_CACHE.get(n);
+  const feature = cabuyaoBoundaries.features.find(f => {
+    const props = f.properties || {};
+    const mappedName = GEOJSON_TO_DB_NAME[props.ADM4_EN] || props.ADM4_EN || '';
+    return norm(mappedName) === n;
+  });
+  let ring = null;
+  const g = feature && feature.geometry;
+  if (g) {
+    if (g.type === 'Polygon') ring = g.coordinates[0];
+    else if (g.type === 'MultiPolygon') {
+      let largest = g.coordinates[0][0];
+      g.coordinates.forEach(poly => { if (poly[0].length > largest.length) largest = poly[0]; });
+      ring = largest;
+    }
+  }
+  BARANGAY_RING_CACHE.set(n, ring);
+  return ring;
+}
+
+// Ray-casting point-in-polygon. Ring points are GeoJSON [lng, lat]. Returns true
+// when there is no polygon to test against, so a missing geometry never blocks a pin.
+function pointInRing(ring, lat, lng) {
+  if (!ring) return true;
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1];
+    const xj = ring[j][0], yj = ring[j][1];
+    if (((yi > lat) !== (yj > lat)) && (lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
 
 const findCanonicalName = (rawName) => {
   if (!rawName) return null;
@@ -512,6 +568,37 @@ const getGeoJsonStyle = (feature, barangayData, activeBarangay = null, focused =
     weight: 1.5,
   };
 };
+
+// Zone detail is two-step by zoom, matching the existing tiers (17 = pins,
+// 18 = puroks, 19 = case dots): below this the zone shading is shown so you can
+// "zoom in to see the zone"; at/above it the fill steps back and each zone is
+// broken down into the location units (purok/blk) inside it.
+const ZONE_BREAKDOWN_ZOOM = 18;
+
+// Shading for a Phase 1 zone polygon. Colour encodes the CLASS (exposure watch
+// vs case hotspot vs weather-linked hotspot); the fill stays light and the border
+// does the heavy lifting so the zone reads on top of the barangay choropleth
+// instead of replacing it. At the breakdown zoom the fill is dropped so the
+// per-unit chips underneath stay readable; the border keeps the zone extent.
+const getZoneStyle = (feature, zoom = 0) => {
+  const props = (feature && feature.properties) || {};
+  const meta = ZONE_KINDS[props.kind] || ZONE_KINDS.case;
+  const score = Number(props.score) || 0;
+  const breakdown = zoom >= ZONE_BREAKDOWN_ZOOM;
+  return {
+    color: meta.color,
+    weight: props.kind === 'weather' ? 3 : 2.5,
+    dashArray: props.kind === 'exposure' ? '6 4' : props.kind === 'watch' ? '3 4' : undefined,
+    fillColor: meta.color,
+    fillOpacity: breakdown ? 0 : Math.min(0.35, 0.1 + score / 80),
+  };
+};
+
+// Background grid drawn when "Show all cells" is on: every one of the 6 bbox
+// cells of a scoped barangay, whether or not it crossed a threshold, so the
+// zone proxy is visible instead of implied. Neutral + non-interactive; the
+// flagged zones draw on top with their own colours.
+const getGridStyle = () => ({ color: '#94a3b8', weight: 1, dashArray: '2 5', fillOpacity: 0 });
 
 const getPurokGroups = (barangayName, cases) => {
   const groups = {};
@@ -1042,6 +1129,32 @@ function LayerBadgeMarkers({ items }) {
   return null;
 }
 
+// Step 2 of the zone view: at ZONE_BREAKDOWN_ZOOM each flagged zone is broken
+// down into the location units (purok/blk) inside it, so the user can see WHICH
+// purok in the zone carried the cases. Chip colour = the zone's class; the mean
+// case coordinate of the unit is the anchor (falls back to the zone centroid).
+function ZoneBreakdownMarkers({ items }) {
+  const map = useMap();
+  const markersRef = useRef([]);
+  useEffect(() => {
+    markersRef.current.forEach(m => m.remove());
+    markersRef.current = [];
+    (items || []).forEach(it => {
+      const html = `<div style="transform:translate(-50%,-50%);display:inline-flex;align-items:center;gap:5px;`
+        + `background:var(--bg-surface);border:1.5px solid ${it.color};border-left:5px solid ${it.color};`
+        + `border-radius:8px;padding:2px 8px;font-size:11px;font-weight:700;color:var(--text-main);`
+        + `white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.35);cursor:pointer">${it.label}</div>`;
+      const icon = L.divIcon({ className: '', html, iconSize: [0, 0], iconAnchor: [0, 0] });
+      const m = L.marker(it.coords, { icon, zIndexOffset: it.z != null ? it.z : 760 }).addTo(map);
+      m.bindTooltip(it.title || '', { direction: 'top', offset: [0, -10] });
+      m.on('click', () => it.onClick && it.onClick());
+      markersRef.current.push(m);
+    });
+    return () => markersRef.current.forEach(m => m.remove());
+  }, [items, map]);
+  return null;
+}
+
 function ZoomListener({ onZoom, filterBarangay, autoDetectedBrgy, setAutoDetectedBrgy, loginRole }) {
   useMapEvents({
     zoomend: (e) => {
@@ -1277,6 +1390,36 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const [manageHazardsOpen, setManageHazardsOpen] = useState(false);
   const [hazardForm, setHazardForm] = useState({ id: null, barangay_id: '', barangay_name: '', event_type: DISASTER_EVENT_TYPES[0], severity: DISASTER_SEVERITIES[1], purok: '', latitude: '', longitude: '', date_started: '', date_ended: '', notes: '' });
   const [hazardsSaving, setHazardsSaving] = useState(false);
+  // Inline custom dropdowns inside the two CHO manage modals (same
+  // .mc-custom-dropdown-btn/panel/item markup used across Manage Cases).
+  // One open key at a time: 'a:brgy' | 'a:type' | 'a:hazard' | 'a:disease' |
+  // 'a:status' | 'h:brgy' | 'h:type' | 'h:sev'.
+  const [manageDD, setManageDD] = useState(null);
+  const manageActionsRef = useRef(null);
+  const manageHazardsRef = useRef(null);
+  // Phase 1 zone (purok-level) hotspots on the Hotspot Disease Map: an exposure
+  // overlay that separates "it rained / flooded here" from "cases are clustering".
+  const [showZones, setShowZones] = useState(true);
+  const [zonePopup, setZonePopup] = useState(null);
+  // Detection sensitivity (see ZONE_PRESETS) and the "show every cell" grid
+  // overlay. Sensitivity persists per browser so a CHO's tuning sticks.
+  const [zoneSensitivity, setZoneSensitivity] = useState(() => {
+    try { return localStorage.getItem('cdms_zone_sensitivity') || DEFAULT_ZONE_SENSITIVITY; }
+    catch { return DEFAULT_ZONE_SENSITIVITY; }
+  });
+  const [showAllZoneCells, setShowAllZoneCells] = useState(false);
+  // Real purok boundary polygons, when the City supplied them (Settings -> Data
+  // Management). Keyed by barangay name: [{ name, rings }]. Empty => the 6-cell
+  // proxy grid is used for every barangay.
+  const [purokAreas, setPurokAreas] = useState({});
+  // Per-zone rainfall, keyed `${barangay}|${zoneIdx}` -> { rain24, rain72 }. Fetched
+  // from the zone centroids the map already knows. Falls back to the barangay
+  // reading (weatherRawByName) for any zone the server could not answer for.
+  const [zoneRain, setZoneRain] = useState({});
+  const changeZoneSensitivity = (v) => {
+    setZoneSensitivity(v);
+    try { localStorage.setItem('cdms_zone_sensitivity', v); } catch { /* ignore */ }
+  };
   // Lazily-fetched "same week in past years" historical summary for the open popup
   const [histSummary, setHistSummary] = useState(null);
 
@@ -1303,6 +1446,20 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     };
     load();
     const iv = setInterval(load, 30000);
+    return () => { alive = false; clearInterval(iv); };
+  }, []);
+
+  // Real purok boundaries change only on an import, so they get their own slow
+  // poll (10 min) instead of riding the 30 s map poll with a multi-KB payload.
+  useEffect(() => {
+    let alive = true;
+    const load = () => {
+      axios.get(API_URL + '/api/purok-areas')
+        .then(res => { if (alive) setPurokAreas(purokRowsToAreas(res.data)); })
+        .catch(() => {});
+    };
+    load();
+    const iv = setInterval(load, 600000);
     return () => { alive = false; clearInterval(iv); };
   }, []);
 
@@ -1469,6 +1626,13 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       if (yearRef.current && !yearRef.current.contains(e.target)) setYearOpen(false);
       if (diseaseRef.current && !diseaseRef.current.contains(e.target)) setDiseaseOpen(false);
       if (riskFactorRef.current && !riskFactorRef.current.contains(e.target)) setRiskFactorOpen(false);
+      // Manage-modal dropdowns: close when the click lands outside both cards.
+      setManageDD((cur) => {
+        if (!cur) return cur;
+        const inActions = manageActionsRef.current && manageActionsRef.current.contains(e.target);
+        const inHazards = manageHazardsRef.current && manageHazardsRef.current.contains(e.target);
+        return (inActions || inHazards) ? cur : null;
+      });
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -1702,6 +1866,11 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   // in purok view): all fills are dropped so pins sit cleanly on the map.
   const barangayFocused = (filterBarangay !== 'All Barangays') || (showAutoPurok && autoDetectedBrgy);
 
+  // The zone (purok-level) layer draws ON TOP of the barangay choropleth as an
+  // outline + tint rather than replacing it: dropping the risk fill would change
+  // the map the whole office already reads. A darker patch inside a red barangay
+  // is the zone driving it. So the choropleth keeps its existing styling.
+  //
   // Re-style every border when the active highlight changes so only the lit
   // barangay shows the thick dashed line and the rest are plain outlines.
   useEffect(() => {
@@ -1709,7 +1878,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     geoJsonLayerRef.current.eachLayer((layer) => {
       layer.setStyle(getGeoJsonStyle(layer.feature, barangayData, activeBarangayHighlight, barangayFocused, mapLayer, bordersOnly));
     });
-  }, [barangayData, hoveredBarangay, filterBarangay, autoDetectedBrgy, showAutoPurok, mapLayer, activeBarangayHighlight, barangayFocused]);
+  }, [barangayData, hoveredBarangay, filterBarangay, autoDetectedBrgy, showAutoPurok, mapLayer, activeBarangayHighlight, barangayFocused, bordersOnly]);
 
   // Label focus: when a barangay is selected (or auto-detected in purok view),
   // hide every permanent label except that barangay's. All-Barangays keeps all.
@@ -1785,12 +1954,16 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
 
   const weatherByName = {};
   const wxOfflineNames = new Set();
+  // Every scoped barangay response (not just the ones carrying a hazard) so the
+  // zone layer can read the trailing rain accumulations.
+  const weatherRawByName = {};
   const hazardScopeList = (loginRole === 'BHW' && loginBarangay) ? [loginBarangay]
     : (loginRole === 'CHO' && sessionContext && CHO_UNIT_BARANGAYS[sessionContext]) ? CHO_UNIT_BARANGAYS[sessionContext]
     : ALL_BARANGAYS;
   const hazardScopeKeys = new Set(hazardScopeList.map(wxKey));
   (weatherHazards || []).forEach(w => {
     if (!w || !w.name) return;
+    weatherRawByName[wxKey(w.name)] = w;
     if (w.error === 'offline') wxOfflineNames.add(wxKey(w.name));
     if (w.hazards && w.hazards.length) weatherByName[wxKey(w.name)] = w;
   });
@@ -1812,6 +1985,201 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     if (!manualBarangayEvents[k]) manualBarangayEvents[k] = [];
     manualBarangayEvents[k].push(ev);
   });
+
+  // A hazard pin whose location text names a unit ("Purok 3", "Blk 8 Lot 8") is
+  // anchored to that unit's zone, resolved with the exact mapping the cases use,
+  // so the pin and the cases it affects land in the same zone. Pins that name no
+  // location unit keep their real coordinates.
+  const manualPinZoneAnchor = useMemo(() => {
+    const out = {};
+    (disasterEvents || []).forEach(ev => {
+      const name = ev.barangay_name;
+      if (!name || !ev.purok) return;
+      const unit = extractLocationUnit(ev.purok);
+      if (!unit) return;
+      const feature = findFeatureForBarangay(name);
+      if (!feature) return;
+      const zones = zonesForBarangay(name, feature, purokAreas[name] || null);
+      if (!zones.length) return;
+      let idx;
+      if (zones[0].real) {
+        // Real boundaries: anchor only when the pin's text names a purok, so a
+        // pin without a purok name keeps its real clicked position.
+        idx = purokIdxForUnit(zones, unit);
+        if (idx == null) return;
+      } else {
+        const available = new Set(zones.map(z => z.idx));
+        idx = resolveZoneIdx(zoneIndexForUnit(name, unit), available).idx;
+      }
+      const z = zones.find(zz => zz.idx === idx);
+      if (z && z.centroid) out[ev.id] = z.centroid;   // [lat, lng]
+    });
+    return out;
+  }, [disasterEvents, purokAreas]);
+  // ── Phase 1: zone (purok-level) hotspot detection ──────────────────────────
+  // Built from the RAW scoped case list, not the sidebar-filtered one: the 7-day
+  // window is part of the rule, so a date/disease filter would silently break
+  // detection. Only the barangay filter narrows the scope, matching the view.
+  const zoneScopeList = useMemo(() => {
+    const scopeList = (loginRole === 'BHW' && loginBarangay) ? [loginBarangay]
+      : (loginRole === 'CHO' && sessionContext && CHO_UNIT_BARANGAYS[sessionContext]) ? CHO_UNIT_BARANGAYS[sessionContext]
+      : ALL_BARANGAYS;
+    return (filterBarangay !== 'All Barangays') ? [filterBarangay] : scopeList;
+  }, [loginRole, loginBarangay, sessionContext, filterBarangay]);
+
+  // Zone geometry for the scoped barangays (the real purok polygons when supplied,
+  // else the 6-cell grid). Reused for detection AND for the per-zone rainfall
+  // request, so both agree on what "zone 3 of barangay X" is.
+  const scopedZoneGeom = useMemo(() => {
+    const out = {};
+    zoneScopeList.forEach(name => {
+      const feature = findFeatureForBarangay(name);
+      if (!feature) return;
+      const zones = zonesForBarangay(name, feature, purokAreas[name] || null);
+      if (zones.length) out[name] = zones;
+    });
+    return out;
+  }, [zoneScopeList, purokAreas]);
+
+  // How many barangays in scope already have REAL purok boundaries (vs the proxy grid).
+  const realBoundaryBarangays = useMemo(
+    () => zoneScopeList.filter(n => (purokAreas[n] || []).length > 0).length,
+    [zoneScopeList, purokAreas]
+  );
+
+  // Ask the server for each zone's own rain reading. One POST per scope change; the
+  // server caches per point for 30 min so a re-render is free. Skipped when offline.
+  const zoneRainSignature = useMemo(() => Object.keys(scopedZoneGeom).sort()
+    .map(name => scopedZoneGeom[name].map(z => `${name}|${z.idx}`).join(',')).join(';'),
+    [scopedZoneGeom]);
+  useEffect(() => {
+    if (isDisasterMap || !showZones || !zoneRainSignature) { setZoneRain({}); return undefined; }
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return undefined;
+    let alive = true;
+    const points = [];
+    Object.keys(scopedZoneGeom).forEach(name => {
+      scopedZoneGeom[name].forEach(z => {
+        if (z.centroid) points.push({ key: `${name}|${z.idx}`, lat: z.centroid[0], lng: z.centroid[1] });
+      });
+    });
+    if (points.length === 0) return undefined;
+    axios.post(API_URL + '/api/weather/by-points', { points })
+      .then(res => { if (alive && res.data && res.data.results) setZoneRain(res.data.results); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [isDisasterMap, showZones, zoneRainSignature]);
+
+  const zoneHotspots = useMemo(() => {
+    if (isDisasterMap || !showZones) return [];
+    const thresholds = ZONE_PRESETS[zoneSensitivity] || ZONE_PRESETS[DEFAULT_ZONE_SENSITIVITY];
+    const rows = [];
+    zoneScopeList.forEach(name => {
+      const feature = findFeatureForBarangay(name);
+      if (!feature) return;
+      const key = wxKey(name);
+      const canon = findCanonicalName(name) || name;
+      const brgyCases = allCases.filter(c => (findCanonicalName(c.barangay_name) || c.barangay_name) === canon);
+      const wx = weatherRawByName[key];
+      const rainfall = wx ? { rain24: wx.rain_24h, rain72: wx.rain_72h } : null;
+      const floodPins = (disasterEvents || []).filter(ev => (
+        isDisasterActive(ev) && FLOOD_EVENT_TYPES.includes(ev.event_type)
+        && (!ev.barangay_name || wxKey(ev.barangay_name) === key)
+      ));
+      // Per-zone readings for THIS barangay, only for zones the server answered for.
+      const zoneRainfall = new Map();
+      (scopedZoneGeom[name] || []).forEach(z => {
+        const rec = zoneRain[`${name}|${z.idx}`];
+        if (rec && (Number.isFinite(rec.rain24) || Number.isFinite(rec.rain72))) zoneRainfall.set(z.idx, rec);
+      });
+      rows.push(...buildZoneHotspots({
+        barangayName: name,
+        cases: brgyCases,
+        feature,
+        extractUnit: extractLocationUnit,
+        rainfall,
+        floodPins,
+        thresholds,
+        purokAreas: purokAreas[name] || null,
+        zoneRainfall: zoneRainfall.size ? zoneRainfall : null,
+      }));
+    });
+    return rows;
+  }, [isDisasterMap, showZones, zoneSensitivity, zoneScopeList, allCases, weatherHazards, disasterEvents, purokAreas, scopedZoneGeom, zoneRain]);
+
+  // "Show all cells": the full 6-cell grid of every scoped barangay, flagged or
+  // not, as a neutral background layer so the proxy grid is visible.
+  const allZoneCellsFC = useMemo(() => {
+    if (isDisasterMap || !showZones || !showAllZoneCells) return { type: 'FeatureCollection', features: [] };
+    const rows = [];
+    zoneScopeList.forEach(name => {
+      const zones = scopedZoneGeom[name];
+      if (!zones) return;
+      zones.forEach(z => rows.push({ ...z, kind: 'grid', score: 0 }));
+    });
+    return zonesToFeatureCollection(rows);
+  }, [isDisasterMap, showZones, showAllZoneCells, zoneScopeList, scopedZoneGeom]);
+
+  const zoneFeatureCollection = useMemo(
+    () => zonesToFeatureCollection(zoneHotspots),
+    [zoneHotspots]
+  );
+  const zoneCounts = useMemo(() => {
+    const counts = { exposure: 0, case: 0, weather: 0, watch: 0 };
+    zoneHotspots.forEach(r => { counts[r.kind] = (counts[r.kind] || 0) + 1; });
+    return counts;
+  }, [zoneHotspots]);
+
+  const zoneRowFor = (zoneId) => zoneHotspots.find(r => r.id === zoneId) || null;
+
+  // Step 2 of the zone view (zoom >= ZONE_BREAKDOWN_ZOOM): one chip per location
+  // unit inside a flagged zone, so the zone opens up into WHICH purok/blk has
+  // what. Skipped for units with no coordinates (they still list in the popup).
+  const zoneBreakdownItems = useMemo(() => {
+    if (isDisasterMap || !showZones || mapZoom < ZONE_BREAKDOWN_ZOOM) return [];
+    const out = [];
+    zoneHotspots.forEach(row => {
+      (row.breakdown || []).forEach(b => {
+        if (!b.coords) return;
+        const top = b.diseases[0];
+        out.push({
+          coords: b.coords,
+          color: row.kindMeta.color,
+          label: top ? `${b.unit} · ${top.disease} ${b.cases7}` : b.unit,
+          title: `${row.barangay} · ${row.label} · ${b.unit}`,
+          onClick: () => setZonePopup(row),
+        });
+      });
+    });
+    return out;
+  }, [isDisasterMap, showZones, mapZoom, zoneHotspots]);
+
+  // Tooltip = plain reading of the zone; click opens the evidence card where the
+  // CHO can log the intervention that answers it.
+  const onEachZone = (feature, layer) => {
+    const props = (feature && feature.properties) || {};
+    const row = zoneRowFor(props.zoneId);
+    if (!row) return;
+    const onlyUnit = row.units.length === 1 && row.units[0] !== 'Unspecified' ? row.units[0] : '';
+    layer.bindTooltip(`${row.barangay} · ${row.label}${onlyUnit ? ' · ' + onlyUnit : ''} — ${t(row.kindMeta.label)}`, { sticky: true });
+    layer.on('click', () => setZonePopup(row));
+  };
+
+  // Hand the zone's evidence to the shared InterventionModal (remarks required,
+  // enforced again server-side). alert_kind lets a Dashboard-computed-style warning
+  // be answered even though a zone has no epi_alerts row of its own.
+  const openZoneIntervention = (row) => {
+    const brgyId = Object.keys(barangayIdMap).find(id => wxKey(barangayIdMap[id]) === wxKey(row.barangay)) || '';
+    setInterventionCtx({
+      barangay: row.barangay,
+      barangay_id: brgyId || null,
+      disease: row.disease || '',
+      count: row.cases7 || 0,
+      alert_kind: row.alertKind,
+      kind_label: t(row.kindMeta.label),
+    });
+    setZonePopup(null);
+  };
+
   // Purok-tier badges are derived from the case purok dots inside a hazard barangay
   const weatherPinsByBarangay = {};
   (purokData || []).forEach(p => {
@@ -1909,6 +2277,79 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     const k = wxKey(name);
     (warnActionsByBarangay[k] = warnActionsByBarangay[k] || []).push(a);
   });
+
+  // ── "Show interventions only" map layer ──
+  // One pin PER intervention, carrying its own action-type glyph (Fogging / Spraying
+  // / Community Cleaning) coloured by status. `barangay_actions` stores no
+  // coordinates, so each intervention is plotted from the centroid of its OWN
+  // barangay (findCoords); when several land in the same barangay they are fanned
+  // out on a small ring so each gets its own pin instead of stacking on one dot.
+  //
+  // A citywide record (barangay_id NULL) is NEVER pinned. It has no location, and
+  // falling back to the linked warning's barangay dropped the pin somewhere the
+  // action was never carried out - a citywide Vaccination Drive answering a Dengue
+  // alert in Niugan is not an intervention "in Niugan". This is the same rule the
+  // action count discs already follow (`findCoords('Citywide')` resolves to nothing).
+  // Position is barangay-level, and the sidebar card says so.
+  const INTERVENTION_STATUS_COLORS = { planned: '#f59e0b', ongoing: '#0891b2', completed: '#10b981' };
+  const interventionRows = [];
+  if (interventionsOnly) {
+    const byOwnBarangay = {};
+    actions.forEach(a => {
+      if (!isWarningIntervention(a)) return;
+      const own = a.barangay_name || '';
+      if (!own) return;
+      const k = wxKey(own);
+      if (actionScopeKeys.size && !actionScopeKeys.has(k)) return;
+      if (pinTier && pinFocusKey && k !== pinFocusKey) return;
+      (byOwnBarangay[k] = byOwnBarangay[k] || []).push(a);
+    });
+    Object.entries(byOwnBarangay).forEach(([k, list]) => {
+      const name = list[0].barangay_name || '';
+      const base = findCoords(name);
+      if (!base) return;
+      const ring = barangayRing(name);
+      const sorted = list.slice().sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0));
+      const n = sorted.length;
+      const radius = n <= 3 ? 0.0035 : n <= 6 ? 0.0048 : 0.0060;
+      const lngRadius = radius / Math.max(0.2, Math.cos((base[0] * Math.PI) / 180));
+      sorted.forEach((a, i) => {
+        // A lone intervention sits on the centroid; several spread evenly from the top.
+        const angle = -Math.PI / 2 + (2 * Math.PI * i) / n;
+        let dLat = radius * Math.sin(angle);
+        let dLng = lngRadius * Math.cos(angle);
+        // Pull the pin back toward the centroid until it sits inside the barangay
+        // border. The centroid is inside, so this converges; without it a fan-out
+        // offset pokes outside a narrow barangay (the vaccination-drive report).
+        for (let t = 0; t < 8 && !pointInRing(ring, base[0] + dLat, base[1] + dLng); t++) {
+          dLat *= 0.6;
+          dLng *= 0.6;
+        }
+        interventionRows.push({
+          a,
+          name,
+          coords: n === 1 ? base : [base[0] + dLat, base[1] + dLng],
+        });
+      });
+    });
+    // Newest first for the sidebar list.
+    interventionRows.sort((x, y) => (Number(y.a.id) || 0) - (Number(x.a.id) || 0));
+  }
+  const interventionPinItems = interventionRows.map(({ a, name, coords }) => {
+    const glyph = ACTION_TYPE_ICONS[a.action_type] || '🗂';
+    const color = INTERVENTION_STATUS_COLORS[a.status] || INTERVENTION_STATUS_COLORS.planned;
+    const disease = a.target_disease || a.alert_disease || '';
+    return {
+      id: `iv-${a.id}`,
+      coords,
+      svg: hazardSvgMarkup(glyph, color, 30, 'iv' + a.id),
+      size: 30,
+      color,
+      z: 1500,
+      title: `${glyph} ${a.action_type} · ${translateActionStatus(a.status)}${disease ? ` · ${disease}` : ''}${a.description ? ` — ${a.description}` : ''}`,
+      onClick: () => openBarangayPopup(name),
+    };
+  });
   const warningBadgeItems = [];
   if (mapZoom < PUROK_ZOOM_THRESHOLD) {
     hazardScopeList.forEach(name => {
@@ -1988,7 +2429,11 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     if (pinFocusKey && wxKey(ev.barangay_name) !== pinFocusKey) return;
     const diseases = hazardDiseases(ev.event_type);
     let evCoords = [parseFloat(ev.latitude), parseFloat(ev.longitude)];
-    if (areaTier) {
+    if (manualPinZoneAnchor[ev.id]) {
+      // Unit-named pin: anchor at its zone centroid, so it renders inside the zone
+      // its cases were counted in (the same zone the engine links it to).
+      evCoords = manualPinZoneAnchor[ev.id];
+    } else if (areaTier) {
       // Phase tier: snap the manual pin onto the nearest phase pin; skip if there is none.
       let best = null, bestD = Infinity;
       pinSourceGroups.forEach(g => {
@@ -2063,6 +2508,38 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       String(ev.barangay_id) === String(actionForm.barangay_id))
     .slice()
     .sort((a, b) => String(b.date_started || '').localeCompare(String(a.date_started || '')));
+
+  // Option lists for the inline custom dropdowns in the two CHO manage modals.
+  // Same { value, label } shape Manage Cases feeds its .mc-custom-dropdown-* menus.
+  const scopedBarangayEntries = Object.entries(barangayIdMap).filter(([_, name]) => (
+    actionScopeKeys.size === 0 || actionScopeKeys.has(wxKey(name))
+  ));
+  const actionBarangayOptions = [
+    { value: '', label: t('Citywide') },
+    ...scopedBarangayEntries.map(([id, name]) => ({ value: id, label: name })),
+  ];
+  const actionTypeOptions = ACTION_TYPES.map(x => ({ value: x, label: x }));
+  const actionStatusOptions = ACTION_STATUSES.map(s => ({ value: s, label: translateActionStatus(s) }));
+  const targetDiseaseOptions = [
+    { value: '', label: t('None') },
+    ...diseaseOptions.filter(d => d && d !== 'All Diseases').map(d => ({ value: d, label: d })),
+  ];
+  const hazardLinkOptions = [
+    { value: '', label: t('None - proactive action') },
+    ...actionHazardOptions.map(ev => ({
+      value: String(ev.id),
+      label: `${hazardIcon(ev.event_type)} ${ev.event_type} · ${ev.severity}${ev.date_started ? ` · ${ev.date_started}` : ''}`,
+    })),
+  ];
+  const hazardBarangayOptions = [
+    { value: '', label: '—' },
+    ...scopedBarangayEntries.map(([id, name]) => ({ value: id, label: name })),
+  ];
+  const hazardTypeOptions = DISASTER_EVENT_TYPES.map(x => ({ value: x, label: `${hazardIcon(x)} ${x}` }));
+  const severityOptions = DISASTER_SEVERITIES.map(s => ({ value: s, label: s }));
+  // Label for whichever value the actions form currently holds.
+  const actionBarangayDisplay = barangayIdMap[actionForm.barangay_id] || t('Citywide');
+  const hazardLinkDisplay = (hazardLinkOptions.find(o => String(o.value) === String(actionForm.hazard_id || '')) || {}).label;
 
   // How many actions across the user's scope point at a given hazard.
   const responseCountFor = (hazardId) => actions.filter(
@@ -2761,6 +3238,107 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           </p>
         </div>
 
+        {/* Zone Hotspots - Phase 1 purok-level exposure overlay (hotspot map only) */}
+        {!isDisasterMap && (
+          <div style={{ paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', gap: '8px' }}>
+              <p style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('Zone Hotspots')}</p>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                <input type="checkbox" checked={showZones} onChange={e => setShowZones(e.target.checked)} style={{ cursor: 'pointer' }} />
+                {t('Show')}
+              </label>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', flexWrap: 'wrap' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                {t('Sensitivity')}
+                <select value={zoneSensitivity} onChange={e => changeZoneSensitivity(e.target.value)} disabled={!showZones}
+                  style={{ background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '3px 6px', fontSize: '12px', cursor: showZones ? 'pointer' : 'default' }}>
+                  <option value="sensitive">{t('Sensitive')}</option>
+                  <option value="standard">{t('Standard')}</option>
+                  <option value="strict">{t('Strict')}</option>
+                </select>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-muted)', cursor: showZones ? 'pointer' : 'default', marginLeft: 'auto' }}>
+                <input type="checkbox" checked={showAllZoneCells} disabled={!showZones} onChange={e => setShowAllZoneCells(e.target.checked)} style={{ cursor: showZones ? 'pointer' : 'default' }} />
+                {realBoundaryBarangays > 0 ? t('Show all boundaries') : t('Show all cells')}
+              </label>
+            </div>
+
+            {!showZones ? (
+              <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
+                {t('Zone shading is hidden.')}
+              </p>
+            ) : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                  {[
+                    { key: 'watch', label: ZONE_KINDS.watch.label, icon: ZONE_KINDS.watch.icon, color: ZONE_KINDS.watch.color },
+                    { key: 'exposure', label: ZONE_KINDS.exposure.label, icon: ZONE_KINDS.exposure.icon, color: ZONE_KINDS.exposure.color },
+                    { key: 'case', label: ZONE_KINDS.case.label, icon: ZONE_KINDS.case.icon, color: ZONE_KINDS.case.color },
+                    { key: 'weather', label: ZONE_KINDS.weather.label, icon: ZONE_KINDS.weather.icon, color: ZONE_KINDS.weather.color },
+                  ].map(({ key, label, icon, color }) => (
+                    <div key={key} style={{ background: 'var(--input-bg)', borderRadius: '8px', padding: '9px 6px', textAlign: 'center', border: `1px solid ${color}33` }}>
+                      <div style={{ fontSize: '20px', fontWeight: '800', color }}>{zoneCounts[key] || 0}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2 }}>{icon} {t(label)}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {zoneHotspots.length === 0 ? (
+                  <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
+                    {t('No zone has crossed a case or flooding threshold in this scope.')}
+                  </p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {zoneHotspots.slice(0, 8).map(row => (
+                      <button key={row.id} onClick={() => setZonePopup(row)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'left',
+                          padding: '7px 9px', borderRadius: '8px', cursor: 'pointer',
+                          background: 'var(--input-bg)', border: `1px solid ${row.kindMeta.color}55`,
+                        }}>
+                        <span style={{ fontSize: '14px' }}>{row.kindMeta.icon}</span>
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {row.barangay} · {row.label}{row.units.length === 1 && row.units[0] !== 'Unspecified' ? ` · ${row.units[0]}` : ''}
+                          </span>
+                          <span style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {row.disease ? `${row.disease} · ${row.cases7}` : t('No cases flagged')}
+                          </span>
+                        </span>
+                        <span style={{ fontSize: '12px', fontWeight: '800', color: row.kindMeta.color }}>{row.score}</span>
+                      </button>
+                    ))}
+                    {zoneHotspots.length > 8 && (
+                      <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
+                        +{zoneHotspots.length - 8} {t('more in this scope')}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                  {realBoundaryBarangays > 0
+                    ? t('Zones use the real purok boundaries supplied by the City where available, and the purok-level grid cell otherwise. A zone is watched for exposure when its own 24h/72h rain or an active flood pin reaches it, and flagged when cases cross the 7-day threshold.')
+                    : t('Zones are the purok-level grid cell each case already snaps to. A zone is watched for exposure when 24h/72h rain or an active flood pin reaches it, and flagged when cases cross the 7-day threshold.')}
+                </p>
+                {realBoundaryBarangays > 0 && (
+                  <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                    {realBoundaryBarangays} {t('barangay(s) in this scope use real purok boundaries.')}
+                  </p>
+                )}
+                <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                  {t('Zoom in to see a zone, then zoom in again to break it down into the puroks/blocks inside it.')}
+                </p>
+                <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                  {t('Sensitivity sets the case and rain thresholds. Near Threshold marks a zone that is climbing but still below the hotspot gate.')}
+                </p>
+              </>
+            )}
+          </div>
+        )}
+
         {/* Hazard Response Coverage - are we answering the hazards we logged? */}
         <div style={{ paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
           <p style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('Hazard Response')}</p>
@@ -2794,7 +3372,39 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
             checkbox filters the map down to the interventions themselves. */}
         <div style={{ paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
           <p style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('Disease Warning Interventions')}</p>
-          {warningItems.length === 0 ? (
+          {interventionsOnly ? (
+            <>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '6px' }}>
+                <span style={{ fontSize: '22px', fontWeight: '800', color: 'var(--text-main)' }}>{interventionRows.length}</span>
+                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{t('interventions logged')}</span>
+              </div>
+              {interventionRows.length === 0 ? (
+                <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: 'var(--text-muted)' }}>{t('No interventions logged in this scope yet.')}</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                  {interventionRows.slice(0, 8).map(({ a, name }) => {
+                    const color = INTERVENTION_STATUS_COLORS[a.status] || INTERVENTION_STATUS_COLORS.planned;
+                    const disease = a.target_disease || a.alert_disease || '';
+                    return (
+                      <button key={a.id} onClick={() => openBarangayPopup(name)}
+                        title={`${a.action_type} · ${name}${disease ? ` · ${disease}` : ''}${a.description ? ` — ${a.description}` : ''}`}
+                        style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '6px 9px', borderRadius: '7px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', cursor: 'pointer', textAlign: 'left', font: 'inherit' }}>
+                        <span>{ACTION_TYPE_ICONS[a.action_type] || '🗂'}</span>
+                        <span style={{ flex: 1, minWidth: 0, fontSize: '13px', fontWeight: '600', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t(a.action_type)} · {name}{disease ? ` · ${disease}` : ''}</span>
+                        <span style={{ fontSize: '11px', fontWeight: '700', color, flexShrink: 0 }}>{translateActionStatus(a.status)}</span>
+                      </button>
+                    );
+                  })}
+                  {interventionRows.length > 8 && (
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>+{interventionRows.length - 8}</span>
+                  )}
+                </div>
+              )}
+              <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                {t('Pins are at barangay level (approximate position). Citywide interventions have no pin - they have no single location.')}
+              </p>
+            </>
+          ) : warningItems.length === 0 ? (
             <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>{t('No flagged disease counts in this scope.')}</p>
           ) : (
             <>
@@ -2921,18 +3531,26 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           <CreateTopPane key="create-top-pane" />
           <ZoomToBarangay key="zoom-barangay" barangay={filterBarangay} loginRole={loginRole} loginBarangay={loginBarangay} sessionContext={sessionContext} cases={allCases} />
           <ZoomListener key="zoom-listener" onZoom={setMapZoom} filterBarangay={filterBarangay} autoDetectedBrgy={autoDetectedBrgy} setAutoDetectedBrgy={setAutoDetectedBrgy} loginRole={loginRole} />
-          {mapZoom === 19 && <CaseDotMarkers key="case-dot-markers" cases={mapCases} zoom={mapZoom} t={t} translateStatus={translateStatus} />}
-          {mapZoom === 18 && purokData.length > 0 && (
+          {/* "Show interventions only" is a real layer filter: case pins, warning
+              badges and hazards are hidden so the map shows the intervention pins
+              themselves (barangay outlines stay for orientation). */}
+          {!interventionsOnly && mapZoom === 19 && <CaseDotMarkers key="case-dot-markers" cases={mapCases} zoom={mapZoom} t={t} translateStatus={translateStatus} />}
+          {!interventionsOnly && mapZoom === 18 && purokData.length > 0 && zoneBreakdownItems.length === 0 && (
             <PulseMarkers key="unit-pins" barangayData={purokData} onHover={setTooltip} onLeave={() => setTooltip(null)} onClick={setPopup} />
           )}
-          {mapZoom === 17 && purokData.length > 0 && pinnedBarangay && (
+          {!interventionsOnly && mapZoom === 17 && purokData.length > 0 && pinnedBarangay && (
             <AreaPins key="area-pins" groups={purokData} barangay={pinnedBarangay} onHover={setTooltip} onLeave={() => setTooltip(null)} onClick={setPopup} />
           )}
-          {mapZoom < 17 && <BarangayPins key="barangay-pins" barangayData={barangayData} onHover={setTooltip} onLeave={() => setTooltip(null)} onClick={setPopup} loginRole={loginRole} />}
-          {isDisasterMap && showActionsLayer && <LayerBadgeMarkers key="layer-actions" items={actionBadgeItems} />}
-          {isDisasterMap && <LayerBadgeMarkers key="layer-warnings" items={warningBadgeItems} />}
+          {!interventionsOnly && mapZoom < 17 && <BarangayPins key="barangay-pins" barangayData={barangayData} onHover={setTooltip} onLeave={() => setTooltip(null)} onClick={setPopup} loginRole={loginRole} />}
+          {isDisasterMap && showActionsLayer && !interventionsOnly && <LayerBadgeMarkers key="layer-actions" items={actionBadgeItems} />}
+          {isDisasterMap && !interventionsOnly && <LayerBadgeMarkers key="layer-warnings" items={warningBadgeItems} />}
+          {/* Weather + hazard layers deliberately stay ON while filtering: during
+              rainy season the rain/flood warnings must not vanish just because you
+              are reviewing interventions. Only the CASE layers are hidden. */}
           {isDisasterMap && showDisasterLayer && mapZoom < 17 && <LayerBadgeMarkers key="layer-hazards-badges" items={hazardBadgeItems} />}
           {isDisasterMap && showDisasterLayer && mapZoom >= 17 && <LayerBadgeMarkers key="layer-hazards-pins" items={hazardPinItems} />}
+          {interventionsOnly && <LayerBadgeMarkers key="layer-interventions" items={interventionPinItems} />}
+          {zoneBreakdownItems.length > 0 && <ZoneBreakdownMarkers key="zone-breakdown" items={zoneBreakdownItems} />}
           <GeoJSON
               key="brgy-geojson"
               ref={geoJsonLayerRef}
@@ -2977,6 +3595,26 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                 });
               }}
             />
+          {/* "Show all cells" grid: every 6-cell zone outline of the scoped
+              barangays, flagged or not, so the zone proxy is visible. Drawn
+              under the flagged zones (Leaflet paints in mount order). */}
+          {!isDisasterMap && showZones && showAllZoneCells && allZoneCellsFC.features.length > 0 && (
+            <GeoJSON key="zone-grid" data={allZoneCellsFC} style={getGridStyle} interactive={false} />
+          )}
+          {/* Phase 1 zone (purok-level) overlay - drawn last so its shading sits
+              above the barangay choropleth. It carries the flagged zones' colour;
+              the choropleth keeps its own case-count fill (see getGeoJsonStyle),
+              which drops to outline only when a single barangay is focused or for
+              a BHW. Pins live in Leaflet's marker pane, so they stay on top of
+              the shaded zones automatically. */}
+          {!isDisasterMap && showZones && zoneHotspots.length > 0 && (
+            <GeoJSON
+              key={`zone-hotspots-${mapZoom >= ZONE_BREAKDOWN_ZOOM ? 'bd' : 'zone'}-${zoneHotspots.map(r => `${r.id}:${r.kind}`).join(',')}`}
+              data={zoneFeatureCollection}
+              style={(feature) => getZoneStyle(feature, mapZoom)}
+              onEachFeature={onEachZone}
+            />
+          )}
         </MapContainer>
 
         {/* DISASTER vs HOTSPOT MAP MODE (replaces the old Actions / Hazards toggles) */}
@@ -3016,6 +3654,43 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
             border: '1px solid var(--border-color)', borderRadius: '6px', padding: '2px 8px',
           }}>
             {WEATHER_ATTRIBUTION}
+          </div>
+        )}
+
+        {/* ─── PHILIPPINE SEASONS (PAGASA) - ON THE HOTSPOT DISEASE MAP ───
+            Deliberately NOT in the Filters panel: it appears on the map itself when
+            the user switches to the Hotspot Disease Map, naming the tropical season
+            Cabuyao is in right now and the months each one covers. `bottom: 118px`
+            is the slot the weather attribution vacates in hotspot mode. */}
+        {!isDisasterMap && (
+          <div style={{
+            position: 'absolute', bottom: '118px', left: '16px', zIndex: 1000,
+            width: '272px', maxWidth: 'calc(100vw - 32px)',
+            background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
+            borderRadius: '10px', padding: '10px 12px', boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', marginBottom: '6px' }}>
+              <span style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text-main)' }}>🇵🇭 {t('Philippine Seasons')}</span>
+              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>PAGASA</span>
+            </div>
+            {PH_SEASONS.map(s => {
+              const isNow = s.months.includes(new Date().getMonth());
+              return (
+                <div key={s.key} style={{
+                  display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 9px', borderRadius: '8px', marginBottom: '4px',
+                  background: isNow ? `${s.color}22` : 'var(--input-bg)',
+                  border: `1px solid ${isNow ? s.color : 'var(--border-color)'}`,
+                }}>
+                  <span style={{ fontSize: '14px', flexShrink: 0 }}>{s.icon}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: '12px', fontWeight: isNow ? '700' : '600', color: 'var(--text-main)' }}>{t(s.label)}</span>
+                  <span style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{t(s.monthsLabel)}</span>
+                  {isNow && <span style={{ fontSize: '10px', fontWeight: '800', color: s.color, flexShrink: 0 }}>{t('now')}</span>}
+                </div>
+              );
+            })}
+            <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.4 }}>
+              {t('Cabuyao, Laguna follows the PAGASA tropical seasons: rainy June to November, cool dry December to February, hot dry (summer) March to May.')}
+            </div>
           </div>
         )}
 
@@ -3426,7 +4101,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--border-color)', fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center' }}>
                 {t('Click "Go To →" to open Manage Cases filtered to that disease and barangay')}
               </div>
-              {loginRole === 'CHO' && isDisasterMap && (
+              {loginRole === 'CHO' && (
                 <button onClick={openManageActions}
                   style={{
                     marginTop: '12px', width: '100%', padding: '9px 14px', borderRadius: '8px',
@@ -3436,7 +4111,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                   🗂 {t('Manage Barangay Actions')}
                 </button>
               )}
-              {loginRole === 'CHO' && isDisasterMap && (
+              {loginRole === 'CHO' && (
                 <button onClick={openManageHazards}
                   style={{
                     marginTop: '8px', width: '100%', padding: '9px 14px', borderRadius: '8px',
@@ -3461,7 +4136,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '14px',
               padding: '24px', width: '520px', maxWidth: '95vw', maxHeight: '85vh', overflowY: 'auto',
               boxShadow: '0 24px 60px rgba(0,0,0,0.3)',
-            }} onClick={e => e.stopPropagation()}>
+            }} ref={manageActionsRef} onClick={e => e.stopPropagation()}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--text-main)' }}>🗂 {t('Barangay Actions')}</h3>
                 <button onClick={() => setManageActionsOpen(false)}
@@ -3471,63 +4146,102 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
-                <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>
-                  {t('Barangay')}
-                  <select
-                    value={actionForm.barangay_id}
-                    onChange={e => setActionForm({ ...actionForm, barangay_id: e.target.value, barangay_name: barangayIdMap[e.target.value] || '' })}
-                    style={{ padding: '8px 10px', borderRadius: '7px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '14px' }}>
-                    <option value="">{t('Citywide')}</option>
-                    {Object.entries(barangayIdMap)
-                      .filter(([_, name]) => {
-                        if (actionScopeKeys.size === 0) return true;
-                        return actionScopeKeys.has(wxKey(name));
-                      })
-                      .map(([id, name]) => (
-                        <option key={id} value={id}>{name}</option>
-                      ))}
-                  </select>
-                </label>
-                <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>
-                  {t('Action Type')}
-                  <select
-                    value={actionForm.action_type}
-                    onChange={e => setActionForm({ ...actionForm, action_type: e.target.value })}
-                    style={{ padding: '8px 10px', borderRadius: '7px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '14px' }}>
-                    {ACTION_TYPES.map(x => <option key={x} value={x}>{x}</option>)}
-                  </select>
-                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                  <span>{t('Barangay')}</span>
+                  <div style={{ position: 'relative' }}>
+                    <button type="button" className="mc-custom-dropdown-btn" style={{ width: '100%', fontSize: '14px' }}
+                      onClick={() => setManageDD(manageDD === 'a:brgy' ? null : 'a:brgy')}>
+                      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{actionBarangayDisplay}</span>
+                      <span style={{ marginLeft: '6px', opacity: 0.6, transition: 'transform 0.2s', display: 'inline-block', flexShrink: 0, transform: manageDD === 'a:brgy' ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                    </button>
+                    {manageDD === 'a:brgy' && (
+                      <div className="mc-custom-dropdown-panel" style={{ maxHeight: '220px', overflowY: 'auto' }}>
+                        {actionBarangayOptions.map(o => (
+                          <div key={o.label}
+                            className={`mc-custom-dropdown-item ${String(actionForm.barangay_id) === String(o.value) ? 'mc-custom-dropdown-item--active' : ''}`}
+                            onClick={() => { setActionForm({ ...actionForm, barangay_id: o.value, barangay_name: barangayIdMap[o.value] || '', hazard_id: '' }); setManageDD(null); }}>
+                            {o.label}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                  <span>{t('Action Type')}</span>
+                  <div style={{ position: 'relative' }}>
+                    <button type="button" className="mc-custom-dropdown-btn" style={{ width: '100%', fontSize: '14px' }}
+                      onClick={() => setManageDD(manageDD === 'a:type' ? null : 'a:type')}>
+                      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{actionForm.action_type}</span>
+                      <span style={{ marginLeft: '6px', opacity: 0.6, transition: 'transform 0.2s', display: 'inline-block', flexShrink: 0, transform: manageDD === 'a:type' ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                    </button>
+                    {manageDD === 'a:type' && (
+                      <div className="mc-custom-dropdown-panel">
+                        {actionTypeOptions.map(o => (
+                          <div key={o.value}
+                            className={`mc-custom-dropdown-item ${actionForm.action_type === o.value ? 'mc-custom-dropdown-item--active' : ''}`}
+                            onClick={() => { setActionForm({ ...actionForm, action_type: o.value }); setManageDD(null); }}>
+                            {o.label}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
-              <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '10px' }}>
-                {t('Responding to hazard')} ({t('optional')})
-                <select
-                  value={actionForm.hazard_id || ''}
-                  onChange={e => setActionForm({ ...actionForm, hazard_id: e.target.value })}
-                  style={{ padding: '8px 10px', borderRadius: '7px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '14px' }}>
-                  <option value="">{t('None - proactive action')}</option>
-                  {actionHazardOptions.map(ev => (
-                    <option key={ev.id} value={ev.id}>
-                      {`${hazardIcon(ev.event_type)} ${ev.event_type} · ${ev.severity}${ev.date_started ? ` · ${ev.date_started}` : ''}`}
-                    </option>
-                  ))}
-                </select>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '10px' }}>
+                <span>{t('Responding to hazard')} ({t('optional')})</span>
+                <div style={{ position: 'relative' }}>
+                  <button type="button" className="mc-custom-dropdown-btn" style={{ width: '100%', fontSize: '14px' }}
+                    onClick={() => setManageDD(manageDD === 'a:hazard' ? null : 'a:hazard')}>
+                    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {hazardLinkDisplay || t('None - proactive action')}
+                    </span>
+                    <span style={{ marginLeft: '6px', opacity: 0.6, transition: 'transform 0.2s', display: 'inline-block', flexShrink: 0, transform: manageDD === 'a:hazard' ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                  </button>
+                  {manageDD === 'a:hazard' && (
+                    <div className="mc-custom-dropdown-panel" style={{ maxHeight: '220px', overflowY: 'auto' }}>
+                      {hazardLinkOptions.map(o => (
+                        <div key={o.value || 'none'}
+                          className={`mc-custom-dropdown-item ${String(actionForm.hazard_id || '') === String(o.value) ? 'mc-custom-dropdown-item--active' : ''}`}
+                          onClick={() => { setActionForm({ ...actionForm, hazard_id: o.value }); setManageDD(null); }}>
+                          {o.label}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '400' }}>
                   {actionHazardOptions.length === 0
                     ? t('No active hazard pins to link yet - log one under Manage Hazard Pins.')
                     : t('Links this action to the hazard it responds to.')}
                 </span>
-              </label>
+              </div>
 
-              <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '10px' }}>
-                {t('Target Disease')} ({t('optional')})
-                <input
-                  value={actionForm.target_disease}
-                  onChange={e => setActionForm({ ...actionForm, target_disease: e.target.value })}
-                  placeholder={t('e.g. Dengue')}
-                  style={{ padding: '8px 10px', borderRadius: '7px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '14px' }}
-                />
-              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '10px' }}>
+                <span>{t('Target Disease')} ({t('optional')})</span>
+                <div style={{ position: 'relative' }}>
+                  <button type="button" className="mc-custom-dropdown-btn" style={{ width: '100%', fontSize: '14px' }}
+                    onClick={() => setManageDD(manageDD === 'a:disease' ? null : 'a:disease')}>
+                    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {actionForm.target_disease || t('None')}
+                    </span>
+                    <span style={{ marginLeft: '6px', opacity: 0.6, transition: 'transform 0.2s', display: 'inline-block', flexShrink: 0, transform: manageDD === 'a:disease' ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                  </button>
+                  {manageDD === 'a:disease' && (
+                    <div className="mc-custom-dropdown-panel" style={{ maxHeight: '220px', overflowY: 'auto' }}>
+                      {targetDiseaseOptions.map(o => (
+                        <div key={o.label}
+                          className={`mc-custom-dropdown-item ${String(actionForm.target_disease || '') === String(o.value) ? 'mc-custom-dropdown-item--active' : ''}`}
+                          onClick={() => { setActionForm({ ...actionForm, target_disease: o.value }); setManageDD(null); }}>
+                          {o.label}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
 
               <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '10px' }}>
                 {t('Description')}
@@ -3549,15 +4263,27 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                   {t('End date')}
                   <DatePicker value={actionForm.date_ended} onChange={v => setActionForm({ ...actionForm, date_ended: v })} dateFormat={dateFormat} clearable />
                 </label>
-                <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>
-                  {t('Status')}
-                  <select
-                    value={actionForm.status}
-                    onChange={e => setActionForm({ ...actionForm, status: e.target.value })}
-                    style={{ padding: '8px 10px', borderRadius: '7px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '14px' }}>
-                    {ACTION_STATUSES.map(s => <option key={s} value={s}>{translateActionStatus(s)}</option>)}
-                  </select>
-                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                  <span>{t('Status')}</span>
+                  <div style={{ position: 'relative' }}>
+                    <button type="button" className="mc-custom-dropdown-btn" style={{ width: '100%', fontSize: '14px' }}
+                      onClick={() => setManageDD(manageDD === 'a:status' ? null : 'a:status')}>
+                      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{translateActionStatus(actionForm.status)}</span>
+                      <span style={{ marginLeft: '6px', opacity: 0.6, transition: 'transform 0.2s', display: 'inline-block', flexShrink: 0, transform: manageDD === 'a:status' ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                    </button>
+                    {manageDD === 'a:status' && (
+                      <div className="mc-custom-dropdown-panel">
+                        {actionStatusOptions.map(o => (
+                          <div key={o.value}
+                            className={`mc-custom-dropdown-item ${actionForm.status === o.value ? 'mc-custom-dropdown-item--active' : ''}`}
+                            onClick={() => { setActionForm({ ...actionForm, status: o.value }); setManageDD(null); }}>
+                            {o.label}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <button onClick={saveAction} disabled={actionsSaving}
@@ -3634,7 +4360,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '14px',
               padding: '24px', width: '560px', maxWidth: '95vw', maxHeight: '85vh', overflowY: 'auto',
               boxShadow: '0 24px 60px rgba(0,0,0,0.3)',
-            }} onClick={e => e.stopPropagation()}>
+            }} ref={manageHazardsRef} onClick={e => e.stopPropagation()}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--text-main)' }}>🌦 {t('Manage Hazard Pins')}</h3>
                 <button onClick={() => setManageHazardsOpen(false)}
@@ -3660,53 +4386,84 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
-                <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>
-                  {t('Barangay')}
-                  <select
-                    value={hazardForm.barangay_id}
-                    onChange={e => setHazardForm({ ...hazardForm, barangay_id: e.target.value, barangay_name: barangayIdMap[e.target.value] || '' })}
-                    style={{ padding: '8px 10px', borderRadius: '7px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '14px' }}>
-                    <option value="">—</option>
-{Object.entries(barangayIdMap)
-                      .filter(([_, name]) => {
-                        if (actionScopeKeys.size === 0) return true;
-                        return actionScopeKeys.has(wxKey(name));
-                      })
-                      .map(([id, name]) => (
-                        <option key={id} value={id}>{name}</option>
-                      ))}
-                  </select>
-                </label>
-                <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>
-                  {t('Hazard Type')}
-                  <select
-                    value={hazardForm.event_type}
-                    onChange={e => setHazardForm({ ...hazardForm, event_type: e.target.value })}
-                    style={{ padding: '8px 10px', borderRadius: '7px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '14px' }}>
-                    {DISASTER_EVENT_TYPES.map(x => <option key={x} value={x}>{hazardIcon(x)} {x}</option>)}
-                  </select>
-                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                  <span>{t('Barangay')}</span>
+                  <div style={{ position: 'relative' }}>
+                    <button type="button" className="mc-custom-dropdown-btn" style={{ width: '100%', fontSize: '14px' }}
+                      onClick={() => setManageDD(manageDD === 'h:brgy' ? null : 'h:brgy')}>
+                      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{barangayIdMap[hazardForm.barangay_id] || '—'}</span>
+                      <span style={{ marginLeft: '6px', opacity: 0.6, transition: 'transform 0.2s', display: 'inline-block', flexShrink: 0, transform: manageDD === 'h:brgy' ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                    </button>
+                    {manageDD === 'h:brgy' && (
+                      <div className="mc-custom-dropdown-panel" style={{ maxHeight: '220px', overflowY: 'auto' }}>
+                        {hazardBarangayOptions.map(o => (
+                          <div key={o.label}
+                            className={`mc-custom-dropdown-item ${String(hazardForm.barangay_id) === String(o.value) ? 'mc-custom-dropdown-item--active' : ''}`}
+                            onClick={() => { setHazardForm({ ...hazardForm, barangay_id: o.value, barangay_name: barangayIdMap[o.value] || '' }); setManageDD(null); }}>
+                            {o.label}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                  <span>{t('Hazard Type')}</span>
+                  <div style={{ position: 'relative' }}>
+                    <button type="button" className="mc-custom-dropdown-btn" style={{ width: '100%', fontSize: '14px' }}
+                      onClick={() => setManageDD(manageDD === 'h:type' ? null : 'h:type')}>
+                      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{hazardIcon(hazardForm.event_type)} {hazardForm.event_type}</span>
+                      <span style={{ marginLeft: '6px', opacity: 0.6, transition: 'transform 0.2s', display: 'inline-block', flexShrink: 0, transform: manageDD === 'h:type' ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                    </button>
+                    {manageDD === 'h:type' && (
+                      <div className="mc-custom-dropdown-panel">
+                        {hazardTypeOptions.map(o => (
+                          <div key={o.value}
+                            className={`mc-custom-dropdown-item ${hazardForm.event_type === o.value ? 'mc-custom-dropdown-item--active' : ''}`}
+                            onClick={() => { setHazardForm({ ...hazardForm, event_type: o.value }); setManageDD(null); }}>
+                            {o.label}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
-                <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>
-                  {t('Severity')}
-                  <select
-                    value={hazardForm.severity}
-                    onChange={e => setHazardForm({ ...hazardForm, severity: e.target.value })}
-                    style={{ padding: '8px 10px', borderRadius: '7px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '14px' }}>
-                    {DISASTER_SEVERITIES.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                  <span>{t('Severity')}</span>
+                  <div style={{ position: 'relative' }}>
+                    <button type="button" className="mc-custom-dropdown-btn" style={{ width: '100%', fontSize: '14px' }}
+                      onClick={() => setManageDD(manageDD === 'h:sev' ? null : 'h:sev')}>
+                      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{hazardForm.severity}</span>
+                      <span style={{ marginLeft: '6px', opacity: 0.6, transition: 'transform 0.2s', display: 'inline-block', flexShrink: 0, transform: manageDD === 'h:sev' ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                    </button>
+                    {manageDD === 'h:sev' && (
+                      <div className="mc-custom-dropdown-panel">
+                        {severityOptions.map(o => (
+                          <div key={o.value}
+                            className={`mc-custom-dropdown-item ${hazardForm.severity === o.value ? 'mc-custom-dropdown-item--active' : ''}`}
+                            onClick={() => { setHazardForm({ ...hazardForm, severity: o.value }); setManageDD(null); }}>
+                            {o.label}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
                 <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>
                   {t('Purok')} ({t('optional')})
                   <input
                     value={hazardForm.purok}
                     onChange={e => setHazardForm({ ...hazardForm, purok: e.target.value })}
-                    placeholder={t('e.g. Purok 3')}
+                    placeholder={t('e.g. Purok 3, Blk 8 Lot 8')}
                     style={{ padding: '8px 10px', borderRadius: '7px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '14px' }}
                   />
                 </label>
+                <p style={{ margin: '6px 0 12px 0', fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                  {t('Flood pins are matched to a zone by their location text (e.g. the same Purok/Blk as the cases) first, then by their coordinates.')}
+                </p>
                 <div style={{ display: 'flex', flexDirection: 'row', gap: '6px' }}>
                   <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600', flex: 1 }}>
                     <span>Lat ({t('optional')})</span>
@@ -3762,36 +4519,219 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
 
               <div style={{ marginTop: '18px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
                 <p style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  {t('Active Hazard Pins')}
+                  {t('Hazard Pins')}
                 </p>
-                {disasterEvents.filter(e => e.barangay_name === (hazardForm.barangay_name || '')).filter(isDisasterActive).length === 0 && (
+                {disasterEvents.filter(e => e.barangay_name === (hazardForm.barangay_name || '')).length === 0 && (
                   <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>{t('No hazard pins for this barangay yet.')}</p>
                 )}
-                {disasterEvents.filter(e => e.barangay_name === (hazardForm.barangay_name || '')).filter(isDisasterActive).map(ev => (
-                  <div key={ev.id} style={{
-                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px',
-                    marginBottom: '6px', borderRadius: '7px', background: 'var(--input-bg)',
-                    border: '1px solid var(--border-color)',
+                {disasterEvents
+                  .filter(e => e.barangay_name === (hazardForm.barangay_name || ''))
+                  .slice()
+                  .sort((a, b) => (isDisasterActive(b) ? 1 : 0) - (isDisasterActive(a) ? 1 : 0))
+                  .map(ev => {
+                    const ended = !isDisasterActive(ev);
+                    return (
+                      <div key={ev.id} style={{
+                        display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px',
+                        marginBottom: '6px', borderRadius: '7px', background: 'var(--input-bg)',
+                        border: '1px solid var(--border-color)',
+                        opacity: ended ? 0.6 : 1,
+                      }}>
+                        <span style={{ fontSize: '15px' }}>{hazardIcon(ev.event_type)}</span>
+                        <span style={{ flex: 1, fontSize: '13px', color: 'var(--text-main)' }}>
+                          {ev.event_type}{ev.purok ? ` · ${ev.purok}` : ''} · <span style={{ textTransform: 'capitalize' }}>{ev.severity.toLowerCase()}</span>
+                          {ended && (
+                            <span style={{ marginLeft: '6px', padding: '1px 7px', borderRadius: '10px', fontSize: '11px', fontWeight: '700', background: 'var(--border-color)', color: 'var(--text-muted)' }}>
+                              {t('Ended')}
+                            </span>
+                          )}
+                        </span>
+                        <button onClick={() => setHazardForm({
+                          id: ev.id, barangay_id: String(ev.barangay_id || ''), barangay_name: ev.barangay_name,
+                          event_type: ev.event_type, severity: ev.severity, purok: ev.purok || '',
+                          latitude: ev.latitude != null ? String(ev.latitude) : '', longitude: ev.longitude != null ? String(ev.longitude) : '',
+                          date_started: ev.date_started || '', date_ended: ev.date_ended || '', notes: ev.notes || '',
+                        })}
+                          style={{ background: 'rgba(8,145,178,0.1)', border: 'none', color: '#0891b2', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>
+                          {t('Edit')}
+                        </button>
+                        <button onClick={() => deleteHazard(ev.id)}
+                          style={{ background: 'rgba(220,38,38,0.1)', border: 'none', color: '#dc2626', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>
+                          {t('Delete')}
+                        </button>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── ZONE (PUROK-LEVEL) EVIDENCE CARD ── Phase 1: shows WHY a zone was
+            flagged (case cluster vs rain/flood exposure) and lets the CHO answer
+            it with the mandatory-remarks intervention modal. */}
+        {zonePopup && (
+          <div style={{
+            position: 'absolute', inset: 0, zIndex: 2500,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.55)', padding: '20px',
+          }} onClick={() => setZonePopup(null)}>
+            <div style={{
+              background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '14px',
+              padding: '24px', width: '480px', maxWidth: '95vw', maxHeight: '80vh', overflowY: 'auto',
+              boxShadow: '0 24px 60px rgba(0,0,0,0.3)',
+            }} onClick={e => e.stopPropagation()}>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                <div>
+                  <h3 style={{ margin: '0 0 5px 0', fontSize: '19px', fontWeight: '700', color: 'var(--text-main)' }}>
+                    {zonePopup.kindMeta.icon} {zonePopup.barangay} · {zonePopup.label}{zonePopup.units.length === 1 && zonePopup.units[0] !== 'Unspecified' ? ` · ${zonePopup.units[0]}` : ''}
+                  </h3>
+                  <span style={{
+                    display: 'inline-block', fontSize: '12px', fontWeight: '700', padding: '3px 9px', borderRadius: '10px',
+                    background: `${zonePopup.kindMeta.color}22`, color: zonePopup.kindMeta.color, border: `1px solid ${zonePopup.kindMeta.color}55`,
                   }}>
-                    <span style={{ fontSize: '15px' }}>{hazardIcon(ev.event_type)}</span>
-                    <span style={{ flex: 1, fontSize: '13px', color: 'var(--text-main)' }}>
-                      {ev.event_type}{ev.purok ? ` · ${ev.purok}` : ''} · <span style={{ textTransform: 'capitalize' }}>{ev.severity.toLowerCase()}</span>
-                    </span>
-                    <button onClick={() => setHazardForm({
-                      id: ev.id, barangay_id: String(ev.barangay_id || ''), barangay_name: ev.barangay_name,
-                      event_type: ev.event_type, severity: ev.severity, purok: ev.purok || '',
-                      latitude: ev.latitude != null ? String(ev.latitude) : '', longitude: ev.longitude != null ? String(ev.longitude) : '',
-                      date_started: ev.date_started || '', date_ended: ev.date_ended || '', notes: ev.notes || '',
-                    })}
-                      style={{ background: 'rgba(8,145,178,0.1)', border: 'none', color: '#0891b2', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>
-                      {t('Edit')}
-                    </button>
-                    <button onClick={() => deleteHazard(ev.id)}
-                      style={{ background: 'rgba(220,38,38,0.1)', border: 'none', color: '#dc2626', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>
-                      {t('Delete')}
-                    </button>
+                    {t(zonePopup.kindMeta.label)} · {t('Score')} {zonePopup.score}
+                  </span>
+                </div>
+                <button onClick={() => setZonePopup(null)}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '24px', lineHeight: 1, padding: 0 }}>
+                  ×
+                </button>
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--border-color)', marginBottom: '12px' }} />
+
+              {/* Why - the case side */}
+              <p style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('Case evidence')}</p>
+              {zonePopup.diseases.length === 0 ? (
+                <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: 'var(--text-muted)' }}>
+                  {t('No disease crossed the 7-day case threshold in this zone.')}
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
+                  {zonePopup.diseases.map(d => (
+                    <div key={d.disease} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border-color)' }}>
+                      <span style={{ flex: 1, fontSize: '14px', color: 'var(--text-main)', fontWeight: '600' }}>{d.disease}</span>
+                      <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                        {d.cases7} {t('in 7 days')}{d.prev7 > 0 ? ` · ${t('prev')} ${d.prev7}` : ''}
+                      </span>
+                      {d.surge && (
+                        <span style={{ fontSize: '11px', fontWeight: '700', color: '#b91c1c', background: 'rgba(185,28,28,0.12)', padding: '2px 7px', borderRadius: '9px' }}>
+                          ↑ {t('Surge')}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Near the hotspot gate but not over it (the `watch` tier). Shown so
+                  an early climb is visible without calling it a hotspot. */}
+              {zonePopup.near && zonePopup.near.length > 0 && (
+                <>
+                  <p style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('Near-threshold cases')}</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '6px' }}>
+                    {zonePopup.near.map(d => (
+                      <div key={d.disease} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', borderRadius: '8px', background: 'var(--input-bg)', border: `1px solid ${zonePopup.kindMeta.color}55` }}>
+                        <span style={{ flex: 1, fontSize: '14px', color: 'var(--text-main)', fontWeight: '600' }}>{d.disease}</span>
+                        <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                          {d.cases7} {t('in 7 days')}{d.prev7 > 0 ? ` · ${t('prev')} ${d.prev7}` : ''}
+                        </span>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                  <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+                    {t('Below the hotspot threshold but climbing.')}
+                  </p>
+                </>
+              )}
+
+              {/* Why - the exposure side */}
+              <p style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('Exposure evidence')}</p>
+              {zonePopup.env.reasons.length === 0 ? (
+                <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: 'var(--text-muted)' }}>
+                  {t('No rain or flood threshold reached in this zone.')}
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '12px' }}>
+                  {zonePopup.env.reasons.map((r, i) => (
+                    <div key={i} style={{ fontSize: '13px', color: 'var(--text-main)', padding: '6px 10px', borderRadius: '8px', background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.35)' }}>
+                      💧 {r}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {zonePopup.env.gate && zonePopup.env.rainSource === 'zone' && (
+                <p style={{ margin: '-6px 0 12px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+                  {t('Rain measured at this zone, not the whole barangay.')}
+                </p>
+              )}
+
+              {/* Watch for - the diseases a flood/rain exposure favours. Kept
+                  visually separate from Case evidence: these are implied by the
+                  hazard, not cases observed in the zone. */}
+              {zonePopup.env.gate && (() => {
+                const watch = new Set();
+                (zonePopup.env.hazardTypes || []).forEach(type => {
+                  if (type === 'Heavy Rain') RAINY_SEASON_DISEASES.forEach(d => watch.add(d));
+                  else hazardDiseases(type).forEach(d => watch.add(d));
+                });
+                const list = [...watch];
+                if (list.length === 0) return null;
+                return (
+                  <>
+                    <p style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('Watch for')}</p>
+                    <div style={{ marginBottom: '12px', fontSize: '13px', color: 'var(--text-main)', padding: '8px 10px', borderRadius: '8px', background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.35)' }}>
+                      🌧 {list.join(', ')}
+                    </div>
+                  </>
+                );
+              })()}
+
+              {zonePopup.seasonHit && (
+                <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+                  {t('Season note:')} {zonePopup.disease} {t('is flagged in the current Philippine season.')}
+                </p>
+              )}
+
+              {zonePopup.breakdown && zonePopup.breakdown.length > 0 ? (
+                <>
+                  <p style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('Breakdown by location unit')}</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '12px' }}>
+                    {zonePopup.breakdown.map(b => (
+                      <div key={b.unit} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', padding: '5px 9px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border-color)' }}>
+                        <span style={{ flex: 1, color: 'var(--text-main)', fontWeight: '600' }}>{b.unit}</span>
+                        <span style={{ color: 'var(--text-muted)' }}>
+                          {b.diseases.length === 0 ? t('No cases in 7 days') : b.diseases.map(d => `${d.disease} ${d.cases7}`).join(', ')}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : zonePopup.units.length > 0 ? (
+                <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+                  {t('Location units in this zone:')} {zonePopup.units.join(', ')}
+                </p>
+              ) : null}
+
+              {zonePopup.merged && (
+                <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+                  {t('Includes cases from a grid cell with no barangay land:')} {zonePopup.mergedIdx.map(i => `Zone ${i + 1}`).join(', ')}. {t('Zoom in for the per-unit breakdown.')}
+                </p>
+              )}
+
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                <button onClick={() => setZonePopup(null)}
+                  style={{ padding: '9px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-main)', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}>
+                  {t('Close')}
+                </button>
+                {loginRole === 'CHO' && (
+                  <button onClick={() => openZoneIntervention(zonePopup)}
+                    style={{ padding: '9px 16px', borderRadius: '8px', border: 'none', background: '#0891b2', color: '#fff', cursor: 'pointer', fontSize: '14px', fontWeight: '700' }}>
+                    ＋ {t('Log Intervention')}
+                  </button>
+                )}
               </div>
             </div>
           </div>

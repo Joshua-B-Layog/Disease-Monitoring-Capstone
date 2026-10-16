@@ -6683,7 +6683,7 @@ function verifyActionHazard(hazardId, cb) {
 // `alert_kind` tags the Dashboard-only warnings that have no row of their own
 // (a recurring hotspot or a threshold card), so both routes carry the
 // "this answers a warning" flag that makes the remarks field mandatory.
-const ALERT_KINDS = ['epi_count', 'count_threshold', 'surge', 'mortality', 'hazard_disease', 'high_active', 'mortality_card', 'rapid_surge', 'rising_trend', 'hotspot', 'disaster'];
+const ALERT_KINDS = ['epi_count', 'count_threshold', 'surge', 'mortality', 'hazard_disease', 'high_active', 'mortality_card', 'rapid_surge', 'rising_trend', 'hotspot', 'disaster', 'zone_disease_density', 'zone_disease_flood'];
 
 function resolveActionAlertId(alertId, res) {
   if (alertId === undefined || alertId === null || alertId === '' || alertId === 'null') return null;
@@ -7097,6 +7097,137 @@ app.delete('/api/disaster-events/:id', authenticate, (req, res) => {
 });
 
 // ═════════════════════════════════════════════════════════
+// PUROK AREAS (real purok/zone boundary polygons — optional)
+// ═════════════════════════════════════════════════════════
+// The zone hotspot engine (frontend/src/zoneHotspots.js) proxies a purok with one
+// cell of a 3x2 grid over the barangay bbox, because Cabuyao has never published
+// purok boundaries. When the City supplies them (Settings -> Data Management ->
+// "Barangay Purok Boundaries"), they are stored here and the engine uses the real
+// polygons instead of the grid for that barangay. `geojson` holds a GeoJSON
+// Polygon/MultiPolygon geometry as text.
+db.query(`CREATE TABLE IF NOT EXISTS purok_areas (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  barangay_id INT NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  geojson LONGTEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_purok_area_barangay (barangay_id)
+)`, (err) => {
+  if (err) console.error('Error creating purok_areas table:', err.message);
+  else console.log('Purok areas table created/verified');
+});
+
+// Only Polygon / MultiPolygon are meaningful here, and the point count is capped
+// so a malformed (or hostile) upload cannot balloon the row.
+const MAX_PUROK_RING_POINTS = 20000;
+function validPurokGeometry(geometry) {
+  if (!geometry || typeof geometry !== 'object') return null;
+  const { type, coordinates } = geometry;
+  if (type !== 'Polygon' && type !== 'MultiPolygon') return null;
+  if (!Array.isArray(coordinates) || coordinates.length === 0) return null;
+  let points = 0;
+  const rings = type === 'Polygon' ? coordinates : coordinates.flat(1);
+  for (const ring of rings) {
+    if (!Array.isArray(ring) || ring.length < 3) return null;
+    for (const pt of ring) {
+      if (!Array.isArray(pt) || pt.length < 2) return null;
+      const lng = Number(pt[0]), lat = Number(pt[1]);
+      if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
+      if (lng < -180 || lng > 180 || lat < -90 || lat > 90) return null;
+      points += 1;
+      if (points > MAX_PUROK_RING_POINTS) return null;
+    }
+  }
+  return { type, coordinates };
+}
+
+app.get('/api/purok-areas', authenticate, (req, res) => {
+  let sql = `SELECT pa.id, pa.barangay_id, b.name AS barangay_name, pa.name, pa.geojson
+             FROM purok_areas pa JOIN barangays b ON pa.barangay_id = b.id`;
+  const params = [];
+  if (req.query.barangay_id) { sql += ' WHERE pa.barangay_id = ?'; params.push(req.query.barangay_id); }
+  sql += ' ORDER BY pa.barangay_id ASC, pa.id ASC';
+  db.query(sql, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+    res.json((rows || []).map(r => {
+      let geometry = r.geojson;
+      try { geometry = JSON.parse(r.geojson); } catch { /* keep the raw string */ }
+      return { id: r.id, barangay_id: r.barangay_id, barangay_name: r.barangay_name, name: r.name, geometry };
+    }));
+  });
+});
+
+// Bulk import. Body: { barangays: [{ name, puroks: [{ name, geometry }] }] }.
+// Import is REPLACE-per-barangay: every barangay named in the file has its stored
+// boundaries cleared first, so re-uploading a corrected file never leaves orphans.
+app.post('/api/purok-areas/import', authenticate, (req, res) => {
+  if (req.user.role !== 'CHO') return res.status(403).json({ error: 'Only CHO can import purok boundaries.' });
+  const incoming = Array.isArray(req.body && req.body.barangays) ? req.body.barangays : [];
+  if (incoming.length === 0) return res.status(400).json({ error: 'No purok boundaries in the file.' });
+
+  const cleaned = [];
+  for (const entry of incoming) {
+    if (!entry || !entry.name) continue;
+    const puroks = [];
+    for (const p of (Array.isArray(entry.puroks) ? entry.puroks : [])) {
+      const geometry = validPurokGeometry(p && p.geometry);
+      if (!geometry) continue;
+      const name = String((p && p.name) || '').trim().slice(0, 100) || `Purok ${puroks.length + 1}`;
+      puroks.push({ name, geometry });
+    }
+    if (puroks.length > 0) cleaned.push({ name: String(entry.name).trim(), puroks });
+  }
+  if (cleaned.length === 0) return res.status(400).json({ error: 'No valid Polygon/MultiPolygon geometries found.' });
+
+  withTransaction((t) => {
+    const names = cleaned.map(c => c.name);
+    t.q('SELECT id, name FROM barangays WHERE name IN (?)', [names], (selErr, brgyRows) => {
+      if (selErr) return t.rollback(() => res.status(500).json({ error: 'Internal database error. Please try again.' }));
+      const byName = new Map((brgyRows || []).map(r => [r.name, r.id]));
+      const unmatched = names.filter(n => !byName.has(n));
+      const target = cleaned.filter(c => byName.has(c.name));
+      if (target.length === 0) {
+        return t.commit(() => res.status(400).json({
+          error: 'No barangay in the file matched a Cabuyao barangay name.',
+          unmatched,
+        }));
+      }
+      const ids = target.map(c => byName.get(c.name));
+      t.q('DELETE FROM purok_areas WHERE barangay_id IN (?)', [ids], (delErr) => {
+        if (delErr) return t.rollback(() => res.status(500).json({ error: 'Internal database error. Please try again.' }));
+        const values = [];
+        target.forEach(c => c.puroks.forEach(p => values.push([byName.get(c.name), p.name, JSON.stringify(p.geometry)])));
+        t.q('INSERT INTO purok_areas (barangay_id, name, geojson) VALUES ?', [values], (insErr, result) => {
+          if (insErr) return t.rollback(() => res.status(500).json({ error: 'Internal database error. Please try again.' }));
+          t.commit(() => {
+            createAuditLog(req.user.user_id, req.user.name, req.user.role, null, req.user.barangay || null,
+              'Import', 'Purok Boundaries',
+              `Imported ${result.affectedRows} purok boundary(ies) across ${target.length} barangay(s)`);
+            res.json({
+              message: 'Purok boundaries imported.',
+              imported: result.affectedRows,
+              barangays: target.map(c => c.name),
+              unmatched,
+            });
+          });
+        });
+      });
+    });
+  }, (txErr) => res.status(500).json({ error: 'Internal database error. Please try again.' }));
+});
+
+// Clear one barangay's boundaries (back to the 6-cell proxy grid for it).
+app.delete('/api/purok-areas/barangay/:barangayId', authenticate, (req, res) => {
+  if (req.user.role !== 'CHO') return res.status(403).json({ error: 'Only CHO can clear purok boundaries.' });
+  db.query('DELETE FROM purok_areas WHERE barangay_id = ?', [req.params.barangayId], (err, result) => {
+    if (err) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+    createAuditLog(req.user.user_id, req.user.name, req.user.role, null, req.user.barangay || null,
+      'Delete', 'Purok Boundaries', `Cleared ${result.affectedRows} purok boundary(ies) for barangay #${req.params.barangayId}`);
+    res.json({ message: 'Purok boundaries cleared.', deleted: result.affectedRows });
+  });
+});
+
+// ═════════════════════════════════════════════════════════
 // WEATHER HAZARDS (Open-Meteo live forecast + historical archive)
 // ═════════════════════════════════════════════════════════
 db.query(`CREATE TABLE IF NOT EXISTS weather_daily (
@@ -7184,6 +7315,18 @@ const buildWeatherInfo = (data) => {
   for (let i = 0; i < times.length; i++) {
     if ((times[i] || '').slice(0, 13) >= now) { startIdx = i; break; }
   }
+
+  // Zone-hotspot environmental gate: rain accumulated over the trailing 24h / 72h
+  // (Open-Meteo is asked for past_days, so these include the hours already passed).
+  const sumBack = (hours) => {
+    let total = 0;
+    for (let i = Math.max(0, startIdx - hours + 1); i <= startIdx && i < precip.length; i++) {
+      total += Number(precip[i]) || 0;
+    }
+    return Math.round(total * 10) / 10;
+  };
+  const rain24 = sumBack(24);
+  const rain72 = sumBack(72);
   const horizon = Math.min(startIdx + 6, times.length);
   let stormSoon = false, rainSoon = false, nextBadCode = null, nextBadTime = null;
   for (let i = startIdx; i < horizon; i++) {
@@ -7213,6 +7356,9 @@ const buildWeatherInfo = (data) => {
     hazards: unique,
     temperature: cur.temperature_2m != null ? Math.round(cur.temperature_2m * 10) / 10 : null,
     precipitation: cur.precipitation != null ? Math.round(cur.precipitation * 10) / 10 : null,
+    // Trailing accumulations used by the zone (purok-level) hotspot environmental gate.
+    rain_24h: rain24,
+    rain_72h: rain72,
     weather_code: cur.weather_code || null,
     outlook: outlookParts.join(' · '),
     // Raw onset bucket for the alert sweep's dedup key (null when nothing is due soon).
@@ -7231,6 +7377,7 @@ const fetchWeatherForBarangays = async (barangays) => {
   const rows = barangays.map(b => ({
     barangay_id: b.id, name: b.name,
     hazards: [], temperature: null, precipitation: null, weather_code: null, outlook: '',
+    rain_24h: null, rain_72h: null,
     next_hazard_type: null, next_hazard_time: null,
   }));
   if (barangays.length === 0) return rows;
@@ -7240,7 +7387,7 @@ const fetchWeatherForBarangays = async (barangays) => {
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}` +
     `&current=weather_code,precipitation,temperature_2m,wind_gusts_10m,relative_humidity_2m` +
     `&hourly=weather_code,precipitation&daily=weather_code,precipitation_sum` +
-    `&forecast_days=2&timezone=Asia%2FManila`;
+    `&forecast_days=2&past_days=3&timezone=Asia%2FManila`;
 
   const payload = await fetchWithRetry(url);
   const series = Array.isArray(payload) ? payload : [payload];
@@ -7272,10 +7419,74 @@ app.get('/api/weather/hazards', (req, res) => {
       }
       res.json(pending.map(b => ({
         barangay_id: b.id, name: b.name, hazards: [], temperature: null,
-        precipitation: null, weather_code: null, outlook: '', error: 'offline',
+        precipitation: null, rain_24h: null, rain_72h: null, weather_code: null, outlook: '', error: 'offline',
       })));
     }
   });
+});
+
+// Per-zone rainfall. Rain is otherwise fetched per BARANGAY, but a zone is a
+// sub-barangay cell and a downpour can sit on one cell. The client knows the zone
+// centroids (real purok ones when they exist), so it POSTs them here and gets back
+// the same rain_24h/rain_72h `buildWeatherInfo` computes — one batched Open-Meteo
+// request for all points. Per-point results are cached 30 min, so the 30s map poll
+// (and a re-render) costs nothing. It is best-effort: unknown points come back null
+// and the engine falls back to the barangay reading.
+const zoneRainCache = new Map();   // "lat,lng" (4 dp) -> { rain24, rain72, at }
+const ZONE_RAIN_TTL = 30 * 60 * 1000;
+const ZONE_RAIN_MAX_POINTS = 200;
+const zoneKeyOf = (lat, lng) => `${lat.toFixed(4)},${lng.toFixed(4)}`;
+
+app.post('/api/weather/by-points', authenticate, async (req, res) => {
+  const points = Array.isArray(req.body && req.body.points) ? req.body.points : [];
+  if (points.length === 0) return res.json({ results: {} });
+  if (points.length > ZONE_RAIN_MAX_POINTS) {
+    return res.status(400).json({ error: `Too many points (max ${ZONE_RAIN_MAX_POINTS}).` });
+  }
+
+  const lookup = new Map();   // "lat,lng" -> array of client keys wanting it
+  points.forEach(p => {
+    if (!p || !p.key) return;
+    const lat = Number(p.lat), lng = Number(p.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const k = zoneKeyOf(lat, lng);
+    if (!lookup.has(k)) lookup.set(k, []);
+    lookup.get(k).push(p.key);
+  });
+
+  const results = {};
+  const missing = [];
+  lookup.forEach((keys, k) => {
+    const hit = zoneRainCache.get(k);
+    if (hit && Date.now() - hit.at < ZONE_RAIN_TTL) return;
+    missing.push(k);
+  });
+
+  if (missing.length > 0) {
+    try {
+      const lats = missing.map(k => k.split(',')[0]).join(',');
+      const lons = missing.map(k => k.split(',')[1]).join(',');
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}` +
+        `&current=weather_code,precipitation,temperature_2m,wind_gusts_10m,relative_humidity_2m` +
+        `&hourly=weather_code,precipitation&daily=weather_code,precipitation_sum` +
+        `&forecast_days=2&past_days=3&timezone=Asia%2FManila`;
+      const payload = await fetchWithRetry(url);
+      const series = Array.isArray(payload) ? payload : [payload];
+      missing.forEach((k, i) => {
+        const info = buildWeatherInfo(series[i] || {});
+        zoneRainCache.set(k, { rain24: info.rain_24h, rain72: info.rain_72h, at: Date.now() });
+      });
+    } catch (e) {
+      console.error('Per-zone weather batch fetch failed:', e.message);
+    }
+  }
+
+  lookup.forEach((keys, k) => {
+    const hit = zoneRainCache.get(k);
+    const value = hit ? { rain24: hit.rain24, rain72: hit.rain72 } : { rain24: null, rain72: null };
+    keys.forEach(key => { results[key] = value; });
+  });
+  res.json({ results });
 });
 
 // ═════════════════════════════════════════════════════════

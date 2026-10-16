@@ -225,6 +225,12 @@ export default function CHOSettings({
   const [lastBackupDate, setLastBackupDate] = useState(() => localStorage.getItem('cdms_last_backup') || null);
   const [backupLoading, setBackupLoading] = useState(false);
   const [autoBackupEnabled, setAutoBackupEnabled] = useState(() => localStorage.getItem('cdms_auto_backup') !== 'false');
+  // Real purok boundary polygons (Settings -> Data Management -> Barangay Purok Boundaries)
+  const [purokAreas, setPurokAreas] = useState([]);
+  const [purokLoading, setPurokLoading] = useState(false);
+  const [purokMsg, setPurokMsg] = useState('');
+  const [purokErr, setPurokErr] = useState('');
+  const purokInputRef = useRef(null);
   const [toastMsg, setToastMsg] = useState('');
   const [toastType, setToastType] = useState('success');
   const [preview, setPreview] = useState(null);
@@ -542,6 +548,67 @@ export default function CHOSettings({
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+
+  // ── Real purok boundaries (zone hotspot map) ──
+  const loadPurokAreas = () => {
+    setPurokLoading(true);
+    axios.get(API_URL + '/api/purok-areas', { headers: authHeaders() })
+      .then(res => setPurokAreas(Array.isArray(res.data) ? res.data : []))
+      .catch(() => {})
+      .finally(() => setPurokLoading(false));
+  };
+  useEffect(() => { if (activeUser?.role === 'CHO') loadPurokAreas(); }, [activeUser?.role]);
+
+  // Import a GeoJSON FeatureCollection: each feature carries properties.barangay
+  // (a Cabuyao barangay name) and properties.name (the purok name) plus a
+  // Polygon/MultiPolygon geometry. The server REPLACES a barangay's boundaries.
+  const handlePurokImport = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPurokMsg(''); setPurokErr('');
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      const features = data && data.type === 'FeatureCollection' ? (data.features || [])
+        : Array.isArray(data) ? data
+        : data && data.type === 'Feature' ? [data] : [];
+      if (features.length === 0) throw new Error(t('No GeoJSON features found in the file.'));
+      const byBrgy = new Map();
+      features.forEach(f => {
+        const props = (f && f.properties) || {};
+        const brgy = props.barangay || props.Barangay || props.BARANGAY || props.ADM4_EN || props.brgy || '';
+        const name = props.name || props.Name || props.purok || props.PUROK || props.Purok || props.PRK || '';
+        if (!brgy || !f.geometry) return;
+        if (!byBrgy.has(brgy)) byBrgy.set(brgy, []);
+        byBrgy.get(brgy).push({ name: String(name || `Purok ${byBrgy.get(brgy).length + 1}`), geometry: f.geometry });
+      });
+      if (byBrgy.size === 0) throw new Error(t('Each feature needs a barangay and a purok name (properties.barangay / properties.name).'));
+      const barangays = [...byBrgy.entries()].map(([name, puroks]) => ({ name, puroks }));
+      const res = await fetch(API_URL + '/api/purok-areas/import', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ barangays }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || t('Import failed.'));
+      setPurokMsg(t('✅ Imported ') + body.imported + t(' boundary(ies) for ') + body.barangays.length + t(' barangay(s).')
+        + ((body.unmatched || []).length ? t(' Skipped unknown: ') + body.unmatched.join(', ') : ''));
+      setTimeout(() => setPurokMsg(''), 6000);
+      loadPurokAreas();
+    } catch (err) {
+      const msg = err && err.message === 'Unexpected token' ? t('That file is not valid JSON.') : (err.message || t('Import failed. Check the GeoJSON.'));
+      setPurokErr(t('❌ ') + msg);
+      setTimeout(() => setPurokErr(''), 6000);
+    } finally {
+      e.target.value = '';
+    }
+  };
+
+  const handleClearPurokBarangay = (brgyId, brgyName) => {
+    if (!window.confirm(t('Remove the stored purok boundaries for ') + brgyName + t('? The map will fall back to the grid for that barangay.'))) return;
+    axios.delete(API_URL + `/api/purok-areas/barangay/${brgyId}`, { headers: authHeaders() })
+      .then(() => loadPurokAreas())
+      .catch(() => {});
+  };
 
   // ── Load profile from DB on mount ──
   useEffect(() => {
@@ -2330,6 +2397,74 @@ if (security.newPassword !== security.confirmPassword) {
 
                 <OfflineSyncPanel dateFormat={systemPrefs.dateFormat} />
               </div>
+
+              {/* Barangay Purok Boundaries - real purok polygons for the zone map */}
+              {activeUser?.role === 'CHO' && (
+                <div className="security-section-card" style={{ borderColor: 'var(--border-color)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(8,145,178,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '19px' }}>🗺️</div>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: 'var(--text-main)' }}>{t('Barangay Purok Boundaries')}</h3>
+                      <span style={{ fontSize: '17px', color: 'var(--text-muted)' }}>{t('Use real purok polygons on the zone hotspot map instead of the grid')}</span>
+                    </div>
+                  </div>
+
+                  <p style={{ margin: 0, fontSize: '15px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                    {t('Optional. Upload a GeoJSON FeatureCollection where each feature has properties.barangay (a Cabuyao barangay name) and properties.name (the purok name), plus a Polygon or MultiPolygon geometry. Re-importing replaces that barangay\'s boundaries.')}
+                  </p>
+
+                  <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
+                    <input type="file" ref={purokInputRef} accept=".geojson,.json" style={{ display: 'none' }} onChange={handlePurokImport} />
+                    <button onClick={() => purokInputRef.current?.click()} disabled={offlineMode} style={{ ...offlineBtnStyle, flex: 1, padding: '12px', background: '#0891b2', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '17px', fontWeight: '600', cursor: offlineMode ? 'not-allowed' : 'pointer' }} title={offlineMode ? t('Unavailable offline') : ''}>
+                      {t('Import Purok Boundaries')}
+                    </button>
+                    <button onClick={loadPurokAreas} disabled={purokLoading || offlineMode} style={{ ...offlineBtnStyle, flex: 1, padding: '12px', background: 'var(--bg-surface)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '17px', fontWeight: '600', cursor: purokLoading || offlineMode ? 'not-allowed' : 'pointer' }} title={offlineMode ? t('Unavailable offline') : ''}>
+                      {purokLoading ? t('Loading...') : t('Refresh')}
+                    </button>
+                  </div>
+
+                  {purokMsg && (
+                    <div style={{ marginTop: '8px', padding: '8px 14px', borderRadius: '8px', fontSize: '15px', fontWeight: '500', background: 'var(--input-bg)', color: 'var(--success-text)' }}>
+                      {purokMsg}
+                    </div>
+                  )}
+                  {purokErr && (
+                    <div style={{ marginTop: '8px', padding: '8px 14px', borderRadius: '8px', fontSize: '15px', fontWeight: '500', background: 'var(--input-bg)', color: 'var(--warning-text)' }}>
+                      {purokErr}
+                    </div>
+                  )}
+
+                  {(() => {
+                    const byBrgy = {};
+                    purokAreas.forEach(p => {
+                      if (!byBrgy[p.barangay_name]) byBrgy[p.barangay_name] = [];
+                      byBrgy[p.barangay_name].push(p);
+                    });
+                    const names = Object.keys(byBrgy);
+                    if (names.length === 0) {
+                      return (
+                        <p style={{ margin: '12px 0 0 0', fontSize: '15px', color: 'var(--text-muted)' }}>
+                          {t('No purok boundaries uploaded yet — the map uses the 6-cell proxy grid.')}
+                        </p>
+                      );
+                    }
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '12px' }}>
+                        {names.map(n => (
+                          <div key={n} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border-color)' }}>
+                            <span style={{ flex: 1, fontSize: '15px', fontWeight: '600', color: 'var(--text-main)' }}>{n}</span>
+                            <span style={{ fontSize: '15px', color: 'var(--text-muted)' }}>{byBrgy[n].length} {t('purok(s)')}</span>
+                            <button onClick={() => handleClearPurokBarangay(byBrgy[n][0].barangay_id, n)}
+                              style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--warning-text)', cursor: 'pointer', fontSize: '15px', fontWeight: '600' }}>
+                              {t('Remove')}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
               </div>
             )}
           </div>
