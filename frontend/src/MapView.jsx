@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, useMap, useMapEvents, CircleMarker } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import axios from 'axios';
@@ -823,6 +823,7 @@ const hazardBadgeLift = (count, size = 32, hasPill = false) => {
 const ALERT_KIND_LABELS = {
   count_threshold: 'Case count warning',
   surge: 'Rapid surge warning',
+  rapid_outbreak: 'Rapid outbreak warning',
   mortality: 'Mortality warning',
   hazard_disease: 'Hazard-linked disease warning',
 };
@@ -1177,6 +1178,20 @@ function ZoomListener({ onZoom, filterBarangay, autoDetectedBrgy, setAutoDetecte
   return null;
 }
 
+// Read-only hazard-pin preview map: re-centre the tiny map whenever the typed
+// coordinates (or the fallback barangay centre) change. Uses setView directly
+// instead of declaring a `center` prop so react-leaflet never remounts the pane.
+function HazardPreviewRecenter({ center }) {
+  const map = useMap();
+  const lat = center ? center[0] : null;
+  const lng = center ? center[1] : null;
+  useEffect(() => {
+    if (lat == null || lng == null) return;
+    map.setView([lat, lng], map.getZoom(), { animate: false });
+  }, [lat, lng, map]);
+  return null;
+}
+
 function ZoomToBarangay({ barangay, loginRole, loginBarangay, sessionContext, cases }) {
   const map = useMap();
   const prevRef = useRef(null);
@@ -1320,7 +1335,7 @@ function ChoroplethLayer({ barangayData, onHover, onLeave, onClick }) {
   );
 }
 
-export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginBarangay, sessionContext, compactMode, dateFormat = 'MM/DD/YY' }) {
+export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginBarangay, sessionContext, compactMode, dateFormat = 'MM/DD/YY', initialFocus, onFocusConsumed }) {
   const { t, translateStatus, translateActionStatus } = useI18n();
   const currentYear = new Date().getFullYear();
   const [allCases, setAllCases] = useState([]);
@@ -1333,8 +1348,19 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const [filterBarangay, setFilterBarangay] = useState('All Barangays');
   const [filterStatus, setFilterStatus]  = useState('All Status');
   const [filterCaseType, setFilterCaseType] = useState('All Case Types');
-  const [filterDateFrom, setFilterDateFrom] = useState(() => `${new Date().getFullYear()}-01-01`);
-  const [filterDateTo, setFilterDateTo] = useState(() => `${new Date().getFullYear()}-12-31`);
+  // Date filter default: a rolling 2-month window ending today (e.g. 08/17 - 10/17),
+  // so the map opens on recent activity instead of the whole calendar year.
+  const [filterDateFrom, setFilterDateFrom] = useState(() => {
+    const t = new Date();
+    const s = new Date(t.getFullYear(), t.getMonth() - 2, t.getDate());
+    const p = (n) => String(n).padStart(2, '0');
+    return `${s.getFullYear()}-${p(s.getMonth() + 1)}-${p(s.getDate())}`;
+  });
+  const [filterDateTo, setFilterDateTo] = useState(() => {
+    const t = new Date();
+    const p = (n) => String(n).padStart(2, '0');
+    return `${t.getFullYear()}-${p(t.getMonth() + 1)}-${p(t.getDate())}`;
+  });
   const [filterYear, setFilterYear] = useState(() => String(new Date().getFullYear()));
   const [filterSeverity, setFilterSeverity] = useState('All Severities');
   const [filterPurok, setFilterPurok] = useState('All Puroks');
@@ -1392,6 +1418,22 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const [manageHazardsOpen, setManageHazardsOpen] = useState(false);
   const [hazardForm, setHazardForm] = useState({ id: null, barangay_id: '', barangay_name: '', event_type: DISASTER_EVENT_TYPES[0], severity: DISASTER_SEVERITIES[1], purok: '', latitude: '', longitude: '', date_started: '', date_ended: '', notes: '' });
   const [hazardsSaving, setHazardsSaving] = useState(false);
+  // Read-only pin preview: typed coordinates win, else the barangay centre, else
+  // the city centre. useMemo keeps the array identity stable so the preview map's
+  // recentre effect does not loop.
+  const hazardPreviewCenter = useMemo(() => {
+    const lat = parseFloat(hazardForm.latitude);
+    const lng = parseFloat(hazardForm.longitude);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) return [lat, lng];
+    const c = hazardForm.barangay_name ? findCoords(hazardForm.barangay_name) : null;
+    return c || CABUYAO_CENTER;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hazardForm.latitude, hazardForm.longitude, hazardForm.barangay_name]);
+  const hazardPreviewZoom = useMemo(() => {
+    const lat = parseFloat(hazardForm.latitude);
+    const lng = parseFloat(hazardForm.longitude);
+    return (Number.isFinite(lat) && Number.isFinite(lng)) ? 17 : (hazardForm.barangay_name ? 14 : 12);
+  }, [hazardForm.latitude, hazardForm.longitude, hazardForm.barangay_name]);
   // Inline custom dropdowns inside the two CHO manage modals (same
   // .mc-custom-dropdown-btn/panel/item markup used across Manage Cases).
   // One open key at a time: 'a:brgy' | 'a:type' | 'a:hazard' | 'a:disease' |
@@ -1450,6 +1492,25 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     const iv = setInterval(load, 30000);
     return () => { alive = false; clearInterval(iv); };
   }, []);
+
+  // Notification -> "View →" focus handoff. A rapid-outbreak alert lands here
+  // (link_to 'MapView'), so the map switches to the Hotspot Disease Map and
+  // narrows to the affected barangay. Waiting on barangayIdMap means a CHO's
+  // view is only narrowed once the id -> name lookup is available; a BHW is
+  // already scoped to their own barangay so the name resolves from that scope.
+  const focusAppliedRef = useRef(false);
+  useEffect(() => {
+    if (!initialFocus) { focusAppliedRef.current = false; return; }
+    setMapMode('hotspot');
+    const name = initialFocus.barangayName
+      || (initialFocus.barangayId != null ? barangayIdMap[initialFocus.barangayId] : null)
+      || (loginRole === 'BHW' ? loginBarangay : null);
+    if (name) setFilterBarangay(name);
+    if (!focusAppliedRef.current && (name || initialFocus.barangayId == null)) {
+      focusAppliedRef.current = true;
+      if (onFocusConsumed) onFocusConsumed();
+    }
+  }, [initialFocus, barangayIdMap, loginRole, loginBarangay, onFocusConsumed]);
 
   // Real purok boundaries change only on an import, so they get their own slow
   // poll (10 min) instead of riding the 30 s map poll with a multi-KB payload.
@@ -2398,6 +2459,43 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     });
   }
 
+  // ── Rapid outbreak pin (Hotspot Disease Map) ─────────────────────────────
+  // The server tags a barangay whose disease count jumped inside 5 days with a
+  // `rapid_outbreak` epi_alerts row. That barangay gets its own red siren disc so
+  // CHO and BHW see at a glance which barangay is surging and with which disease.
+  // Hotspot-map only, and it disappears once an intervention answers the alert.
+  const OUTBREAK_PIN_SIZE = 42;
+  const outbreakPinItems = [];
+  if (!isDisasterMap && mapZoom < PUROK_ZOOM_THRESHOLD) {
+    hazardScopeList.forEach(name => {
+      const k = wxKey(name);
+      const rows = (epiAlerts || []).filter(a => a && a.alert_type === 'rapid_outbreak'
+        && wxKey(a.barangay_name) === k);
+      if (!rows.length) return;
+      // Highest-case outbreak in this barangay that nobody has answered yet.
+      const top = rows.filter(a => !interventionMatchesWarning(a))
+        .sort((a, b) => (Number(b.alert_value) || 0) - (Number(a.alert_value) || 0))[0];
+      if (!top) return;
+      const coords = findCoords(name);
+      if (!coords) return;
+      outbreakPinItems.push({
+        id: 'outbreak-' + k,
+        coords,
+        svg: hazardSvgMarkup('🚨', '#dc2626', OUTBREAK_PIN_SIZE, 'Outbreak' + k),
+        count: Number(top.alert_value) || 0,
+        color: '#dc2626',
+        size: OUTBREAK_PIN_SIZE,
+        z: 1650,
+        // Same rule as the hazard/warning discs: a badge sharing the barangay
+        // centroid must clear the tall barangay pin or it buries the case number.
+        // The disc always renders a count pill, so hasPill is true.
+        above: hazardBadgeLift(barangayCaseCount[k] || 0, OUTBREAK_PIN_SIZE, true),
+        title: `🚨 ${name} — rapid ${top.disease_name} outbreak: ${top.alert_value} cases in the last 5 days. Tap to see the purok/blk breakdown and log an intervention.`,
+        onClick: () => openBarangayPopup(name),
+      });
+    });
+  }
+
   // Pin tier (zoomed in). Weather pins follow the same tiers as the case pins:
   //   zoom 17 (phase tier)   -> ONLY the phases get weather pins (loose Purok/Blk/Lot
   //                             are folded into their nearest phase, never shown alone)
@@ -2473,7 +2571,16 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const popupActionsList = mapActions.filter(a => a.barangay_name === popupActionKey);
   // The flagged disease count for the inspected barangay (if any) and the
   // intervention that answers it - drives the popup warning banner.
-  const popupWarning = popupActionKey ? (alertsByBarangay[wxKey(popupActionKey)] || null) : null;
+  // A rapid outbreak gets its own red banner above the generic one. When the same
+  // epi_alerts row is also the highest-counted warning, the generic banner steps
+  // aside so the outbreak is not printed twice.
+  const popupOutbreak = popupActionKey
+    ? ((epiAlerts || []).filter(a => a && a.alert_type === 'rapid_outbreak' && wxKey(a.barangay_name) === wxKey(popupActionKey))
+        .sort((a, b) => (Number(b.alert_value) || 0) - (Number(a.alert_value) || 0))[0] || null)
+    : null;
+  const popupOutbreakIntervention = interventionMatchesWarning(popupOutbreak);
+  const popupWarningRaw = popupActionKey ? (alertsByBarangay[wxKey(popupActionKey)] || null) : null;
+  const popupWarning = (popupOutbreak && popupWarningRaw && popupWarningRaw.id === popupOutbreak.id) ? null : popupWarningRaw;
   const popupWarningIntervention = interventionMatchesWarning(popupWarning);
   // Warning-linked interventions for the inspected barangay. When the warning came
   // from the Dashboard (no epi_alerts row) `popupWarning` is null, so this is what
@@ -3189,6 +3296,12 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               <span style={{ width: '11px', height: '11px', borderRadius: '50%', background: 'var(--accent, #60a5fa)', border: '2px solid var(--bg-surface)', flexShrink: 0, display: 'inline-block' }} />
               <span style={{ fontSize: '13px', color: 'var(--text-main)' }}>{t('Case dot (max zoom) - one dot per case, colored by disease')}</span>
             </div>
+            {!isDisasterMap && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '9px', marginBottom: '8px' }}>
+                <span style={{ width: '13px', height: '13px', borderRadius: '50%', background: '#dc2626', border: '2px solid var(--bg-surface)', flexShrink: 0, display: 'inline-block', textAlign: 'center', lineHeight: '9px', fontSize: '8px' }}>🚨</span>
+                <span style={{ fontSize: '13px', color: 'var(--text-main)' }}>{t('Rapid outbreak - a disease count jumped in under 5 days')}</span>
+              </div>
+            )}
           </div>
           <div style={{ paddingTop: '10px', borderTop: '1px dashed var(--border-color)', marginTop: '2px' }}>
             <p style={{ margin: '0 0 6px 0', fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>{t('Disease pin colors')}</p>
@@ -3317,7 +3430,9 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                             {row.barangay} · {row.label}{row.units.length === 1 && row.units[0] !== 'Unspecified' ? ` · ${row.units[0]}` : ''}
                           </span>
                           <span style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {row.disease ? `${row.disease} · ${row.cases7}` : t('No cases flagged')}
+                            {row.rapid && row.rapidDiseases.length > 0
+                              ? `🚨 ${row.rapidDiseases[0].disease} · ${row.rapidDiseases[0].cases5} ${t('cases in the last 5 days')}`
+                              : row.disease ? `${row.disease} · ${row.cases7}` : t('No cases flagged')}
                           </span>
                         </span>
                         <span style={{ fontSize: '12px', fontWeight: '800', color: row.kindMeta.color }}>{row.score}</span>
@@ -3555,6 +3670,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
             <AreaPins key="area-pins" groups={purokData} barangay={pinnedBarangay} onHover={setTooltip} onLeave={() => setTooltip(null)} onClick={setPopup} />
           )}
           {!interventionsOnly && mapZoom < 17 && <BarangayPins key="barangay-pins" barangayData={barangayData} onHover={setTooltip} onLeave={() => setTooltip(null)} onClick={setPopup} loginRole={loginRole} />}
+          {!interventionsOnly && <LayerBadgeMarkers key="layer-outbreaks" items={outbreakPinItems} />}
           {isDisasterMap && showActionsLayer && !interventionsOnly && <LayerBadgeMarkers key="layer-actions" items={actionBadgeItems} />}
           {isDisasterMap && !interventionsOnly && <LayerBadgeMarkers key="layer-warnings" items={warningBadgeItems} />}
           {/* "Show interventions only" is an isolation mode: the weather/hazard
@@ -3885,6 +4001,42 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
 
               <EpiPanel cases={popup.cases} t={t} />
 
+              {/* Rapid outbreak (<5 days) for this barangay. Red so it reads as the
+                  most urgent thing in the popup; the pin on the map led here. */}
+              {popupOutbreak && (
+                <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
+                  <p style={{ margin: '0 0 10px 0', fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    🚨 {t('Rapid Outbreak')}
+                  </p>
+                  <div style={{ padding: '10px 12px', borderRadius: '8px', background: 'rgba(220,38,38,0.12)', border: '1px solid rgba(220,38,38,0.5)' }}>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>
+                      🚨 {popupOutbreak.disease_name} · {popupOutbreak.alert_value} {t('cases in the last 5 days')}
+                    </div>
+                    {popupOutbreak.detail ? (
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '3px' }}>{popupOutbreak.detail}</div>
+                    ) : null}
+                    {popupOutbreakIntervention ? (
+                      <div style={{ marginTop: '8px', fontSize: '12px', color: '#10b981', fontWeight: '700' }}>
+                        ✔ {t('Intervention logged')}: {ACTION_TYPE_ICONS[popupOutbreakIntervention.action_type] || '🗂'} {t(popupOutbreakIntervention.action_type)} · {translateActionStatus(popupOutbreakIntervention.status)}
+                        {popupOutbreakIntervention.description ? (
+                          <div style={{ marginTop: '3px', color: 'var(--text-muted)', fontWeight: '400', fontStyle: 'italic' }}>“{popupOutbreakIntervention.description}”</div>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <div style={{ marginTop: '8px', fontSize: '12px', color: '#dc2626', fontWeight: '700' }}>
+                        ⚠ {t('No intervention recorded for this outbreak yet')}
+                      </div>
+                    )}
+                    {loginRole === 'CHO' && (
+                      <button onClick={() => openWarningIntervention(popupOutbreak)}
+                        style={{ marginTop: '10px', padding: '6px 14px', borderRadius: '7px', border: '1px solid #129968', background: 'transparent', color: '#129968', cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>
+                        ＋ {popupOutbreakIntervention ? t('Add Intervention') : t('Log Intervention')}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Disease warning for this barangay + its intervention (required
                   remarks). CHO logs one straight from the map popup. */}
               {popupWarning && (
@@ -3925,7 +4077,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               {/* A warning the Dashboard computed has no epi_alerts row, so there is
                   nothing for the banner above to render. The logged intervention is
                   the record of that warning on the map. */}
-              {!popupWarning && popupLoggedWarnings.length > 0 && (
+              {!popupWarning && !popupOutbreak && popupLoggedWarnings.length > 0 && (
                 <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
                   <p style={{ margin: '0 0 10px 0', fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     {t('Disease Warning Interventions')}
@@ -4443,7 +4595,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>
                   <span>{t('Severity')}</span>
                   <div style={{ position: 'relative' }}>
@@ -4474,29 +4626,59 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                     style={{ padding: '8px 10px', borderRadius: '7px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '14px' }}
                   />
                 </label>
-                <p style={{ margin: '6px 0 12px 0', fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
-                  {t('Flood pins are matched to a zone by their location text (e.g. the same Purok/Blk as the cases) first, then by their coordinates.')}
+              </div>
+
+              {/* Full-width helper line: this used to sit in the third grid cell and
+                  squeezed Severity/Purok and pushed Lat/Lng aside. */}
+              <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                {t('Flood pins are matched to a zone by their location text (e.g. the same Purok/Blk as the cases) first, then by their coordinates.')}
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                  <span>Lat ({t('optional')})</span>
+                  <input
+                    value={hazardForm.latitude}
+                    onChange={e => setHazardForm({ ...hazardForm, latitude: e.target.value })}
+                    placeholder="14.xxx"
+                    style={{ padding: '8px 10px', borderRadius: '7px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '14px', width: '100%', boxSizing: 'border-box' }}
+                  />
+                </label>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                  <span>Lng ({t('optional')})</span>
+                  <input
+                    value={hazardForm.longitude}
+                    onChange={e => setHazardForm({ ...hazardForm, longitude: e.target.value })}
+                    placeholder="121.xxx"
+                    style={{ padding: '8px 10px', borderRadius: '7px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '14px', width: '100%', boxSizing: 'border-box' }}
+                  />
+                </label>
+              </div>
+
+              {/* Read-only preview: where this pin will land. Coordinates win when
+                  typed, otherwise the barangay centroid stands in. */}
+              <div style={{ marginBottom: '12px' }}>
+                <p style={{ margin: '0 0 6px 0', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                  {t('Pin preview')} <span style={{ fontWeight: '400' }}>({t('read-only')})</span>
                 </p>
-                <div style={{ display: 'flex', flexDirection: 'row', gap: '6px' }}>
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600', flex: 1 }}>
-                    <span>Lat ({t('optional')})</span>
-                    <input
-                      value={hazardForm.latitude}
-                      onChange={e => setHazardForm({ ...hazardForm, latitude: e.target.value })}
-                      placeholder="14.xxx"
-                      style={{ padding: '8px 10px', borderRadius: '7px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '14px', width: '100%', boxSizing: 'border-box' }}
-                    />
-                  </label>
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: '600', flex: 1 }}>
-                    <span>Lng ({t('optional')})</span>
-                    <input
-                      value={hazardForm.longitude}
-                      onChange={e => setHazardForm({ ...hazardForm, longitude: e.target.value })}
-                      placeholder="121.xxx"
-                      style={{ padding: '8px 10px', borderRadius: '7px', background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '14px', width: '100%', boxSizing: 'border-box' }}
-                    />
-                  </label>
-                </div>
+                {!offlineMode ? (
+                  <div style={{ height: '170px', borderRadius: '9px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+                    <MapContainer key="hazard-preview-map" center={hazardPreviewCenter} zoom={hazardPreviewZoom}
+                      style={{ height: '100%', width: '100%' }} zoomControl={false} dragging={false} scrollWheelZoom={false}
+                      doubleClickZoom={false} boxZoom={false} keyboard={false} touchZoom={false} attributionControl={false}>
+                      <TileLayer attribution="" maxZoom={19} url={mapLayer === 'SD'
+                        ? 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+                        : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'} />
+                      <CircleMarker center={hazardPreviewCenter} radius={8}
+                        pathOptions={{ color: '#dc2626', fillColor: '#dc2626', fillOpacity: 0.85, weight: 2 }} />
+                      <HazardPreviewRecenter center={hazardPreviewCenter} />
+                    </MapContainer>
+                  </div>
+                ) : (
+                  <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
+                    {t('Map preview is unavailable offline. The pin will use the coordinates above, or the barangay center otherwise.')}
+                  </p>
+                )}
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
@@ -4615,6 +4797,24 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
 
               <div style={{ borderTop: '1px solid var(--border-color)', marginBottom: '12px' }} />
 
+              {/* Rapid rise: this purok/blk is climbing fast inside a short window,
+                  not just over the 7-day threshold. This is the zone to act on. */}
+              {zonePopup.rapid && zonePopup.rapidDiseases.length > 0 && (
+                <div style={{ marginBottom: '12px', padding: '10px 12px', borderRadius: '8px', background: 'rgba(220,38,38,0.12)', border: '1px solid rgba(220,38,38,0.5)' }}>
+                  <div style={{ fontSize: '13px', fontWeight: '800', color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    🚨 {t('Rapid rise in this zone')}
+                  </div>
+                  <div style={{ fontSize: '13px', color: 'var(--text-main)', marginTop: '4px' }}>
+                    {zonePopup.rapidDiseases.map(rd => (
+                      <div key={rd.disease}>
+                        {rd.disease}: {rd.cases5} {t('cases in the last 5 days')}
+                        {rd.prev5 > 0 ? ` · ${t('prev')} ${rd.prev5}` : ''}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Why - the case side */}
               <p style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('Case evidence')}</p>
               {zonePopup.diseases.length === 0 ? (
@@ -4629,6 +4829,11 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                       <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
                         {d.cases7} {t('in 7 days')}{d.prev7 > 0 ? ` · ${t('prev')} ${d.prev7}` : ''}
                       </span>
+                      {d.rapid && (
+                        <span style={{ fontSize: '11px', fontWeight: '700', color: '#dc2626', background: 'rgba(220,38,38,0.12)', padding: '2px 7px', borderRadius: '9px' }}>
+                          🚨 {t('Rapid')}
+                        </span>
+                      )}
                       {d.surge && (
                         <span style={{ fontSize: '11px', fontWeight: '700', color: '#b91c1c', background: 'rgba(185,28,28,0.12)', padding: '2px 7px', borderRadius: '9px' }}>
                           ↑ {t('Surge')}

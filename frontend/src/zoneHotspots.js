@@ -24,6 +24,14 @@ export const ZONE_ROWS = 2;
 // Tunable detection consts (mirror the server-side EPI_ALERT_* naming style).
 export const ZONE_WINDOW_DAYS = 7;      // case window
 
+// Rapid-rise window: the map also flags a zone whose case count is climbing fast
+// over a short window (the "rapid outbreak" rule the server uses for barangays:
+// RAPID_OUTBREAK_WINDOW_DAYS / MIN_CASES / RATIO in server.js). 5 recent cases at
+// 1.5x the 5 days before marks the purok/blk driving a barangay-level outbreak.
+export const RAPID_WINDOW_DAYS = 5;
+export const RAPID_MIN_CASES = 5;
+export const RAPID_RATIO = 1.5;
+
 // Sensitivity presets. `standard` is the panel rule; `sensitive` lowers every
 // gate so an early signal surfaces sooner, `strict` raises them when the CHO
 // wants only unambiguous clusters. The CHO picks one in the Zone Hotspots
@@ -420,6 +428,10 @@ export function buildZoneHotspots({
   const buckets = new Map();
   const unitsByZone = new Map();
   const unitStats = new Map();   // resolved idx -> Map(unit -> { lat/lng sums, byDisease })
+  // Rapid-rise window (subset of the 7-day window): idx -> disease -> { recent, prior }.
+  const rapidStart = day - (RAPID_WINDOW_DAYS - 1) * dayMs;
+  const rapidPrevStart = rapidStart - RAPID_WINDOW_DAYS * dayMs;
+  const rapidBuckets = new Map();
   cases.forEach(c => {
     const unit = extractUnit ? extractUnit(c.address) : null;
     const raw = realZones ? null : zoneIndexForUnit(barangayName, unit);
@@ -448,6 +460,14 @@ export function buildZoneHotspots({
       slot[d].cur += 1;
       u.byDisease.set(d, (u.byDisease.get(d) || 0) + 1);
     } else if (t >= prevStart) slot[d].prev += 1;
+    // Rapid window: the last 5 days vs the 5 before (drives the `rapid` flag).
+    if (t >= rapidPrevStart) {
+      if (!rapidBuckets.has(idx)) rapidBuckets.set(idx, {});
+      const rb = rapidBuckets.get(idx);
+      if (!rb[d]) rb[d] = { recent: 0, prior: 0 };
+      if (t >= rapidStart) rb[d].recent += 1;
+      else rb[d].prior += 1;
+    }
   });
 
   // Which zones an active flood/rain pin sits in. The pin's own location text is
@@ -492,6 +512,31 @@ export function buildZoneHotspots({
     qualifying.sort((a, b) => b.cases7 - a.cases7);
     near.sort((a, b) => b.cases7 - a.cases7);
 
+    // Rapid-rise detection for this zone (same rule the server uses per barangay:
+    // 5+ cases in 5 days at 1.5x the 5 days before). A rapid zone is a real case
+    // hotspot, so a disease sitting only in `near` is promoted into `qualifying`.
+    const rb = rapidBuckets.get(zone.idx) || {};
+    const rapidDiseases = Object.entries(rb)
+      .filter(([, v]) => v.recent >= RAPID_MIN_CASES && (v.prior === 0 || v.recent >= RAPID_RATIO * v.prior))
+      .map(([disease, v]) => ({ disease, cases5: v.recent, prev5: v.prior }))
+      .sort((a, b) => b.cases5 - a.cases5);
+    rapidDiseases.forEach(rd => {
+      const q = qualifying.find(x => x.disease === rd.disease);
+      if (q) { q.rapid = true; q.cases5 = rd.cases5; q.prev5 = rd.prev5; return; }
+      const i = near.findIndex(x => x.disease === rd.disease);
+      if (i >= 0) {
+        const n = near[i];
+        near.splice(i, 1);
+        qualifying.push({ ...n, surge: true, rapid: true, cases5: rd.cases5, prev5: rd.prev5 });
+        return;
+      }
+      // Defensive: neither the case gate nor the watch gate listed it (only possible
+      // if the presets are retuned). A rapid rise is a hotspot regardless, so keep it
+      // rather than letting the `qualifying.length === 0` skip below hide the zone.
+      qualifying.push({ disease: rd.disease, cases7: rd.cases5, prev7: rd.prev5, surge: true, rapid: true, cases5: rd.cases5, prev5: rd.prev5 });
+    });
+    if (rapidDiseases.length) qualifying.sort((a, b) => b.cases7 - a.cases7);
+
     const flood = floodZoneIdx.has(zone.idx);
     // Prefer the zone's OWN rain reading when the client supplied one — it sees the
     // sub-barangay cell, so it CAN discriminate between two cells and a rain-only
@@ -514,6 +559,7 @@ export function buildZoneHotspots({
     const seasonHit = top ? seasonWeights(top.disease, season) : false;
     const score = (caseTotal7 * 2)
       + (qualifying.some(q => q.surge) ? 1 : 0)
+      + (rapidDiseases.length ? 1.5 : 0)
       + (envGate ? 1.5 : 0)
       + (seasonHit ? 1 : 0);
 
@@ -559,6 +605,8 @@ export function buildZoneHotspots({
       near,
       cases7: caseTotal7,
       surge: qualifying.some(q => q.surge),
+      rapid: rapidDiseases.length > 0,
+      rapidDiseases,
       season,
       seasonHit,
       env: { rain24: rainReason.rain24, rain72: rainReason.rain72, flood, gate: envGate, reasons: envReasons, hazardTypes: [...hazardTypes], rainSource },

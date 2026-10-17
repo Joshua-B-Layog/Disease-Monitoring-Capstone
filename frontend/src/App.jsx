@@ -118,6 +118,8 @@ function App() {
   const [keyboardShortcuts, setKeyboardShortcuts] = useState(false);
   const [fontScale, setFontScale] = useState(getSavedFontScale);
   const [pendingInboxView, setPendingInboxView] = useState(null);
+  // Rapid-outbreak notification -> Map View handoff (map mode + barangay to focus).
+  const [pendingMapFocus, setPendingMapFocus] = useState(null);
   const [pendingOpenCaseId, setPendingOpenCaseId] = useState(null);
   const [pendingOpenAdd, setPendingOpenAdd] = useState(false);
   const [pendingMcLanding, setPendingMcLanding] = useState(false);
@@ -490,7 +492,7 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
       case 'Manage Cases':
         return <ErrorBoundary moduleName="ManageCases" onBack={() => setActiveTab('Dashboard')}><ManageCases caseFilter={caseFilter} setCaseFilter={setCaseFilter} dateFormat={dateFormat} autoSave={autoSave} confirmDelete={confirmDelete} keyboardShortcuts={keyboardShortcuts} fontScale={fontScale} compactMode={effectiveCompact} loggedUserId={loggedUserId} loggedUser={loggedUser} loginRole={loginRole} loginBarangay={loggedUserBarangay} sessionContext={sessionContext} initialView={pendingInboxView} onInitialViewConsumed={() => setPendingInboxView(null)} pendingOpenCaseId={pendingOpenCaseId} onPendingCaseConsumed={() => setPendingOpenCaseId(null)} pendingOpenAdd={pendingOpenAdd} onPendingOpenAddConsumed={() => setPendingOpenAdd(false)} pendingMcLanding={pendingMcLanding} onMcLandingConsumed={() => setPendingMcLanding(false)} /></ErrorBoundary>;
       case 'Map View':
-        return <ErrorBoundary moduleName="MapView" onBack={() => setActiveTab('Dashboard')}><MapView setActiveTab={setActiveTab} setCaseFilter={setCaseFilter} fontScale={fontScale} compactMode={effectiveCompact} loginRole={loginRole} loginBarangay={loggedUserBarangay} sessionContext={sessionContext} dateFormat={dateFormat} /></ErrorBoundary>;
+        return <ErrorBoundary moduleName="MapView" onBack={() => setActiveTab('Dashboard')}><MapView setActiveTab={setActiveTab} setCaseFilter={setCaseFilter} fontScale={fontScale} compactMode={effectiveCompact} loginRole={loginRole} loginBarangay={loggedUserBarangay} sessionContext={sessionContext} dateFormat={dateFormat} initialFocus={pendingMapFocus} onFocusConsumed={() => setPendingMapFocus(null)} /></ErrorBoundary>;
       case 'User Accounts': 
         if (loginRole !== 'CHO') {
           return (
@@ -1022,6 +1024,12 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                                      setActiveTab('Settings');
                                      setOpenSecurityView(true);
                                    } else if (target === 'MapView') {
+                                     // A rapid-outbreak notice opens the Hotspot Disease
+                                     // Map pre-focused on the affected barangay so the
+                                     // CHO/BHW lands straight on the surge.
+                                     if (n.type === 'outbreak') {
+                                       setPendingMapFocus({ mode: 'hotspot', barangayId: n.reference_id || null });
+                                     }
                                      setActiveTab('Map View');
                                    } else {
                                      setActiveTab(n.link_to);

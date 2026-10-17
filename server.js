@@ -2252,6 +2252,9 @@ function proceedToCheck() {
                 const auditPatient = patient_name || 'Unknown Patient';
                 const finalizeCommit = () => {
                     t.commit(() => {
+                        // A new case can cross the rapid-outbreak rule immediately -
+                        // check now instead of waiting for the next sweep.
+                        scheduleRapidOutbreakCheck();
                         // Trigger auto-notifications after the data writes commit
                         db.query(`
                             SELECT dc.patient_name, d.name AS disease_name, b.name AS barangay_name, dc.barangay_id, dc.severity
@@ -3025,6 +3028,9 @@ app.put('/api/case-add-requests/:id/approve', authenticate, (req, res) => {
                       (uErr) => {
                         if (uErr) { t.rollback(); return console.error('Approve request status error:', uErr.message); }
                         t.commit(() => {
+                          // An approved case enters disease_cases here - re-check the
+                          // rapid-outbreak rule at once so the pin/notice appear now.
+                          scheduleRapidOutbreakCheck();
                           // -- Side effects after the database writes commit --
                           db.query('SELECT user_id, full_name, email FROM users WHERE user_id = ?', [reqRow.requested_by], (bErr, bRes) => {
                             if (!bErr && bRes.length > 0) {
@@ -4471,6 +4477,8 @@ app.post('/api/sync', authenticate, (req, res) => {
                     t.commit(() => {
                         processed++;
                         results.push({ type, newCaseId: result.insertId });
+                        // Synced offline case counts toward a rapid outbreak too.
+                        scheduleRapidOutbreakCheck();
                         // Mirror the online POST /api/cases notifications for synced offline creates
                         db.query(`
                             SELECT dc.patient_name, d.name AS disease_name, b.name AS barangay_name, dc.barangay_id, dc.severity, dc.status
@@ -6362,11 +6370,15 @@ function isoDateFor(d) {
 }
 
 function notifyEpiAlert(alert) {
+  // A rapid outbreak (<5 day) alert opens the Hotspot Disease Map focused on the
+  // affected barangay, so it goes through its own delivery path.
+  if (alert.alert_type === 'rapid_outbreak') return notifyRapidOutbreak(alert);
   const titles = {
     count_threshold: 'Epidemiological Alert',
     surge: 'Rapid Surge Alert',
     mortality: 'Mortality Alert',
     hazard_disease: 'Hazard Disease Risk Alert',
+    rapid_outbreak: 'Rapid Outbreak Alert',
   };
   const title = titles[alert.alert_type] || 'Epidemiological Alert';
   const html = `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#fff7ed;border-radius:12px">
@@ -6395,6 +6407,22 @@ function notifyEpiAlert(alert) {
       if (!bErr && bhws) bhws.forEach(u => insert(u.user_id, u.email));
     });
   }
+}
+
+// Rapid outbreak (<5 day) notice. Deliberately routed through the shared notice
+// path so each recipient's own channel toggles (in-app / email / SMS) are honoured,
+// and so the row lands on the Hotspot Disease Map `link_to` with the affected
+// barangay in `reference_id` - the client uses that to open the map pre-focused.
+function notifyRapidOutbreak(alert) {
+  deliverNotice({
+    title: 'Rapid Outbreak Alert',
+    message: alert.detail,
+    barangay_id: alert.barangay_id,
+    type: 'outbreak',
+    linkTo: 'MapView',
+    recipients: 'staff',
+    referenceId: alert.barangay_id,
+  });
 }
 
 
@@ -6483,6 +6511,100 @@ function runEpiAlerts() {
   });
 
   runHazardDiseaseAlerts(weekStartIso, nextWeekIso);
+  runRapidOutbreakAlerts();
+}
+
+// ── Rapid outbreak detection (<5 days) ──────────────────────────────────────
+// The weekly `surge` rule compares two 7-day windows; a genuinely fast cluster
+// (5+ cases in 5 days, at least 1.5x the 5 days before) can be missed entirely by
+// a weekly bucket, so it gets its own short-window sweep. Runs on the same hourly
+// cron as the rest of the epi alerts. Dedupe is per (day, barangay, disease) via
+// the epi_alerts unique key, so a still-growing outbreak re-alerts once a day, not
+// every hour.
+const RAPID_OUTBREAK_WINDOW_DAYS = 5;
+const RAPID_OUTBREAK_MIN_CASES = 5;
+const RAPID_OUTBREAK_RATIO = 1.5;
+
+function runRapidOutbreakAlerts() {
+  const now = new Date();
+  const dayMs = 86400000;
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayIso = isoDateFor(todayStart);
+  const tomorrowIso = isoDateFor(new Date(todayStart.getTime() + dayMs));
+  // Both windows are exactly RAPID_OUTBREAK_WINDOW_DAYS days, inclusive of today -
+  // the same 5-vs-5 split the client zone engine uses (`zoneHotspots.js`:
+  // rapidStart = today - (WINDOW_DAYS - 1), rapidPrevStart = rapidStart - WINDOW_DAYS).
+  // Using `today - WINDOW_DAYS` here would silently make the recent window 6 days
+  // against a 5-day prior window and bias every ratio upward.
+  const recentStartIso = isoDateFor(new Date(todayStart.getTime() - (RAPID_OUTBREAK_WINDOW_DAYS - 1) * dayMs));
+  const priorStartIso = isoDateFor(new Date(todayStart.getTime() - (2 * RAPID_OUTBREAK_WINDOW_DAYS - 1) * dayMs));
+
+  // One query, both windows: `recent` is the last 5 days, `prior` is the 5 before that.
+  const q = `
+    SELECT b.id AS barangay_id, b.name AS barangay_name, d.name AS disease_name,
+           SUM(CASE WHEN dc.date_reported >= ? THEN 1 ELSE 0 END) AS recent_cnt,
+           SUM(CASE WHEN dc.date_reported <  ? THEN 1 ELSE 0 END) AS prior_cnt
+      FROM disease_cases dc
+      JOIN barangays b ON dc.barangay_id = b.id
+      JOIN diseases d ON dc.disease_id = d.id
+     WHERE dc.is_archived = 0 AND dc.status != 'Draft'
+       AND dc.date_reported >= ? AND dc.date_reported < ?
+     GROUP BY b.id, b.name, d.name
+    HAVING recent_cnt >= ${RAPID_OUTBREAK_MIN_CASES}
+  `;
+  db.query(q, [recentStartIso, recentStartIso, priorStartIso, tomorrowIso], (err, rows) => {
+    if (err) { console.error('Rapid outbreak query error:', err.message); return; }
+    (rows || []).forEach(r => {
+      const recent = Number(r.recent_cnt) || 0;
+      const prior = Number(r.prior_cnt) || 0;
+      // A brand-new cluster (prior 0) still qualifies - there is nothing to compare
+      // against, and 5 cases of one disease in 5 days is already a signal.
+      if (prior > 0 && recent < RAPID_OUTBREAK_RATIO * prior) return;
+      const ratio = prior > 0 ? (recent / prior) : null;
+      const alert = {
+        period_start: todayIso,
+        barangay_id: r.barangay_id,
+        barangay_name: r.barangay_name,
+        disease_name: r.disease_name,
+        alert_type: 'rapid_outbreak',
+        alert_value: recent,
+        detail: `${recent} ${r.disease_name} cases in Barangay ${r.barangay_name} in the last ${RAPID_OUTBREAK_WINDOW_DAYS} days`
+          + (prior > 0 ? ` (${prior} in the previous ${RAPID_OUTBREAK_WINDOW_DAYS}, ${ratio.toFixed(1)}x rise)` : ' (new cluster - none in the previous window)')
+          + '. Rapid outbreak - check the purok/blk breakdown and log a response action.',
+      };
+      db.query(
+        'SELECT id FROM epi_alerts WHERE period_start = ? AND barangay_id = ? AND disease_name = ? AND alert_type = ? LIMIT 1',
+        [alert.period_start, alert.barangay_id, alert.disease_name, alert.alert_type],
+        (dErr, dRows) => {
+          if (dErr || (dRows && dRows.length > 0)) return; // already alerted today
+          db.query(
+            'INSERT INTO epi_alerts (period_start, barangay_id, barangay_name, disease_name, alert_type, alert_value, detail) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [alert.period_start, alert.barangay_id, alert.barangay_name, alert.disease_name, alert.alert_type, alert.alert_value, alert.detail],
+            (iErr) => {
+              if (iErr) { console.error('Rapid outbreak alert insert error:', iErr.message); return; }
+              console.log('🚨 Rapid outbreak alert fired:', alert.detail);
+              notifyRapidOutbreak(alert);
+            }
+          );
+        }
+      );
+    });
+  });
+}
+
+// ── Instant rapid-outbreak check (after a case is added/approved) ───────────
+// The rapid sweep normally runs on a 5-minute cron, but a case added from the UI
+// should light up the outbreak pin within seconds, not minutes. Callers fire this
+// after the case row is committed. Bursts (bulk entry, offline sync replay) are
+// coalesced into one sweep ~1.5s after the last write, and epi_alerts' per-day
+// unique key means a re-run can never duplicate an alert.
+let rapidCheckTimer = null;
+function scheduleRapidOutbreakCheck() {
+  if (rapidCheckTimer) clearTimeout(rapidCheckTimer);
+  rapidCheckTimer = setTimeout(() => {
+    rapidCheckTimer = null;
+    runRapidOutbreakAlerts();
+  }, 1500);
 }
 
 const HAZARD_ALERT_MIN_CASES = 3; // active hazard + this many linked-disease cases in the same barangay this week
@@ -6540,8 +6662,16 @@ function runHazardDiseaseAlerts(weekStartIso, nextWeekIso) {
   );
 }
 
-// Hourly epi alert sweep
-cron.schedule('0 * * * *', () => {
+// Epi alert sweep - every 5 minutes.
+// Runs the full sweep (count_threshold, surge, mortality, hazard_disease) so a
+// newly added case is picked up by every rule within 5 minutes instead of waiting
+// for the hour, and `runEpiAlerts()` ends by calling `runRapidOutbreakAlerts()` so
+// the time-critical rapid-outbreak monitor rides the same 5-minute cadence (no
+// separate rapid cron - it would just duplicate the sweep). The per-week
+// (count/surge/mortality/hazard) and per-day (rapid) `epi_alerts` unique keys mean
+// re-running this often can never create a duplicate alert; a case added from the
+// UI is still checked instantly by `scheduleRapidOutbreakCheck()`.
+cron.schedule('*/5 * * * *', () => {
   console.log('🚨 Running epidemiological alert sweep...');
   runEpiAlerts();
 });
@@ -6683,7 +6813,7 @@ function verifyActionHazard(hazardId, cb) {
 // `alert_kind` tags the Dashboard-only warnings that have no row of their own
 // (a recurring hotspot or a threshold card), so both routes carry the
 // "this answers a warning" flag that makes the remarks field mandatory.
-const ALERT_KINDS = ['epi_count', 'count_threshold', 'surge', 'mortality', 'hazard_disease', 'high_active', 'mortality_card', 'rapid_surge', 'rising_trend', 'hotspot', 'disaster', 'zone_disease_density', 'zone_disease_flood'];
+const ALERT_KINDS = ['epi_count', 'count_threshold', 'surge', 'mortality', 'hazard_disease', 'high_active', 'mortality_card', 'rapid_surge', 'rapid_outbreak', 'rising_trend', 'hotspot', 'disaster', 'zone_disease_density', 'zone_disease_flood'];
 
 function resolveActionAlertId(alertId, res) {
   if (alertId === undefined || alertId === null || alertId === '' || alertId === 'null') return null;
@@ -6723,6 +6853,7 @@ function alertContextLabel(alert, kind) {
     mortality_card: 'mortality warning',
     high_active: 'High Active Cases warning',
     rapid_surge: 'Rapid Surge warning',
+    rapid_outbreak: 'Rapid outbreak warning',
     rising_trend: 'Rising Trend warning',
     hotspot: 'recurring hotspot warning',
     disaster: 'disaster alert',
@@ -6923,14 +7054,14 @@ const formatOnsetHour = (isoHour) => {
 //             'barangay' -> only the affected barangay's BHW (no CHO echo-back)
 // Channel delivery follows each user's own notification_preferences toggles.
 const deliverNotice = (opts, done) => {
-  const { title, message, barangay_id, severity, type, linkTo, recipients } = opts;
+  const { title, message, barangay_id, severity, type, linkTo, recipients, referenceId } = opts;
   const notifType = type || (severity === 'Severe' ? 'warning' : 'info');
   const link = linkTo || 'MapView';
   const audience = recipients || 'staff';
   const insert = (u) => {
     db.query(
-      'INSERT INTO notifications (user_id, title, message, type, link_to) VALUES (?, ?, ?, ?, ?)',
-      [u.user_id, title, message, notifType, link],
+      'INSERT INTO notifications (user_id, title, message, type, link_to, reference_id) VALUES (?, ?, ?, ?, ?, ?)',
+      [u.user_id, title, message, notifType, link, referenceId || null],
       (nErr) => { if (nErr) console.error('Notice notification insert failed:', nErr.message); }
     );
   };

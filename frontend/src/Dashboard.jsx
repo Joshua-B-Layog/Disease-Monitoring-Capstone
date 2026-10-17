@@ -1015,6 +1015,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     high_active: t('High active cases warning'),
     mortality_card: t('Mortality warning'),
     rapid_surge: t('Rapid surge warning'),
+    rapid_outbreak: t('Rapid outbreak warning'),
     rising_trend: t('Rising trend warning'),
     hotspot: t('Recurring hotspot warning'),
     disaster: t('Disaster alert'),

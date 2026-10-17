@@ -129,6 +129,9 @@ const InterventionModal = ({ open, context, barangays = [], diseases = [], dateF
   };
 
   const barangayNameOf = (id) => (barangays.find(b => String(b.id) === String(id)) || {}).name || '';
+  // A rapid-outbreak warning reads as more urgent than a threshold warning, so it
+  // gets the siren glyph and the red banner instead of the amber default.
+  const isOutbreak = context?.alert_kind === 'rapid_outbreak';
 
   return (
     <div
@@ -149,8 +152,8 @@ const InterventionModal = ({ open, context, barangays = [], diseases = [], dateF
         </div>
 
         {/* The warning this intervention answers */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', marginBottom: '16px', borderRadius: '9px', background: 'var(--warning-bg, rgba(217,119,6,0.15))', border: '1px solid var(--warning-border, #D97706)' }}>
-          <span style={{ fontSize: '18px', lineHeight: 1 }}>⚠️</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', marginBottom: '16px', borderRadius: '9px', background: isOutbreak ? 'rgba(220,38,38,0.12)' : 'var(--warning-bg, rgba(217,119,6,0.15))', border: `1px solid ${isOutbreak ? 'rgba(220,38,38,0.5)' : 'var(--warning-border, #D97706)'}` }}>
+          <span style={{ fontSize: '18px', lineHeight: 1 }}>{isOutbreak ? '🚨' : '⚠️'}</span>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>
               {context?.disease || t('Disease')}{context?.barangay ? ` · ${context.barangay}` : ''}{context?.count ? ` · ${context.count} ${context.count === 1 ? t('case') : t('cases')}` : ''}
