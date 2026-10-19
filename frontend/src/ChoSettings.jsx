@@ -610,6 +610,24 @@ export default function CHOSettings({
       .catch(() => {});
   };
 
+  // Per-zone rename / delete (drawn zones are managed here as well as on the map).
+  const handleRenamePurokZone = (zone) => {
+    const next = window.prompt(t('Rename zone'), zone.name);
+    if (next == null) return;
+    const name = next.trim();
+    if (!name || name === zone.name) return;
+    axios.put(API_URL + `/api/purok-areas/${zone.id}`, { name }, { headers: authHeaders() })
+      .then(() => { setPurokMsg(t('Zone renamed.')); setTimeout(() => setPurokMsg(''), 5000); loadPurokAreas(); })
+      .catch(err => { setPurokErr(t('❌ ') + ((err.response && err.response.data && err.response.data.error) || t('Could not rename the zone.'))); setTimeout(() => setPurokErr(''), 6000); });
+  };
+
+  const handleDeletePurokZone = (zone) => {
+    if (!window.confirm(`${t('Delete zone')} "${zone.name}" (${zone.barangay_name})?`)) return;
+    axios.delete(API_URL + `/api/purok-areas/${zone.id}`, { headers: authHeaders() })
+      .then(() => { setPurokMsg(t('Zone deleted.')); setTimeout(() => setPurokMsg(''), 5000); loadPurokAreas(); })
+      .catch(err => { setPurokErr(t('❌ ') + ((err.response && err.response.data && err.response.data.error) || t('Could not delete the zone.'))); setTimeout(() => setPurokErr(''), 6000); });
+  };
+
   // ── Load profile from DB on mount ──
   useEffect(() => {
     if (!userId) {
@@ -1286,7 +1304,7 @@ if (security.newPassword !== security.confirmPassword) {
                     {t('Cancel')}
                   </button>
                   <button onClick={handleSaveProfile} disabled={saving}
-                    style={{ background: saving ? 'rgba(0,14,203,.55)' : 'var(--primary-600, #000ECB)', border: 'none', color: '#ffffff', borderRadius: '12px', padding: '12px', fontSize: '17px', fontWeight: '500', cursor: saving ? 'not-allowed' : 'pointer', flexGrow: 1 }}>
+                    style={{ background: 'var(--success, #129968)', border: 'none', color: '#ffffff', borderRadius: '12px', padding: '12px', fontSize: '17px', fontWeight: '500', cursor: saving ? 'not-allowed' : 'pointer', flexGrow: 1, opacity: saving ? 0.6 : 1 }}>
                     {saving ? t('Saving...') : t('Save Changes')}
                   </button>
                 </div>
@@ -2410,7 +2428,7 @@ if (security.newPassword !== security.confirmPassword) {
                   </div>
 
                   <p style={{ margin: 0, fontSize: '15px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-                    {t('Optional. Upload a GeoJSON FeatureCollection where each feature has properties.barangay (a Cabuyao barangay name) and properties.name (the purok name), plus a Polygon or MultiPolygon geometry. Re-importing replaces that barangay\'s boundaries.')}
+                    {t('Optional. Upload a GeoJSON FeatureCollection where each feature has Cabuyao barangay name and purok name, plus a Polygon or MultiPolygon geometry. Re-importing replaces that barangay\'s boundaries.')}
                   </p>
 
                   <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
@@ -2444,20 +2462,40 @@ if (security.newPassword !== security.confirmPassword) {
                     if (names.length === 0) {
                       return (
                         <p style={{ margin: '12px 0 0 0', fontSize: '15px', color: 'var(--text-muted)' }}>
-                          {t('No purok boundaries uploaded yet — the map uses the 6-cell proxy grid.')}
+                          {t('No purok boundaries uploaded yet - the map uses the 6-cell proxy grid.')}
                         </p>
                       );
                     }
                     return (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '12px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px' }}>
                         {names.map(n => (
-                          <div key={n} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border-color)' }}>
-                            <span style={{ flex: 1, fontSize: '15px', fontWeight: '600', color: 'var(--text-main)' }}>{n}</span>
-                            <span style={{ fontSize: '15px', color: 'var(--text-muted)' }}>{byBrgy[n].length} {t('purok(s)')}</span>
-                            <button onClick={() => handleClearPurokBarangay(byBrgy[n][0].barangay_id, n)}
-                              style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--warning-text)', cursor: 'pointer', fontSize: '15px', fontWeight: '600' }}>
-                              {t('Remove')}
-                            </button>
+                          <div key={n} style={{ padding: '10px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border-color)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <span style={{ flex: 1, fontSize: '15px', fontWeight: '600', color: 'var(--text-main)' }}>{n}</span>
+                              <span style={{ fontSize: '15px', color: 'var(--text-muted)' }}>{byBrgy[n].length} {t('purok(s)')}</span>
+                              <button onClick={() => handleClearPurokBarangay(byBrgy[n][0].barangay_id, n)}
+                                style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--warning-text)', cursor: 'pointer', fontSize: '15px', fontWeight: '600' }}>
+                                {t('Remove')}
+                              </button>
+                            </div>
+                            {/* One row per zone so a drawn zone can be renamed or removed
+                                without wiping the barangay's whole boundary set. */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px' }}>
+                              {byBrgy[n].map(z => (
+                                <div key={`${n}|${z.id}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px', borderRadius: '6px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)' }}>
+                                  <span style={{ flex: 1, minWidth: 0, fontSize: '14px', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    🗺 {z.name}
+                                  </span>
+                                  <span style={{ fontSize: '12px', fontWeight: '700', padding: '1px 7px', borderRadius: '10px', color: z.source === 'manual' ? '#0891b2' : 'var(--text-muted)', background: z.source === 'manual' ? 'rgba(8,145,178,0.12)' : 'transparent', border: `1px solid ${z.source === 'manual' ? '#0891b2' : 'var(--border-color)'}` }}>
+                                    {z.source === 'manual' ? t('Drawn') : t('Imported')}
+                                  </span>
+                                  <button onClick={() => handleRenamePurokZone(z)} title={t('Rename zone')}
+                                    style={{ padding: '2px 7px', borderRadius: '5px', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '14px' }}>✎</button>
+                                  <button onClick={() => handleDeletePurokZone(z)} title={t('Delete zone')}
+                                    style={{ padding: '2px 7px', borderRadius: '5px', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--warning-text)', cursor: 'pointer', fontSize: '14px' }}>🗑</button>
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         ))}
                       </div>

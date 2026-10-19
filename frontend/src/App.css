@@ -2184,3 +2184,30 @@ button:active { transform: scale(0.97); }
   from { transform: scaleX(0); }
   to   { transform: scaleX(1); }
 }
+
+/* ── Hotspot Disease Map: inline label on a close-up zone box ──────────────────
+   Each small box carries the blk/lot/purok it covers (see ZONE_FINE_ZOOM in
+   MapView.jsx) so the unit name is readable the moment the boxes appear. The box
+   lives in its own pane above the barangay choropleth, so hovering it shows the
+   hotspot card here instead of the barangay hover stealing it. Themed via the
+   shared CSS variables. */
+.leaflet-tooltip.zone-fine-label {
+  background: var(--bg-surface);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+/* Hovered: the label swaps to the hotspot card, so lift it above the box shape. */
+.leaflet-tooltip.zone-fine-label.is-hover {
+  border-color: var(--alert-500, #FF4444);
+  padding: 3px 8px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45);
+}
+/* No arrow: the label sits inside/next to a block, an arrow only adds noise. */
+.leaflet-tooltip.zone-fine-label::before { display: none; }

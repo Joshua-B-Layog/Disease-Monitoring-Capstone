@@ -21,6 +21,23 @@
 export const ZONE_COLS = 3;
 export const ZONE_ROWS = 2;
 
+// When the map is zoomed in to ZONE_FINE_ZOOM the coarse grid cell is too big to
+// point at a purok/blk (one cell is up to 1/6 of the barangay bbox, so a Blk 4
+// cluster looks like it covers half the barangay). At that zoom the barangay is
+// divided into a finer grid - ZONE_COLS*6 x ZONE_ROWS*6 = 18 x 12 cells (~180 x
+// 250 m in Niugan, ~1/18 of the barangay bbox per box) - and ONLY the fine cells
+// that actually hold case COORDINATES are shaded. So the hotspot reads as a small
+// box on the right block instead of a slab over its neighbours, and two units whose
+// cases share one fine cell share one box ("Blk 4 . Lot 5"). Detection is untouched
+// - it still runs on the coarse cell; this is presentation only.
+export const ZONE_FINE_COLS = ZONE_COLS * 6;
+export const ZONE_FINE_ROWS = ZONE_ROWS * 6;
+
+// Fallback subdivision (k x k of the coarse cell) used ONLY for a unit whose cases
+// carry no usable coordinates, so the unit still shows somewhere stable instead of
+// vanishing from the close-up view.
+const SUB_FALLBACK = 3;
+
 // Tunable detection consts (mirror the server-side EPI_ALERT_* naming style).
 export const ZONE_WINDOW_DAYS = 7;      // case window
 
@@ -250,8 +267,9 @@ export function purokIdxForUnit(zones, unit) {
   return exact ? exact.idx : null;
 }
 
-// Parse /api/purok-areas rows into { [barangay_name]: [{ name, rings }] }. The API
-// returns `geometry` (already parsed); `geojson` is accepted as a fallback.
+// Parse /api/purok-areas rows into { [barangay_name]: [{ id, name, source, rings }] }.
+// The API returns `geometry` (already parsed); `geojson` is accepted as a fallback.
+// `id`/`source` are carried through so the map can edit/delete a specific zone.
 export function purokRowsToAreas(rows) {
   const out = {};
   (Array.isArray(rows) ? rows : []).forEach(row => {
@@ -264,7 +282,7 @@ export function purokRowsToAreas(rows) {
     if (rings.length === 0) return;
     if (!out[row.barangay_name]) out[row.barangay_name] = [];
     const name = row.name || `Purok ${out[row.barangay_name].length + 1}`;
-    out[row.barangay_name].push({ name, rings });
+    out[row.barangay_name].push({ id: row.id != null ? row.id : null, name, source: row.source || 'import', rings });
   });
   return out;
 }
@@ -339,6 +357,129 @@ export function zonesForBarangay(barangayName, feature, purokAreas = null) {
     }
   }
   return zones;
+}
+
+// ── fine (sub-cell) geometry for close-up viewing ─────────────────────────────
+// A unit's fallback sub-cell inside its coarse cell, used only when the unit has no
+// usable coordinates. Stable per unit, so the box never jumps between renders.
+export function subIdxForUnit(barangayName, unit, k = SUB_FALLBACK) {
+  const cells = k * k;
+  const m = /Purok\s+(\d+)/i.exec(unit || '');
+  if (m) {
+    const n = parseInt(m[1], 10);
+    if (Number.isFinite(n)) return n % cells;
+  }
+  return Math.floor(seededRandom(`${barangayName}|${unit || 'C'}|_sub`) * cells);
+}
+
+// Which fine cell of the barangay-wide fine grid (ZONE_FINE_COLS x ZONE_FINE_ROWS
+// over the barangay bbox) a point falls in. THIS is what places a close-up box on
+// the actual block: hashing the unit NAME parked "Blk 4" at whatever cell the hash
+// picked - often the top of its zone - while its cases sit somewhere else entirely.
+export function fineCellForCoords(feature, lat, lng) {
+  const rings = outerRings(feature && feature.geometry);
+  if (rings.length === 0) return null;
+  const { minLng, maxLng, minLat, maxLat } = boundingBox(rings);
+  const w = maxLng - minLng;
+  const h = maxLat - minLat;
+  if (!(w > 0) || !(h > 0)) return null;
+  const pLat = parseFloat(lat);
+  const pLng = parseFloat(lng);
+  if (!Number.isFinite(pLat) || !Number.isFinite(pLng)) return null;
+  const col = Math.min(ZONE_FINE_COLS - 1, Math.max(0, Math.floor(((pLng - minLng) / w) * ZONE_FINE_COLS)));
+  const row = Math.min(ZONE_FINE_ROWS - 1, Math.max(0, Math.floor(((pLat - minLat) / h) * ZONE_FINE_ROWS)));
+  return { col, row, key: `${col}_${row}` };
+}
+
+// Clip a set of rings to one lat/lng rectangle, dropping any that lose all their
+// land (a concave barangay can leave a cell with no land at all).
+function clipRingsToRect(sourceRings, minLng, maxLng, minLat, maxLat) {
+  const out = [];
+  sourceRings.forEach(r => {
+    const clipped = clipRingToCell(r, minLng, maxLng, minLat, maxLat);
+    if (clipped) out.push(clipped);
+  });
+  return out;
+}
+
+// The deterministic fallback box for a coordless unit: its sub-cell inside the
+// parent coarse cell (barangay outline clipped to that sub-cell).
+function fallbackCellRings(rings, barangayName, unit, zoneBox) {
+  const s = subIdxForUnit(barangayName, unit, SUB_FALLBACK);
+  const sc = s % SUB_FALLBACK;
+  const sr = Math.floor(s / SUB_FALLBACK);
+  const cw = (zoneBox.maxLng - zoneBox.minLng) / SUB_FALLBACK;
+  const ch = (zoneBox.maxLat - zoneBox.minLat) / SUB_FALLBACK;
+  const minLng = zoneBox.minLng + sc * cw;
+  const minLat = zoneBox.minLat + sr * ch;
+  return clipRingsToRect(rings, minLng, minLng + cw, minLat, minLat + ch);
+}
+
+// The small shaded boxes for one flagged coarse-grid row: one per fine cell that
+// actually holds cases, so a Blk 4 cluster reads as a small box ON Blk 4 and the
+// other blocks inside the zone stay unshaded. Units sharing a fine cell are MERGED
+// into one box (its label lists them all). Boxes are clipped to the barangay
+// outline AND to the parent coarse cell, so a box can never bleed into a
+// neighbouring zone. Real-purok rows return [] (the City's polygon is already the
+// right shape and size, so there is nothing to subdivide).
+export function subCellsForZone(row, feature) {
+  if (!row || row.real || row.col == null || row.row == null) return [];
+  const rings = outerRings(feature && feature.geometry);
+  if (rings.length === 0) return [];
+  const { minLng, maxLng, minLat, maxLat } = boundingBox(rings);
+  const w = maxLng - minLng;
+  const h = maxLat - minLat;
+  if (!(w > 0) || !(h > 0)) return [];
+
+  // The parent coarse cell, so a box can never bleed into a neighbouring zone.
+  const czw = w / ZONE_COLS;
+  const czh = h / ZONE_ROWS;
+  const zoneBox = {
+    minLng: minLng + row.col * czw, maxLng: minLng + (row.col + 1) * czw,
+    minLat: minLat + row.row * czh, maxLat: minLat + (row.row + 1) * czh,
+  };
+
+  // Group the zone's units by the fine cell that holds their case coordinates.
+  const buckets = new Map();   // cell key -> { col, row, units: [], cases7, coordless }
+  (row.breakdown || []).forEach(b => {
+    if (!(b.cases7 > 0)) return;
+    const cell = b.coords ? fineCellForCoords(feature, b.coords[0], b.coords[1]) : null;
+    const key = cell ? `c${cell.key}` : `f${subIdxForUnit(row.barangay, b.unit, SUB_FALLBACK)}`;
+    if (!buckets.has(key)) buckets.set(key, { cell, coordless: !cell, units: [], cases7: 0 });
+    const g = buckets.get(key);
+    g.units.push(b.unit);
+    g.cases7 += b.cases7;
+  });
+
+  const cw = w / ZONE_FINE_COLS;
+  const ch = h / ZONE_FINE_ROWS;
+  const out = [];
+  buckets.forEach((g, key) => {
+    let boxRings = [];
+    if (g.cell) {
+      const cMinLng = minLng + g.cell.col * cw;
+      const cMinLat = minLat + g.cell.row * ch;
+      boxRings = clipRingsToRect(rings, cMinLng, cMinLng + cw, cMinLat, cMinLat + ch);
+      // Keep the box inside its own coarse zone (a few old seeded rows carry
+      // coordinates that disagree with the zone their unit name resolves to).
+      boxRings = clipRingsToRect(boxRings, zoneBox.minLng, zoneBox.maxLng, zoneBox.minLat, zoneBox.maxLat);
+    }
+    if (boxRings.length === 0) {
+      // No coordinates, or the clip came out empty: fall back to the unit's
+      // deterministic spot inside its own zone cell so it stays visible.
+      boxRings = fallbackCellRings(rings, row.barangay, g.units[0], zoneBox);
+    }
+    if (boxRings.length === 0) return;
+    out.push({
+      id: `${row.id}|${key}`,
+      unit: g.units.join(' · '),
+      units: g.units,
+      cases7: g.cases7,
+      coordless: g.coordless,
+      rings: boxRings,
+    });
+  });
+  return out;
 }
 
 // ── season helpers ───────────────────────────────────────────────────────────
@@ -417,10 +558,21 @@ export function buildZoneHotspots({
   const availableIdx = new Set(zones.map(z => z.idx));
   const realZones = !!(zones[0] && zones[0].real);
   const matchPurok = (unit) => purokIdxForUnit(zones, unit);
-  const resolveUnit = (unit) => {
+  // Real (imported or hand-drawn) zones resolve NAME FIRST, then LOCATION: a case
+  // whose address names the zone ("Purok 3", or a drawn zone the CHO called
+  // "Blk 4") goes there; a case that names no zone is placed by whether its own
+  // map point falls inside a zone polygon (the same fallback the flood pins use);
+  // only then does it fall back to a deterministic zone so it stays visible.
+  const resolveUnit = (unit, caseRec) => {
     if (!realZones) return resolveZoneIdx(zoneIndexForUnit(barangayName, unit), availableIdx);
     const hit = matchPurok(unit);
     if (hit != null) return { idx: hit, folded: false };
+    const lat = caseRec ? parseFloat(caseRec.latitude) : NaN;
+    const lng = caseRec ? parseFloat(caseRec.longitude) : NaN;
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      const inside = zones.find(z => pointInZones(lat, lng, z.rings));
+      if (inside) return { idx: inside.idx, folded: false };
+    }
     const h = Math.floor(seededRandom(`${barangayName}|${unit || 'C'}|_purok`) * zones.length);
     return { idx: zones[h].idx, folded: false };
   };
@@ -435,7 +587,7 @@ export function buildZoneHotspots({
   cases.forEach(c => {
     const unit = extractUnit ? extractUnit(c.address) : null;
     const raw = realZones ? null : zoneIndexForUnit(barangayName, unit);
-    const { idx, folded } = resolveUnit(unit);
+    const { idx, folded } = resolveUnit(unit, c);
     if (!availableIdx.has(idx)) return;
     if (folded) {
       if (!foldedIdx.has(idx)) foldedIdx.set(idx, new Set());
@@ -642,4 +794,4 @@ export function zonesToFeatureCollection(rows) {
   return { type: 'FeatureCollection', features };
 }
 
-export default { buildZoneHotspots, zonesForBarangay, zoneIndexForUnit, zonesToFeatureCollection, resolveZoneIdx, purokIdxForUnit, purokRowsToAreas, ZONE_PRESETS, DEFAULT_ZONE_SENSITIVITY };
+export default { buildZoneHotspots, zonesForBarangay, zoneIndexForUnit, zonesToFeatureCollection, resolveZoneIdx, purokIdxForUnit, purokRowsToAreas, subCellsForZone, subIdxForUnit, fineCellForCoords, ZONE_PRESETS, ZONE_FINE_COLS, ZONE_FINE_ROWS, DEFAULT_ZONE_SENSITIVITY };

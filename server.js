@@ -7241,11 +7241,24 @@ db.query(`CREATE TABLE IF NOT EXISTS purok_areas (
   barangay_id INT NOT NULL,
   name VARCHAR(100) NOT NULL,
   geojson LONGTEXT NOT NULL,
+  source VARCHAR(12) NOT NULL DEFAULT 'import',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_purok_area_barangay (barangay_id)
 )`, (err) => {
   if (err) console.error('Error creating purok_areas table:', err.message);
   else console.log('Purok areas table created/verified');
+});
+
+// `source` distinguishes a zone the City uploaded in a GeoJSON file ('import') from
+// one a CHO drew on the map ('manual'). Without it, re-importing a file would wipe
+// every hand-drawn zone for that barangay. Added on startup for existing DBs.
+db.query(`SHOW COLUMNS FROM purok_areas LIKE 'source'`, (err, cols) => {
+  if (err) return console.error('Error checking purok_areas.source:', err.message);
+  if (Array.isArray(cols) && cols.length > 0) return;
+  db.query(`ALTER TABLE purok_areas ADD COLUMN source VARCHAR(12) NOT NULL DEFAULT 'import'`, (aErr) => {
+    if (aErr) console.error('Error adding purok_areas.source:', aErr.message);
+    else console.log('Purok areas source column added');
+  });
 });
 
 // Only Polygon / MultiPolygon are meaningful here, and the point count is capped
@@ -7273,7 +7286,7 @@ function validPurokGeometry(geometry) {
 }
 
 app.get('/api/purok-areas', authenticate, (req, res) => {
-  let sql = `SELECT pa.id, pa.barangay_id, b.name AS barangay_name, pa.name, pa.geojson
+  let sql = `SELECT pa.id, pa.barangay_id, b.name AS barangay_name, pa.name, pa.geojson, pa.source
              FROM purok_areas pa JOIN barangays b ON pa.barangay_id = b.id`;
   const params = [];
   if (req.query.barangay_id) { sql += ' WHERE pa.barangay_id = ?'; params.push(req.query.barangay_id); }
@@ -7283,7 +7296,7 @@ app.get('/api/purok-areas', authenticate, (req, res) => {
     res.json((rows || []).map(r => {
       let geometry = r.geojson;
       try { geometry = JSON.parse(r.geojson); } catch { /* keep the raw string */ }
-      return { id: r.id, barangay_id: r.barangay_id, barangay_name: r.barangay_name, name: r.name, geometry };
+      return { id: r.id, barangay_id: r.barangay_id, barangay_name: r.barangay_name, name: r.name, source: r.source || 'import', geometry };
     }));
   });
 });
@@ -7324,11 +7337,14 @@ app.post('/api/purok-areas/import', authenticate, (req, res) => {
         }));
       }
       const ids = target.map(c => byName.get(c.name));
-      t.q('DELETE FROM purok_areas WHERE barangay_id IN (?)', [ids], (delErr) => {
+      // Only imported rows are replaced. Hand-drawn zones (source='manual') in the
+      // same barangay are left alone, so uploading a corrected file never destroys
+      // a CHO's work on the map.
+      t.q(`DELETE FROM purok_areas WHERE barangay_id IN (?) AND source = 'import'`, [ids], (delErr) => {
         if (delErr) return t.rollback(() => res.status(500).json({ error: 'Internal database error. Please try again.' }));
         const values = [];
-        target.forEach(c => c.puroks.forEach(p => values.push([byName.get(c.name), p.name, JSON.stringify(p.geometry)])));
-        t.q('INSERT INTO purok_areas (barangay_id, name, geojson) VALUES ?', [values], (insErr, result) => {
+        target.forEach(c => c.puroks.forEach(p => values.push([byName.get(c.name), p.name, JSON.stringify(p.geometry), 'import'])));
+        t.q('INSERT INTO purok_areas (barangay_id, name, geojson, source) VALUES ?', [values], (insErr, result) => {
           if (insErr) return t.rollback(() => res.status(500).json({ error: 'Internal database error. Please try again.' }));
           t.commit(() => {
             createAuditLog(req.user.user_id, req.user.name, req.user.role, null, req.user.barangay || null,
@@ -7355,6 +7371,74 @@ app.delete('/api/purok-areas/barangay/:barangayId', authenticate, (req, res) => 
     createAuditLog(req.user.user_id, req.user.name, req.user.role, null, req.user.barangay || null,
       'Delete', 'Purok Boundaries', `Cleared ${result.affectedRows} purok boundary(ies) for barangay #${req.params.barangayId}`);
     res.json({ message: 'Purok boundaries cleared.', deleted: result.affectedRows });
+  });
+});
+
+// ── Custom zones (hand-drawn on the Map View) ────────────────────────────────
+// A drawn zone is stored exactly like an imported purok boundary (same table and
+// geometry validation) but tagged source='manual'. A barangay with ANY stored
+// zone uses those polygons instead of the 6-cell proxy grid, so drawing a zone
+// makes it the real zone set for that barangay — no other engine change needed.
+app.post('/api/purok-areas', authenticate, (req, res) => {
+  if (req.user.role !== 'CHO') return res.status(403).json({ error: 'Only CHO can define custom zones.' });
+  const barangayId = parseInt(req.body && req.body.barangay_id, 10);
+  if (!Number.isFinite(barangayId)) return res.status(400).json({ error: 'A barangay is required for the zone.' });
+  const geometry = validPurokGeometry(req.body && req.body.geometry);
+  if (!geometry) return res.status(400).json({ error: 'A valid Polygon or MultiPolygon is required.' });
+  const name = String((req.body && req.body.name) || '').trim().slice(0, 100);
+  if (!name) return res.status(400).json({ error: 'A zone name is required.' });
+  db.query('SELECT id, name FROM barangays WHERE id = ?', [barangayId], (bErr, rows) => {
+    if (bErr) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+    if (!rows || rows.length === 0) return res.status(400).json({ error: 'Unknown barangay.' });
+    db.query('INSERT INTO purok_areas (barangay_id, name, geojson, source) VALUES (?, ?, ?, ?)',
+      [barangayId, name, JSON.stringify(geometry), 'manual'], (err, result) => {
+        if (err) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+        createAuditLog(req.user.user_id, req.user.name, req.user.role, null, req.user.barangay || null,
+          'Create', 'Custom Zones', `Drew zone "${name}" for ${rows[0].name}`);
+        res.json({ message: 'Custom zone saved.', id: result.insertId, barangay_id: barangayId, barangay_name: rows[0].name, name, source: 'manual' });
+      });
+  });
+});
+
+// Rename and/or reshape an existing zone (drag-edit on the map, or the Settings list).
+app.put('/api/purok-areas/:id', authenticate, (req, res) => {
+  if (req.user.role !== 'CHO') return res.status(403).json({ error: 'Only CHO can edit custom zones.' });
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid zone id.' });
+  const sets = [];
+  const params = [];
+  if (req.body && req.body.name != null) {
+    const name = String(req.body.name).trim().slice(0, 100);
+    if (!name) return res.status(400).json({ error: 'A zone name is required.' });
+    sets.push('name = ?'); params.push(name);
+  }
+  if (req.body && req.body.geometry != null) {
+    const geometry = validPurokGeometry(req.body.geometry);
+    if (!geometry) return res.status(400).json({ error: 'A valid Polygon or MultiPolygon is required.' });
+    sets.push('geojson = ?'); params.push(JSON.stringify(geometry));
+  }
+  if (sets.length === 0) return res.status(400).json({ error: 'Nothing to update.' });
+  params.push(id);
+  db.query(`UPDATE purok_areas SET ${sets.join(', ')} WHERE id = ?`, params, (err, result) => {
+    if (err) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+    if (!result || result.affectedRows === 0) return res.status(404).json({ error: 'Zone not found.' });
+    createAuditLog(req.user.user_id, req.user.name, req.user.role, null, req.user.barangay || null,
+      'Update', 'Custom Zones', `Updated zone #${id}`);
+    res.json({ message: 'Custom zone updated.' });
+  });
+});
+
+// Delete ONE zone by id (the barangay-level route above clears them all).
+app.delete('/api/purok-areas/:id', authenticate, (req, res) => {
+  if (req.user.role !== 'CHO') return res.status(403).json({ error: 'Only CHO can delete custom zones.' });
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid zone id.' });
+  db.query('DELETE FROM purok_areas WHERE id = ?', [id], (err, result) => {
+    if (err) return res.status(500).json({ error: 'Internal database error. Please try again.' });
+    if (!result || result.affectedRows === 0) return res.status(404).json({ error: 'Zone not found.' });
+    createAuditLog(req.user.user_id, req.user.name, req.user.role, null, req.user.barangay || null,
+      'Delete', 'Custom Zones', `Deleted zone #${id}`);
+    res.json({ message: 'Custom zone deleted.', deleted: result.affectedRows });
   });
 });
 
@@ -7665,7 +7749,7 @@ function runWeatherAlerts() {
         (insErr, res) => {
           if (insErr) { console.error('Weather alert insert error:', insErr.message); return; }
           if (!res || !res.affectedRows) return; // already alerted for this onset hour
-          console.log(`⛈ Weather alert — ${info.name}: ${detail}`);
+          console.log(`⛈ Weather alert - ${info.name}: ${detail}`);
           sendWeatherAlert({
             title: 'Weather Hazard Expected',
             message: detail,

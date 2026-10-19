@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { MapContainer, TileLayer, useMap, useMapEvents, CircleMarker } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -7,6 +7,11 @@ import { API_URL } from './config';
 import { notify } from './components/Toast';
 import { cacheCases, getCachedCases } from './offlineSync';
 import { GeoJSON } from 'react-leaflet';
+// Publish Leaflet on `window.L` (Geoman reads it from the global), then load Geoman.
+// Order matters: the shim must evaluate before the Geoman bundle.
+import './leafletGlobal';
+import '@geoman-io/leaflet-geoman-free';
+import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 import cabuyaoBoundaries from './data/cabuyao_barangays.geojson.json';
 import cabuyaoGeoJSON from './data/cabuyao_barangays.geojson';
 import { getPointInBarangay, pointInFeature } from './data/coordinates';
@@ -20,7 +25,7 @@ import { precacheTiles } from './mapTileCache';
 import EpiPanel from './epiStats';
 // Phase 1 zone (purok-level) hotspots: the 3x2 grid cell a case already snaps to
 // is treated as a "zone" so flooding can be related to case clustering.
-import { buildZoneHotspots, zonesToFeatureCollection, ZONE_KINDS, FLOOD_EVENT_TYPES, RAINY_SEASON_DISEASES, zonesForBarangay, zoneIndexForUnit, resolveZoneIdx, ZONE_PRESETS, DEFAULT_ZONE_SENSITIVITY, purokRowsToAreas, purokIdxForUnit } from './zoneHotspots';
+import { buildZoneHotspots, zonesToFeatureCollection, ZONE_KINDS, FLOOD_EVENT_TYPES, RAINY_SEASON_DISEASES, zonesForBarangay, zoneIndexForUnit, resolveZoneIdx, ZONE_PRESETS, DEFAULT_ZONE_SENSITIVITY, purokRowsToAreas, purokIdxForUnit, subCellsForZone } from './zoneHotspots';
 import { ACTION_TYPES, ACTION_TYPE_ICONS, ACTION_STATUSES, DISASTER_EVENT_TYPES, DISASTER_SEVERITIES, SEVERITY_COLORS, hazardIcon, hazardDiseases, hazardColor, hazardSvgMarkup, hazardSvgIcon, isDisasterActive, getDisasterWatch, WEATHER_ATTRIBUTION } from './disasterRisk';
 import { RISK_FACTOR_GROUPS, parseRiskFactors, riskFactorLabel } from './riskFactors';
 import { seasonForMonth, seasonalDiseases } from './seasonalDiseases';
@@ -573,24 +578,39 @@ const getGeoJsonStyle = (feature, barangayData, activeBarangay = null, focused =
 // 18 = puroks, 19 = case dots): below this the zone shading is shown so you can
 // "zoom in to see the zone"; at/above it the fill steps back and each zone is
 // broken down into the location units (purok/blk) inside it.
-const ZONE_BREAKDOWN_ZOOM = 18;
+// Below this the flagged zone is drawn as its full coarse cell (right for the
+// whole-barangay view). At/above it only the fine cell(s) that actually hold case
+// coordinates are shaded, so zooming into a barangay shows a small box ON the
+// affected blk/lot/purok (labelled) instead of a slab covering its neighbours. 14
+// is "as soon as you enter the barangay", not a deep close-up.
+const ZONE_FINE_ZOOM = 14;
 
 // Shading for a Phase 1 zone polygon. Colour encodes the CLASS (exposure watch
 // vs case hotspot vs weather-linked hotspot); the fill stays light and the border
 // does the heavy lifting so the zone reads on top of the barangay choropleth
-// instead of replacing it. At the breakdown zoom the fill is dropped so the
-// per-unit chips underneath stay readable; the border keeps the zone extent.
-const getZoneStyle = (feature, zoom = 0) => {
+// instead of replacing it. The close-up boxes ARE the hotspot presentation at
+// every zoom, so they keep their heavy fill + stroke (nothing steps on top of
+// them any more: the per-unit chips and the unit/area pin tiers step aside while
+// a box is on screen).
+const getZoneStyle = (feature) => {
   const props = (feature && feature.properties) || {};
   const meta = ZONE_KINDS[props.kind] || ZONE_KINDS.case;
   const score = Number(props.score) || 0;
-  const breakdown = zoom >= ZONE_BREAKDOWN_ZOOM;
+  if (props.fine) {
+    return {
+      color: meta.color, weight: 3.5,
+      // Keep the kind's dash cue (exposure = dashed, watch = dotted) so a bold amber
+      // box still reads as "exposure watch", not as a case hotspot.
+      dashArray: props.kind === 'exposure' ? '6 4' : props.kind === 'watch' ? '3 4' : undefined,
+      fillColor: meta.color, fillOpacity: 0.6,
+    };
+  }
   return {
     color: meta.color,
     weight: props.kind === 'weather' ? 3 : 2.5,
     dashArray: props.kind === 'exposure' ? '6 4' : props.kind === 'watch' ? '3 4' : undefined,
     fillColor: meta.color,
-    fillOpacity: breakdown ? 0 : Math.min(0.35, 0.1 + score / 80),
+    fillOpacity: Math.min(0.35, 0.1 + score / 80),
   };
 };
 
@@ -599,6 +619,14 @@ const getZoneStyle = (feature, zoom = 0) => {
 // zone proxy is visible instead of implied. Neutral + non-interactive; the
 // flagged zones draw on top with their own colours.
 const getGridStyle = () => ({ color: '#94a3b8', weight: 1, dashArray: '2 5', fillOpacity: 0 });
+
+// The coarse cell's faint outline kept behind the close-up sub-cell boxes, so the
+// user still sees which whole zone the small box belongs to.
+const getZoneOutlineStyle = (feature) => {
+  const props = (feature && feature.properties) || {};
+  const meta = ZONE_KINDS[props.kind] || ZONE_KINDS.case;
+  return { color: meta.color, weight: 1, opacity: 0.35, dashArray: '2 6', fillOpacity: 0 };
+};
 
 const getPurokGroups = (barangayName, cases) => {
   const groups = {};
@@ -724,8 +752,14 @@ if (!document.getElementById('cdms-barangay-labels')) {
 function CreateTopPane() {
   const map = useMap();
   useEffect(() => {
-    const pane = map.createPane('topPane');
-    pane.style.zIndex = 800;
+    // `topPane` (800) floats the case dots over everything.
+    if (!map.getPane('topPane')) map.createPane('topPane').style.zIndex = 800;
+    // `zonePane` (420) keeps the hotspot overlay ABOVE the barangay choropleth
+    // (overlayPane 400) but under the marker/tooltip panes. The choropleth calls
+    // bringToFront() on mouseover, which reorders paths *within its own pane* —
+    // with the boxes in a separate pane that can never bury them, so hovering a
+    // hotspot box wins over the barangay hover instead of the other way round.
+    if (!map.getPane('zonePane')) map.createPane('zonePane').style.zIndex = 420;
   }, [map]);
   return null;
 }
@@ -1132,29 +1166,97 @@ function LayerBadgeMarkers({ items }) {
   return null;
 }
 
-// Step 2 of the zone view: at ZONE_BREAKDOWN_ZOOM each flagged zone is broken
-// down into the location units (purok/blk) inside it, so the user can see WHICH
-// purok in the zone carried the cases. Chip colour = the zone's class; the mean
-// case coordinate of the unit is the anchor (falls back to the zone centroid).
-function ZoneBreakdownMarkers({ items }) {
+// ── Custom zone drawing (CHO, Hotspot map) ───────────────────────────────────
+// Arms Geoman's polygon draw and hands the finished ring to the parent, which
+// opens the naming dialog. Geoman is bound imperatively because it is a plain
+// Leaflet plugin, not a react-leaflet component.
+function ZoneDrawControl({ drawOn, onCreated }) {
   const map = useMap();
-  const markersRef = useRef([]);
   useEffect(() => {
-    markersRef.current.forEach(m => m.remove());
-    markersRef.current = [];
-    (items || []).forEach(it => {
-      const html = `<div style="transform:translate(-50%,-50%);display:inline-flex;align-items:center;gap:5px;`
-        + `background:var(--bg-surface);border:1.5px solid ${it.color};border-left:5px solid ${it.color};`
-        + `border-radius:8px;padding:2px 8px;font-size:11px;font-weight:700;color:var(--text-main);`
-        + `white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.35);cursor:pointer">${it.label}</div>`;
-      const icon = L.divIcon({ className: '', html, iconSize: [0, 0], iconAnchor: [0, 0] });
-      const m = L.marker(it.coords, { icon, zIndexOffset: it.z != null ? it.z : 760 }).addTo(map);
-      m.bindTooltip(it.title || '', { direction: 'top', offset: [0, -10] });
-      m.on('click', () => it.onClick && it.onClick());
-      markersRef.current.push(m);
+    if (!map || typeof map.pm === 'undefined') return undefined;
+    const onCreate = (e) => {
+      const layer = e.layer;
+      const rings = ((layer && layer.getLatLngs()) || []).map(ring =>
+        (Array.isArray(ring) ? ring : []).map(p => [p.lng, p.lat]));
+      const shape = rings.filter(r => r.length >= 3);
+      if (layer && layer.remove) layer.remove();
+      if (shape.length) onCreated({ type: 'Polygon', coordinates: shape });
+    };
+    map.on('pm:create', onCreate);
+    return () => { map.off('pm:create', onCreate); };
+  }, [map, onCreated]);
+
+  useEffect(() => {
+    if (!map || typeof map.pm === 'undefined') return undefined;
+    if (drawOn) {
+      map.pm.enableDraw('Polygon', {
+        snappable: false,
+        continueDrawing: false,
+        templineStyle: { color: '#dc2626', weight: 3 },
+        hintlineStyle: { color: '#dc2626', dashArray: '5 5' },
+        pathOptions: { color: '#dc2626', weight: 2, fillColor: '#dc2626', fillOpacity: 0.15 },
+      });
+    } else {
+      try { map.pm.disableDraw(); } catch { /* no drawer open */ }
+    }
+    return () => { try { map.pm.disableDraw(); } catch { /* no drawer open */ } };
+  }, [map, drawOn]);
+
+  return null;
+}
+
+// Edit mode: every stored zone is drawn as a polygon with Geoman vertex handles so
+// a CHO can drag it into shape. A committed edit is debounced per zone and saved.
+function ZoneEditLayer({ editOn, zones, onCommit }) {
+  const map = useMap();
+  const groupRef = useRef(null);
+  const timersRef = useRef({});
+
+  useEffect(() => {
+    const clearTimers = () => {
+      Object.values(timersRef.current).forEach(t => clearTimeout(t));
+      timersRef.current = {};
+    };
+    const drop = () => {
+      if (groupRef.current) { groupRef.current.remove(); groupRef.current = null; }
+    };
+    if (!map || !editOn) { drop(); clearTimers(); return undefined; }
+
+    const group = L.layerGroup().addTo(map);
+    groupRef.current = group;
+
+    const commit = (layer) => {
+      const id = layer && layer.__zoneId;
+      if (id == null) return;
+      if (timersRef.current[id]) clearTimeout(timersRef.current[id]);
+      timersRef.current[id] = setTimeout(() => {
+        const rings = (layer.getLatLngs() || []).map(ring =>
+          (Array.isArray(ring) ? ring : []).map(p => [p.lng, p.lat]));
+        const shape = rings.filter(r => r.length >= 3);
+        if (shape.length) onCommit(id, { type: 'Polygon', coordinates: shape });
+      }, 500);
+    };
+
+    (zones || []).forEach(z => {
+      if (!z.rings || !z.rings.length) return;
+      const latlngs = z.rings.map(r => r.map(([lng, lat]) => [lat, lng]));
+      const poly = L.polygon(latlngs, {
+        color: '#0891b2', weight: 2, dashArray: '6 4', fillColor: '#0891b2', fillOpacity: 0.08,
+      });
+      poly.__zoneId = z.id;
+      poly.addTo(group);
+      if (z.id != null && poly.pm) {
+        poly.pm.enable({ allowSelfIntersection: false, preventMarkerRemoval: false });
+        poly.on('pm:edit', () => commit(poly));
+        poly.on('pm:markerdragend', () => commit(poly));
+        poly.on('pm:dragend', () => commit(poly));
+      }
+      poly.bindTooltip(`✏️ ${z.name} · ${z.barangay}`, { sticky: true });
     });
-    return () => markersRef.current.forEach(m => m.remove());
-  }, [items, map]);
+
+    return () => { clearTimers(); drop(); };
+  }, [map, editOn, zones, onCommit]);
+
   return null;
 }
 
@@ -1337,6 +1439,7 @@ function ChoroplethLayer({ barangayData, onHover, onLeave, onClick }) {
 
 export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginBarangay, sessionContext, compactMode, dateFormat = 'MM/DD/YY', initialFocus, onFocusConsumed }) {
   const { t, translateStatus, translateActionStatus } = useI18n();
+  const isCho = loginRole === 'CHO';
   const currentYear = new Date().getFullYear();
   const [allCases, setAllCases] = useState([]);
   const [barangayData, setBarangayData] = useState([]);
@@ -1456,6 +1559,15 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   // Management). Keyed by barangay name: [{ name, rings }]. Empty => the 6-cell
   // proxy grid is used for every barangay.
   const [purokAreas, setPurokAreas] = useState({});
+  // CHO custom-zone drawing (Hotspot map only). `zoneDrawOn` arms Geoman's polygon
+  // draw; `zoneDraft` holds the pending ring while the naming dialog is open;
+  // `zoneEditOn` turns on vertex editing of the drawn zones; `zoneDrawMsg` is the
+  // save/delete confirmation line.
+  const [zoneDrawOn, setZoneDrawOn] = useState(false);
+  const [zoneEditOn, setZoneEditOn] = useState(false);
+  const [zoneDraft, setZoneDraft] = useState(null);
+  const [zoneDrawMsg, setZoneDrawMsg] = useState('');
+  const [zoneBusy, setZoneBusy] = useState(false);
   // Per-zone rainfall, keyed `${barangay}|${zoneIdx}` -> { rain24, rain72 }. Fetched
   // from the zone centroids the map already knows. Falls back to the barangay
   // reading (weatherRawByName) for any zone the server could not answer for.
@@ -1525,6 +1637,91 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     const iv = setInterval(load, 600000);
     return () => { alive = false; clearInterval(iv); };
   }, []);
+
+  // Pull the zone set immediately after a draw / reshape / delete (the map is the
+  // source of truth for how a zone is shaped).
+  const reloadPurokAreas = () => axios.get(API_URL + '/api/purok-areas')
+    .then(res => setPurokAreas(purokRowsToAreas(res.data)))
+    .catch(() => {});
+
+  // Flat list of every stored zone (imported + drawn) for the CHO manage UI.
+  const allPurokRows = useMemo(() => {
+    const out = [];
+    Object.entries(purokAreas).forEach(([barangay, list]) => {
+      list.forEach(z => out.push({ barangay, name: z.name, id: z.id, source: z.source }));
+    });
+    return out;
+  }, [purokAreas]);
+
+  // Barangay <select> options for the naming dialog (id -> name).
+  const barangayOptions = useMemo(
+    () => ALL_BARANGAYS
+      .map(name => ({ name, id: Number(Object.keys(barangayIdMap).find(k => barangayIdMap[k] === name) || 0) }))
+      .filter(b => b.id > 0),
+    [barangayIdMap]
+  );
+
+  // Latest-handler refs keep the Geoman callbacks stable, so an in-progress vertex
+  // drag is never interrupted by a re-render rebuilding the edit layer.
+  const zoneCreatedRef = useRef(null);
+  zoneCreatedRef.current = (geometry) => {
+    const defaultName = filterBarangay !== 'All Barangays' ? filterBarangay : '';
+    const defaultId = Number(Object.keys(barangayIdMap).find(k => barangayIdMap[k] === defaultName) || 0);
+    setZoneDrawMsg('');
+    setZoneDraft({ geometry, barangayId: defaultId || '', name: '' });
+  };
+  const handleZoneCreated = useCallback((geometry) => zoneCreatedRef.current(geometry), []);
+
+  const zoneCommitRef = useRef(null);
+  zoneCommitRef.current = (id, geometry) => {
+    setZoneBusy(true);
+    axios.put(API_URL + `/api/purok-areas/${id}`, { geometry })
+      .then(() => { setZoneDrawMsg(t('Zone shape saved.')); return reloadPurokAreas(); })
+      .catch(err => setZoneDrawMsg((err.response && err.response.data && err.response.data.error) || t('Could not save the zone.')))
+      .finally(() => setZoneBusy(false));
+  };
+  const handleZoneCommit = useCallback((id, geometry) => zoneCommitRef.current(id, geometry), []);
+
+  const saveZoneDraft = () => {
+    if (!zoneDraft || !zoneDraft.geometry) return;
+    const bId = parseInt(zoneDraft.barangayId, 10);
+    if (!Number.isFinite(bId)) { setZoneDrawMsg(t('Pick a barangay for the zone.')); return; }
+    const name = String(zoneDraft.name || '').trim();
+    if (!name) { setZoneDrawMsg(t('Give the zone a name.')); return; }
+    setZoneBusy(true);
+    axios.post(API_URL + '/api/purok-areas', { barangay_id: bId, name, geometry: zoneDraft.geometry })
+      .then(() => {
+        setZoneDraft(null);
+        setZoneDrawOn(false);
+        setZoneDrawMsg(t('Zone saved. It is now this barangay\'s zone set.'));
+        return reloadPurokAreas();
+      })
+      .catch(err => setZoneDrawMsg((err.response && err.response.data && err.response.data.error) || t('Could not save the zone.')))
+      .finally(() => setZoneBusy(false));
+  };
+
+  const renameZone = (z) => {
+    if (!z || z.id == null) return;
+    const next = window.prompt(t('Rename zone'), z.name);
+    if (next == null) return;
+    const name = next.trim();
+    if (!name || name === z.name) return;
+    setZoneBusy(true);
+    axios.put(API_URL + `/api/purok-areas/${z.id}`, { name })
+      .then(() => { setZoneDrawMsg(t('Zone renamed.')); return reloadPurokAreas(); })
+      .catch(err => setZoneDrawMsg((err.response && err.response.data && err.response.data.error) || t('Could not rename the zone.')))
+      .finally(() => setZoneBusy(false));
+  };
+
+  const deleteZone = (z) => {
+    if (!z || z.id == null) return;
+    if (!window.confirm(`${t('Delete zone')} "${z.name}" (${z.barangay})?`)) return;
+    setZoneBusy(true);
+    axios.delete(API_URL + `/api/purok-areas/${z.id}`)
+      .then(() => { setZoneDrawMsg(t('Zone deleted.')); return reloadPurokAreas(); })
+      .catch(err => setZoneDrawMsg((err.response && err.response.data && err.response.data.error) || t('Could not delete the zone.')))
+      .finally(() => setZoneBusy(false));
+  };
 
   // "Show interventions only" - the server already filters warning-linked rows
   // via ?interventions=1, so the map layer just consumes that payload instead of
@@ -2186,6 +2383,75 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     () => zonesToFeatureCollection(zoneHotspots),
     [zoneHotspots]
   );
+
+  // Close-up view: at/above ZONE_FINE_ZOOM each flagged coarse cell is replaced by
+  // the small fine-cell box(es) that actually hold case COORDINATES (subCellsForZone
+  // in zoneHotspots.js), so a Blk 4 cluster reads as a small box ON Blk 4 - not a
+  // slab over its neighbours, and not a box parked at a hashed spot. Units sharing
+  // one fine cell share one box, labelled with both.
+  //
+  // Three cases must not be lost when zooming in:
+  //   - a real (imported/drawn) zone has the right shape already -> drawn whole;
+  //   - an exposure-only zone (rain/flood, no cases yet) has no unit to point at
+  //     -> drawn whole, or it would vanish from the map;
+  //   - a case zone -> drawn as its small fine-cell box(es), with the parent cell
+  //     kept as a faint outline (zoneOutlineFC) for orientation.
+  const zoneZoomView = useMemo(() => {
+    const empty = { type: 'FeatureCollection', features: [] };
+    if (isDisasterMap || !showZones || mapZoom < ZONE_FINE_ZOOM || zoneHotspots.length === 0) {
+      return { active: false, main: empty, outline: empty };
+    }
+    const coarseFeatures = (row) => row.rings.map(ring => ({
+      type: 'Feature',
+      properties: {
+        zoneId: row.id, idx: row.idx, kind: row.kind, score: row.score,
+        barangay: row.barangay, label: row.label,
+      },
+      geometry: { type: 'Polygon', coordinates: [[...ring, ring[0]]] },
+    }));
+
+    const main = [];
+    const outline = [];
+    zoneHotspots.forEach(row => {
+      const feature = findFeatureForBarangay(row.barangay);
+      // One box per fine cell that actually holds cases (units sharing a cell are
+      // merged, and the box is clipped to its own coarse zone). Real zones and
+      // exposure-only zones return [] here -> drawn whole.
+      const subs = row.real ? [] : subCellsForZone(row, feature);
+      if (subs.length === 0) {
+        // Real zone, or a grid zone with nothing to point at (exposure-only):
+        // draw the whole cell, no separate outline needed.
+        main.push(...coarseFeatures(row));
+        return;
+      }
+      outline.push(...coarseFeatures(row));
+      subs.forEach(sc => sc.rings.forEach(ring => {
+        main.push({
+          type: 'Feature',
+          properties: {
+            zoneId: row.id, idx: row.idx, kind: row.kind, score: row.score,
+            barangay: row.barangay, label: row.label, unit: sc.unit,
+            units: sc.units, cases7: sc.cases7, fine: true,
+          },
+          geometry: { type: 'Polygon', coordinates: [[...ring, ring[0]]] },
+        });
+      }));
+    });
+    return {
+      active: true,
+      main: { type: 'FeatureCollection', features: main },
+      outline: { type: 'FeatureCollection', features: outline },
+    };
+  }, [isDisasterMap, showZones, mapZoom, zoneHotspots]);
+
+  // Every stored zone as an editable polygon (CHO edit mode).
+  const zonesForEdit = useMemo(() => {
+    const out = [];
+    Object.entries(purokAreas).forEach(([barangay, list]) => {
+      list.forEach(z => out.push({ id: z.id, name: z.name, barangay, rings: z.rings }));
+    });
+    return out;
+  }, [purokAreas]);
   const zoneCounts = useMemo(() => {
     const counts = { exposure: 0, case: 0, weather: 0, watch: 0 };
     zoneHotspots.forEach(r => { counts[r.kind] = (counts[r.kind] || 0) + 1; });
@@ -2194,37 +2460,54 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
 
   const zoneRowFor = (zoneId) => zoneHotspots.find(r => r.id === zoneId) || null;
 
-  // Step 2 of the zone view (zoom >= ZONE_BREAKDOWN_ZOOM): one chip per location
-  // unit inside a flagged zone, so the zone opens up into WHICH purok/blk has
-  // what. Skipped for units with no coordinates (they still list in the popup).
-  const zoneBreakdownItems = useMemo(() => {
-    if (isDisasterMap || !showZones || mapZoom < ZONE_BREAKDOWN_ZOOM) return [];
-    const out = [];
-    zoneHotspots.forEach(row => {
-      (row.breakdown || []).forEach(b => {
-        if (!b.coords) return;
-        const top = b.diseases[0];
-        out.push({
-          coords: b.coords,
-          color: row.kindMeta.color,
-          label: top ? `${b.unit} · ${top.disease} ${b.cases7}` : b.unit,
-          title: `${row.barangay} · ${row.label} · ${b.unit}`,
-          onClick: () => setZonePopup(row),
-        });
-      });
-    });
-    return out;
-  }, [isDisasterMap, showZones, mapZoom, zoneHotspots]);
+  // The close-up boxes ARE the hotspot presentation from ZONE_FINE_ZOOM up, so
+  // while they are on screen the older unit tiers step aside: no per-unit chips,
+  // no zoom-17 named-area pins, no zoom-18 purok pins. That is what makes the
+  // hotspot map read like a battle-royale zone — only the hotspot itself — and it
+  // is why a barangay-wide pin labelled "Mabitac Phase 1" never shows next to a
+  // Blk 4 hotspot it has nothing to do with.
+  const zoneBoxesOn = zoneZoomView.active;
 
   // Tooltip = plain reading of the zone; click opens the evidence card where the
-  // CHO can log the intervention that answers it.
+  // CHO can log the intervention that answers it. A close-up box gets a PERMANENT
+  // label naming the blk/lot/purok it covers (readable the moment the box appears)
+  // which swaps to the hotspot card while the box is hovered — there is no other
+  // per-unit layer left to hand the reading over to.
   const onEachZone = (feature, layer) => {
     const props = (feature && feature.properties) || {};
     const row = zoneRowFor(props.zoneId);
     if (!row) return;
-    const onlyUnit = row.units.length === 1 && row.units[0] !== 'Unspecified' ? row.units[0] : '';
-    layer.bindTooltip(`${row.barangay} · ${row.label}${onlyUnit ? ' · ' + onlyUnit : ''} — ${t(row.kindMeta.label)}`, { sticky: true });
     layer.on('click', () => setZonePopup(row));
+    if (props.fine) {
+      const units = (props.units || []).filter(u => u && u !== 'Unspecified');
+      const name = units.length > 0 ? units.join(' · ') : row.label;
+      const n = Number(props.cases7) || 0;
+      const label = `${name} · ${n} case${n === 1 ? '' : 's'}`;
+      // Permanent inline label (the unit is readable the moment the box appears)
+      // that SWAPS to the hotspot card while the box is hovered. The box is in its
+      // own pane above the choropleth, so this hover is what the user gets — the
+      // barangay hover card can no longer steal it.
+      const card = `${row.rapid ? '🚨 ' : ''}${row.barangay} · ${row.label}`
+        + `${row.disease ? ` - ${row.disease} · ${n} case${n === 1 ? '' : 's'} in 7 days` : ` - ${t(row.kindMeta.label)}`}`;
+      layer.bindTooltip(label, {
+        permanent: true, direction: 'top', offset: [0, -3], className: 'zone-fine-label',
+      });
+      layer.on('mouseover', () => {
+        const tip = layer.getTooltip && layer.getTooltip();
+        const el = tip && tip.getElement && tip.getElement();
+        if (el) el.classList.add('is-hover');
+        layer.setTooltipContent(card);
+      });
+      layer.on('mouseout', () => {
+        const tip = layer.getTooltip && layer.getTooltip();
+        const el = tip && tip.getElement && tip.getElement();
+        if (el) el.classList.remove('is-hover');
+        layer.setTooltipContent(label);
+      });
+      return;
+    }
+    const onlyUnit = row.units.length === 1 && row.units[0] !== 'Unspecified' ? row.units[0] : '';
+    layer.bindTooltip(`${row.barangay} · ${row.label}${onlyUnit ? ' · ' + onlyUnit : ''} - ${t(row.kindMeta.label)}`, { sticky: true });
   };
 
   // Hand the zone's evidence to the shared InterventionModal (remarks required,
@@ -2274,7 +2557,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         svg: hazardSvgMarkup(off ? '⚠️' : '☁️', off ? '#f59e0b' : '#94a3b8', 38, off ? 'Off' : 'Clear'),
         count: 0,
         color: off ? '#f59e0b' : '#94a3b8',
-        title: off ? `${name} — Weather offline` : `${name} — No active weather hazard`,
+        title: off ? `${name} - Weather offline` : `${name} - No active weather hazard`,
         size: 38,
         z: 1500,
         above: hazardBadgeLift(barangayCaseCount[wxKey(name)] || 0, 38, false),
@@ -2298,7 +2581,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       svg: hazardSvgIcon(mainType, 38),
       count: pinCount,
       color: hazardColor(mainType),
-      title: `${name} — ${details.join(' · ')}${diseaseHint}`,
+      title: `${name} - ${details.join(' · ')}${diseaseHint}`,
       size: 38,
       z: 1500,
       above: hazardBadgeLift(barangayCaseCount[wxKey(name)] || 0, 38, pinCount > 0),
@@ -2420,7 +2703,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       size: INTERVENTION_PIN_SIZE,
       color,
       z: 1700,
-      title: `${glyph} ${a.action_type} · ${translateActionStatus(a.status)}${disease ? ` · ${disease}` : ''}${a.description ? ` — ${a.description}` : ''}`,
+      title: `${glyph} ${a.action_type} · ${translateActionStatus(a.status)}${disease ? ` · ${disease}` : ''}${a.description ? ` - ${a.description}` : ''}`,
       onClick: () => openBarangayPopup(name),
     };
   });
@@ -2450,7 +2733,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         svg: hazardSvgMarkup('⚠️', '#D97706', 34, 'Warn'),
         count: 0,
         color: '#D97706',
-        title: `${name} — ${alert.disease_name} warning (${alert.alert_value} cases): no intervention logged yet`,
+        title: `${name} - ${alert.disease_name} warning (${alert.alert_value} cases): no intervention logged yet`,
         size: 34,
         z: 1600,
         above: hazardStack || hazardBadgeLift(barangayCaseCount[k] || 0, 34, false),
@@ -2490,7 +2773,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         // centroid must clear the tall barangay pin or it buries the case number.
         // The disc always renders a count pill, so hasPill is true.
         above: hazardBadgeLift(barangayCaseCount[k] || 0, OUTBREAK_PIN_SIZE, true),
-        title: `🚨 ${name} — rapid ${top.disease_name} outbreak: ${top.alert_value} cases in the last 5 days. Tap to see the purok/blk breakdown and log an intervention.`,
+        title: `🚨 ${name} - rapid ${top.disease_name} outbreak: ${top.alert_value} cases in the last 5 days. Tap to see the purok/blk breakdown and log an intervention.`,
         onClick: () => openBarangayPopup(name),
       });
     });
@@ -2529,7 +2812,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       coords: p.coords,
       svg: hazardSvgIcon(w.hazards[0], 32),
       color: hazardColor(w.hazards[0]),
-      title: `${p.purok || p.barangay} — ${w.hazards.join(', ')}${diseases.length ? ` · Possible: ${diseases.join(', ')}` : ''}`,
+      title: `${p.purok || p.barangay} - ${w.hazards.join(', ')}${diseases.length ? ` · Possible: ${diseases.join(', ')}` : ''}`,
       size: 32,
       above: hazardBadgeLift(p.totalCases),
       z: 1500,
@@ -2652,7 +2935,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     })),
   ];
   const hazardBarangayOptions = [
-    { value: '', label: '—' },
+    { value: '', label: '-' },
     ...scopedBarangayEntries.map(([id, name]) => ({ value: id, label: name })),
   ];
   const hazardTypeOptions = DISASTER_EVENT_TYPES.map(x => ({ value: x, label: `${hazardIcon(x)} ${x}` }));
@@ -3391,6 +3674,59 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               </label>
             </div>
 
+            {/* Custom zones (CHO): draw a zone on the map instead of relying on the
+                auto grid. A barangay with drawn zones uses those polygons, so the
+                drawn shape is what the hotspot detection and shading follow. */}
+            {isCho && showZones && (
+              <div style={{ borderTop: '1px dashed var(--border-color)', paddingTop: '8px', marginBottom: '8px' }}>
+                <p style={{ margin: '0 0 6px 0', fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('Custom Zones')}</p>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  <button onClick={() => { setZoneEditOn(false); setZoneDrawMsg(''); setZoneDrawOn(v => !v); }}
+                    disabled={offlineMode}
+                    title={offlineMode ? t('Unavailable offline') : ''}
+                    style={{ flex: '1 1 auto', padding: '7px 10px', borderRadius: '8px', border: `1px solid ${zoneDrawOn ? '#dc2626' : 'var(--border-color)'}`, background: zoneDrawOn ? '#dc2626' : 'var(--input-bg)', color: zoneDrawOn ? '#fff' : 'var(--text-main)', fontSize: '12px', fontWeight: '700', cursor: offlineMode ? 'not-allowed' : 'pointer' }}>
+                    {zoneDrawOn ? t('✕ Cancel drawing') : t('✏️ Draw Zone')}
+                  </button>
+                  <button onClick={() => { setZoneDrawOn(false); setZoneEditOn(v => !v); }}
+                    title={t('Drag the corner points of a zone to reshape it')}
+                    style={{ flex: '1 1 auto', padding: '7px 10px', borderRadius: '8px', border: `1px solid ${zoneEditOn ? '#0891b2' : 'var(--border-color)'}`, background: zoneEditOn ? '#0891b2' : 'var(--input-bg)', color: zoneEditOn ? '#fff' : 'var(--text-main)', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+                    {zoneEditOn ? t('✓ Done editing') : t('✏️ Edit zone shapes')}
+                  </button>
+                </div>
+                {zoneDrawOn && (
+                  <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: '#dc2626', lineHeight: 1.4 }}>
+                    {t('Click on the map to place the corners, then click the first point (or double-click) to close the shape.')}
+                  </p>
+                )}
+                {zoneEditOn && (
+                  <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: '#0891b2', lineHeight: 1.4 }}>
+                    {t('Drag any cyan corner point to reshape that zone. Changes save automatically.')}
+                  </p>
+                )}
+                {zoneDrawMsg && (
+                  <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.4 }}>{zoneDrawMsg}</p>
+                )}
+                {zonesForEdit.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
+                    {zonesForEdit.slice(0, 8).map(z => (
+                      <div key={`${z.barangay}|${z.id}`} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 8px', borderRadius: '6px', background: 'var(--input-bg)', border: '1px solid var(--border-color)' }}>
+                        <span style={{ flex: 1, minWidth: 0, fontSize: '12px', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          🗺 {z.name} <span style={{ color: 'var(--text-muted)' }}>· {z.barangay}</span>
+                        </span>
+                        <button onClick={() => renameZone(z)} disabled={zoneBusy}
+                          style={{ padding: '2px 6px', borderRadius: '5px', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-muted)', cursor: zoneBusy ? 'not-allowed' : 'pointer', fontSize: '12px' }}>✎</button>
+                        <button onClick={() => deleteZone(z)} disabled={zoneBusy}
+                          style={{ padding: '2px 6px', borderRadius: '5px', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--warning-text)', cursor: zoneBusy ? 'not-allowed' : 'pointer', fontSize: '12px' }}>🗑</button>
+                      </div>
+                    ))}
+                    {zonesForEdit.length > 8 && (
+                      <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-muted)' }}>+{zonesForEdit.length - 8} {t('more zones')}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {!showZones ? (
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
                 {t('Zone shading is hidden.')}
@@ -3515,7 +3851,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                     const disease = a.target_disease || a.alert_disease || '';
                     return (
                       <button key={a.id} onClick={() => openBarangayPopup(name)}
-                        title={`${a.action_type} · ${name}${disease ? ` · ${disease}` : ''}${a.description ? ` — ${a.description}` : ''}`}
+                        title={`${a.action_type} · ${name}${disease ? ` · ${disease}` : ''}${a.description ? ` - ${a.description}` : ''}`}
                         style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '6px 9px', borderRadius: '7px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', cursor: 'pointer', textAlign: 'left', font: 'inherit' }}>
                         <span>{ACTION_TYPE_ICONS[a.action_type] || '🗂'}</span>
                         <span style={{ flex: 1, minWidth: 0, fontSize: '13px', fontWeight: '600', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t(a.action_type)} · {name}{disease ? ` · ${disease}` : ''}</span>
@@ -3663,10 +3999,13 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               badges and hazards are hidden so the map shows the intervention pins
               themselves (barangay outlines stay for orientation). */}
           {!interventionsOnly && mapZoom === 19 && <CaseDotMarkers key="case-dot-markers" cases={mapCases} zoom={mapZoom} t={t} translateStatus={translateStatus} />}
-          {!interventionsOnly && mapZoom === 18 && purokData.length > 0 && zoneBreakdownItems.length === 0 && (
+          {/* Close-up hotspot boxes replace the older unit tiers: while a box is on
+              screen the named-area pins (17) and the purok pins (18) step aside, so
+              the hotspot map shows the hotspot and nothing else. */}
+          {!interventionsOnly && !zoneBoxesOn && mapZoom === 18 && purokData.length > 0 && (
             <PulseMarkers key="unit-pins" barangayData={purokData} onHover={setTooltip} onLeave={() => setTooltip(null)} onClick={setPopup} />
           )}
-          {!interventionsOnly && mapZoom === 17 && purokData.length > 0 && pinnedBarangay && (
+          {!interventionsOnly && !zoneBoxesOn && mapZoom === 17 && purokData.length > 0 && pinnedBarangay && (
             <AreaPins key="area-pins" groups={purokData} barangay={pinnedBarangay} onHover={setTooltip} onLeave={() => setTooltip(null)} onClick={setPopup} />
           )}
           {!interventionsOnly && mapZoom < 17 && <BarangayPins key="barangay-pins" barangayData={barangayData} onHover={setTooltip} onLeave={() => setTooltip(null)} onClick={setPopup} loginRole={loginRole} />}
@@ -3679,7 +4018,6 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           {isDisasterMap && showDisasterLayer && !interventionsOnly && mapZoom < 17 && <LayerBadgeMarkers key="layer-hazards-badges" items={hazardBadgeItems} />}
           {isDisasterMap && showDisasterLayer && !interventionsOnly && mapZoom >= 17 && <LayerBadgeMarkers key="layer-hazards-pins" items={hazardPinItems} />}
           {interventionsOnly && <LayerBadgeMarkers key="layer-interventions" items={interventionPinItems} />}
-          {zoneBreakdownItems.length > 0 && <ZoneBreakdownMarkers key="zone-breakdown" items={zoneBreakdownItems} />}
           <GeoJSON
               key="brgy-geojson"
               ref={geoJsonLayerRef}
@@ -3728,21 +4066,44 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               barangays, flagged or not, so the zone proxy is visible. Drawn
               under the flagged zones (Leaflet paints in mount order). */}
           {!isDisasterMap && showZones && showAllZoneCells && allZoneCellsFC.features.length > 0 && (
-            <GeoJSON key="zone-grid" data={allZoneCellsFC} style={getGridStyle} interactive={false} />
+            <GeoJSON key="zone-grid" data={allZoneCellsFC} style={getGridStyle} interactive={false} pane="zonePane" />
           )}
           {/* Phase 1 zone (purok-level) overlay - drawn last so its shading sits
               above the barangay choropleth. It carries the flagged zones' colour;
               the choropleth keeps its own case-count fill (see getGeoJsonStyle),
               which drops to outline only when a single barangay is focused or for
               a BHW. Pins live in Leaflet's marker pane, so they stay on top of
-              the shaded zones automatically. */}
+              the shaded zones automatically.
+              Zoomed in past ZONE_FINE_ZOOM the coarse cell steps back to a faint
+              outline and the small fine-cell boxes carry the colour instead.
+              All three layers sit in the dedicated `zonePane` (see CreateTopPane):
+              the choropleth's bringToFront() only reorders paths inside its OWN
+              pane, so a barangay hover can never bury a hotspot box and steal its
+              hover/click. */}
+          {!isDisasterMap && showZones && zoneHotspots.length > 0 && zoneZoomView.active && zoneZoomView.outline.features.length > 0 && (
+            <GeoJSON
+              key={`zone-coarse-outline-${mapZoom}-${zoneHotspots.map(r => `${r.id}:${r.kind}`).join(',')}`}
+              data={zoneZoomView.outline}
+              style={getZoneOutlineStyle}
+              interactive={false}
+              pane="zonePane"
+            />
+          )}
           {!isDisasterMap && showZones && zoneHotspots.length > 0 && (
             <GeoJSON
-              key={`zone-hotspots-${mapZoom >= ZONE_BREAKDOWN_ZOOM ? 'bd' : 'zone'}-${zoneHotspots.map(r => `${r.id}:${r.kind}`).join(',')}`}
-              data={zoneFeatureCollection}
-              style={(feature) => getZoneStyle(feature, mapZoom)}
+              key={`zone-hotspots-${zoneZoomView.active ? 'fine' : 'zone'}-${zoneHotspots.map(r => `${r.id}:${r.kind}`).join(',')}`}
+              data={zoneZoomView.active ? zoneZoomView.main : zoneFeatureCollection}
+              style={getZoneStyle}
               onEachFeature={onEachZone}
+              pane="zonePane"
             />
+          )}
+          {/* CHO custom-zone drawing / reshaping on the Hotspot map. */}
+          {!isDisasterMap && isCho && (
+            <ZoneDrawControl drawOn={zoneDrawOn} onCreated={handleZoneCreated} />
+          )}
+          {!isDisasterMap && isCho && (
+            <ZoneEditLayer editOn={zoneEditOn} zones={zonesForEdit} onCommit={handleZoneCommit} />
           )}
         </MapContainer>
 
@@ -4258,7 +4619,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               {!popupWeather && popupManualEvents.length === 0 && (popupWxRaw || weatherOffline) && (
                 <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--border-color)', fontSize: '12px', color: 'var(--text-muted)' }}>
                   {popupWxRaw && popupWxRaw.error === 'offline'
-                    ? `🌦 ${WEATHER_ATTRIBUTION} — ${t('offline')}`
+                    ? `🌦 ${WEATHER_ATTRIBUTION} - ${t('offline')}`
                     : `☁️ ${t('No active weather hazard')} · ${WEATHER_ATTRIBUTION}`}
                 </div>
               )}
@@ -4556,7 +4917,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                   <div style={{ position: 'relative' }}>
                     <button type="button" className="mc-custom-dropdown-btn" style={{ width: '100%', fontSize: '14px' }}
                       onClick={() => setManageDD(manageDD === 'h:brgy' ? null : 'h:brgy')}>
-                      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{barangayIdMap[hazardForm.barangay_id] || '—'}</span>
+                      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{barangayIdMap[hazardForm.barangay_id] || '-'}</span>
                       <span style={{ marginLeft: '6px', opacity: 0.6, transition: 'transform 0.2s', display: 'inline-block', flexShrink: 0, transform: manageDD === 'h:brgy' ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                     </button>
                     {manageDD === 'h:brgy' && (
@@ -4966,6 +5327,51 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           onClose={() => setInterventionCtx(null)}
           onSaved={reloadMapActions}
         />
+
+        {/* ── NEW CUSTOM ZONE DIALOG ── names and files the polygon just drawn on
+            the map. The shape is already captured; this only picks the barangay
+            and the label the cases will match against. */}
+        {zoneDraft && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+            <div style={{ width: '100%', maxWidth: '420px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '20px', boxShadow: '0 12px 40px rgba(0,0,0,0.4)' }}>
+              <h3 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: '700', color: 'var(--text-main)' }}>🗺 {t('New Custom Zone')}</h3>
+              <p style={{ margin: '0 0 14px 0', fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                {t('Name the zone after the purok/blk so cases match it by address, then optionally drag the corners in Edit mode to fine-tune the shape.')}
+              </p>
+
+              <label style={{ display: 'block', marginBottom: '10px' }}>
+                <span style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: '600', color: 'var(--text-muted)' }}>{t('Barangay')}</span>
+                <select value={zoneDraft.barangayId} onChange={e => setZoneDraft({ ...zoneDraft, barangayId: e.target.value })}
+                  style={{ width: '100%', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '9px 10px', fontSize: '14px' }}>
+                  <option value="">{t('Select a barangay')}</option>
+                  {barangayOptions.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              </label>
+
+              <label style={{ display: 'block', marginBottom: '14px' }}>
+                <span style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: '600', color: 'var(--text-muted)' }}>{t('Zone name')}</span>
+                <input value={zoneDraft.name} onChange={e => setZoneDraft({ ...zoneDraft, name: e.target.value })}
+                  placeholder={t('e.g. Blk 4')}
+                  style={{ width: '100%', background: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '9px 10px', fontSize: '14px' }} />
+              </label>
+
+              {zoneDrawMsg && (
+                <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: 'var(--warning-text)', lineHeight: 1.4 }}>{zoneDrawMsg}</p>
+              )}
+
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                <button onClick={() => { setZoneDraft(null); setZoneDrawOn(false); setZoneDrawMsg(''); }}
+                  style={{ padding: '9px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-main)', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}>
+                  {t('Cancel')}
+                </button>
+                <button onClick={saveZoneDraft} disabled={zoneBusy}
+                  style={{ padding: '9px 16px', borderRadius: '8px', border: 'none', background: '#0891b2', color: '#fff', cursor: zoneBusy ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: '700' }}>
+                  {zoneBusy ? t('Saving...') : t('Save Zone')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
