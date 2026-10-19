@@ -1029,6 +1029,10 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
                                      // CHO/BHW lands straight on the surge.
                                      if (n.type === 'outbreak') {
                                        setPendingMapFocus({ mode: 'hotspot', barangayId: n.reference_id || null });
+                                     } else if (n.type === 'exposure') {
+                                       // An environmental (blue-zone) advisory opens the
+                                       // DISASTER map, where the water/environment layer is.
+                                       setPendingMapFocus({ mode: 'disaster', barangayId: n.reference_id || null });
                                      }
                                      setActiveTab('Map View');
                                    } else {

@@ -162,7 +162,81 @@ const fil = {
   'Disease Warning': 'Babala sa Sakit', 'Disease warning': 'Babala sa sakit', 'Intervention logged': 'Naitala ang interbensyon', 'Answers': 'Sinagot', 'Disease Warning Interventions': 'Mga Interbensyon sa Babala ng Sakit', 'No flagged disease counts in this scope.': 'Walang na-flag na bilang ng sakit sa saklaw na ito.', 'warnings answered': 'babala ang nasagot', 'Flagged barangays with no intervention logged yet.': 'Mga na-flag na barangay na wala pang naitalang interbensyon.', 'Flagged barangays with at least one intervention logged.': 'Mga na-flag na barangay na may hindi bababa sa isang naitalang interbensyon.', 'Show interventions only': 'Ipakita lamang ang mga interbensyon', 'week of': 'linggo ng', 'No interventions logged in this scope yet.': 'Wala pang naitalang interbensyon sa saklaw na ito.', 'Philippine Seasons': 'Mga Panahon sa Pilipinas', 'Rainy Season': 'Tag-ulan', 'Summer (Hot Dry Season)': 'Tag-init (Mainit na Tuyong Panahon)', 'Cool Dry Season': 'Malamig na Tuyong Panahon', 'now': 'ngayon', 'June to November': 'Hunyo hanggang Nobyembre', 'March to May': 'Marso hanggang Mayo', 'December to February': 'Disyembre hanggang Pebrero', 'Cabuyao, Laguna follows the PAGASA tropical seasons: rainy June to November, cool dry December to February, hot dry (summer) March to May.': 'Ang Cabuyao, Laguna ay sumusunod sa mga tropikal na panahon ng PAGASA: tag-ulan Hunyo hanggang Nobyembre, malamig na tuyo Disyembre hanggang Pebrero, mainit na tuyo (tag-init) Marso hanggang Mayo.', 'Pins are at barangay level (approximate position). Citywide interventions have no pin - they have no single location.': 'Ang mga pin ay nasa antas ng barangay (tinatayang lokasyon). Ang mga interbensyong pang-lungsod ay walang pin - wala silang iisang lokasyon.',
 };
 
+// ── Water & environmental risk (blue zones) ──
+Object.assign(fil, {
+  'Weather & Environmental Risk': 'Panahon at Panganib sa Kapaligiran',
+  'Blue zone': 'Bughaw na sona',
+  'Blue zones': 'Mga bughaw na sona',
+  'Blue Zone (environmental risk)': 'Bughaw na Sona (panganib sa kapaligiran)',
+  'Not a blue zone': 'Hindi bughaw na sona',
+  'Forced blue': 'Pinilit na bughaw',
+  'Forced not blue': 'Pinilit na hindi bughaw',
+  'Use computed': 'Gamitin ang kinalkula',
+  'Force blue': 'Pilitin ang bughaw',
+  'Force not blue': 'Pilitin ang hindi bughaw',
+  'Environmental Risk': 'Panganib sa Kapaligiran',
+  'Environmental Risk Advisory': 'Abiso sa Panganib sa Kapaligiran',
+  'Environmental exposure advisory': 'Abiso sa pagkasangkapan sa kapaligiran',
+  'Environmental Health Advisory': 'Abiso sa Kalusugang Pangkapaligiran',
+  'Red / Blue by barangay': 'Pula / Bughaw ayon sa barangay',
+  'Both': 'Pareho',
+  'Red zone': 'Pulang sona',
+  'Watch for': 'Bantayan',
+  'Near Laguna de Bay': 'Malapit sa Laguna de Bay',
+  'Near / inside a large water body': 'Malapit / nasa loob ng malaking anyong tubig',
+  'Flood-prone (rain / flood)': 'Madaling bahain (ulan / baha)',
+  'Extreme heat': 'Sobrang init',
+  'Water body': 'Anyong tubig',
+  'Heat': 'Init',
+  'Blue zones follow the real purok boundaries supplied by the City where available, and the purok-level grid cell otherwise. A zone turns blue when its own water (Laguna de Bay / a large body), 24h/72h rain or an active flood pin reaches it.': 'Ang mga bughaw na sona ay sumusunod sa tunay na hangganan ng purok na ibinigay ng Lungsod kung mayroon, at sa grid cell ng purok kung wala. Nagiging bughaw ang isang sona kapag umabot dito ang sarili nitong tubig (Laguna de Bay / malaking anyong tubig), 24h/72h na ulan o aktibong flood pin.',
+  'Blue zones are the purok-level grid cell each case snaps to. A zone turns blue when its own water (Laguna de Bay / a large body), 24h/72h rain or an active flood pin reaches it.': 'Ang mga bughaw na sona ay ang grid cell sa antas ng purok kung saan naka-snap ang bawat kaso. Nagiging bughaw ang isang sona kapag umabot dito ang sarili nitong tubig (Laguna de Bay / malaking anyong tubig), 24h/72h na ulan o aktibong flood pin.',
+  'No zone has crossed a water, rain or flooding threshold in this scope.': 'Walang sona ang lumampas sa hangganan ng tubig, ulan o baha sa saklaw na ito.',
+  'Water & Environmental Risk': 'Panganib sa Tubig at Kapaligiran',
+  'Blue zones — water / heat exposure, and the BHW advisory': 'Mga bughaw na sona — tubig / init, at ang abiso sa BHW',
+  'Source': 'Pinagmulan',
+  'bundled water features': 'nakapaloob na anyong tubig',
+  'large bodies': 'malalaking anyong tubig',
+  'added by hand': 'idinagdag nang manu-mano',
+  '🔄 Recompute from the map engine': '🔄 Muling kalkulahin mula sa engine ng mapa',
+  'Working...': 'Gumagawa...',
+  'No water-risk verdict stored yet. Use Recompute to build it from the map engine.': 'Wala pang nakaimbak na hatol sa panganib sa tubig. Gamitin ang Muling kalkulahin upang buuin ito mula sa engine ng mapa.',
+  'Buffer (m)': 'Buffer (m)',
+  'No environmental driver detected.': 'Walang natukoy na dahlian sa kapaligiran.',
+  'Add a Water Feature': 'Magdagdag ng Anyong Tubig',
+  'Barangay (optional)': 'Barangay (opsyonal)',
+  'Name (e.g. Pond beside covered court)': 'Pangalan (hal. Lawa sa tabi ng covered court)',
+  'Radius (m)': 'Radyus (m)',
+  '💧 Add water feature': '💧 Magdagdag ng anyong tubig',
+  'unassigned': 'walang nakatalaga',
+  '✅ Recomputed water & environmental risk for ': '✅ Naikalkula muli ang panganib sa tubig at kapaligiran para sa ',
+  '✅ Water feature added. Recompute to apply it to the map and the advisory.': '✅ Naidagdag ang anyong tubig. Muling kalkulahin upang mailapat ito sa mapa at sa abiso.',
+  'Water feature deleted. Recompute to apply.': 'Nabura ang anyong tubig. Muling kalkulahin upang mailapat.',
+  'Override saved.': 'Nai-save ang override.',
+  'Could not add the water feature.': 'Hindi maidagdag ang anyong tubig.',
+  'Give the water feature a name.': 'Bigyan ng pangalan ang anyong tubig.',
+  'Enter the latitude and longitude of the water feature.': 'Ilagay ang latitude at longitude ng anyong tubig.',
+  'No barangays matched.': 'Walang tumugmang barangay.',
+  'Recompute failed.': 'Nabigo ang muling pagkalkula.',
+  'Delete water feature "': 'Burahin ang anyong tubig "',
+});
+
+// ── Water & environmental risk: Dashboard card + export labels ──
+Object.assign(fil, {
+  'Environmental driver': 'Dahlian sa kapaligiran',
+  'Environmental driver present': 'May dahlian sa kapaligiran',
+  'None present': 'Wala pang kaso',
+  'environment favours': 'pinapaboran ng kapaligiran',
+  'Environment favours': 'Pinapaboran ng kapaligiran',
+  'barangays are blue zones': 'barangay ang mga bughaw na sona',
+  'with a matching disease': 'may katugmang sakit',
+  'Run the water-risk recompute in Settings to build this view.': 'Patakbuhin ang muling pagkalkula ng panganib sa tubig sa Settings upang mabuo ang view na ito.',
+  'No water-risk verdict stored yet.': 'Wala pang nakaimbak na hatol sa panganib sa tubig.',
+  'No barangay in scope is a blue zone right now.': 'Walang barangay sa saklaw ang bughaw na sona ngayon.',
+  'Blue-zone barangays (near Laguna de Bay / a large water body, flood-prone or under extreme heat) and the water-/heat-borne diseases already present there this period.': 'Ang mga barangay na bughaw na sona (malapit sa Laguna de Bay / malaking anyong tubig, madaling bahain o sobrang init) at ang mga sakit na dala ng tubig/init na naroroon na sa panahong ito.',
+});
+
 export const dictionaries = { en, fil };
+
 
 export const langNames = {
   en: 'English', fil: 'Filipino'

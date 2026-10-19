@@ -25,7 +25,8 @@ import { precacheTiles } from './mapTileCache';
 import EpiPanel from './epiStats';
 // Phase 1 zone (purok-level) hotspots: the 3x2 grid cell a case already snaps to
 // is treated as a "zone" so flooding can be related to case clustering.
-import { buildZoneHotspots, zonesToFeatureCollection, ZONE_KINDS, FLOOD_EVENT_TYPES, RAINY_SEASON_DISEASES, zonesForBarangay, zoneIndexForUnit, resolveZoneIdx, ZONE_PRESETS, DEFAULT_ZONE_SENSITIVITY, purokRowsToAreas, purokIdxForUnit, subCellsForZone } from './zoneHotspots';
+import { buildZoneHotspots, zonesToFeatureCollection, ZONE_KINDS, ZONE_MODE_KINDS, zoneKindFitsMode, FLOOD_EVENT_TYPES, RAINY_SEASON_DISEASES, zonesForBarangay, zoneIndexForUnit, resolveZoneIdx, ZONE_PRESETS, DEFAULT_ZONE_SENSITIVITY, purokRowsToAreas, purokIdxForUnit, subCellsForZone } from './zoneHotspots';
+import { waterDriversForFeature, waterDriversForRings, heatDriverFor, waterDriverLabel, waterDriverReason, waterProneDiseases, WATER_DRIVER_ICONS, WATER_BODIES, WATER_DRIVER_ORDER, buildWaterIndex, mergeWaterFeatures } from './waterRisk';
 import { ACTION_TYPES, ACTION_TYPE_ICONS, ACTION_STATUSES, DISASTER_EVENT_TYPES, DISASTER_SEVERITIES, SEVERITY_COLORS, hazardIcon, hazardDiseases, hazardColor, hazardSvgMarkup, hazardSvgIcon, isDisasterActive, getDisasterWatch, WEATHER_ATTRIBUTION } from './disasterRisk';
 import { RISK_FACTOR_GROUPS, parseRiskFactors, riskFactorLabel } from './riskFactors';
 import { seasonForMonth, seasonalDiseases } from './seasonalDiseases';
@@ -333,6 +334,12 @@ const findFeatureForBarangay = (barangayName) => {
     return norm(mapped) === n;
   }) || null;
 };
+
+// Water / environmental drivers per barangay are derived from the bundled OSM
+// asset plus the CHO's manual water features. The merged index is built once per
+// manual-set change (see `waterDriversByName` in MapView) instead of re-running
+// waterRisk.js's ring-sampling for all 18 barangays on every map re-render (zoom,
+// hover, poll).
 
 // Display snap: keep a case's stored coordinates when they sit inside the
 // case's own barangay polygon (the same shapes the choropleth renders);
@@ -745,6 +752,20 @@ if (!document.getElementById('cdms-barangay-labels')) {
     .cdms-barangay-pin .pin-label-tag {
       display: none;
     }
+    /* The two themed maps shrink the case pins + the permanent barangay name box
+       so the layers they add stay readable. Driven by a class on the map area, so
+       toggling a mode re-styles instantly without rebinding any tooltip. */
+    .cdms-map-mode-disaster .brgy-tooltip-label {
+      padding: 3px 5px !important;
+      border-radius: 5px !important;
+    }
+    .cdms-map-mode-disaster .brgy-tooltip-label .brgy-name { font-size: 9px; }
+    .cdms-map-mode-disaster .brgy-tooltip-label .brgy-disease { font-size: 7.5px; margin-top: 0; }
+    .cdms-map-mode-disaster .brgy-tooltip-label .brgy-risk { font-size: 7px; margin-top: 0; }
+    .cdms-map-mode-hotspot .brgy-tooltip-label { padding: 3px 6px !important; }
+    .cdms-map-mode-hotspot .brgy-tooltip-label .brgy-name { font-size: 10.5px; }
+    .cdms-map-mode-hotspot .brgy-tooltip-label .brgy-disease { font-size: 9px; }
+    .cdms-map-mode-hotspot .brgy-tooltip-label .brgy-risk { font-size: 8px; }
   `;
   document.head.appendChild(ls);
 }
@@ -835,7 +856,11 @@ const escapeHtmlBasic = (s) =>
 
 // Shared SVG pin maker: white counter on a colored teardrop, optional small
 // label tag underneath (used by per-unit pins, area pins and barangay pins).
-const getPinSize = (count) => Math.max(40, Math.min(76, 28 + count * 1.8));
+// `scale` < 1 shrinks the whole pin on the Disaster / Hotspot maps (see the
+// `pinScale` value in the MapView body); the default 1 is the plain
+// "just cases" view.
+const getPinSize = (count, scale = 1) =>
+  Math.round(Math.max(40, Math.min(76, 28 + count * 1.8)) * (scale > 0 ? scale : 1));
 
 // Lift (px) that keeps a hazard badge fully clear of the pin beneath it.
 // Pins anchor at their tip and grow upward as the case count rises, so a fixed
@@ -845,12 +870,27 @@ const getPinSize = (count) => Math.max(40, Math.min(76, 28 + count * 1.8));
 // is the visible breathing room; keep it small or the dot reads as detached from
 // its pin. Tuned down from 6 after the badges proved to sit too high.
 const HAZARD_BADGE_GAP = 2;
-const hazardBadgeLift = (count, size = 32, hasPill = false) => {
-  const pinH = Math.round(getPinSize(Number(count) || 0) * 44 / 34);
+const hazardBadgeLift = (count, size = 32, hasPill = false, pinScale = 1) => {
+  const pinH = Math.round(getPinSize(Number(count) || 0, pinScale) * 44 / 34);
   const discCentre = hasPill ? (size / 2) + 8 : size / 2;
   const badgeH = hasPill ? size + 12 : size;
   return pinH + badgeH + HAZARD_BADGE_GAP - discCentre;
 };
+
+// Size of the weather/hazard disc the Disaster map always draws on a barangay
+// centroid (one per barangay in scope, hazard or not).
+const HAZARD_DISC_SIZE = 38;
+
+// Lift for a SECOND badge that has to sit above that hazard disc instead of on
+// top of it. Purely derived geometry - the hazard disc's own lift, plus the
+// height it actually renders (it grows by 12px when it carries a count pill),
+// plus the same gap - so a pill-carrying hazard pushes the next disc up too.
+// Never replace this with a fixed offset: the pill appears/disappears with the
+// weather, and a hardcoded number parks the upper disc back on the lower one.
+const hazardStackLift = (count, hazardPill, pinScale = 1) =>
+  hazardBadgeLift(count, HAZARD_DISC_SIZE, hazardPill, pinScale)
+    + (hazardPill ? HAZARD_DISC_SIZE + 12 : HAZARD_DISC_SIZE)
+    + HAZARD_BADGE_GAP;
 
 // Human labels for the server epi_alerts.alert_type values shown on the popup
 // warning banner and on any intervention that answers one.
@@ -860,10 +900,11 @@ const ALERT_KIND_LABELS = {
   rapid_outbreak: 'Rapid outbreak warning',
   mortality: 'Mortality warning',
   hazard_disease: 'Hazard-linked disease warning',
+  environmental_exposure: 'Environmental exposure advisory',
 };
 
-const createPinIcon = ({ count, color, label = null, className = '' }) => {
-  const size = getPinSize(count);
+const createPinIcon = ({ count, color, label = null, className = '', scale = 1 }) => {
+  const size = getPinSize(count, scale);
   const w = size;
   const h = Math.round(size * 44 / 34);
   const hasLabel = !!(label && String(label) !== 'Unspecified');
@@ -888,7 +929,7 @@ const createPinIcon = ({ count, color, label = null, className = '' }) => {
   });
 };
 
-function PulseMarkers({ barangayData, onHover, onLeave, onClick }) {
+function PulseMarkers({ barangayData, onHover, onLeave, onClick, pinScale = 1 }) {
   const map = useMap();
   const markersRef = useRef([]);
 
@@ -901,7 +942,7 @@ function PulseMarkers({ barangayData, onHover, onLeave, onClick }) {
       const dcount = b.diseases || {};
       const top = Object.entries(dcount).sort((a, b2) => b2[1] - a[1])[0];
       const color = top ? getDiseaseColor(top[0]) : '#374151';
-      const icon = createPinIcon({ count: b.totalCases, color, label: b.purok });
+      const icon = createPinIcon({ count: b.totalCases, color, label: b.purok, scale: pinScale });
 
       const m = L.marker(b.coords, { icon, zIndexOffset: 1000 }).addTo(map);
       m.on('mouseover', () => onHover(b));
@@ -911,7 +952,7 @@ function PulseMarkers({ barangayData, onHover, onLeave, onClick }) {
     });
 
     return () => { markersRef.current.forEach(m => m.remove()); };
-  }, [barangayData, map]);
+  }, [barangayData, map, pinScale]);
 
   return null;
 }
@@ -956,7 +997,7 @@ function buildAreaTierItems(groups, barangay) {
 // T2 (zoom 17): one pin per named area (Phase/Mabitac/Southville),
 // each collecting the blk/lot/purok units nearest to it. Barangays without any
 // named area fall back to a single pin at the barangay's centre with the total.
-function AreaPins({ groups, barangay, onHover, onLeave, onClick }) {
+function AreaPins({ groups, barangay, onHover, onLeave, onClick, pinScale = 1 }) {
   const map = useMap();
   const markersRef = useRef([]);
 
@@ -1003,7 +1044,7 @@ function AreaPins({ groups, barangay, onHover, onLeave, onClick }) {
       const dcount = b.diseases || {};
       const top = Object.entries(dcount).sort((a, b2) => b2[1] - a[1])[0];
       const color = top ? getDiseaseColor(top[0]) : '#374151';
-      const icon = createPinIcon({ count: b.totalCases, color, label: b.purok });
+      const icon = createPinIcon({ count: b.totalCases, color, label: b.purok, scale: pinScale });
       const m = L.marker(b.coords, { icon, zIndexOffset: 1000 }).addTo(map);
       m.on('mouseover', () => onHover(b));
       m.on('mouseout',  () => onLeave());
@@ -1012,7 +1053,7 @@ function AreaPins({ groups, barangay, onHover, onLeave, onClick }) {
     });
 
     return () => { markersRef.current.forEach(m => m.remove()); };
-  }, [groups, barangay, map]);
+  }, [groups, barangay, map, pinScale]);
 
   return null;
 }
@@ -1054,7 +1095,7 @@ function clusterByScreenProximity(map, barangayData) {
 // centre, showing that barangay's full case total. Pins whose centroids
 // collide on screen (e.g. the three tightly-packed Poblacion barangays) are
 // radially spread apart so every label stays readable at any zoom level.
-function BarangayPins({ barangayData, onHover, onLeave, onClick, loginRole }) {
+function BarangayPins({ barangayData, onHover, onLeave, onClick, loginRole, pinScale = 1 }) {
   const map = useMap();
   const markersRef = useRef([]);
 
@@ -1067,7 +1108,7 @@ function BarangayPins({ barangayData, onHover, onLeave, onClick, loginRole }) {
     // BHW has no box (own barangay only) so keeps its name tag. Exports unhide the
     // tag on all pins so the image shows names under every pin.
     const pinClass = loginRole === 'BHW' ? '' : 'cdms-barangay-pin';
-    const icon = createPinIcon({ count: b.totalCases, color, label: b.barangayName, className: pinClass });
+    const icon = createPinIcon({ count: b.totalCases, color, label: b.barangayName, className: pinClass, scale: pinScale });
     const m = L.marker(coords, { icon, zIndexOffset: 1000 }).addTo(map);
     m.on('mouseover', () => onHover(b));
     m.on('mouseout',  () => onLeave());
@@ -1112,7 +1153,7 @@ function BarangayPins({ barangayData, onHover, onLeave, onClick, loginRole }) {
       map.off('zoomend moveend', placeMarkers);
       markersRef.current.forEach(m => m.remove());
     };
-  }, [barangayData, map]);
+  }, [barangayData, map, pinScale]);
 
   return null;
 }
@@ -1502,10 +1543,21 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const [pagasa, setPagasa] = useState(null);
   const [showActionsLayer, setShowActionsLayer] = useState(true);
   const [showDisasterLayer, setShowDisasterLayer] = useState(true);
-  // Map mode: 'disaster' = hazards + actions + probable disease watch (replaces the old
-  // Actions/Hazards layers); 'hotspot' = case density only.
-  const [mapMode, setMapMode] = useState('disaster');
+  // Map mode - a THREE-state control, not two independent buttons:
+  //   null        "just cases"  the map opens plan (barangay name boxes + case pins)
+  //   'disaster'  hazards + water/heat + probable disease watch
+  //   'hotspot'   case density only
+  // Clicking the button of the active mode de-clicks it back to "just cases", so
+  // the user only ever sees the layers they asked for.
+  const [mapMode, setMapMode] = useState(null);
+  const toggleMapMode = (m) => setMapMode(prev => (prev === m ? null : m));
   const isDisasterMap = mapMode === 'disaster';
+  const isHotspotMap = mapMode === 'hotspot';
+  const isCaseOnly = mapMode === null;
+  // Pins + the permanent barangay name box shrink on the two themed maps so the
+  // added layers stay readable: "significantly smaller" on the Disaster map,
+  // "small" on the Hotspot map, untouched in the default just-cases view.
+  const pinScale = isDisasterMap ? 0.7 : isHotspotMap ? 0.85 : 1;
   const [weatherOffline, setWeatherOffline] = useState(false);
   const [manageActionsOpen, setManageActionsOpen] = useState(false);
   const [actionForm, setActionForm] = useState({ id: null, barangay_id: '', barangay_name: '', hazard_id: '', action_type: ACTION_TYPES[0], description: '', target_disease: '', date_started: '', date_ended: '', status: 'planned' });
@@ -1514,6 +1566,12 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   // cards use) + the option to show only warning-linked interventions on the map
   // + the context handed to the shared InterventionModal.
   const [epiAlerts, setEpiAlerts] = useState([]);
+  // CHO-drawn water features + the stored per-barangay verdict (used for the CHO
+  // buffer override). Both are merged into the map's water index so what the map
+  // shows, what the double-check screen lists and what the weekly BHW advisory
+  // says all agree.
+  const [manualWater, setManualWater] = useState([]);
+  const [barangayWaterRisk, setBarangayWaterRisk] = useState([]);
   const [interventionsOnly, setInterventionsOnly] = useState(false);
   const [warnActions, setWarnActions] = useState([]);
   const [interventionCtx, setInterventionCtx] = useState(null);
@@ -1568,6 +1626,12 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const [zoneDraft, setZoneDraft] = useState(null);
   const [zoneDrawMsg, setZoneDrawMsg] = useState('');
   const [zoneBusy, setZoneBusy] = useState(false);
+  // Zone drawing/editing belongs to the zone card, which is hidden in the default
+  // "just cases" view - disarm both on the way out so a CHO is never left holding
+  // an active draw handle (or vertex handles) they cannot switch off.
+  useEffect(() => {
+    if (mapMode === null) { setZoneDrawOn(false); setZoneEditOn(false); setZoneDrawMsg(''); }
+  }, [mapMode]);
   // Per-zone rainfall, keyed `${barangay}|${zoneIdx}` -> { rain24, rain72 }. Fetched
   // from the zone centroids the map already knows. Falls back to the barangay
   // reading (weatherRawByName) for any zone the server could not answer for.
@@ -1613,7 +1677,9 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const focusAppliedRef = useRef(false);
   useEffect(() => {
     if (!initialFocus) { focusAppliedRef.current = false; return; }
-    setMapMode('hotspot');
+    // A rapid-outbreak notice opens the HOTSPOT map; an environmental (blue-zone)
+    // advisory opens the DISASTER map, where the water/environment layer lives.
+    setMapMode(initialFocus.mode === 'disaster' ? 'disaster' : 'hotspot');
     const name = initialFocus.barangayName
       || (initialFocus.barangayId != null ? barangayIdMap[initialFocus.barangayId] : null)
       || (loginRole === 'BHW' ? loginBarangay : null);
@@ -1635,6 +1701,23 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     };
     load();
     const iv = setInterval(load, 600000);
+    return () => { alive = false; clearInterval(iv); };
+  }, []);
+
+  // CHO water features + the stored per-barangay verdict. Changed only by a CHO,
+  // so a slow 5-minute poll is plenty.
+  useEffect(() => {
+    let alive = true;
+    const load = () => {
+      axios.get(API_URL + '/api/water-features')
+        .then(res => { if (alive) setManualWater(Array.isArray(res.data) ? res.data : []); })
+        .catch(() => {});
+      axios.get(API_URL + '/api/barangay-water-risk')
+        .then(res => { if (alive) setBarangayWaterRisk(Array.isArray(res.data) ? res.data : []); })
+        .catch(() => {});
+    };
+    load();
+    const iv = setInterval(load, 300000);
     return () => { alive = false; clearInterval(iv); };
   }, []);
 
@@ -2309,11 +2392,13 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
 
   // Ask the server for each zone's own rain reading. One POST per scope change; the
   // server caches per point for 30 min so a re-render is free. Skipped when offline.
+  // Needed on BOTH maps: the Hotspot map uses rain to colour a `weather` case zone,
+  // and the Disaster map uses it as a blue-zone (environmental) driver.
   const zoneRainSignature = useMemo(() => Object.keys(scopedZoneGeom).sort()
     .map(name => scopedZoneGeom[name].map(z => `${name}|${z.idx}`).join(',')).join(';'),
     [scopedZoneGeom]);
   useEffect(() => {
-    if (isDisasterMap || !showZones || !zoneRainSignature) { setZoneRain({}); return undefined; }
+    if (!showZones || !zoneRainSignature) { setZoneRain({}); return undefined; }
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return undefined;
     let alive = true;
     const points = [];
@@ -2327,10 +2412,14 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       .then(res => { if (alive && res.data && res.data.results) setZoneRain(res.data.results); })
       .catch(() => {});
     return () => { alive = false; };
-  }, [isDisasterMap, showZones, zoneRainSignature]);
+  }, [showZones, zoneRainSignature]);
 
-  const zoneHotspots = useMemo(() => {
-    if (isDisasterMap || !showZones) return [];
+  // Every flagged zone for the current scope, BOTH sides (case + environment).
+  // The presentation filters this by map mode below (zoneHotspots), so the same
+  // detection feeds the Hotspot map (red) and the Disaster map (blue) without
+  // running the engine twice.
+  const allZoneRows = useMemo(() => {
+    if (!showZones) return [];
     const thresholds = ZONE_PRESETS[zoneSensitivity] || ZONE_PRESETS[DEFAULT_ZONE_SENSITIVITY];
     const rows = [];
     zoneScopeList.forEach(name => {
@@ -2364,12 +2453,21 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       }));
     });
     return rows;
-  }, [isDisasterMap, showZones, zoneSensitivity, zoneScopeList, allCases, weatherHazards, disasterEvents, purokAreas, scopedZoneGeom, zoneRain]);
+  }, [showZones, zoneSensitivity, zoneScopeList, allCases, weatherHazards, disasterEvents, purokAreas, scopedZoneGeom, zoneRain]);
+
+  // Presentation split (see ZONE_MODE_KINDS): the Hotspot Disease Map is cases only
+  // (red), the Disaster Disease Map carries the environment (blue). Layering and the
+  // sidebar counters simply follow this filtered list, so they never need to know
+  // which mode is active.
+  const zoneHotspots = useMemo(
+    () => allZoneRows.filter(r => zoneKindFitsMode(r.kind, mapMode)),
+    [allZoneRows, mapMode]
+  );
 
   // "Show all cells": the full 6-cell grid of every scoped barangay, flagged or
   // not, as a neutral background layer so the proxy grid is visible.
   const allZoneCellsFC = useMemo(() => {
-    if (isDisasterMap || !showZones || !showAllZoneCells) return { type: 'FeatureCollection', features: [] };
+    if (!showZones || !showAllZoneCells) return { type: 'FeatureCollection', features: [] };
     const rows = [];
     zoneScopeList.forEach(name => {
       const zones = scopedZoneGeom[name];
@@ -2377,7 +2475,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       zones.forEach(z => rows.push({ ...z, kind: 'grid', score: 0 }));
     });
     return zonesToFeatureCollection(rows);
-  }, [isDisasterMap, showZones, showAllZoneCells, zoneScopeList, scopedZoneGeom]);
+  }, [showZones, showAllZoneCells, zoneScopeList, scopedZoneGeom]);
 
   const zoneFeatureCollection = useMemo(
     () => zonesToFeatureCollection(zoneHotspots),
@@ -2398,7 +2496,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   //     kept as a faint outline (zoneOutlineFC) for orientation.
   const zoneZoomView = useMemo(() => {
     const empty = { type: 'FeatureCollection', features: [] };
-    if (isDisasterMap || !showZones || mapZoom < ZONE_FINE_ZOOM || zoneHotspots.length === 0) {
+    if (!showZones || mapZoom < ZONE_FINE_ZOOM || zoneHotspots.length === 0) {
       return { active: false, main: empty, outline: empty };
     }
     const coarseFeatures = (row) => row.rings.map(ring => ({
@@ -2442,7 +2540,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       main: { type: 'FeatureCollection', features: main },
       outline: { type: 'FeatureCollection', features: outline },
     };
-  }, [isDisasterMap, showZones, mapZoom, zoneHotspots]);
+  }, [showZones, mapZoom, zoneHotspots]);
 
   // Every stored zone as an editable polygon (CHO edit mode).
   const zonesForEdit = useMemo(() => {
@@ -2467,6 +2565,12 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   // is why a barangay-wide pin labelled "Mabitac Phase 1" never shows next to a
   // Blk 4 hotspot it has nothing to do with.
   const zoneBoxesOn = zoneZoomView.active;
+
+  // Presentation tiering (leader's requirement): at barangay level the Disaster
+  // Disease Map shows the MINIMAL blue disc only; the zonal blue boxes appear once
+  // the user reaches the barangay addresses (ZONE_FINE_ZOOM and in). The Hotspot
+  // map keeps its existing behaviour (its cells show at every zoom).
+  const zoneBoxesVisible = showZones && (isHotspotMap || (isDisasterMap && mapZoom >= ZONE_FINE_ZOOM));
 
   // Tooltip = plain reading of the zone; click opens the evidence card where the
   // CHO can log the intervention that answers it. A close-up box gets a PERMANENT
@@ -2558,9 +2662,9 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         count: 0,
         color: off ? '#f59e0b' : '#94a3b8',
         title: off ? `${name} - Weather offline` : `${name} - No active weather hazard`,
-        size: 38,
+        size: HAZARD_DISC_SIZE,
         z: 1500,
-        above: hazardBadgeLift(barangayCaseCount[wxKey(name)] || 0, 38, false),
+        above: hazardBadgeLift(barangayCaseCount[wxKey(name)] || 0, HAZARD_DISC_SIZE, false, pinScale),
         onClick: () => openBarangayPopup(name),
       });
       return;
@@ -2582,9 +2686,9 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       count: pinCount,
       color: hazardColor(mainType),
       title: `${name} - ${details.join(' · ')}${diseaseHint}`,
-      size: 38,
+      size: HAZARD_DISC_SIZE,
       z: 1500,
-      above: hazardBadgeLift(barangayCaseCount[wxKey(name)] || 0, 38, pinCount > 0),
+      above: hazardBadgeLift(barangayCaseCount[wxKey(name)] || 0, HAZARD_DISC_SIZE, pinCount > 0, pinScale),
       onClick: () => openBarangayPopup(name),
     });
   });
@@ -2598,6 +2702,10 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const alertsByBarangay = {};
   (epiAlerts || []).forEach(a => {
     if (!a || !a.barangay_name) return;
+    // The environmental ("blue zone") advisory is a different warning family; it is
+    // carried by the blue disc + the Weather & Environmental Risk card, so it must
+    // not hijack the disease-count warning banner here.
+    if (a.alert_type === 'environmental_exposure') return;
     const k = wxKey(a.barangay_name);
     const prev = alertsByBarangay[k];
     if (!prev || (Number(a.alert_value) || 0) > (Number(prev.alert_value) || 0)) alertsByBarangay[k] = a;
@@ -2610,6 +2718,106 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       && wxKey(x.barangay_name) === wxKey(alert.barangay_name)
       && (x.target_disease || x.alert_disease || '') === (alert.disease_name || '')) || null;
   };
+
+  // ── Water / environmental risk per barangay (Disaster Disease Map) ─────────
+  // The leader's rule: a place is prone not only because it HAS cases (RED zone) but
+  // because of the ENVIRONMENT it sits in (BLUE zone) — water first, heat second:
+  // "if there's a big pond of water then it's blue ... the red is cases". Evaluated
+  // once per barangay and reused by the blue-zone disc (the minimal barangay tier)
+  // and the "Weather & Environmental Risk" sidebar card. Water proximity is spatial
+  // (Laguna de Bay shoreline / a large inland body); heat is a barangay-level
+  // Open-Meteo reading, so it can only flag the whole barangay, never one zone.
+  // `discRed` mirrors the red discs actually drawn at the barangay tier (an
+  // unanswered disease warning or rapid outbreak), so the blue disc can never stack
+  // on one of them; `red` is the broader "has a case hotspot" the card reports.
+  //
+  // The water index is bundled OSM + the CHO's manual water features, and a CHO
+  // buffer override widens the proximity test for that barangay. It is rebuilt only
+  // when the manual set or an override changes (not on the weather poll), so the
+  // engine's ring-sampling never runs for all 18 barangays on every re-render.
+  const waterRiskOverride = useMemo(() => {
+    const m = new Map();
+    (barangayWaterRisk || []).forEach(r => { if (r && r.barangay_name) m.set(wxKey(r.barangay_name), r); });
+    return m;
+  }, [barangayWaterRisk]);
+
+  // One water index for the whole render: the per-barangay verdict AND the
+  // per-cell placement of the blue 💧 disc below both query it.
+  const waterIndex = useMemo(
+    () => buildWaterIndex(mergeWaterFeatures(WATER_BODIES ? WATER_BODIES.features : [], manualWater)),
+    [manualWater]
+  );
+
+  // `buffer_override_m` widens the proximity test for that barangay only.
+  const waterOptsByName = useMemo(() => {
+    const m = new Map();
+    hazardScopeList.forEach(name => {
+      const ov = waterRiskOverride.get(wxKey(name));
+      const buf = ov && ov.buffer_override_m ? Number(ov.buffer_override_m) : null;
+      m.set(name, (buf && Number.isFinite(buf)) ? { lakeBufferM: buf, waterBodyBufferM: buf } : undefined);
+    });
+    return m;
+  }, [hazardScopeList, waterRiskOverride]);
+
+  const waterDriversByName = useMemo(() => {
+    const out = new Map();
+    hazardScopeList.forEach(name => {
+      const feature = findFeatureForBarangay(name);
+      if (!feature) { out.set(name, { drivers: [], blue: false }); return; }
+      out.set(name, waterDriversForFeature(feature, { index: waterIndex, opts: waterOptsByName.get(name) }));
+    });
+    return out;
+  }, [hazardScopeList, waterIndex, waterOptsByName]);
+
+  const barangayEnvRisk = useMemo(() => {
+    const present = new Map();   // barangay key -> Set(disease actually present)
+    (allCases || []).forEach(c => {
+      const canon = findCanonicalName(c.barangay_name) || c.barangay_name;
+      if (!canon) return;
+      const k = wxKey(canon);
+      if (!present.has(k)) present.set(k, new Set());
+      if (c.disease_name) present.get(k).add(c.disease_name);
+    });
+    return hazardScopeList.map(name => {
+      const key = wxKey(name);
+      const water = waterDriversByName.get(name) || { drivers: [], blue: false };
+      const wx = weatherRawByName[key];
+      const heat = (wx && wx.temperature != null && wx.error !== 'offline')
+        ? heatDriverFor({ tempC: wx.temperature, monthIndex: new Date().getMonth() })
+        : null;
+      const drivers = [...(water.drivers || [])];
+      if (heat) drivers.push('heat');
+      // A CHO override in the double-check screen wins over the computed verdict,
+      // so what the map shows agrees with the stored advisory.
+      const ov = waterRiskOverride.get(key);
+      const forced = ov && ov.override_blue != null ? !!ov.override_blue : null;
+      const blue = forced != null ? forced : drivers.length > 0;
+      const redZones = allZoneRows.filter(r => wxKey(r.barangay) === key && (r.kind === 'case' || r.kind === 'weather'));
+      const blueZones = allZoneRows.filter(r => wxKey(r.barangay) === key && r.kind === 'exposure');
+      const alert = alertsByBarangay[key] || null;
+      const warningLive = !!alert && !interventionMatchesWarning(alert);
+      const outbreakLive = (epiAlerts || []).some(a => a && a.alert_type === 'rapid_outbreak'
+        && wxKey(a.barangay_name) === key && !interventionMatchesWarning(a));
+      const discRed = warningLive || outbreakLive;
+      const red = redZones.length > 0 || !!alert || (epiAlerts || []).some(a => a && a.alert_type === 'rapid_outbreak' && wxKey(a.barangay_name) === key);
+      if (!blue && !red) return null;
+      const have = present.get(wxKey(findCanonicalName(name) || name)) || present.get(key) || new Set();
+      // A CHO forcing a barangay blue with no detected driver is asserting the
+      // place is water/heat-exposed, so show the whole prone set.
+      const proneDrivers = drivers.length ? drivers
+        : (forced === true ? WATER_DRIVER_ORDER : []);
+      const proneAll = waterProneDiseases(proneDrivers);
+      const prone = proneAll.filter(d => have.has(d));
+      return {
+        name, key, water, heat, drivers, blue, red, discRed, override: forced,
+        redZones, blueZones,
+        temperature: wx ? wx.temperature : null,
+        // The leader's ask: warn about "kung anong klase disease ang meron sila",
+        // so prefer the diseases actually present that the environment favours.
+        prone, proneAll,
+      };
+    }).filter(Boolean);
+  }, [hazardScopeList, weatherRawByName, allZoneRows, allCases, epiAlerts, alertsByBarangay, waterDriversByName, waterRiskOverride]);
   // Warning-linked interventions grouped by barangay. A Dashboard-computed warning
   // (High Active Cases, a Recurring Hotspot, ...) has no `epi_alerts` row of its
   // own, so the logged intervention is the only evidence of it the map can see -
@@ -2725,7 +2933,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       // Stack above the hazard disc when that layer is drawn, otherwise take the
       // normal pin lift. Both come from the shared badge geometry.
       const hazardStack = (isDisasterMap && showDisasterLayer)
-        ? hazardBadgeLift(barangayCaseCount[k] || 0, 38, hazardPill) + (hazardPill ? 50 : 38) + 2
+        ? hazardStackLift(barangayCaseCount[k] || 0, hazardPill, pinScale)
         : 0;
       warningBadgeItems.push({
         id: 'warn-' + name,
@@ -2736,7 +2944,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         title: `${name} - ${alert.disease_name} warning (${alert.alert_value} cases): no intervention logged yet`,
         size: 34,
         z: 1600,
-        above: hazardStack || hazardBadgeLift(barangayCaseCount[k] || 0, 34, false),
+        above: hazardStack || hazardBadgeLift(barangayCaseCount[k] || 0, 34, false, pinScale),
         onClick: () => openBarangayPopup(name),
       });
     });
@@ -2749,7 +2957,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   // Hotspot-map only, and it disappears once an intervention answers the alert.
   const OUTBREAK_PIN_SIZE = 42;
   const outbreakPinItems = [];
-  if (!isDisasterMap && mapZoom < PUROK_ZOOM_THRESHOLD) {
+  if (isHotspotMap && mapZoom < PUROK_ZOOM_THRESHOLD) {
     hazardScopeList.forEach(name => {
       const k = wxKey(name);
       const rows = (epiAlerts || []).filter(a => a && a.alert_type === 'rapid_outbreak'
@@ -2772,9 +2980,69 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         // Same rule as the hazard/warning discs: a badge sharing the barangay
         // centroid must clear the tall barangay pin or it buries the case number.
         // The disc always renders a count pill, so hasPill is true.
-        above: hazardBadgeLift(barangayCaseCount[k] || 0, OUTBREAK_PIN_SIZE, true),
+        above: hazardBadgeLift(barangayCaseCount[k] || 0, OUTBREAK_PIN_SIZE, true, pinScale),
         title: `🚨 ${name} - rapid ${top.disease_name} outbreak: ${top.alert_value} cases in the last 5 days. Tap to see the purok/blk breakdown and log an intervention.`,
         onClick: () => openBarangayPopup(name),
+      });
+    });
+  }
+
+  // ── Blue-zone disc (environmental tier, DISASTER map) ────────────────────
+  // The leader's "minimal" tier: on the Disaster Disease Map an area reads as a
+  // BLUE zone when an environmental driver is present (near Laguna de Bay / a large
+  // water body, or extreme heat) and it is NOT already a red zone (a disease warning
+  // or a rapid outbreak). Red wins at this tier, so blue and red never share a spot.
+  //
+  // WHERE it sits: inside the barangay cell CLOSEST TO THE WATER among the cells the
+  // barangay already has ("any one within the blue, preferably near the water - that
+  // side carries more magnitude"). It is computed per cell with the same driver test
+  // `zoneHotspots` uses. Only the no-cell fallback shares the weather disc's spot, so
+  // only that one still stacks. 34 px keeps it the smallest disc on the map.
+  const BLUE_ZONE_PIN_SIZE = 34;
+  const blueZonePinItems = [];
+  if (isDisasterMap && mapZoom < PUROK_ZOOM_THRESHOLD) {
+    barangayEnvRisk.forEach(row => {
+      if (!row.blue || row.discRed) return;   // blue only, and red wins at this tier
+      const k = row.key;
+
+      // Pick the barangay cell nearest the water. A cell that CONTAINS a large body
+      // scores best (-1), then the smallest laguna/water-body distance, else nothing.
+      const opts = waterOptsByName.get(row.name);
+      let cellCoords = null;
+      let bestScore = Infinity;
+      (scopedZoneGeom[row.name] || []).forEach(z => {
+        if (!z || !z.centroid || !Array.isArray(z.rings) || z.rings.length === 0) return;
+        const detail = waterDriversForRings(z.rings, { index: waterIndex, opts });
+        const close = (detail.lagunaM != null || detail.waterBodyM != null)
+          ? Math.min(detail.lagunaM != null ? detail.lagunaM : Infinity,
+            detail.waterBodyM != null ? detail.waterBodyM : Infinity)
+          : Infinity;
+        const score = (detail.contained || []).length > 0 ? -1 : close;
+        if (!Number.isFinite(score) && score !== -1) return;
+        if (score < bestScore) { bestScore = score; cellCoords = z.centroid; }
+      });
+
+      const coords = cellCoords || findCoords(row.name);
+      if (!coords) return;
+      const w = weatherByName[k];
+      const man = manualBarangayEvents[k] || [];
+      const pillCount = (weatherPinsByBarangay[k] || 0) + man.filter(e => e.latitude && e.longitude).length;
+      // Only the centroid fallback sits on the weather disc, so only it lifts.
+      const hazardPill = !!((w || man.length > 0) && pillCount > 0);
+      const hazardStack = (!cellCoords && isDisasterMap && showDisasterLayer)
+        ? hazardStackLift(barangayCaseCount[k] || 0, hazardPill, pinScale)
+        : 0;
+      blueZonePinItems.push({
+        id: 'blue-' + k,
+        coords,
+        svg: hazardSvgMarkup('💧', '#2563eb', BLUE_ZONE_PIN_SIZE, 'Blue' + k),
+        count: 0,
+        color: '#2563eb',
+        size: BLUE_ZONE_PIN_SIZE,
+        z: 1600,
+        above: hazardStack || (cellCoords ? 0 : hazardBadgeLift(barangayCaseCount[k] || 0, BLUE_ZONE_PIN_SIZE, false, pinScale)),
+        title: `💧 ${row.name} - Blue Zone (environmental risk): ${row.drivers.map(d => waterDriverLabel(d)).join(', ')}${row.prone.length ? `. Watch for: ${row.prone.join(', ')}` : ''}`,
+        onClick: () => openBarangayPopup(row.name),
       });
     });
   }
@@ -2814,7 +3082,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       color: hazardColor(w.hazards[0]),
       title: `${p.purok || p.barangay} - ${w.hazards.join(', ')}${diseases.length ? ` · Possible: ${diseases.join(', ')}` : ''}`,
       size: 32,
-      above: hazardBadgeLift(p.totalCases),
+      above: hazardBadgeLift(p.totalCases, 32, false, pinScale),
       z: 1500,
       onClick: () => openBarangayPopup(p.barangay),
     });
@@ -2844,7 +3112,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       color: hazardColor(ev.event_type),
       title: `${ev.event_type}${ev.purok ? ' · ' + ev.purok : ''} (${ev.severity})${diseases.length ? ` · Possible: ${diseases.join(', ')}` : ''}`,
       size: 32,
-      above: hazardBadgeLift(pinCountNear(evCoords[0], evCoords[1])),
+      above: hazardBadgeLift(pinCountNear(evCoords[0], evCoords[1]), 32, false, pinScale),
       z: 1400,
       onClick: () => openBarangayPopup(ev.barangay_name),
     });
@@ -2871,6 +3139,11 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const popupLoggedWarnings = popupActionKey ? (warnActionsByBarangay[wxKey(popupActionKey)] || []) : [];
   const popupWeather = popupActionKey ? weatherByName[wxKey(popupActionKey)] : null;
   const popupManualEvents = popupActionKey ? (manualBarangayEvents[wxKey(popupActionKey)] || []) : [];
+  // The inspected barangay's Red/Blue environmental verdict (Disaster map), so the
+  // popup explains WHY the place is a blue zone and what to watch for.
+  const popupEnvRisk = popupActionKey
+    ? (barangayEnvRisk.find(r => r.key === wxKey(popupActionKey)) || null)
+    : null;
 
   // Disaster Disease Map: the active hazard types for the inspected barangay.
   const popupHazardTypes = useMemo(() => {
@@ -3579,10 +3852,16 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               <span style={{ width: '11px', height: '11px', borderRadius: '50%', background: 'var(--accent, #60a5fa)', border: '2px solid var(--bg-surface)', flexShrink: 0, display: 'inline-block' }} />
               <span style={{ fontSize: '13px', color: 'var(--text-main)' }}>{t('Case dot (max zoom) - one dot per case, colored by disease')}</span>
             </div>
-            {!isDisasterMap && (
+            {isHotspotMap && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '9px', marginBottom: '8px' }}>
                 <span style={{ width: '13px', height: '13px', borderRadius: '50%', background: '#dc2626', border: '2px solid var(--bg-surface)', flexShrink: 0, display: 'inline-block', textAlign: 'center', lineHeight: '9px', fontSize: '8px' }}>🚨</span>
                 <span style={{ fontSize: '13px', color: 'var(--text-main)' }}>{t('Rapid outbreak - a disease count jumped in under 5 days')}</span>
+              </div>
+            )}
+            {isDisasterMap && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '9px', marginBottom: '8px' }}>
+                <span style={{ width: '13px', height: '13px', borderRadius: '50%', background: '#2563eb', border: '2px solid var(--bg-surface)', flexShrink: 0, display: 'inline-block', textAlign: 'center', lineHeight: '9px', fontSize: '8px' }}>💧</span>
+                <span style={{ fontSize: '13px', color: 'var(--text-main)' }}>{t('Blue zone - water / heat exposure, no case hotspot. Red wins if both.')}</span>
               </div>
             )}
           </div>
@@ -3647,11 +3926,17 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           </p>
         </div>
 
-        {/* Zone Hotspots - Phase 1 purok-level exposure overlay (hotspot map only) */}
-        {!isDisasterMap && (
-          <div style={{ paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
+        {/* Zone-level card. Mode-aware: on the HOTSPOT map it is "Zone Hotspots"
+            (cases only - the red side), on the DISASTER map it is "Weather &
+            Environmental Risk" (the blue side - water / rain / flood / heat), and it
+            also carries the per-barangay Red/Blue/Both verdict on the disaster map.
+            The Sensitivity + Show + Custom Zones controls are shared by both.
+            Hidden entirely in the default "just cases" view, where the map is only
+            the barangay name boxes + the case pins. */}
+        {!isCaseOnly && (
+        <div style={{ paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', gap: '8px' }}>
-              <p style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('Zone Hotspots')}</p>
+              <p style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{isDisasterMap ? t('Weather & Environmental Risk') : t('Zone Hotspots')}</p>
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-muted)', cursor: 'pointer' }}>
                 <input type="checkbox" checked={showZones} onChange={e => setShowZones(e.target.checked)} style={{ cursor: 'pointer' }} />
                 {t('Show')}
@@ -3727,29 +4012,71 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               </div>
             )}
 
+            {/* Per-barangay verdict (DISASTER map): the leader's "show red zone or
+                blue zone for their place" — each barangay in scope is RED (a case
+                hotspot), BLUE (an environmental driver) or BOTH. Water first, heat
+                second, with the reason and the diseases actually present that the
+                environment favours. Independent of the zone-shading toggle: it is a
+                barangay-level verdict, not a zonal box. */}
+            {isDisasterMap && barangayEnvRisk.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
+                <p style={{ margin: 0, fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('Red / Blue by barangay')}</p>
+                {barangayEnvRisk.slice(0, 8).map(row => {
+                  const badge = row.red && row.blue ? { icon: '⚠️', label: t('Both'), color: '#7c3aed' }
+                    : row.red ? { icon: '🔴', label: t('Red zone'), color: '#dc2626' }
+                      : { icon: '💧', label: t('Blue zone'), color: '#2563eb' };
+                  return (
+                    <div key={row.key} style={{ padding: '7px 9px', borderRadius: '8px', background: 'var(--input-bg)', border: `1px solid ${badge.color}55` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                        <span style={{ fontSize: '13px' }}>{badge.icon}</span>
+                        <span style={{ flex: 1, minWidth: 0, fontSize: '13px', fontWeight: '700', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.name}</span>
+                        <span style={{ fontSize: '11px', fontWeight: '700', color: badge.color, whiteSpace: 'nowrap' }}>{badge.label}</span>
+                      </div>
+                      {row.drivers.length > 0 && (
+                        <div style={{ marginTop: '3px', fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.35 }}>
+                          {row.drivers.map(d => `${WATER_DRIVER_ICONS[d] || '💧'} ${d === 'heat' ? t(waterDriverLabel(d)) : waterDriverReason(d, row.water)}`).join(' · ')}
+                          {row.temperature != null ? ` · ${Math.round(row.temperature)}°C` : ''}
+                        </div>
+                      )}
+                      {row.prone.length > 0 && (
+                        <div style={{ marginTop: '3px', fontSize: '12px', color: 'var(--text-main)', lineHeight: 1.35 }}>
+                          {t('Watch for')}: <span style={{ fontWeight: '600' }}>{row.prone.join(', ')}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {barangayEnvRisk.length > 8 && (
+                  <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>+{barangayEnvRisk.length - 8} {t('more in this scope')}</p>
+                )}
+              </div>
+            )}
+
             {!showZones ? (
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
                 {t('Zone shading is hidden.')}
               </p>
             ) : (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
-                  {[
-                    { key: 'watch', label: ZONE_KINDS.watch.label, icon: ZONE_KINDS.watch.icon, color: ZONE_KINDS.watch.color },
-                    { key: 'exposure', label: ZONE_KINDS.exposure.label, icon: ZONE_KINDS.exposure.icon, color: ZONE_KINDS.exposure.color },
-                    { key: 'case', label: ZONE_KINDS.case.label, icon: ZONE_KINDS.case.icon, color: ZONE_KINDS.case.color },
-                    { key: 'weather', label: ZONE_KINDS.weather.label, icon: ZONE_KINDS.weather.icon, color: ZONE_KINDS.weather.color },
-                  ].map(({ key, label, icon, color }) => (
-                    <div key={key} style={{ background: 'var(--input-bg)', borderRadius: '8px', padding: '9px 6px', textAlign: 'center', border: `1px solid ${color}33` }}>
-                      <div style={{ fontSize: '20px', fontWeight: '800', color }}>{zoneCounts[key] || 0}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2 }}>{icon} {t(label)}</div>
+                  {ZONE_MODE_KINDS[mapMode] && ZONE_MODE_KINDS[mapMode].length > 0 && (
+                    <div style={{ display: 'grid', gridTemplateColumns: isDisasterMap ? '1fr' : '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                      {(ZONE_MODE_KINDS[mapMode] || []).map(key => {
+                    const { label, icon, color } = ZONE_KINDS[key];
+                    return (
+                      <div key={key} style={{ background: 'var(--input-bg)', borderRadius: '8px', padding: '9px 6px', textAlign: 'center', border: `1px solid ${color}33` }}>
+                        <div style={{ fontSize: '20px', fontWeight: '800', color }}>{zoneCounts[key] || 0}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2 }}>{icon} {t(label)}</div>
+                      </div>
+                    );
+                      })}
                     </div>
-                  ))}
-                </div>
+                  )}
 
                 {zoneHotspots.length === 0 ? (
                   <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
-                    {t('No zone has crossed a case or flooding threshold in this scope.')}
+                    {isDisasterMap
+                      ? t('No zone has crossed a water, rain or flooding threshold in this scope.')
+                      : t('No zone has crossed a case threshold in this scope.')}
                   </p>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -3768,7 +4095,9 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                           <span style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {row.rapid && row.rapidDiseases.length > 0
                               ? `🚨 ${row.rapidDiseases[0].disease} · ${row.rapidDiseases[0].cases5} ${t('cases in the last 5 days')}`
-                              : row.disease ? `${row.disease} · ${row.cases7}` : t('No cases flagged')}
+                              : row.disease ? `${row.disease} · ${row.cases7}`
+                                : (row.env && row.env.reasons && row.env.reasons.length) ? `${row.env.waterGate ? '💧' : '🌧'} ${row.env.reasons[0]}`
+                                  : t('No cases flagged')}
                           </span>
                         </span>
                         <span style={{ fontSize: '12px', fontWeight: '800', color: row.kindMeta.color }}>{row.score}</span>
@@ -3783,9 +4112,13 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                 )}
 
                 <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
-                  {realBoundaryBarangays > 0
-                    ? t('Zones use the real purok boundaries supplied by the City where available, and the purok-level grid cell otherwise. A zone is watched for exposure when its own 24h/72h rain or an active flood pin reaches it, and flagged when cases cross the 7-day threshold.')
-                    : t('Zones are the purok-level grid cell each case already snaps to. A zone is watched for exposure when 24h/72h rain or an active flood pin reaches it, and flagged when cases cross the 7-day threshold.')}
+                  {isDisasterMap
+                    ? (realBoundaryBarangays > 0
+                      ? t('Blue zones follow the real purok boundaries supplied by the City where available, and the purok-level grid cell otherwise. A zone turns blue when its own water (Laguna de Bay / a large body), 24h/72h rain or an active flood pin reaches it.')
+                      : t('Blue zones are the purok-level grid cell each case snaps to. A zone turns blue when its own water (Laguna de Bay / a large body), 24h/72h rain or an active flood pin reaches it.'))
+                    : (realBoundaryBarangays > 0
+                      ? t('Zones use the real purok boundaries supplied by the City where available, and the purok-level grid cell otherwise. A zone is flagged when its cases cross the 7-day threshold.')
+                      : t('Zones are the purok-level grid cell each case already snaps to. A zone is flagged when its cases cross the 7-day threshold.'))}
                 </p>
                 {realBoundaryBarangays > 0 && (
                   <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
@@ -3926,7 +4259,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       </div>
 
       {/* ── MAP AREA ── */}
-      <div className="cdms-map-area" style={{ flex: 1, position: 'relative', minWidth: 0 }}
+      <div className={`cdms-map-area map-mode-${mapMode || 'cases'}`} style={{ flex: 1, position: 'relative', minWidth: 0 }}
         onMouseMove={(e) => {
           const rect = e.currentTarget.getBoundingClientRect();
           setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
@@ -4003,13 +4336,14 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               screen the named-area pins (17) and the purok pins (18) step aside, so
               the hotspot map shows the hotspot and nothing else. */}
           {!interventionsOnly && !zoneBoxesOn && mapZoom === 18 && purokData.length > 0 && (
-            <PulseMarkers key="unit-pins" barangayData={purokData} onHover={setTooltip} onLeave={() => setTooltip(null)} onClick={setPopup} />
+            <PulseMarkers key="unit-pins" barangayData={purokData} onHover={setTooltip} onLeave={() => setTooltip(null)} onClick={setPopup} pinScale={pinScale} />
           )}
           {!interventionsOnly && !zoneBoxesOn && mapZoom === 17 && purokData.length > 0 && pinnedBarangay && (
-            <AreaPins key="area-pins" groups={purokData} barangay={pinnedBarangay} onHover={setTooltip} onLeave={() => setTooltip(null)} onClick={setPopup} />
+            <AreaPins key="area-pins" groups={purokData} barangay={pinnedBarangay} onHover={setTooltip} onLeave={() => setTooltip(null)} onClick={setPopup} pinScale={pinScale} />
           )}
-          {!interventionsOnly && mapZoom < 17 && <BarangayPins key="barangay-pins" barangayData={barangayData} onHover={setTooltip} onLeave={() => setTooltip(null)} onClick={setPopup} loginRole={loginRole} />}
-          {!interventionsOnly && <LayerBadgeMarkers key="layer-outbreaks" items={outbreakPinItems} />}
+          {!interventionsOnly && mapZoom < 17 && <BarangayPins key="barangay-pins" barangayData={barangayData} onHover={setTooltip} onLeave={() => setTooltip(null)} onClick={setPopup} loginRole={loginRole} pinScale={pinScale} />}
+          {isHotspotMap && !interventionsOnly && <LayerBadgeMarkers key="layer-outbreaks" items={outbreakPinItems} />}
+          {isDisasterMap && !interventionsOnly && <LayerBadgeMarkers key="layer-blue-zones" items={blueZonePinItems} />}
           {isDisasterMap && showActionsLayer && !interventionsOnly && <LayerBadgeMarkers key="layer-actions" items={actionBadgeItems} />}
           {isDisasterMap && !interventionsOnly && <LayerBadgeMarkers key="layer-warnings" items={warningBadgeItems} />}
           {/* "Show interventions only" is an isolation mode: the weather/hazard
@@ -4065,7 +4399,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           {/* "Show all cells" grid: every 6-cell zone outline of the scoped
               barangays, flagged or not, so the zone proxy is visible. Drawn
               under the flagged zones (Leaflet paints in mount order). */}
-          {!isDisasterMap && showZones && showAllZoneCells && allZoneCellsFC.features.length > 0 && (
+          {zoneBoxesVisible && showAllZoneCells && allZoneCellsFC.features.length > 0 && (
             <GeoJSON key="zone-grid" data={allZoneCellsFC} style={getGridStyle} interactive={false} pane="zonePane" />
           )}
           {/* Phase 1 zone (purok-level) overlay - drawn last so its shading sits
@@ -4080,7 +4414,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               the choropleth's bringToFront() only reorders paths inside its OWN
               pane, so a barangay hover can never bury a hotspot box and steal its
               hover/click. */}
-          {!isDisasterMap && showZones && zoneHotspots.length > 0 && zoneZoomView.active && zoneZoomView.outline.features.length > 0 && (
+          {zoneBoxesVisible && zoneHotspots.length > 0 && zoneZoomView.active && zoneZoomView.outline.features.length > 0 && (
             <GeoJSON
               key={`zone-coarse-outline-${mapZoom}-${zoneHotspots.map(r => `${r.id}:${r.kind}`).join(',')}`}
               data={zoneZoomView.outline}
@@ -4089,7 +4423,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               pane="zonePane"
             />
           )}
-          {!isDisasterMap && showZones && zoneHotspots.length > 0 && (
+          {zoneBoxesVisible && zoneHotspots.length > 0 && (
             <GeoJSON
               key={`zone-hotspots-${zoneZoomView.active ? 'fine' : 'zone'}-${zoneHotspots.map(r => `${r.id}:${r.kind}`).join(',')}`}
               data={zoneZoomView.active ? zoneZoomView.main : zoneFeatureCollection}
@@ -4098,24 +4432,30 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               pane="zonePane"
             />
           )}
-          {/* CHO custom-zone drawing / reshaping on the Hotspot map. */}
-          {!isDisasterMap && isCho && (
+          {/* CHO custom-zone drawing / reshaping. Available on BOTH maps: a drawn
+              zone becomes that barangay's real zone set, which is exactly how a CHO
+              corrects a blue (environmental) zone on the Disaster map, not only a
+              case hotspot on the Hotspot map. */}
+          {isCho && !isCaseOnly && (
             <ZoneDrawControl drawOn={zoneDrawOn} onCreated={handleZoneCreated} />
           )}
-          {!isDisasterMap && isCho && (
+          {isCho && !isCaseOnly && (
             <ZoneEditLayer editOn={zoneEditOn} zones={zonesForEdit} onCommit={handleZoneCommit} />
           )}
         </MapContainer>
 
-        {/* DISASTER vs HOTSPOT MAP MODE (replaces the old Actions / Hazards toggles) */}
+        {/* MAP MODE - ONE 3-state control (replaces the old Actions / Hazards toggles).
+            Neither button lit = "Just Cases": only the barangay name boxes + the case
+            pins. Clicking a button lights it; clicking it again de-clicks it, so the
+            user can always get back to the plain map. */}
         <div style={{
           position: 'absolute', bottom: '64px', left: '16px', zIndex: 1000,
           display: 'flex', gap: '4px', padding: '4px',
           background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
           borderRadius: '10px', boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
         }}>
-          <button onClick={() => setMapMode('disaster')}
-            title={t('Hazards, barangay actions and probable disease watch')}
+          <button onClick={() => toggleMapMode('disaster')}
+            title={t('Hazards, barangay actions and probable disease watch (click again for just cases)')}
             style={{
               padding: '6px 14px', border: 'none', borderRadius: '7px', cursor: 'pointer',
               fontSize: '13px', fontWeight: '700',
@@ -4124,13 +4464,13 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
             }}>
             🌦 {t('Disaster Disease Map')}
           </button>
-          <button onClick={() => setMapMode('hotspot')}
-            title={t('Case density hotspots by disease and barangay')}
+          <button onClick={() => toggleMapMode('hotspot')}
+            title={t('Case density hotspots by disease and barangay (click again for just cases)')}
             style={{
               padding: '6px 14px', border: 'none', borderRadius: '7px', cursor: 'pointer',
               fontSize: '13px', fontWeight: '700',
-              background: !isDisasterMap ? '#dc2626' : 'transparent',
-              color: !isDisasterMap ? '#fff' : 'var(--text-muted)',
+              background: isHotspotMap ? '#dc2626' : 'transparent',
+              color: isHotspotMap ? '#fff' : 'var(--text-muted)',
             }}>
             🔥 {t('Hotspot Disease Map')}
           </button>
@@ -4147,14 +4487,18 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           </div>
         )}
 
-        {/* ─── PHILIPPINE SEASONS (PAGASA) - ON THE HOTSPOT DISEASE MAP ───
-            Deliberately NOT in the Filters panel: it appears on the map itself when
-            the user switches to the Hotspot Disease Map, naming the tropical season
-            Cabuyao is in right now and the months each one covers. `bottom: 118px`
-            is the slot the weather attribution vacates in hotspot mode. */}
-        {!isDisasterMap && (
+        {/* ─── PHILIPPINE SEASONS (PAGASA) - ON THE DISASTER DISEASE MAP ───
+            Deliberately NOT in the Filters panel: it appears on the map itself on the
+            Disaster Disease Map (the weather/environment map), naming the tropical
+            season Cabuyao is in right now and the months each one covers. It was
+            moved here from the Hotspot map together with the water/environment work:
+            seasons drive environmental disease risk, so they belong on the map that
+            carries the environmental (blue) zones. It sits one slot ABOVE the
+            Open-Meteo attribution (which already owns `bottom: 118px` on this map)
+            so the two never overlap. */}
+        {isDisasterMap && (
           <div style={{
-            position: 'absolute', bottom: '118px', left: '16px', zIndex: 1000,
+            position: 'absolute', bottom: '150px', left: '16px', zIndex: 1000,
             width: '272px', maxWidth: 'calc(100vw - 32px)',
             background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
             borderRadius: '10px', padding: '10px 12px', boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
@@ -4461,6 +4805,43 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                   {popupLoggedWarnings.length > 3 && (
                     <p style={{ margin: '0', fontSize: '12px', color: 'var(--text-muted)' }}>+{popupLoggedWarnings.length - 3}</p>
                   )}
+                </div>
+              )}
+
+              {/* Environmental (blue-zone) verdict for the inspected barangay: why it
+                  is flagged, and the diseases actually present that the environment
+                  favours ("kung anong klase disease ang meron sila"). */}
+              {isDisasterMap && popupEnvRisk && (
+                <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
+                  <p style={{ margin: '0 0 10px 0', fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {t('Environmental Risk')}
+                  </p>
+                  <div style={{
+                    padding: '10px 12px', borderRadius: '8px',
+                    background: popupEnvRisk.red && popupEnvRisk.blue ? 'rgba(124,58,237,0.12)' : popupEnvRisk.blue ? 'rgba(37,99,235,0.12)' : 'rgba(220,38,38,0.12)',
+                    border: `1px solid ${popupEnvRisk.red && popupEnvRisk.blue ? 'rgba(124,58,237,0.45)' : popupEnvRisk.blue ? 'rgba(37,99,235,0.45)' : 'rgba(220,38,38,0.45)'}`,
+                  }}>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>
+                      {popupEnvRisk.red && popupEnvRisk.blue ? `⚠️ ${t('Both')}` : popupEnvRisk.red ? `🔴 ${t('Red zone')}` : `💧 ${t('Blue zone')}`}
+                      <span style={{ fontWeight: '600', color: 'var(--text-muted)' }}> · {t('environmental risk')}</span>
+                    </div>
+                    {popupEnvRisk.drivers.length > 0 && (
+                      <div style={{ marginTop: '5px', fontSize: '13px', color: 'var(--text-main)', lineHeight: 1.4 }}>
+                        {popupEnvRisk.drivers.map(d => `${WATER_DRIVER_ICONS[d] || '💧'} ${d === 'heat' ? t(waterDriverLabel(d)) : waterDriverReason(d, popupEnvRisk.water)}`).join(' · ')}
+                        {popupEnvRisk.temperature != null ? ` · ${Math.round(popupEnvRisk.temperature)}°C` : ''}
+                      </div>
+                    )}
+                    {popupEnvRisk.prone.length > 0 && (
+                      <div style={{ marginTop: '5px', fontSize: '13px', color: 'var(--text-main)', lineHeight: 1.4 }}>
+                        {t('Watch for')}: <span style={{ fontWeight: '700' }}>{popupEnvRisk.prone.join(', ')}</span>
+                      </div>
+                    )}
+                    {popupEnvRisk.blueZones.length > 0 && (
+                      <div style={{ marginTop: '5px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                        {popupEnvRisk.blueZones.length} {t('blue zone(s) flagged in this barangay.')}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -5256,13 +5637,18 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                   if (type === 'Heavy Rain') RAINY_SEASON_DISEASES.forEach(d => watch.add(d));
                   else hazardDiseases(type).forEach(d => watch.add(d));
                 });
+                // Blue zone: the diseases a water/environmental exposure favours.
+                if (zonePopup.env.waterGate) {
+                  waterProneDiseases(zonePopup.env.water ? zonePopup.env.water.drivers : []).forEach(d => watch.add(d));
+                }
                 const list = [...watch];
                 if (list.length === 0) return null;
+                const blue = !!zonePopup.env.waterGate;
                 return (
                   <>
                     <p style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('Watch for')}</p>
-                    <div style={{ marginBottom: '12px', fontSize: '13px', color: 'var(--text-main)', padding: '8px 10px', borderRadius: '8px', background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.35)' }}>
-                      🌧 {list.join(', ')}
+                    <div style={{ marginBottom: '12px', fontSize: '13px', color: 'var(--text-main)', padding: '8px 10px', borderRadius: '8px', background: blue ? 'rgba(37,99,235,0.10)' : 'rgba(56,189,248,0.1)', border: `1px solid ${blue ? 'rgba(37,99,235,0.4)' : 'rgba(56,189,248,0.35)'}` }}>
+                      {blue ? '💧' : '🌧'} {list.join(', ')}
                     </div>
                   </>
                 );

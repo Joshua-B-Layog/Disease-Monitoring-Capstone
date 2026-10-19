@@ -1,0 +1,250 @@
+{
+  "source": "OpenStreetMap (ODbL)",
+  "engine": "frontend/src/waterRisk.js",
+  "buffers": {
+    "lakeBufferM": 300,
+    "waterBodyBufferM": 300,
+    "minWaterBodyM2": 2000
+  },
+  "generated": "2026-10-19T12:49:58.243Z",
+  "barangays": [
+    {
+      "barangay_name": "Baclaran",
+      "blue": true,
+      "drivers": [
+        "laguna_de_bay"
+      ],
+      "laguna_m": 19,
+      "water_body_m": 1532,
+      "nearest_name": null,
+      "nearest_kind": "stream",
+      "contained": []
+    },
+    {
+      "barangay_name": "Banay-Banay",
+      "blue": false,
+      "drivers": [],
+      "laguna_m": 1193,
+      "water_body_m": 553,
+      "nearest_name": null,
+      "nearest_kind": "stream",
+      "contained": []
+    },
+    {
+      "barangay_name": "Banlic",
+      "blue": true,
+      "drivers": [
+        "inland_water"
+      ],
+      "laguna_m": 3101,
+      "water_body_m": 51,
+      "nearest_name": "San Cristobal River",
+      "nearest_kind": "river",
+      "contained": [
+        {
+          "name": null,
+          "kind": "river",
+          "area": 14802
+        }
+      ]
+    },
+    {
+      "barangay_name": "Barangay Dos (Poblacion)",
+      "blue": false,
+      "drivers": [],
+      "laguna_m": 1782,
+      "water_body_m": 1887,
+      "nearest_name": "Petang Creek",
+      "nearest_kind": "river",
+      "contained": []
+    },
+    {
+      "barangay_name": "Barangay Tres (Poblacion)",
+      "blue": false,
+      "drivers": [],
+      "laguna_m": 1910,
+      "water_body_m": 2077,
+      "nearest_name": "Petang Creek",
+      "nearest_kind": "river",
+      "contained": []
+    },
+    {
+      "barangay_name": "Barangay Uno (Poblacion)",
+      "blue": false,
+      "drivers": [],
+      "laguna_m": 1421,
+      "water_body_m": 1401,
+      "nearest_name": "Petang Creek",
+      "nearest_kind": "river",
+      "contained": []
+    },
+    {
+      "barangay_name": "Bigaa",
+      "blue": true,
+      "drivers": [
+        "laguna_de_bay",
+        "inland_water"
+      ],
+      "laguna_m": 16,
+      "water_body_m": 13,
+      "nearest_name": "Cabuyao River",
+      "nearest_kind": "river",
+      "contained": []
+    },
+    {
+      "barangay_name": "Butong",
+      "blue": true,
+      "drivers": [
+        "laguna_de_bay"
+      ],
+      "laguna_m": 12,
+      "water_body_m": 530,
+      "nearest_name": null,
+      "nearest_kind": "river",
+      "contained": []
+    },
+    {
+      "barangay_name": "Casile",
+      "blue": true,
+      "drivers": [
+        "inland_water"
+      ],
+      "laguna_m": null,
+      "water_body_m": 64,
+      "nearest_name": null,
+      "nearest_kind": "river",
+      "contained": [
+        {
+          "name": null,
+          "kind": "water",
+          "area": 15906
+        },
+        {
+          "name": null,
+          "kind": "water",
+          "area": 2944
+        },
+        {
+          "name": null,
+          "kind": "water",
+          "area": 2200
+        },
+        {
+          "name": null,
+          "kind": "water",
+          "area": 4923
+        },
+        {
+          "name": null,
+          "kind": "water",
+          "area": 12033
+        },
+        {
+          "name": null,
+          "kind": "pond",
+          "area": 12522
+        }
+      ]
+    },
+    {
+      "barangay_name": "Diezmo",
+      "blue": true,
+      "drivers": [
+        "inland_water"
+      ],
+      "laguna_m": null,
+      "water_body_m": 77,
+      "nearest_name": null,
+      "nearest_kind": "river",
+      "contained": []
+    },
+    {
+      "barangay_name": "Gulod",
+      "blue": true,
+      "drivers": [
+        "laguna_de_bay"
+      ],
+      "laguna_m": 4,
+      "water_body_m": 2333,
+      "nearest_name": "Laguna de Bay",
+      "nearest_kind": "shoreline",
+      "contained": []
+    },
+    {
+      "barangay_name": "Mamatid",
+      "blue": true,
+      "drivers": [
+        "laguna_de_bay"
+      ],
+      "laguna_m": 137,
+      "water_body_m": 913,
+      "nearest_name": "Laguna de Bay",
+      "nearest_kind": "shoreline",
+      "contained": []
+    },
+    {
+      "barangay_name": "Marinig",
+      "blue": true,
+      "drivers": [
+        "laguna_de_bay"
+      ],
+      "laguna_m": 8,
+      "water_body_m": 1994,
+      "nearest_name": null,
+      "nearest_kind": "river",
+      "contained": []
+    },
+    {
+      "barangay_name": "Niugan",
+      "blue": false,
+      "drivers": [],
+      "laguna_m": 862,
+      "water_body_m": 1334,
+      "nearest_name": null,
+      "nearest_kind": "river",
+      "contained": []
+    },
+    {
+      "barangay_name": "Pittland",
+      "blue": true,
+      "drivers": [
+        "inland_water"
+      ],
+      "laguna_m": null,
+      "water_body_m": 64,
+      "nearest_name": null,
+      "nearest_kind": "river",
+      "contained": []
+    },
+    {
+      "barangay_name": "Pulo",
+      "blue": false,
+      "drivers": [],
+      "laguna_m": 1996,
+      "water_body_m": 521,
+      "nearest_name": null,
+      "nearest_kind": "river",
+      "contained": []
+    },
+    {
+      "barangay_name": "Sala",
+      "blue": false,
+      "drivers": [],
+      "laguna_m": 811,
+      "water_body_m": 1977,
+      "nearest_name": null,
+      "nearest_kind": "river",
+      "contained": []
+    },
+    {
+      "barangay_name": "San Isidro",
+      "blue": false,
+      "drivers": [],
+      "laguna_m": 1397,
+      "water_body_m": 501,
+      "nearest_name": "San Cristobal River",
+      "nearest_kind": "river",
+      "contained": []
+    }
+  ]
+}

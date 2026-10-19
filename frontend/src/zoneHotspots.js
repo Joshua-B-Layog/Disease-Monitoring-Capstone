@@ -18,6 +18,10 @@
 //     a flooded/raining zone  -> a WEATHER-LINKED HOTSPOT (the flood is the reason)
 // Flooding is the exposure/driver, never the case count.
 
+// Water / environmental ("blue zone") drivers. waterRisk.js imports only
+// seasonalDiseases.js, so this direction is safe (no import cycle).
+import { waterDriversForRings, waterDriverReason } from './waterRisk';
+
 export const ZONE_COLS = 3;
 export const ZONE_ROWS = 2;
 
@@ -80,9 +84,15 @@ export const SUMMER_SEASON_DISEASES = ['Diarrhea', 'Cholera', 'Hepatitis A', 'So
 export const FLOOD_EVENT_TYPES = ['Flood', 'Typhoon', 'Heavy Rain'];
 
 export const ZONE_KINDS = {
-  exposure: { key: 'exposure', label: 'Exposure Watch', color: '#f59e0b', icon: '💧' },
-  case: { key: 'case', label: 'Case Hotspot', color: '#dc2626', icon: '🔥' },
-  weather: { key: 'weather', label: 'Weather-Linked Hotspot', color: '#b91c1c', icon: '🌧️' },
+  // BLUE ZONE — an environmental driver is present (water proximity, flood/rain,
+  // extreme heat) whether or not cases are: "if there's a big pond of water then
+  // it's blue". Kept on the internal key `exposure` so the existing alerts /
+  // alert_kind / intervention plumbing keeps working; only the colour + label are
+  // the leader's blue. RED ZONES are the case side: `case` (cases, no driver) and
+  // `weather` (a case hotspot sitting inside an exposed area).
+  exposure: { key: 'exposure', label: 'Blue Zone (environmental risk)', color: '#2563eb', icon: '💧' },
+  case: { key: 'case', label: 'Case Hotspot (red)', color: '#dc2626', icon: '🔥' },
+  weather: { key: 'weather', label: 'Case Hotspot + exposure (red)', color: '#b91c1c', icon: '🌧️' },
   // Below the hotspot gate but at/above the sensitivity's watchMin: an early
   // signal, not a hotspot. No warning is created, so logging a proactive
   // intervention against one carries no mandatory remarks.
@@ -91,6 +101,24 @@ export const ZONE_KINDS = {
 
 // Zone-level alert kinds (also whitelisted server-side in ALERT_KINDS).
 export const ZONE_ALERT_KIND = { case: 'zone_disease_density', weather: 'zone_disease_flood', exposure: 'zone_disease_flood' };
+
+// Which zone kinds each map mode presents. The HOTSPOT Disease Map is CASES ONLY
+// (the red side: `case` = cases with no environmental driver, `weather` = a case
+// hotspot sitting inside an exposed area, `watch` = climbing but below the gate).
+// The DISASTER Disease Map carries the ENVIRONMENT (the blue side: `exposure` = an
+// environmental driver with no case signal — water, rain, flood or heat). Keeping
+// the split here lets the map layers and the sidebar counters stay mode-agnostic
+// and simply follow the rows they are handed.
+export const ZONE_MODE_KINDS = {
+  hotspot: ['case', 'weather', 'watch'],
+  disaster: ['exposure'],
+};
+
+/** True when a zone row of `kind` belongs on the given map mode. */
+export function zoneKindFitsMode(kind, mode) {
+  const kinds = ZONE_MODE_KINDS[mode];
+  return !kinds || kinds.includes(kind);
+}
 
 // ── deterministic cell selection (port of coordinates.js / geoSnap.js) ────────
 function seededRandom(seed) {
@@ -517,11 +545,13 @@ function toDay(v) {
 //   purokAreas,              // optional [{ name, rings }] real boundaries for this barangay
 //   floodPins: [{ latitude, longitude, event_type, purok }],  // active pins only
 //   thresholds,              // a ZONE_PRESETS entry; defaults to `standard`
+//   waterOpts,               // CHO buffer overrides for the water driver (or null)
 //   now: Date,               // optional, for tests
 // }
 export function buildZoneHotspots({
   barangayName, cases = [], feature, extractUnit, rainfall = null, floodPins = [], monthIndex,
   thresholds = ZONE_PRESETS.standard, purokAreas = null, zoneRainfall = null,
+  waterOpts = null,
 }) {
   const th = thresholds || ZONE_PRESETS.standard;
   const zones = zonesForBarangay(barangayName, feature, purokAreas);
@@ -690,6 +720,18 @@ export function buildZoneHotspots({
     if (rapidDiseases.length) qualifying.sort((a, b) => b.cases7 - a.cases7);
 
     const flood = floodZoneIdx.has(zone.idx);
+    // BLUE-ZONE driver, independent of cases. Water proximity comes from the bundled
+    // OSM geometry (Laguna de Bay shoreline + large inland water bodies, >= 0.2 ha):
+    // "if there's a big pond of water then it's blue". This driver IS spatial, so it
+    // belongs at zone (address) level.
+    //
+    // Heat is deliberately NOT a zone driver: Open-Meteo reports temperature per
+    // BARANGAY, so gating zones on it would turn every zone of a hot barangay blue at
+    // once and the map would lose its signal. Heat flags the barangay instead (the
+    // minimal blue disc), which is the tiering the leader described: minimal weather
+    // level at the top, zonal detail once you reach the barangay addresses.
+    const waterDetail = waterDriversForRings(zone.rings, waterOpts ? { opts: waterOpts } : undefined);
+    const waterGate = !!waterDetail.blue;
     // Prefer the zone's OWN rain reading when the client supplied one — it sees the
     // sub-barangay cell, so it CAN discriminate between two cells and a rain-only
     // gate stands on its own. Otherwise fall back to the barangay reading, which
@@ -702,7 +744,7 @@ export function buildZoneHotspots({
     const rainGateOn = zRain ? !!zoneRainGate : (rainGate && zoneHasCases);
     const rainReason = zRain || { rain24, rain72 };
     const rainSource = zRain ? 'zone' : ((rainGate && zoneHasCases) ? 'barangay' : null);
-    const envGate = flood || rainGateOn;
+    const envGate = flood || rainGateOn || waterGate;
     const caseTotal7 = Object.values(slot).reduce((n, s) => n + s.cur, 0);
 
     if (!envGate && qualifying.length === 0 && near.length === 0) return;
@@ -724,6 +766,8 @@ export function buildZoneHotspots({
     if (rainGateOn && rainReason.rain72 != null && rainReason.rain72 >= th.rain72) envReasons.push(`${Math.round(rainReason.rain72)} mm rain / 72h`);
     if (rainGateOn && rainReason.rain24 != null && rainReason.rain24 >= th.rain24) envReasons.push(`${Math.round(rainReason.rain24)} mm rain / 24h`);
     if (flood) envReasons.push(...(floodReasons.get(zone.idx) || ['Flood']).map(r => `flood pin · ${r}`));
+    // Blue-zone reason: water (the leader's example). Heat is a barangay-level flag.
+    if (waterGate) waterDetail.drivers.forEach(d => envReasons.push(waterDriverReason(d, waterDetail)));
 
     // Hazard types driving the exposure gate — the popup maps these to the
     // "Watch for" disease list. A rain-only gate stands in as 'Heavy Rain'.
@@ -761,7 +805,7 @@ export function buildZoneHotspots({
       rapidDiseases,
       season,
       seasonHit,
-      env: { rain24: rainReason.rain24, rain72: rainReason.rain72, flood, gate: envGate, reasons: envReasons, hazardTypes: [...hazardTypes], rainSource },
+      env: { rain24: rainReason.rain24, rain72: rainReason.rain72, flood, gate: envGate, reasons: envReasons, hazardTypes: [...hazardTypes], rainSource, water: waterDetail, waterGate },
       units: [...(unitsByZone.get(zone.idx) || [])],
       breakdown,
       merged: mergedIdx.length > 0,

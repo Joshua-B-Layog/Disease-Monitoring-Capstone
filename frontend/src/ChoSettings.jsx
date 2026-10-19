@@ -10,7 +10,23 @@ import { emitTwoFaChanged, onTwoFaChanged } from './twoFaSignal';
 import { formatDate, formatDateTime } from './formatDate';
 import { buildPdfDoc } from './exportPdf';
 import { useI18n } from './i18n';
+import cabuyaoBoundaries from './data/cabuyao_barangays.geojson.json';
+import { waterDriversForFeature, WATER_BODIES, buildWaterIndex, mergeWaterFeatures, waterDriverReason, WATER_DRIVER_ICONS, waterAssetInfo, waterProneDiseases } from './waterRisk';
 import './ChoSettings.css';
+
+// Maps GeoJSON ADM4_EN values to the DB barangays.name values (same map the
+// Disaster Disease Map uses, kept here so the double-check recompute agrees).
+const GEOJSON_TO_DB_NAME = {
+  'Baclaran': 'Baclaran', 'Banaybanay': 'Banay-Banay', 'Banlic': 'Banlic', 'Butong': 'Butong',
+  'Bigaa': 'Bigaa', 'Casile': 'Casile', 'Gulod': 'Gulod', 'Mamatid': 'Mamatid', 'Marinig': 'Marinig',
+  'Niugan': 'Niugan', 'Pittland': 'Pittland', 'Pulo': 'Pulo', 'Sala': 'Sala', 'San Isidro': 'San Isidro',
+  'Diezmo': 'Diezmo', 'Barangay Uno (Pob.)': 'Barangay Uno (Poblacion)',
+  'Barangay Dos (Pob.)': 'Barangay Dos (Poblacion)', 'Barangay Tres (Pob.)': 'Barangay Tres (Poblacion)',
+};
+const findBoundaryFeature = (dbName) => cabuyaoBoundaries.features.find(f => {
+  const mapped = GEOJSON_TO_DB_NAME[f.properties.ADM4_EN] || f.properties.ADM4_EN;
+  return mapped === dbName;
+}) || null;
 
 const CACHE_STORES = [
   { key: 'cases_cached_at', label: 'Cases' },
@@ -231,6 +247,16 @@ export default function CHOSettings({
   const [purokMsg, setPurokMsg] = useState('');
   const [purokErr, setPurokErr] = useState('');
   const purokInputRef = useRef(null);
+  // Water / environmental risk (Settings -> Data Management -> Water & Environmental
+  // Risk). `waterRows` are the CHO-drawn water features that feed the engine;
+  // `waterRisk` is the stored per-barangay verdict the weekly BHW advisory reads.
+  const [waterRows, setWaterRows] = useState([]);
+  const [waterRisk, setWaterRisk] = useState([]);
+  const [waterLoading, setWaterLoading] = useState(false);
+  const [waterBusy, setWaterBusy] = useState(false);
+  const [waterMsg, setWaterMsg] = useState('');
+  const [waterErr, setWaterErr] = useState('');
+  const [waterForm, setWaterForm] = useState({ barangay_id: '', name: '', radius_m: '40', latitude: '', longitude: '' });
   const [toastMsg, setToastMsg] = useState('');
   const [toastType, setToastType] = useState('success');
   const [preview, setPreview] = useState(null);
@@ -626,6 +652,105 @@ export default function CHOSettings({
     axios.delete(API_URL + `/api/purok-areas/${zone.id}`, { headers: authHeaders() })
       .then(() => { setPurokMsg(t('Zone deleted.')); setTimeout(() => setPurokMsg(''), 5000); loadPurokAreas(); })
       .catch(err => { setPurokErr(t('❌ ') + ((err.response && err.response.data && err.response.data.error) || t('Could not delete the zone.'))); setTimeout(() => setPurokErr(''), 6000); });
+  };
+
+  // ── Water / environmental risk (blue zones) ──
+  const loadWaterRisk = () => {
+    setWaterLoading(true);
+    Promise.all([
+      axios.get(API_URL + '/api/water-features', { headers: authHeaders() }),
+      axios.get(API_URL + '/api/barangay-water-risk', { headers: authHeaders() }),
+    ])
+      .then(([wf, wr]) => {
+        setWaterRows(Array.isArray(wf.data) ? wf.data : []);
+        setWaterRisk(Array.isArray(wr.data) ? wr.data : []);
+      })
+      .catch(() => {})
+      .finally(() => setWaterLoading(false));
+  };
+  useEffect(() => { if (activeUser?.role === 'CHO') loadWaterRisk(); }, [activeUser?.role]);
+
+  // Recompute the per-barangay verdict HERE (the browser owns the engine + the OSM
+  // asset + any manual features) and POST the result so the weekly advisory and the
+  // map agree. The recompute honours a stored buffer override per barangay.
+  const handleRecomputeWater = () => {
+    setWaterBusy(true); setWaterMsg(''); setWaterErr('');
+    try {
+      const index = buildWaterIndex(mergeWaterFeatures(WATER_BODIES ? WATER_BODIES.features : [], waterRows));
+      const overrideById = new Map(waterRisk.map(r => [r.barangay_id, r]));
+      const rows = [];
+      cabuyaoBoundaries.features.forEach(f => {
+        const name = GEOJSON_TO_DB_NAME[f.properties.ADM4_EN] || f.properties.ADM4_EN;
+        const brgy = (barangayList || []).find(b => b.name === name);
+        if (!brgy) return;
+        const ov = overrideById.get(brgy.id);
+        const buf = ov && ov.buffer_override_m ? Number(ov.buffer_override_m) : null;
+        const opts = buf && Number.isFinite(buf) ? { lakeBufferM: buf, waterBodyBufferM: buf } : undefined;
+        const d = waterDriversForFeature(f, { index, opts });
+        rows.push({
+          barangay_id: brgy.id, blue: d.blue, drivers: d.drivers,
+          laguna_m: d.lagunaM, water_body_m: d.waterBodyM,
+          nearest_name: d.nearest ? d.nearest.name : null,
+          nearest_kind: d.nearest ? d.nearest.kind : null,
+          contained: d.contained || [],
+        });
+      });
+      if (!rows.length) throw new Error(t('No barangays matched.'));
+      axios.post(API_URL + '/api/water-risk/recompute', { rows }, { headers: authHeaders() })
+        .then(res => {
+          setWaterMsg(t('✅ Recomputed water & environmental risk for ') + (res.data.rows || rows.length) + t(' barangay(s).'));
+          setTimeout(() => setWaterMsg(''), 6000);
+          loadWaterRisk();
+        })
+        .catch(err => {
+          setWaterErr(t('❌ ') + ((err.response && err.response.data && err.response.data.error) || t('Recompute failed.')));
+          setTimeout(() => setWaterErr(''), 6000);
+        })
+        .finally(() => setWaterBusy(false));
+    } catch (err) {
+      setWaterErr(t('❌ ') + (err.message || t('Recompute failed.')));
+      setWaterBusy(false);
+      setTimeout(() => setWaterErr(''), 6000);
+    }
+  };
+
+  const handleAddWaterFeature = () => {
+    const lat = parseFloat(waterForm.latitude);
+    const lng = parseFloat(waterForm.longitude);
+    if (!waterForm.name.trim()) { setWaterErr(t('❌ Give the water feature a name.')); setTimeout(() => setWaterErr(''), 6000); return; }
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) { setWaterErr(t('❌ Enter the latitude and longitude of the water feature.')); setTimeout(() => setWaterErr(''), 6000); return; }
+    const radius = Math.max(1, parseFloat(waterForm.radius_m) || 40);
+    setWaterBusy(true); setWaterErr(''); setWaterMsg('');
+    axios.post(API_URL + '/api/water-features', {
+      barangay_id: waterForm.barangay_id || null,
+      name: waterForm.name.trim(), kind: 'manual_water',
+      latitude: lat, longitude: lng, radius_m: radius,
+    }, { headers: authHeaders() })
+      .then(() => {
+        setWaterMsg(t('✅ Water feature added. Recompute to apply it to the map and the advisory.'));
+        setTimeout(() => setWaterMsg(''), 8000);
+        setWaterForm(f => ({ ...f, name: '', latitude: '', longitude: '' }));
+        loadWaterRisk();
+      })
+      .catch(err => { setWaterErr(t('❌ ') + ((err.response && err.response.data && err.response.data.error) || t('Could not add the water feature.'))); setTimeout(() => setWaterErr(''), 6000); })
+      .finally(() => setWaterBusy(false));
+  };
+
+  const handleDeleteWaterFeature = (row) => {
+    if (!window.confirm(t('Delete water feature "') + row.name + t('"?'))) return;
+    setWaterBusy(true);
+    axios.delete(API_URL + `/api/water-features/${row.id}`, { headers: authHeaders() })
+      .then(() => { setWaterMsg(t('Water feature deleted. Recompute to apply.')); setTimeout(() => setWaterMsg(''), 6000); loadWaterRisk(); })
+      .catch(() => {})
+      .finally(() => setWaterBusy(false));
+  };
+
+  const handleWaterOverride = (row, patch) => {
+    setWaterBusy(true);
+    axios.put(API_URL + `/api/barangay-water-risk/${row.barangay_id}`, patch, { headers: authHeaders() })
+      .then(() => { setWaterMsg(t('Override saved.')); setTimeout(() => setWaterMsg(''), 4000); loadWaterRisk(); })
+      .catch(() => {})
+      .finally(() => setWaterBusy(false));
   };
 
   // ── Load profile from DB on mount ──
@@ -2503,6 +2628,145 @@ if (security.newPassword !== security.confirmPassword) {
                   })()}
                 </div>
               )}
+
+              {/* Water & Environmental Risk (blue zones). The leader's requirement:
+                  an area is prone not just because it has CASES (red) but because of
+                  the ENVIRONMENT it sits in (blue) — water first, heat second. This
+                  card is the CHO's double-check: see the computed verdict per barangay,
+                  correct it, and add the ponds the bundled data does not know about. */}
+              {activeUser?.role === 'CHO' && (() => {
+                const asset = waterAssetInfo();
+                const manual = waterRows;
+                const byId = new Map((barangayList || []).map(b => [b.id, b.name]));
+                return (
+                  <div className="security-section-card" style={{ borderColor: 'var(--border-color)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                      <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(37,99,235,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '19px' }}>💧</div>
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: 'var(--text-main)' }}>{t('Water & Environmental Risk')}</h3>
+                        <span style={{ fontSize: '17px', color: 'var(--text-muted)' }}>{t('Blue zones — water / heat exposure, and the BHW advisory')}</span>
+                      </div>
+                    </div>
+
+                    <p style={{ margin: 0, fontSize: '15px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                      {t('A barangay is a BLUE zone when it is near Laguna de Bay or a large water body, or under extreme heat. Blue zones are shown on the Disaster Disease Map. Every week the field workers of an exposed barangay are warned, in-app, by email and by SMS, about the diseases they actually have that the environment favours.')}
+                    </p>
+                    <p style={{ margin: '8px 0 0 0', fontSize: '14px', color: 'var(--text-muted)' }}>
+                      {t('Source')}: {asset.source} · {asset.features} {t('bundled water features')} · {asset.bigWaterBodies} {t('large bodies')} · {manual.length} {t('added by hand')}
+                    </p>
+
+                    <div style={{ display: 'flex', gap: '12px', marginTop: '12px', flexWrap: 'wrap' }}>
+                      <button onClick={handleRecomputeWater} disabled={waterBusy || offlineMode} style={{ ...offlineBtnStyle, flex: '1 1 200px', padding: '12px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '17px', fontWeight: '600', cursor: waterBusy || offlineMode ? 'not-allowed' : 'pointer' }} title={offlineMode ? t('Unavailable offline') : ''}>
+                        {waterBusy ? t('Working...') : t('🔄 Recompute from the map engine')}
+                      </button>
+                      <button onClick={loadWaterRisk} disabled={waterLoading || offlineMode} style={{ ...offlineBtnStyle, flex: '1 1 120px', padding: '12px', background: 'var(--bg-surface)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '17px', fontWeight: '600', cursor: waterLoading || offlineMode ? 'not-allowed' : 'pointer' }} title={offlineMode ? t('Unavailable offline') : ''}>
+                        {waterLoading ? t('Loading...') : t('Refresh')}
+                      </button>
+                    </div>
+
+                    {waterMsg && (
+                      <div style={{ marginTop: '8px', padding: '8px 14px', borderRadius: '8px', fontSize: '15px', fontWeight: '500', background: 'var(--input-bg)', color: 'var(--success-text)' }}>{waterMsg}</div>
+                    )}
+                    {waterErr && (
+                      <div style={{ marginTop: '8px', padding: '8px 14px', borderRadius: '8px', fontSize: '15px', fontWeight: '500', background: 'var(--input-bg)', color: 'var(--warning-text)' }}>{waterErr}</div>
+                    )}
+
+                    {/* Per-barangay verdict. The CHO can force a verdict either way
+                        and widen the buffer the engine uses for that barangay. */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '14px' }}>
+                      {waterRisk.length === 0 ? (
+                        <p style={{ margin: 0, fontSize: '15px', color: 'var(--text-muted)' }}>
+                          {t('No water-risk verdict stored yet. Use Recompute to build it from the map engine.')}
+                        </p>
+                      ) : waterRisk.map(r => {
+                        const blue = r.effective_blue;
+                        const color = blue ? '#2563eb' : '#16a34a';
+                        const badge = r.override_blue != null ? (blue ? t('Forced blue') : t('Forced not blue'))
+                          : blue ? t('Blue zone') : t('Not a blue zone');
+                        return (
+                          <div key={r.barangay_id} style={{ padding: '10px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: `1px solid ${color}55` }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: '15px' }}>{blue ? '💧' : '✅'}</span>
+                              <span style={{ flex: 1, minWidth: '140px', fontSize: '15px', fontWeight: '700', color: 'var(--text-main)' }}>{r.barangay_name}</span>
+                              <span style={{ fontSize: '13px', fontWeight: '700', color, whiteSpace: 'nowrap' }}>{badge}</span>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                                {t('Buffer (m)')}
+                                <input type="number" min="0" step="50" defaultValue={r.buffer_override_m != null ? r.buffer_override_m : ''}
+                                  placeholder={t('default')}
+                                  onBlur={e => {
+                                    const v = e.target.value.trim();
+                                    const val = v === '' ? null : Number(v);
+                                    if (val !== null && (!Number.isFinite(val) || val < 0)) return;
+                                    if ((r.buffer_override_m == null && val == null) || Number(r.buffer_override_m) === Number(val)) return;
+                                    handleWaterOverride(r, { buffer_override_m: val });
+                                  }}
+                                  style={{ width: '84px', background: 'var(--bg-surface)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '4px 6px', fontSize: '13px' }} />
+                              </label>
+                              <ChoDropdown
+                                value={r.override_blue == null ? '' : (r.override_blue ? '1' : '0')}
+                                onChange={(v) => handleWaterOverride(r, { override_blue: v === '' ? null : v })}
+                                options={[
+                                  { value: '', label: t('Use computed') },
+                                  { value: '1', label: t('Force blue') },
+                                  { value: '0', label: t('Force not blue') },
+                                ]}
+                                style={{ flex: '0 0 132px', minWidth: '132px' }}
+                                buttonStyle={{ padding: '4px 8px', fontSize: '13px', borderRadius: '6px' }}
+                              />
+                            </div>
+                            <div style={{ marginTop: '4px', fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                              {(r.drivers || []).length > 0
+                                ? (r.drivers || []).map(d => `${WATER_DRIVER_ICONS[d] || '💧'} ${d === 'laguna_de_bay' ? waterDriverReason(d, { lagunaM: r.laguna_m }) : d === 'inland_water' ? waterDriverReason(d, { waterBodyM: r.water_body_m, contained: r.contained }) : d}`).join(' · ')
+                                : t('No environmental driver detected.')}
+                              {r.prone && r.prone.length > 0 ? ` · ${t('Watch for')}: ${r.prone.join(', ')}` : ''}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Add a pond / reservoir by hand. It feeds the engine on the next
+                        Recompute (the map merges it too), so the leader's "manual water
+                        work must feed the algorithm" holds. */}
+                    <div style={{ borderTop: '1px dashed var(--border-color)', paddingTop: '12px', marginTop: '14px' }}>
+                      <p style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t('Add a Water Feature')}</p>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px' }}>
+                        <ChoDropdown
+                          value={waterForm.barangay_id}
+                          onChange={(v) => setWaterForm(f => ({ ...f, barangay_id: v }))}
+                          placeholder={t('Barangay (optional)')}
+                          options={[{ value: '', label: t('Barangay (optional)') }, ...(barangayList || []).map(b => ({ value: b.id, label: b.name }))]}
+                          buttonStyle={{ padding: '8px 10px', fontSize: '15px' }}
+                        />
+                        <input value={waterForm.name} onChange={e => setWaterForm(f => ({ ...f, name: e.target.value }))} placeholder={t('Name (e.g. Pond beside covered court)')}
+                          style={{ ...fieldStyle, padding: '8px 10px', fontSize: '15px' }} />
+                        <input value={waterForm.latitude} onChange={e => setWaterForm(f => ({ ...f, latitude: e.target.value }))} placeholder={t('Latitude')}
+                          style={{ ...fieldStyle, padding: '8px 10px', fontSize: '15px' }} />
+                        <input value={waterForm.longitude} onChange={e => setWaterForm(f => ({ ...f, longitude: e.target.value }))} placeholder={t('Longitude')}
+                          style={{ ...fieldStyle, padding: '8px 10px', fontSize: '15px' }} />
+                        <input type="number" min="1" value={waterForm.radius_m} onChange={e => setWaterForm(f => ({ ...f, radius_m: e.target.value }))} placeholder={t('Radius (m)')}
+                          style={{ ...fieldStyle, padding: '8px 10px', fontSize: '15px' }} />
+                      </div>
+                      <button onClick={handleAddWaterFeature} disabled={waterBusy || offlineMode} style={{ ...offlineBtnStyle, marginTop: '8px', padding: '10px 18px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: '600', cursor: waterBusy || offlineMode ? 'not-allowed' : 'pointer' }} title={offlineMode ? t('Unavailable offline') : ''}>
+                        {t('💧 Add water feature')}
+                      </button>
+                      {manual.length > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '10px' }}>
+                          {manual.map(row => (
+                            <div key={row.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', borderRadius: '6px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)' }}>
+                              <span style={{ flex: 1, minWidth: 0, fontSize: '14px', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                💧 {row.name} <span style={{ color: 'var(--text-muted)' }}>· {row.barangay_name || t('unassigned')} · ⌀{Math.round(Number(row.radius_m) || 0)}m · {Math.round(Number(row.area_m2) || 0)} m²</span>
+                              </span>
+                              <button onClick={() => handleDeleteWaterFeature(row)} disabled={waterBusy}
+                                style={{ padding: '2px 7px', borderRadius: '5px', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--warning-text)', cursor: waterBusy ? 'not-allowed' : 'pointer', fontSize: '14px' }}>🗑</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
               </div>
             )}
           </div>
@@ -2517,3 +2781,55 @@ const fieldStyle = {
   boxShadow: '0 2px 4px rgba(0,0,0,0.02)', outline: 'none', width: '100%',
   boxSizing: 'border-box',
 };
+
+// Same look + behaviour as the Profile -> "Unit Office Assignment" control (button
+// + rotating ▼ + absolutely positioned panel + ✓ on the selected row), packaged so
+// the Data Management -> Water & Environmental Risk fields stop falling back to the
+// browser's native <select> popup. `options` = [{ value, label }].
+function ChoDropdown({ value, options, onChange, placeholder = '', style, buttonStyle, panelMaxHeight = 220 }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
+  const norm = (v) => (v == null ? '' : String(v));
+  const selected = (options || []).find(o => norm(o.value) === norm(value));
+  return (
+    <div style={{ position: 'relative', ...(style || {}) }} ref={ref}>
+      <button type="button" onClick={() => setOpen(o => !o)}
+        style={{
+          ...fieldStyle, cursor: 'pointer', display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', gap: '8px', textAlign: 'left',
+          background: 'var(--input-bg)', color: 'var(--text-main)', ...(buttonStyle || {}),
+        }}>
+        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {selected ? selected.label : placeholder}
+        </span>
+        <span style={{ fontSize: '13px', transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', opacity: 0.6, pointerEvents: 'none' }}>▼</span>
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 30,
+          background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
+          borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,0.25)',
+          maxHeight: panelMaxHeight, overflowY: 'auto', padding: '4px',
+        }}>
+          {(options || []).map(o => {
+            const isSel = norm(o.value) === norm(value);
+            return (
+              <button key={norm(o.value)} type="button"
+                onClick={() => { onChange(o.value); setOpen(false); }}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '9px 12px', border: 'none', borderRadius: '8px', cursor: 'pointer', background: isSel ? 'rgba(96,165,250,0.18)' : 'transparent', color: 'var(--text-main)', fontSize: '15px', fontWeight: isSel ? '600' : '400', textAlign: 'left' }}>
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.label}</span>
+                {isSel && <span style={{ color: '#60a5fa', fontSize: '15px' }}>✓</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

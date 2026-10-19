@@ -9,6 +9,7 @@ import ExportPreviewModal from './components/ExportPreview';
 import InterventionModal from './components/InterventionModal';
 import { DISASTER_ICONS, SEVERITY_COLORS, ACTION_TYPE_ICONS } from './disasterRisk';
 import { RISK_FACTOR_GROUPS, summarizeRiskFactors } from './riskFactors';
+import { waterProneDiseases, waterDriverReason, waterDriverLabel, WATER_DRIVER_ICONS, WATER_DRIVER_ORDER } from './waterRisk';
 
 // Counts up (or down) to `value` whenever it changes
 const AnimatedNumber = ({ value, style }) => {
@@ -117,6 +118,9 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   const yearRef = useRef(null);
   const [hoveredCard, setHoveredCard] = useState(null);
   const [epiAlerts, setEpiAlerts] = useState([]);
+  // Per-barangay water / environmental verdict (blue zones). Drives the
+  // Environmental Risk vulnerability card and the export section below.
+  const [waterRisk, setWaterRisk] = useState([]);
   const [disasterEvents, setDisasterEvents] = useState([]);
   // Warning-linked interventions (barangay_actions rows answering a flagged
   // disease count). CHO logs them from the alert cards below; BHW reads them.
@@ -131,6 +135,9 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       if (!isOnline()) return;
       axios.get(API_URL + '/api/epi-alerts')
         .then(res => { if (alive) setEpiAlerts(Array.isArray(res.data) ? res.data : []); })
+        .catch(() => {});
+      axios.get(API_URL + '/api/barangay-water-risk')
+        .then(res => { if (alive) setWaterRisk(Array.isArray(res.data) ? res.data : []); })
         .catch(() => {});
       axios.get(API_URL + '/api/disaster-events?active=1')
         .then(res => { if (alive) setDisasterEvents(Array.isArray(res.data) ? res.data : []); })
@@ -342,6 +349,40 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
   // ── Epidemiology: contributing risk factors across the scoped/period cases ──
   const riskFactorSummary = summarizeRiskFactors(displayCases);
   const factorGroupFor = (key) => RISK_FACTOR_GROUPS.find(g => g.factors.some(f => f.key === key));
+
+  // ── Environmental risk (blue zones) ────────────────────────────────────────
+  // The leader's rule: a place is prone not only because it has CASES (red) but
+  // because of the ENVIRONMENT it sits in (blue) — water first, heat second. A
+  // barangay that is a blue zone AND already has one of the water-/heat-borne
+  // diseases is a genuine vulnerability, so it is surfaced as its own card.
+  const envRisk = (() => {
+    const present = new Map();  // barangay key -> Map(disease -> count)
+    displayCases.forEach(c => {
+      if (!c.barangay_name || !c.disease_name) return;
+      const k = String(c.barangay_name).trim().toLowerCase();
+      if (!present.has(k)) present.set(k, new Map());
+      const m = present.get(k);
+      m.set(c.disease_name, (m.get(c.disease_name) || 0) + 1);
+    });
+    return waterRisk
+      .filter(r => r && r.effective_blue)
+      .map(r => {
+        const have = present.get(String(r.barangay_name || '').trim().toLowerCase()) || new Map();
+        const proneAll = (r.prone && r.prone.length) ? r.prone : waterProneDiseases(r.drivers || []);
+        const prone = proneAll
+          .map(d => ({ disease: d, count: have.get(d) || 0 }))
+          .filter(x => x.count > 0)
+          .sort((a, b) => b.count - a.count);
+        return { ...r, proneAll, prone, proneTotal: prone.reduce((s, x) => s + x.count, 0) };
+      })
+      .sort((a, b) => b.proneTotal - a.proneTotal || a.barangay_name.localeCompare(b.barangay_name));
+  })();
+  const envRiskFlagged = envRisk.filter(r => r.prone.length > 0);
+  const envRiskDriverText = (r) => (r.drivers || []).map(d => {
+    if (d === 'laguna_de_bay') return waterDriverReason(d, { lagunaM: r.laguna_m });
+    if (d === 'inland_water') return waterDriverReason(d, { waterBodyM: r.water_body_m, contained: r.contained });
+    return d === 'heat' ? t(waterDriverLabel(d)) : d;
+  }).join(' · ');
 
   // ── Same-period-last-year comparison (for period charts with a date range) ──
   const lastYearRange = (() => {
@@ -1019,6 +1060,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
     rising_trend: t('Rising trend warning'),
     hotspot: t('Recurring hotspot warning'),
     disaster: t('Disaster alert'),
+    environmental_exposure: t('Environmental exposure advisory'),
   }[kind] || t('Disease warning'));
 
   // Opens the "Log Intervention" modal already pointed at the warning.
@@ -1058,12 +1100,15 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       epiAlerts.forEach(a => {
         const label = a.alert_type === 'surge' ? t('Rapid Surge')
           : a.alert_type === 'mortality' ? t('Mortality Alert')
+          : a.alert_type === 'rapid_outbreak' ? t('Rapid Outbreak Alert')
+          : a.alert_type === 'environmental_exposure' ? t('Environmental Risk Advisory')
           : t('Epidemiological Alert');
+        const isEnv = a.alert_type === 'environmental_exposure';
         alerts.push({
           label,
           detail: `${a.disease_name} · ${a.barangay_name} (${a.alert_value})`,
-          color: a.alert_type === 'surge' ? '#D97706' : '#DC2626',
-          border: a.alert_type === 'surge' ? 'rgba(217,119,6,0.3)' : 'rgba(220,38,38,0.3)',
+          color: isEnv ? '#2563eb' : a.alert_type === 'surge' ? '#D97706' : '#DC2626',
+          border: isEnv ? 'rgba(37,99,235,0.3)' : a.alert_type === 'surge' ? 'rgba(217,119,6,0.3)' : 'rgba(220,38,38,0.3)',
           cases: displayCases.filter(c => c.disease_name === a.disease_name && c.barangay_name === a.barangay_name),
           warn: { barangay: a.barangay_name || '', barangay_id: a.barangay_id || null, disease: a.disease_name || '', count: a.alert_value, alert_id: a.id || null, alert_kind: a.alert_type || 'epi_count' },
         });
@@ -1254,6 +1299,32 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
       </table>`;
   };
 
+  // Environmental-risk (blue zone) section for the export: which barangays sit on
+  // water / in the heat and which water-/heat-borne diseases they already have —
+  // the "kung anong klase disease ang meron sila" reading the leader asked for.
+  const buildEnvRiskSectionHTML = () => {
+    if (envRisk.length === 0) return '';
+    const rows = envRisk.map(r => `<tr>
+        <td style="padding:6px 10px;font-size:13px;white-space:nowrap;">${r.barangay_name}</td>
+        <td style="padding:6px 10px;font-size:13px;">${envRiskDriverText(r) || '-'}</td>
+        <td style="padding:6px 10px;font-size:13px;">${r.prone.length
+          ? r.prone.map(p => `${p.disease} (${p.count})`).join(', ')
+          : `<span style="color:#64748b;">${t('None present')} &mdash; ${t('environment favours')}: ${r.proneAll.slice(0, 4).join(', ')}</span>`}</td>
+      </tr>`).join('');
+    return `<h3>${t('Environmental Risk')} &mdash; ${t('Blue zones')}</h3>
+      <p style="margin:0 0 8px 0;font-size:12px;color:#475569;">
+        ${t('Blue-zone barangays (near Laguna de Bay / a large water body, flood-prone or under extreme heat) and the water-/heat-borne diseases already present there this period.')}
+      </p>
+      <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;">
+        <thead><tr style="background:#eff6ff;">
+          <th style="padding:6px 10px;font-size:12px;text-align:left;">${t('Barangay')}</th>
+          <th style="padding:6px 10px;font-size:12px;text-align:left;">${t('Environmental driver')}</th>
+          <th style="padding:6px 10px;font-size:12px;text-align:left;">${t('Watch for')}</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  };
+
   // Full-dashboard report for Word / PDF(Print) / PPT slide exports
   const buildDashboardReportHTML = (variant) => {
     const isSlide = variant === 'slide';
@@ -1357,6 +1428,7 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
 
       ${buildAlertsSectionHTML()}
       ${buildInterventionsSectionHTML()}
+      ${buildEnvRiskSectionHTML()}
 
       <h3>${t('Weekly Trend')}</h3>
       ${weekBars.length === 0 ? `<p style="color:#64748b;font-size:14px;">${t('No cases found.')}</p>` : buildBarChartHTML(weekBars, t('Weekly Trend'), weekMax)}
@@ -1912,6 +1984,61 @@ const Dashboard = ({ setActiveTab, loggedUser, dateFormat, fontScale, compactMod
                 </div>
               );
             })}
+          </div>
+        )}
+      </div>
+
+      {/* ── ENVIRONMENTAL RISK (BLUE ZONES) ──
+          The leader's ask: an area is prone not only because it has CASES (red) but
+          because of the ENVIRONMENT it sits in (blue) — water first, heat second.
+          This card flags the blue-zone barangays and, for each, the water-/heat-borne
+          diseases that barangay ALREADY has. */}
+      <div className="cdms-view-in" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: compactMode ? '12px' : '20px', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', marginBottom: '12px' }}>
+          <h4 style={{ color: 'var(--text-main)', margin: 0, fontSize: '15px', fontWeight: '600' }}>
+            💧 {t('Environmental Risk')} - {t('Blue zones')}
+          </h4>
+          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+            {waterRisk.length === 0
+              ? t('Run the water-risk recompute in Settings to build this view.')
+              : `${envRisk.length}/${waterRisk.length} ${t('barangays are blue zones')} · ${envRiskFlagged.length} ${t('with a matching disease')}`}
+          </span>
+        </div>
+        {envRisk.length === 0 ? (
+          <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-muted)' }}>
+            {waterRisk.length === 0
+              ? t('No water-risk verdict stored yet.')
+              : t('No barangay in scope is a blue zone right now.')}
+          </p>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px' }}>
+            {envRisk.map((r, i) => (
+              <div key={r.barangay_id || i} style={{ display: 'flex', flexDirection: 'column', gap: '6px', background: 'var(--input-bg)', border: `1px solid ${r.prone.length ? 'rgba(220,38,38,0.35)' : 'var(--border-color)'}`, borderRadius: '8px', padding: '12px 14px', animationDelay: `${i * 45}ms` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ width: '30px', height: '30px', borderRadius: '8px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(37,99,235,0.14)', fontSize: '16px' }}>💧</span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: '14px', fontWeight: '700', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.barangay_name}</span>
+                  {r.prone.length > 0 && (
+                    <span style={{ flexShrink: 0, padding: '2px 8px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', color: '#fff', background: '#dc2626' }}>
+                      {r.proneTotal} ⚠
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                  {(r.drivers || []).map(d => WATER_DRIVER_ICONS[d] || '💧').join('')} {envRiskDriverText(r) || t('Environmental driver present')}
+                </div>
+                <div style={{ fontSize: '12px', lineHeight: 1.45 }}>
+                  {r.prone.length > 0 ? (
+                    <span style={{ color: 'var(--warning-text, #b45309)', fontWeight: '600' }}>
+                      ⚠ {t('Watch for')}: {r.prone.map(p => `${p.disease} (${p.count})`).join(', ')}
+                    </span>
+                  ) : (
+                    <span style={{ color: 'var(--text-muted)' }}>
+                      {t('Environment favours')}: {r.proneAll.slice(0, 4).join(', ')}{r.proneAll.length > 4 ? '…' : ''}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
