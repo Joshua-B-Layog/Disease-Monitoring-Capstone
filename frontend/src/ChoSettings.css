@@ -1,7 +1,10 @@
 /* --- Root Layout Wrapper --- */
 .settings-wrapper {
   width: 100%;
-  min-height: 100vh;
+  /* The app scales with CSS `zoom`; `100vh` inside that subtree shrank with it
+     and left a bare strip at the bottom on Small / Medium. Divide by the same
+     scale so the page still fills the window. */
+  min-height: calc((100vh - var(--top-nav-height, 76px)) / var(--app-font-scale, 1));
   background-color: var(--bg-main);
   padding: 40px 20px;
   box-sizing: border-box;

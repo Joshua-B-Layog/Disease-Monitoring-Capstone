@@ -386,12 +386,57 @@ function AnimatedMapView({ setFade, active, onSequenceComplete }) {
 
 
 
+    // Which role card is currently highlighted. Derived from the state that
+    // is actually sent to /api/login, so the glow can never disagree with the
+    // payload. '' means "nothing selected".
+    const activeRoleKey = !roleChosen ? ''
+      : selectedContext === 'CHO Unit I (Sala)' ? 'CHO1'
+      : selectedContext === 'CHO Unit II (Pulo)' ? 'CHO2'
+      : selectedRole === 'BHW' ? 'BHW'
+      : '';
+
+    // Clicking the ALREADY selected card deselects it, so the user can change
+    // their mind without reloading the screen. Selecting clears the error.
     const handleRoleCard = (key) => {
       setLoginError('');
+      if (activeRoleKey && activeRoleKey === key) {
+        setRoleChosen(false);
+        setSelectedRole('');
+        setSelectedContext('');
+        return;
+      }
       setRoleChosen(true);
       if (key === 'CHO1') { setSelectedRole('CHO'); setSelectedContext('CHO Unit I (Sala)'); }
       else if (key === 'CHO2') { setSelectedRole('CHO'); setSelectedContext('CHO Unit II (Pulo)'); }
       else { setSelectedRole('BHW'); setSelectedContext(''); }
+    };
+
+    // Explicit "clear" chip - same effect as clicking the selected card.
+    const clearRoleSelection = () => {
+      setLoginError('');
+      setRoleChosen(false);
+      setSelectedRole('');
+      setSelectedContext('');
+    };
+
+    // Sign-up role cards work exactly like the login ones: click the card you
+    // want, click it AGAIN to deselect it and fall back to the "Before you
+    // register" view. Clicking the OTHER card switches the role in place.
+    const handleSignupRoleCard = (role) => {
+      setSignupError('');
+      if (signupRolePicked && signupRole === role) {
+        setSignupRolePicked(false);
+        return;
+      }
+      setSignupRole(role);
+      setSignupRolePicked(true);
+    };
+
+    // Same "clear selection" chip as the login screen - drops back to the
+    // pre-registration view (helper + "Before you register" notice).
+    const clearSignupRoleSelection = () => {
+      setSignupError('');
+      setSignupRolePicked(false);
     };
 
     const handleUnifiedSubmit = (e) => {
@@ -692,6 +737,47 @@ const handleLoginOtpSubmit = async (e) => {
       }
     };
 
+    // CHO accounts cannot be self-registered - the applicant must ask the CHO
+    // unit directly. The SAME panel is used by the `cho_contact` step (reached
+    // from the OTP footer) and by the sign-up screen, where it is rendered
+    // INLINE instead of jumping to another screen.
+    const choContactPanel = (
+      <>
+        <div className="login-header" style={{ marginBottom: '16px', textAlign: 'left' }}>
+          <h2 style={{ fontSize: '26px', color: 'var(--text-main)', marginBottom: '8px' }}>{t('CHO Account Access')}</h2>
+          <p style={{ color: 'var(--text-muted)', lineHeight: '1.6' }}>
+            {t('For security purposes, City Health Office accounts cannot be created through self-registration. Please contact your CHO unit directly to request an account.')}
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ padding: '18px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', textAlign: 'left' }}>
+            <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '10px' }}>
+              CHO Unit I (Main - Sala)
+            </div>
+            <div style={{ fontSize: '15px', color: 'var(--text-main)', marginBottom: '6px' }}>
+              📞 {t('Contact Number')}: <span style={{ color: 'var(--brand-text)', fontWeight: '600' }}>09478891074</span>
+            </div>
+            <div style={{ fontSize: '15px', color: 'var(--text-main)' }}>
+              ✉️ {t('Email')}: <span style={{ color: 'var(--brand-text)', fontWeight: '600' }}>idkwutishappen@gmail.com</span>
+            </div>
+          </div>
+
+          <div style={{ padding: '18px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', textAlign: 'left' }}>
+            <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '10px' }}>
+              CHO Unit II (Extension - Pulo)
+            </div>
+            <div style={{ fontSize: '15px', color: 'var(--text-main)', marginBottom: '6px' }}>
+              📞 {t('Contact Number')}: <span style={{ color: 'var(--brand-text)', fontWeight: '600' }}>09558411426</span>
+            </div>
+            <div style={{ fontSize: '15px', color: 'var(--text-main)' }}>
+              ✉️ {t('Email')}: <span style={{ color: 'var(--brand-text)', fontWeight: '600' }}>jhon@gmail.com</span>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+
     return (
       <div className="login-screen ui-v2">
 
@@ -814,10 +900,24 @@ const handleLoginOtpSubmit = async (e) => {
 
                 <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500', textAlign: 'left' }}>{t('Select your access role')}</label>
                 <div className="role-grid">
-                  <button type="button" className={`role-card ${roleChosen && selectedContext === 'CHO Unit I (Sala)' ? 'is-selected' : ''}`} onClick={() => handleRoleCard('CHO1')}>CHO I<small>City Health Office Unit I (Main)</small></button>
-                  <button type="button" className={`role-card ${roleChosen && selectedContext === 'CHO Unit II (Pulo)' ? 'is-selected' : ''}`} onClick={() => handleRoleCard('CHO2')}>CHO II<small>City Health Office Unit II (Main)</small></button>
-                  <button type="button" className={`role-card ${roleChosen && selectedRole === 'BHW' ? 'is-selected' : ''}`} onClick={() => handleRoleCard('BHW')}>BHW<small>Barangay Health Worker</small></button>
+                  <button type="button" className={`role-card ${activeRoleKey === 'CHO1' ? 'is-selected' : ''}`} onClick={() => handleRoleCard('CHO1')}>CHO I<small>City Health Office Unit I (Main)</small></button>
+                  <button type="button" className={`role-card ${activeRoleKey === 'CHO2' ? 'is-selected' : ''}`} onClick={() => handleRoleCard('CHO2')}>CHO II<small>City Health Office Unit II (Main)</small></button>
+                  <button type="button" className={`role-card ${activeRoleKey === 'BHW' ? 'is-selected' : ''}`} onClick={() => handleRoleCard('BHW')}>BHW<small>Barangay Health Worker</small></button>
                 </div>
+
+                {/* Explicit deselect - visible only while a role is picked. */}
+                {roleChosen && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-6px', marginBottom: '14px' }}>
+                    <button type="button" onClick={clearRoleSelection}
+                      style={{
+                        background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-muted)',
+                        borderRadius: '20px', padding: '4px 12px', fontSize: '13px', cursor: 'pointer',
+                        display: 'inline-flex', alignItems: 'center', gap: '6px',
+                      }}>
+                      <span aria-hidden="true">✕</span> {t('Clear selection')}
+                    </button>
+                  </div>
+                )}
 
                 {selectedRole === 'BHW' && (
                   <div style={{ textAlign: 'left', marginBottom: '16px' }}>
@@ -935,7 +1035,7 @@ const handleLoginOtpSubmit = async (e) => {
                 </form>
 
                 <div style={{ marginTop: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '15px' }}>
-                  {t("Don't have an account?")} <span onClick={() => { setSignupRole('BHW'); setSignupRolePicked(false); setStep('signup'); }} style={{ color: 'var(--text-main)', cursor: 'pointer', fontWeight: '500', textDecoration: 'underline' }}>{t('Sign up here')}</span>
+                  {t("Don't have an account?")} <span onClick={() => { setSignupRole('BHW'); setSignupRolePicked(false); setStep('signup'); }} style={{ color: 'var(--brand-text)', cursor: 'pointer', fontWeight: '600', textDecoration: 'underline' }}>{t('Sign up here')}</span>
                 </div>
               </>
             )}
@@ -1002,40 +1102,9 @@ const handleLoginOtpSubmit = async (e) => {
             {/* STEP: CHO CONTACT INFO (no self-registration for CHO) */}
             {step === 'cho_contact' && (
               <>
-                <div className="login-header" style={{ marginBottom: '20px', textAlign: 'left' }}>
-                  <h2 style={{ fontSize: '26px', color: 'var(--text-main)', marginBottom: '8px' }}>CHO Account Access</h2>
-                  <p style={{ color: 'var(--text-muted)', lineHeight: '1.6' }}>
-                    For security purposes, City Health Office accounts cannot be created through self-registration. Please contact your CHO unit directly to request an account.
-                  </p>
-                </div>
+                {choContactPanel}
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div style={{ padding: '18px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', textAlign: 'left' }}>
-                    <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '10px' }}>
-                      CHO Unit I (Main - Sala)
-                    </div>
-                    <div style={{ fontSize: '15px', color: 'var(--text-main)', marginBottom: '6px' }}>
-                      📞 Contact Number: <span style={{ color: 'var(--primary-600, #000ECB)', fontWeight: '600' }}>09478891074</span>
-                    </div>
-                    <div style={{ fontSize: '15px', color: 'var(--text-main)' }}>
-                      ✉️ Email: <span style={{ color: 'var(--primary-600, #000ECB)', fontWeight: '600' }}>idkwutishappen@gmail.com</span>
-                    </div>
-                  </div>
-
-                  <div style={{ padding: '18px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px', textAlign: 'left' }}>
-                    <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '10px' }}>
-                      CHO Unit II (Extension - Pulo)
-                    </div>
-                    <div style={{ fontSize: '15px', color: 'var(--text-main)', marginBottom: '6px' }}>
-                      📞 Contact Number: <span style={{ color: 'var(--primary-600, #000ECB)', fontWeight: '600' }}>09558411426</span>
-                    </div>
-                    <div style={{ fontSize: '15px', color: 'var(--text-main)' }}>
-                      ✉️ Email: <span style={{ color: 'var(--primary-600, #000ECB)', fontWeight: '600' }}>jhon@gmail.com</span>
-                    </div>
-                  </div>
-                </div>
-
-                <BackButton onClick={() => setStep('signup')} className="back-btn-boxed" style={{ marginTop: '24px', width: '100%', justifyContent: 'center' }}>{t('Back to Sign-up')}</BackButton>
+                <BackButton onClick={() => { setSignupRolePicked(false); setStep('signup'); }} className="back-btn-boxed" style={{ marginTop: '24px', width: '100%', justifyContent: 'center' }}>{t('Back to Sign-up')}</BackButton>
               </>
             )}
 
@@ -1074,40 +1143,59 @@ const handleLoginOtpSubmit = async (e) => {
             {/* SIGN UP SECTION */}
             {step === 'signup' && (
                 <>
-                    <div style={{ textAlign: 'left', marginBottom: '10px' }}>
+                    <h2 style={{ marginTop: 0 }}>{t('Sign up')}</h2>
+
+                    <p className="login-helper">
+                        {signupRolePicked
+                            ? t('Create an Account. Registrations require approval from the City Health Office administrator before account activation.')
+                            : t('Choose your access role to get started with registration.')}
+                    </p>
+
+                    {/* The role cards toggle themselves on and off, so the only way
+                        back to the login screen is this button - there is no
+                        separate "Change role" button any more. */}
+                    <div style={{ textAlign: 'left', marginBottom: '12px' }}>
                         <button
                             type="button"
                             onClick={handleBackNavigation}
                             className="cdms-back-pill"
                         >← {t('Back to Log-in')}</button>
                     </div>
-                    <h2 style={{ marginTop: 0 }}>{t('Sign up')}</h2>
 
-                    {!signupRolePicked ? (
-                        <>
-                            <p className="login-helper">{t('Choose your access role to get started with registration.')}</p>
-
-                            <div className="signup-notice">
-                                <div className="signup-notice-title"><span className="signup-notice-icon">!</span> {t('Before you register')}</div>
-                                <p>{t('Select your access role to view the applicable registration instructions. BHW applicants must submit their details for approval by the City Health Office administrator. CHO personnel must request an account directly from their assigned CHO unit.')}</p>
-                            </div>
-
-                            <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500', textAlign: 'left' }}>{t('Select your access role')}</label>
-                            <div className="role-grid two-col">
-                              <button type="button" className="role-card" onClick={() => setStep('cho_contact')}>CHO<small>City Health Office Unit I &amp; II (Main) Registration</small></button>
-                              <button type="button" className="role-card" onClick={() => { setSignupRole('BHW'); setSignupRolePicked(true); }}>BHW<small>Barangay Health Worker Registration</small></button>
-                            </div>
-                        </>
-                    ) : (
-                        <>
-                    <p className="login-helper">{t('Create an Account. Registrations require approval from the City Health Office administrator before account activation.')}</p>
+                    {!signupRolePicked && (
+                        <div className="signup-notice">
+                            <div className="signup-notice-title"><span className="signup-notice-icon">!</span> {t('Before you register')}</div>
+                            <p>{t('Select your access role to view the applicable registration instructions. BHW applicants must submit their details for approval by the City Health Office administrator. CHO personnel must request an account directly from their assigned CHO unit.')}</p>
+                        </div>
+                    )}
 
                     <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-main)', fontSize: '15px', fontWeight: '500', textAlign: 'left' }}>{t('Select your access role')}</label>
                     <div className="role-grid two-col">
-                      <button type="button" className="role-card" onClick={() => setStep('cho_contact')}>CHO<small>City Health Office Unit I &amp; II (Main) Registration</small></button>
-                      <button type="button" className="role-card is-selected">BHW<small>Barangay Health Worker Registration</small></button>
+                        <button type="button" className={`role-card ${signupRolePicked && signupRole === 'CHO' ? 'is-selected' : ''}`} onClick={() => handleSignupRoleCard('CHO')}>CHO<small>City Health Office Unit I &amp; II (Main) Registration</small></button>
+                        <button type="button" className={`role-card ${signupRolePicked && signupRole === 'BHW' ? 'is-selected' : ''}`} onClick={() => handleSignupRoleCard('BHW')}>BHW<small>Barangay Health Worker Registration</small></button>
                     </div>
 
+                    {/* Explicit deselect - same chip as the login screen. */}
+                    {signupRolePicked && (
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-6px', marginBottom: '14px' }}>
+                            <button type="button" onClick={clearSignupRoleSelection}
+                                style={{
+                                    background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-muted)',
+                                    borderRadius: '20px', padding: '4px 12px', fontSize: '13px', cursor: 'pointer',
+                                    display: 'inline-flex', alignItems: 'center', gap: '6px',
+                                }}>
+                                <span aria-hidden="true">✕</span> {t('Clear selection')}
+                            </button>
+                        </div>
+                    )}
+
+                    {signupRolePicked && (signupRole === 'CHO' ? (
+                        /* CHO cannot self-register, so the instructions are shown
+                           INLINE here - no jump to another screen. */
+                        <div style={{ marginTop: '18px' }}>
+                            {choContactPanel}
+                        </div>
+                    ) : (
                     <form onSubmit={handleSignupSubmit}>
                         <div className="signup-two-col">
                         {/* Assigned Station */}
@@ -1296,33 +1384,34 @@ const handleLoginOtpSubmit = async (e) => {
                             })()}
                         </div>
                     <button type="submit" className="submit-btn" style={{ marginTop: '20px' }}>Submit Registration Request</button>
+                    </form>
+                    ))}
 
                     <div style={{ marginTop: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '15px' }}>
-                      Already have an account? <span onClick={() => setStep('role')} style={{ color: 'var(--primary-600, #000ECB)', cursor: 'pointer', fontWeight: '500' }}>Log-in here</span>
+                      {t('Already have an account?')} <span onClick={() => setStep('role')} style={{ color: 'var(--brand-text)', cursor: 'pointer', fontWeight: '600' }}>{t('Log-in here')}</span>
                     </div>
-                    </form>
-                        </>
-                    )}
                 </>
             )}
 
             {/* SHARED FOOTER ROUTING */}
             {step === 'otp_login' && (
               <div style={{ marginTop: '30px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '15px' }}>
-                Don't have an account? <span onClick={() => {
+                {t("Don't have an account?")} <span onClick={() => {
                   if (selectedRole === 'CHO') {
+                    setSignupRole('CHO');
+                    setSignupRolePicked(false);
                     setStep('cho_contact');
                     return;
                   }
                   setSignupRole('BHW');
                   setSignupRolePicked(false);
                   setStep('signup');
-                }} style={{ color: 'var(--primary-600, #000ECB)', cursor: 'pointer', fontWeight: '500' }}>Sign Up</span>
+                }} style={{ color: 'var(--brand-text)', cursor: 'pointer', fontWeight: '600' }}>{t('Sign Up')}</span>
               </div>
             )}
             {(step === 'forgot_password') && (
               <div style={{ marginTop: '30px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '15px' }}>
-                Already have an account? <span onClick={() => setStep('role')} style={{ color: 'var(--primary-600, #000ECB)', cursor: 'pointer', fontWeight: '500' }}>Sign In</span>
+                {t('Already have an account?')} <span onClick={() => setStep('role')} style={{ color: 'var(--brand-text)', cursor: 'pointer', fontWeight: '600' }}>{t('Sign In')}</span>
               </div>
             )}
             </div>

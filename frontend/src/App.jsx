@@ -1125,7 +1125,15 @@ const unreadCount = notifications.filter(n => n.is_read === 0).length;
           </div>
         </div>
 
-        <div className="content-scroller" style={{ zoom: parseFloat(fontScale), paddingBottom: activeTab === 'Map View' ? '0px' : undefined }}>
+        {/* `zoom` scales the scroller's own box too, so at Small / Large the
+            container ended short of the window and a strip of the page
+            background showed at the bottom. The inverse min-height keeps it
+            filling the window at every scale. */}
+        <div className="content-scroller" style={{
+          zoom: parseFloat(fontScale) || 1,
+          ...((parseFloat(fontScale) || 1) !== 1 ? { minHeight: `${(100 / (parseFloat(fontScale) || 1)).toFixed(4)}%` } : {}),
+          paddingBottom: activeTab === 'Map View' ? '0px' : undefined,
+        }}>
           <div key={`page-${activeTab}`} className="app-page-enter">
             {renderContent()}
           </div>

@@ -27,7 +27,7 @@ import EpiPanel from './epiStats';
 // is treated as a "zone" so flooding can be related to case clustering.
 import { buildZoneHotspots, zonesToFeatureCollection, ZONE_KINDS, ZONE_MODE_KINDS, zoneKindFitsMode, FLOOD_EVENT_TYPES, RAINY_SEASON_DISEASES, zonesForBarangay, zoneIndexForUnit, resolveZoneIdx, ZONE_PRESETS, DEFAULT_ZONE_SENSITIVITY, purokRowsToAreas, purokIdxForUnit, subCellsForZone } from './zoneHotspots';
 import { waterDriversForFeature, waterDriversForRings, heatDriverFor, waterDriverLabel, waterDriverReason, waterProneDiseases, WATER_DRIVER_ICONS, WATER_BODIES, WATER_DRIVER_ORDER, buildWaterIndex, mergeWaterFeatures } from './waterRisk';
-import { ACTION_TYPES, ACTION_TYPE_ICONS, ACTION_STATUSES, DISASTER_EVENT_TYPES, DISASTER_SEVERITIES, SEVERITY_COLORS, hazardIcon, hazardDiseases, hazardColor, hazardSvgMarkup, hazardSvgIcon, isDisasterActive, getDisasterWatch, WEATHER_ATTRIBUTION } from './disasterRisk';
+import { ACTION_TYPES, ACTION_TYPE_ICONS, ACTION_STATUSES, DISASTER_EVENT_TYPES, DISASTER_SEVERITIES, SEVERITY_COLORS, hazardIcon, hazardDiseases, hazardColor, hazardSvgMarkup, hazardSvgIcon, isDisasterActive, getDisasterWatch, WEATHER_ATTRIBUTION, weatherConditionIcon, weatherConditionColor, weatherConditionLabel, isHazardCondition } from './disasterRisk';
 import { RISK_FACTOR_GROUPS, parseRiskFactors, riskFactorLabel } from './riskFactors';
 import { seasonForMonth, seasonalDiseases } from './seasonalDiseases';
 
@@ -363,6 +363,19 @@ const snapToOwnBarangay = (c) => {
 };
 
 const PUROK_ZOOM_THRESHOLD = 17;
+
+// Rolling 2-month window ending today (e.g. 08/22 - 10/22). The map opens on
+// recent activity instead of the whole calendar year, and "Reset Filters"
+// returns to the same window.
+const rollingTwoMonthWindow = () => {
+  const t = new Date();
+  const s = new Date(t.getFullYear(), t.getMonth() - 2, t.getDate());
+  const p = (n) => String(n).padStart(2, '0');
+  return {
+    from: `${s.getFullYear()}-${p(s.getMonth() + 1)}-${p(s.getDate())}`,
+    to: `${t.getFullYear()}-${p(t.getMonth() + 1)}-${p(t.getDate())}`,
+  };
+};
 
 const PUROK_OPTIONS = [
   'All Puroks', 'Purok 1', 'Purok 2', 'Purok 3', 'Purok 4', 'Purok 5', 'Purok 6',
@@ -939,9 +952,10 @@ function PulseMarkers({ barangayData, onHover, onLeave, onClick, pinScale = 1 })
 
     barangayData.forEach(b => {
       if (!b.purok || b.purok === 'Unspecified') return;
-      const dcount = b.diseases || {};
-      const top = Object.entries(dcount).sort((a, b2) => b2[1] - a[1])[0];
-      const color = top ? getDiseaseColor(top[0]) : '#374151';
+      // Pin colour = the risk gradient (green -> amber -> red -> dark red ->
+      // crimson), NOT the top disease. Disease colours made a busy purok look
+      // pink and an empty one grey, which read as random.
+      const color = getRisk(b.totalCases).color;
       const icon = createPinIcon({ count: b.totalCases, color, label: b.purok, scale: pinScale });
 
       const m = L.marker(b.coords, { icon, zIndexOffset: 1000 }).addTo(map);
@@ -1041,9 +1055,8 @@ function AreaPins({ groups, barangay, onHover, onLeave, onClick, pinScale = 1 })
     }
 
     items.forEach(b => {
-      const dcount = b.diseases || {};
-      const top = Object.entries(dcount).sort((a, b2) => b2[1] - a[1])[0];
-      const color = top ? getDiseaseColor(top[0]) : '#374151';
+      // Same as the other pin tiers: colour by risk, not by disease.
+      const color = getRisk(b.totalCases).color;
       const icon = createPinIcon({ count: b.totalCases, color, label: b.purok, scale: pinScale });
       const m = L.marker(b.coords, { icon, zIndexOffset: 1000 }).addTo(map);
       m.on('mouseover', () => onHover(b));
@@ -1100,9 +1113,10 @@ function BarangayPins({ barangayData, onHover, onLeave, onClick, loginRole, pinS
   const markersRef = useRef([]);
 
   const placeSinglePin = (b, coords) => {
-    const dcount = b.diseases || {};
-    const top = Object.entries(dcount).sort((a, b2) => b2[1] - a[1])[0];
-    const color = top ? getDiseaseColor(top[0]) : '#374151';
+    // The barangay pin is coloured by the barangay's TOTAL case count on the
+    // risk scale, so 40 cases is always dark red and a clear barangay is
+    // always green - never grey or a stray disease colour.
+    const color = getRisk(b.totalCases).color;
     // For CHO the permanent barangay-name box shows the name at this tier, so the
     // pin's own name tag is hidden live (CSS: .cdms-barangay-pin .pin-label-tag).
     // BHW has no box (own barangay only) so keeps its name tag. Exports unhide the
@@ -1424,6 +1438,27 @@ function ScopeEnforcer({ bounds }) {
   return null;
 }
 
+// The filter sidebar can collapse, which changes the map container's width.
+// Leaflet only listens to window resize, so watch the container itself and
+// re-tile when it changes - otherwise the freed space stays blank.
+function MapResizeWatcher() {
+  const map = useMap();
+  useEffect(() => {
+    const el = map.getContainer();
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    let timer = null;
+    const ro = new ResizeObserver(() => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        try { map.invalidateSize({ pan: true, animate: false }); } catch (e) { /* map gone */ }
+      }, 120);
+    });
+    ro.observe(el);
+    return () => { clearTimeout(timer); ro.disconnect(); };
+  }, [map]);
+  return null;
+}
+
 function ChoroplethLayer({ barangayData, onHover, onLeave, onClick }) {
   const findMatch = (feature) => {
     const rawName = feature?.properties?.name ?? feature?.properties?.NAME ?? '';
@@ -1494,18 +1529,11 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const [filterCaseType, setFilterCaseType] = useState('All Case Types');
   // Date filter default: a rolling 2-month window ending today (e.g. 08/17 - 10/17),
   // so the map opens on recent activity instead of the whole calendar year.
-  const [filterDateFrom, setFilterDateFrom] = useState(() => {
-    const t = new Date();
-    const s = new Date(t.getFullYear(), t.getMonth() - 2, t.getDate());
-    const p = (n) => String(n).padStart(2, '0');
-    return `${s.getFullYear()}-${p(s.getMonth() + 1)}-${p(s.getDate())}`;
-  });
-  const [filterDateTo, setFilterDateTo] = useState(() => {
-    const t = new Date();
-    const p = (n) => String(n).padStart(2, '0');
-    return `${t.getFullYear()}-${p(t.getMonth() + 1)}-${p(t.getDate())}`;
-  });
-  const [filterYear, setFilterYear] = useState(() => String(new Date().getFullYear()));
+  const [filterDateFrom, setFilterDateFrom] = useState(() => rollingTwoMonthWindow().from);
+  const [filterDateTo, setFilterDateTo] = useState(() => rollingTwoMonthWindow().to);
+  // The year preset only drives the dropdown label - the real filter is the
+  // From/To dates, so it starts empty and reads "From / To dates".
+  const [filterYear, setFilterYear] = useState('');
   const [filterSeverity, setFilterSeverity] = useState('All Severities');
   const [filterPurok, setFilterPurok] = useState('All Puroks');
   const [filterDisease, setFilterDisease] = useState('All Diseases');
@@ -1535,6 +1563,33 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const yearRef = useRef(null);
   const [mapLayer, setMapLayer] = useState('HD'); // 'SD' = street map (OSM), 'HD' = satellite (Esri)
   const [filtersOpen, setFiltersOpen] = useState(false); // mobile: filter sidebar as hamburger drawer
+  // Desktop: the filter panel can be collapsed so the map keeps the full
+  // width instead of being squeezed by the 280px sidebar. Remembered per
+  // browser so it stays collapsed between visits.
+  const [filtersCollapsed, setFiltersCollapsed] = useState(() => {
+    try { return localStorage.getItem('cdms_map_filters_collapsed') === 'true'; } catch (e) { return false; }
+  });
+  // Phone or desktop? The same Filters button opens the drawer on a phone and
+  // collapses/expands the sidebar on a desktop.
+  const [isNarrow, setIsNarrow] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 900px)');
+    const onChange = (e) => setIsNarrow(e.matches);
+    setIsNarrow(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  const applyFiltersCollapsed = (next) => {
+    const value = typeof next === 'boolean' ? next : !filtersCollapsed;
+    setFiltersCollapsed(value);
+    try { localStorage.setItem('cdms_map_filters_collapsed', value ? 'true' : 'false'); } catch (e) { /* storage blocked */ }
+  };
+
+  const handleFiltersToggle = () => {
+    if (isNarrow) setFiltersOpen(o => !o);
+    else applyFiltersCollapsed();
+  };
 
   // ── F: Barangay Actions layer + H: Weather/Hazard layer (weather + manual pins) ──
   const [actions, setActions] = useState([]);
@@ -1560,7 +1615,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const pinScale = isDisasterMap ? 0.7 : isHotspotMap ? 0.85 : 1;
   const [weatherOffline, setWeatherOffline] = useState(false);
   const [manageActionsOpen, setManageActionsOpen] = useState(false);
-  const [actionForm, setActionForm] = useState({ id: null, barangay_id: '', barangay_name: '', hazard_id: '', action_type: ACTION_TYPES[0], description: '', target_disease: '', date_started: '', date_ended: '', status: 'planned' });
+  const [actionForm, setActionForm] = useState({ id: null, barangay_id: '', barangay_name: '', hazard_id: '', action_type: ACTION_TYPES[0], description: '', target_disease: '', date_started: '', date_ended: '', status: 'planned', status_auto: 1 });
   const [actionsSaving, setActionsSaving] = useState(false);
   // Disease-warning layer: server epi alerts (same rows the Dashboard warning
   // cards use) + the option to show only warning-linked interventions on the map
@@ -1577,6 +1632,29 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   const [interventionCtx, setInterventionCtx] = useState(null);
   const [barangayIdMap, setBarangayIdMap] = useState({});
   const [manageHazardsOpen, setManageHazardsOpen] = useState(false);
+  // ── "Just the map" ────────────────────────────────────────────────────────
+  // A one-click cleanup for showing the map on a phone or on a screen: every
+  // marker, the zone shading, the season card and the attribution step aside
+  // and only the map (with the barangay borders and labels) is left. It is a
+  // view-only toggle - it never touches the data or the filters. The floating
+  // button lives on the map itself (bottom-right); there is deliberately no
+  // duplicate checkbox in the Filters panel.
+  const [cleanMap, setCleanMap] = useState(false);
+  // ── Philippine Seasons card ───────────────────────────────────────────────
+  // Collapsible so a small screen can still see the phone/map. The choice is
+  // remembered; on a phone the card starts collapsed.
+  const [seasonsOpen, setSeasonsOpen] = useState(() => {
+    const saved = localStorage.getItem('cdms_seasons_open');
+    if (saved !== null) return saved === 'true';
+    return typeof window !== 'undefined' ? window.innerWidth > 820 : true;
+  });
+  const toggleSeasons = () => {
+    setSeasonsOpen(prev => {
+      const next = !prev;
+      try { localStorage.setItem('cdms_seasons_open', String(next)); } catch (e) { /* private mode */ }
+      return next;
+    });
+  };
   const [hazardForm, setHazardForm] = useState({ id: null, barangay_id: '', barangay_name: '', event_type: DISASTER_EVENT_TYPES[0], severity: DISASTER_SEVERITIES[1], purok: '', latitude: '', longitude: '', date_started: '', date_ended: '', notes: '' });
   const [hazardsSaving, setHazardsSaving] = useState(false);
   // Read-only pin preview: typed coordinates win, else the barangay centre, else
@@ -1854,7 +1932,9 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     });
   };
   const geoJsonLayerRef = useRef(null);
-  const bordersOnly = loginRole === 'BHW';
+  // "Just the map" also drops the choropleth shading - the borders and the
+  // barangay labels stay so the map is still readable.
+  const bordersOnly = loginRole === 'BHW' || cleanMap;
   const barangayDataRef = useRef(barangayData);
   useEffect(() => { barangayDataRef.current = barangayData; }, [barangayData]);
 
@@ -2650,21 +2730,37 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     const coords = findCoords(name);
     if (!coords) return;
     const w = weatherByName[wxKey(name)];
-    const man = manualBarangayEvents[wxKey(name)] || [];
+    const key = wxKey(name);
+    const man = manualBarangayEvents[key] || [];
     const barLevelEvents = man.filter(m => !(m.latitude && m.longitude));
-    const pinCount = (weatherPinsByBarangay[wxKey(name)] || 0) + man.filter(m => m.latitude && m.longitude).length;
-    if (!w && man.length === 0) {
-      const off = wxOfflineNames.has(wxKey(name));
+    const pinCount = (weatherPinsByBarangay[key] || 0) + man.filter(m => m.latitude && m.longitude).length;
+    const off = wxOfflineNames.has(key);
+    // PAGASA-style readout for the tooltip. The reading is measured AT this
+    // barangay, so two neighbours can show two different skies - that is the
+    // whole point of the condition disc.
+    const raw = weatherRawByName[key];
+    const condition = (raw && raw.condition) || 'unknown';
+    const conditionLabel = t((raw && raw.condition_label) || weatherConditionLabel(condition));
+    const readings = [];
+    if (raw && raw.temperature != null) {
+      readings.push(`${raw.temperature}°C`);
+      if (raw.feels_like != null) readings.push(`feels ${raw.feels_like}°C`);
+    }
+    if (raw && raw.humidity != null) readings.push(`${raw.humidity}% humidity`);
+    if (raw && raw.wind_speed != null) readings.push(`wind ${raw.wind_speed} km/h`);
+    if (raw && raw.precipitation != null && raw.precipitation > 0) readings.push(`${raw.precipitation} mm/h`);
+
+    if (!w && man.length === 0 && off) {
       hazardBadgeItems.push({
         id: 'hzd-' + name,
         coords,
-        svg: hazardSvgMarkup(off ? '⚠️' : '☁️', off ? '#f59e0b' : '#94a3b8', 38, off ? 'Off' : 'Clear'),
+        svg: hazardSvgMarkup('⚠️', '#f59e0b', HAZARD_DISC_SIZE, 'Off'),
         count: 0,
-        color: off ? '#f59e0b' : '#94a3b8',
-        title: off ? `${name} - Weather offline` : `${name} - No active weather hazard`,
+        color: '#f59e0b',
+        title: `${name} - Weather offline`,
         size: HAZARD_DISC_SIZE,
         z: 1500,
-        above: hazardBadgeLift(barangayCaseCount[wxKey(name)] || 0, HAZARD_DISC_SIZE, false, pinScale),
+        above: hazardBadgeLift(barangayCaseCount[key] || 0, HAZARD_DISC_SIZE, false, pinScale),
         onClick: () => openBarangayPopup(name),
       });
       return;
@@ -2672,23 +2768,36 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     const allTypes = [];
     if (w) allTypes.push(w.hazards[0]);
     barLevelEvents.forEach(e => allTypes.push(e.event_type));
+    const hasHazard = allTypes.length > 0;
     const mainType = allTypes[0] || (man.find(m => m.latitude && m.longitude) || {}).event_type || 'Flood';
     const details = [];
-    if (w) details.push(`${w.hazards.join(', ')}${w.temperature != null ? ' ' + w.temperature + '°C' : ''}`);
+    if (w && w.hazards.length) details.push(w.hazards.join(', '));
+    if (readings.length) details.push(readings.join(' · '));
     if (w && w.outlook) details.push(w.outlook);
     barLevelEvents.forEach(e => details.push(`${hazardIcon(e.event_type)} ${e.event_type} (${e.severity})`));
     const diseases = [...new Set(allTypes.flatMap(hazardDiseases))];
     const diseaseHint = diseases.length ? ` · Possible: ${diseases.join(', ')}` : '';
+    // A barangay WITH a hazard keeps the solid PAGASA hazard disc. A barangay
+    // with no hazard gets the calm disc: its OWN sky condition, drawn
+    // translucent so the map reads "fine here" instead of shouting.
+    const svg = hasHazard
+      ? hazardSvgIcon(mainType, HAZARD_DISC_SIZE)
+      : hazardSvgMarkup(weatherConditionIcon(condition), weatherConditionColor(condition), HAZARD_DISC_SIZE, 'cond' + key, 0.55);
+    const color = hasHazard ? hazardColor(mainType) : weatherConditionColor(condition);
+    const head = hasHazard
+      ? `${name} - ${(w && w.hazards.length) ? w.hazards.join(', ') : 'Active hazard'}`
+      : `${name} - ${conditionLabel}`;
+    const tail = details.length ? ` (${details.join(' · ')})` : '';
     hazardBadgeItems.push({
       id: 'hzd-' + name,
       coords,
-      svg: hazardSvgIcon(mainType, 38),
-      count: pinCount,
-      color: hazardColor(mainType),
-      title: `${name} - ${details.join(' · ')}${diseaseHint}`,
+      svg,
+      count: hasHazard ? pinCount : 0,
+      color,
+      title: `${head}${tail}${diseaseHint}`,
       size: HAZARD_DISC_SIZE,
       z: 1500,
-      above: hazardBadgeLift(barangayCaseCount[wxKey(name)] || 0, HAZARD_DISC_SIZE, pinCount > 0, pinScale),
+      above: hazardBadgeLift(barangayCaseCount[key] || 0, HAZARD_DISC_SIZE, hasHazard && pinCount > 0, pinScale),
       onClick: () => openBarangayPopup(name),
     });
   });
@@ -2855,6 +2964,11 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
     const byOwnBarangay = {};
     actions.forEach(a => {
       if (!isWarningIntervention(a)) return;
+      // A finished intervention leaves the map: the work is done, so the pin
+      // would only clutter the live picture. It still ANSWERS its warning
+      // (the trail keeps it, marked completed) and it stays in the audit
+      // reports - only the live map disc and the intervention list drop it.
+      if (a.status === 'completed') return;
       const own = a.barangay_name || '';
       if (!own) return;
       const k = wxKey(own);
@@ -3073,7 +3187,25 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   pinSourceGroups.forEach(p => {
     if (pinFocusKey && wxKey(p.barangay) !== pinFocusKey) return;
     const w = weatherByName[wxKey(p.barangay)];
-    if (!w || !w.hazards || !w.hazards.length) return;
+    if (!w || !w.hazards || !w.hazards.length) {
+      // No hazard over this barangay: show the sky condition measured there
+      // instead, so zooming in never loses the per-place weather reading.
+      const raw = weatherRawByName[wxKey(p.barangay)];
+      if (!raw || raw.error === 'offline') return;
+      const condition = raw.condition || 'unknown';
+      hazardPinItems.push({
+        id: 'wxc-' + (p.purok || p.barangay) + '-' + p.barangay,
+        coords: p.coords,
+        svg: hazardSvgMarkup(weatherConditionIcon(condition), weatherConditionColor(condition), 32, 'cond' + wxKey(p.barangay), 0.55),
+        color: weatherConditionColor(condition),
+        title: `${p.purok || p.barangay} - ${t(raw.condition_label || weatherConditionLabel(condition))}${raw.temperature != null ? ` · ${raw.temperature}°C` : ''}`,
+        size: 32,
+        above: hazardBadgeLift(p.totalCases, 32, false, pinScale),
+        z: 1500,
+        onClick: () => openBarangayPopup(p.barangay),
+      });
+      return;
+    }
     const diseases = [...new Set(w.hazards.flatMap(hazardDiseases))];
     hazardPinItems.push({
       id: 'wxp-' + (p.purok || p.barangay) + '-' + p.barangay,
@@ -3331,6 +3463,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       date_started: actionForm.date_started || null,
       date_ended: actionForm.date_ended || null,
       status: actionForm.status,
+      status_auto: actionForm.status_auto === undefined ? 1 : (actionForm.status_auto ? 1 : 0),
     };
     try {
       if (actionForm.id) {
@@ -3362,6 +3495,9 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
       date_started: a.date_started || '',
       date_ended: a.date_ended || '',
       status: a.status || 'planned',
+      // A row created before the automatic status existed has status_auto = NULL,
+      // which the server treats as "automatic" - so mirror that here.
+      status_auto: Number(a.status_auto) === 0 ? 0 : 1,
     });
   };
 
@@ -3434,10 +3570,14 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
   };
 
   return (
-    <div className="cdms-map-wrap" style={{ display: 'flex', height: compactMode ? 'calc(100vh - 56px)' : 'calc(100vh - 70px)' }}>
+    // The scroller this map lives in is scaled with CSS `zoom` (the Font Size
+    // setting). `100vh` inside a zoomed subtree shrinks with it, which left a
+    // grey strip under the map at Small (0.9), so divide by the same scale to
+    // make the map fill the window exactly at every font size.
+    <div className="cdms-map-wrap" style={{ display: 'flex', height: compactMode ? 'calc((100vh - 56px) / var(--app-font-scale, 1))' : 'calc((100vh - 70px) / var(--app-font-scale, 1))' }}>
 
-      {/* ── SIDEBAR - fixed 280px on desktop; slide-in hamburger drawer on mobile ── */}
-      <div className={filtersOpen ? 'cdms-map-sidebar cdms-map-sidebar-open' : 'cdms-map-sidebar'} style={{
+      {/* ── SIDEBAR - fixed 280px on desktop (collapsible); slide-in hamburger drawer on mobile ── */}
+      <div className={`cdms-map-sidebar${filtersOpen ? ' cdms-map-sidebar-open' : ''}${filtersCollapsed ? ' cdms-map-sidebar-collapsed' : ''}`} style={{
         width: '280px', minWidth: '280px', flexShrink: 0,
         background: 'var(--bg-surface)', borderRight: '1px solid var(--border-color)',
         padding: '20px 16px', display: 'flex', flexDirection: 'column',
@@ -3769,7 +3909,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               ))}
               <div style={{ height: '1px', margin: '4px 12px', background: 'var(--border-color)' }} />
               <button type="button"
-                onClick={() => { setFilterYear(''); setYearOpen(false); }}
+                onClick={() => { const win = rollingTwoMonthWindow(); setFilterYear(''); setFilterDateFrom(win.from); setFilterDateTo(win.to); setYearOpen(false); }}
                 style={{ display: 'block', width: '100%', padding: '10px 14px', background: filterYear === '' ? 'var(--input-bg)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: filterYear === '' ? '600' : '400' }}
                 onMouseEnter={e => { if (filterYear !== '') e.target.style.background = 'var(--input-bg)'; }}
                 onMouseLeave={e => { if (filterYear !== '') e.target.style.background = 'transparent'; }}>
@@ -3842,11 +3982,11 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
             <p style={{ margin: '0 0 6px 0', fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>{t('Pins & markers')}</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '9px', marginBottom: '8px' }}>
               <svg width="14" height="18" viewBox="0 0 24 30" style={{ flexShrink: 0 }}>
-                <path d="M12 0C5.4 0 0 5.4 0 12c0 8.5 12 18 12 18S24 20.5 24 12C24 5.4 18.6 0 12 0z" fill="var(--accent, #60a5fa)" />
+                <path d="M12 0C5.4 0 0 5.4 0 12c0 8.5 12 18 12 18S24 20.5 24 12C24 5.4 18.6 0 12 0z" fill="#DC2626" />
                 <circle cx="12" cy="12" r="7.5" fill="var(--bg-surface)" />
-                <text x="12" y="15.8" textAnchor="middle" fontSize="9" fontWeight="800" fill="var(--accent, #60a5fa)" fontFamily="system-ui, sans-serif">12</text>
+                <text x="12" y="15.8" textAnchor="middle" fontSize="9" fontWeight="800" fill="#DC2626" fontFamily="system-ui, sans-serif">12</text>
               </svg>
-              <span style={{ fontSize: '13px', color: 'var(--text-main)' }}>{t('Barangay / unit pin - number shows total cases')}</span>
+              <span style={{ fontSize: '13px', color: 'var(--text-main)' }}>{t('Barangay / unit pin - number shows total cases, colour follows the risk scale')}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '9px', marginBottom: '8px' }}>
               <span style={{ width: '11px', height: '11px', borderRadius: '50%', background: 'var(--accent, #60a5fa)', border: '2px solid var(--bg-surface)', flexShrink: 0, display: 'inline-block' }} />
@@ -3864,9 +4004,15 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                 <span style={{ fontSize: '13px', color: 'var(--text-main)' }}>{t('Blue zone - water / heat exposure, no case hotspot. Red wins if both.')}</span>
               </div>
             )}
+            {isDisasterMap && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '9px', marginBottom: '8px' }}>
+                <span style={{ width: '13px', height: '13px', borderRadius: '50%', background: '#60a5fa', border: '2px solid var(--bg-surface)', flexShrink: 0, display: 'inline-block', textAlign: 'center', lineHeight: '9px', fontSize: '8px' }}>⛅</span>
+                <span style={{ fontSize: '13px', color: 'var(--text-main)' }}>{t('Weather disc - the sky condition measured over that barangay (solid = hazard)')}</span>
+              </div>
+            )}
           </div>
           <div style={{ paddingTop: '10px', borderTop: '1px dashed var(--border-color)', marginTop: '2px' }}>
-            <p style={{ margin: '0 0 6px 0', fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>{t('Disease pin colors')}</p>
+            <p style={{ margin: '0 0 6px 0', fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>{t('Case dot colors (by disease)')}</p>
             {topDiseaseColors.length === 0 && (
               <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>{t('No cases match the current filters.')}</p>
             )}
@@ -4243,7 +4389,12 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         </div>
 
         <button
-          onClick={() => { setAutoDetectedBrgy(null); setFilterBarangay('All Barangays'); setFilterStatus('All Status'); setFilterCaseType('All Case Types'); setFilterDateFrom(`${currentYear}-01-01`); setFilterDateTo(`${currentYear}-12-31`); setFilterYear(String(currentYear)); setFilterSeverity('All Severities'); setFilterDisease('All Diseases'); setFilterPurok('All Puroks'); }}
+          onClick={() => {
+            const win = rollingTwoMonthWindow();
+            setAutoDetectedBrgy(null); setFilterBarangay('All Barangays'); setFilterStatus('All Status'); setFilterCaseType('All Case Types');
+            setFilterDateFrom(win.from); setFilterDateTo(win.to); setFilterYear('');
+            setFilterSeverity('All Severities'); setFilterDisease('All Diseases'); setFilterPurok('All Puroks');
+          }}
           style={{ padding: '11px', background: '#DC2626', color: 'white', border: 'none', borderRadius: '7px', cursor: 'pointer', fontWeight: '600', fontSize: '15px', marginTop: 'auto' }}>
           {t('Reset Filters')}
         </button>
@@ -4269,8 +4420,9 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           <div className="cdms-map-backdrop" onClick={() => setFiltersOpen(false)} />
         )}
         <button
-          className="cdms-map-filter-btn"
-          onClick={() => setFiltersOpen(!filtersOpen)}
+          className="cdms-map-filter-btn cdms-map-filters-toggle"
+          onClick={handleFiltersToggle}
+          title={isNarrow ? t('Open filters') : (filtersCollapsed ? t('Show the filters') : t('Hide the filters'))}
           style={{
             position: 'absolute', top: '12px', left: '12px', zIndex: 1000,
             display: 'flex', alignItems: 'center', gap: '7px',
@@ -4280,7 +4432,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
             fontSize: '14px', fontWeight: '600', color: 'var(--text-main)',
           }}
         >
-          ⚙ {t('Filters')}
+          {!isNarrow && !filtersCollapsed ? '✕' : '⚙'} {t('Filters')}
         </button>
         <button
           className="cdms-map-filter-btn"
@@ -4311,6 +4463,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           maxBoundsViscosity={1.0}
           style={{ width: '100%', height: '100%' }}>
           <ScopeEnforcer key="scope-enforcer" bounds={roleBounds} />
+          <MapResizeWatcher key="map-resize-watcher" />
           {mapLayer === 'SD' ? (
             <TileLayer
               key="tile-sd"
@@ -4331,27 +4484,27 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           {/* "Show interventions only" is a real layer filter: case pins, warning
               badges and hazards are hidden so the map shows the intervention pins
               themselves (barangay outlines stay for orientation). */}
-          {!interventionsOnly && mapZoom === 19 && <CaseDotMarkers key="case-dot-markers" cases={mapCases} zoom={mapZoom} t={t} translateStatus={translateStatus} />}
+          {!cleanMap && !interventionsOnly && mapZoom === 19 && <CaseDotMarkers key="case-dot-markers" cases={mapCases} zoom={mapZoom} t={t} translateStatus={translateStatus} />}
           {/* Close-up hotspot boxes replace the older unit tiers: while a box is on
               screen the named-area pins (17) and the purok pins (18) step aside, so
               the hotspot map shows the hotspot and nothing else. */}
-          {!interventionsOnly && !zoneBoxesOn && mapZoom === 18 && purokData.length > 0 && (
+          {!cleanMap && !interventionsOnly && !zoneBoxesOn && mapZoom === 18 && purokData.length > 0 && (
             <PulseMarkers key="unit-pins" barangayData={purokData} onHover={setTooltip} onLeave={() => setTooltip(null)} onClick={setPopup} pinScale={pinScale} />
           )}
-          {!interventionsOnly && !zoneBoxesOn && mapZoom === 17 && purokData.length > 0 && pinnedBarangay && (
+          {!cleanMap && !interventionsOnly && !zoneBoxesOn && mapZoom === 17 && purokData.length > 0 && pinnedBarangay && (
             <AreaPins key="area-pins" groups={purokData} barangay={pinnedBarangay} onHover={setTooltip} onLeave={() => setTooltip(null)} onClick={setPopup} pinScale={pinScale} />
           )}
-          {!interventionsOnly && mapZoom < 17 && <BarangayPins key="barangay-pins" barangayData={barangayData} onHover={setTooltip} onLeave={() => setTooltip(null)} onClick={setPopup} loginRole={loginRole} pinScale={pinScale} />}
-          {isHotspotMap && !interventionsOnly && <LayerBadgeMarkers key="layer-outbreaks" items={outbreakPinItems} />}
-          {isDisasterMap && !interventionsOnly && <LayerBadgeMarkers key="layer-blue-zones" items={blueZonePinItems} />}
-          {isDisasterMap && showActionsLayer && !interventionsOnly && <LayerBadgeMarkers key="layer-actions" items={actionBadgeItems} />}
-          {isDisasterMap && !interventionsOnly && <LayerBadgeMarkers key="layer-warnings" items={warningBadgeItems} />}
+          {!cleanMap && !interventionsOnly && mapZoom < 17 && <BarangayPins key="barangay-pins" barangayData={barangayData} onHover={setTooltip} onLeave={() => setTooltip(null)} onClick={setPopup} loginRole={loginRole} pinScale={pinScale} />}
+          {!cleanMap && isHotspotMap && !interventionsOnly && <LayerBadgeMarkers key="layer-outbreaks" items={outbreakPinItems} />}
+          {!cleanMap && isDisasterMap && !interventionsOnly && <LayerBadgeMarkers key="layer-blue-zones" items={blueZonePinItems} />}
+          {!cleanMap && isDisasterMap && showActionsLayer && !interventionsOnly && <LayerBadgeMarkers key="layer-actions" items={actionBadgeItems} />}
+          {!cleanMap && isDisasterMap && !interventionsOnly && <LayerBadgeMarkers key="layer-warnings" items={warningBadgeItems} />}
           {/* "Show interventions only" is an isolation mode: the weather/hazard
               pins are hidden too so the map shows nothing but the intervention
               discs (barangay outlines stay for orientation). */}
-          {isDisasterMap && showDisasterLayer && !interventionsOnly && mapZoom < 17 && <LayerBadgeMarkers key="layer-hazards-badges" items={hazardBadgeItems} />}
-          {isDisasterMap && showDisasterLayer && !interventionsOnly && mapZoom >= 17 && <LayerBadgeMarkers key="layer-hazards-pins" items={hazardPinItems} />}
-          {interventionsOnly && <LayerBadgeMarkers key="layer-interventions" items={interventionPinItems} />}
+          {!cleanMap && isDisasterMap && showDisasterLayer && !interventionsOnly && mapZoom < 17 && <LayerBadgeMarkers key="layer-hazards-badges" items={hazardBadgeItems} />}
+          {!cleanMap && isDisasterMap && showDisasterLayer && !interventionsOnly && mapZoom >= 17 && <LayerBadgeMarkers key="layer-hazards-pins" items={hazardPinItems} />}
+          {!cleanMap && interventionsOnly && <LayerBadgeMarkers key="layer-interventions" items={interventionPinItems} />}
           <GeoJSON
               key="brgy-geojson"
               ref={geoJsonLayerRef}
@@ -4399,7 +4552,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
           {/* "Show all cells" grid: every 6-cell zone outline of the scoped
               barangays, flagged or not, so the zone proxy is visible. Drawn
               under the flagged zones (Leaflet paints in mount order). */}
-          {zoneBoxesVisible && showAllZoneCells && allZoneCellsFC.features.length > 0 && (
+          {!cleanMap && zoneBoxesVisible && showAllZoneCells && allZoneCellsFC.features.length > 0 && (
             <GeoJSON key="zone-grid" data={allZoneCellsFC} style={getGridStyle} interactive={false} pane="zonePane" />
           )}
           {/* Phase 1 zone (purok-level) overlay - drawn last so its shading sits
@@ -4414,7 +4567,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               the choropleth's bringToFront() only reorders paths inside its OWN
               pane, so a barangay hover can never bury a hotspot box and steal its
               hover/click. */}
-          {zoneBoxesVisible && zoneHotspots.length > 0 && zoneZoomView.active && zoneZoomView.outline.features.length > 0 && (
+          {!cleanMap && zoneBoxesVisible && zoneHotspots.length > 0 && zoneZoomView.active && zoneZoomView.outline.features.length > 0 && (
             <GeoJSON
               key={`zone-coarse-outline-${mapZoom}-${zoneHotspots.map(r => `${r.id}:${r.kind}`).join(',')}`}
               data={zoneZoomView.outline}
@@ -4423,7 +4576,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               pane="zonePane"
             />
           )}
-          {zoneBoxesVisible && zoneHotspots.length > 0 && (
+          {!cleanMap && zoneBoxesVisible && zoneHotspots.length > 0 && (
             <GeoJSON
               key={`zone-hotspots-${zoneZoomView.active ? 'fine' : 'zone'}-${zoneHotspots.map(r => `${r.id}:${r.kind}`).join(',')}`}
               data={zoneZoomView.active ? zoneZoomView.main : zoneFeatureCollection}
@@ -4436,10 +4589,10 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               zone becomes that barangay's real zone set, which is exactly how a CHO
               corrects a blue (environmental) zone on the Disaster map, not only a
               case hotspot on the Hotspot map. */}
-          {isCho && !isCaseOnly && (
+          {isCho && !isCaseOnly && !cleanMap && (
             <ZoneDrawControl drawOn={zoneDrawOn} onCreated={handleZoneCreated} />
           )}
-          {isCho && !isCaseOnly && (
+          {isCho && !isCaseOnly && !cleanMap && (
             <ZoneEditLayer editOn={zoneEditOn} zones={zonesForEdit} onCommit={handleZoneCommit} />
           )}
         </MapContainer>
@@ -4477,7 +4630,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
         </div>
 
         {/* Weather attribution (Open-Meteo, CC BY 4.0) when the hazard layer is on */}
-        {isDisasterMap && showDisasterLayer && !interventionsOnly && (
+        {isDisasterMap && showDisasterLayer && !interventionsOnly && !cleanMap && (
           <div style={{
             position: 'absolute', bottom: '118px', left: '16px', zIndex: 1000,
             fontSize: '10px', color: 'var(--text-muted)', background: 'var(--bg-surface)',
@@ -4496,35 +4649,53 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
             carries the environmental (blue) zones. It sits one slot ABOVE the
             Open-Meteo attribution (which already owns `bottom: 118px` on this map)
             so the two never overlap. */}
-        {isDisasterMap && (
+        {isDisasterMap && !cleanMap && (
           <div style={{
             position: 'absolute', bottom: '150px', left: '16px', zIndex: 1000,
             width: '272px', maxWidth: 'calc(100vw - 32px)',
             background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
             borderRadius: '10px', padding: '10px 12px', boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', marginBottom: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', marginBottom: seasonsOpen ? '6px' : '0' }}>
               <span style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text-main)' }}>🇵🇭 {t('Philippine Seasons')}</span>
-              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>PAGASA</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>PAGASA</span>
+                {/* Collapsible so a small screen can still see the map/phone. */}
+                <button type="button" onClick={toggleSeasons}
+                  title={seasonsOpen ? t('Collapse the seasons card') : t('Expand the seasons card')}
+                  aria-expanded={seasonsOpen}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    width: '22px', height: '22px', padding: 0, borderRadius: '6px', cursor: 'pointer',
+                    border: '1px solid var(--border-color)', background: 'var(--input-bg)',
+                    color: 'var(--text-main)', fontSize: '11px', fontWeight: '800', lineHeight: 1,
+                  }}>
+                  {seasonsOpen ? '▾' : '▸'}
+                </button>
+              </span>
             </div>
-            {PH_SEASONS.map(s => {
-              const isNow = s.months.includes(new Date().getMonth());
-              return (
-                <div key={s.key} style={{
-                  display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 9px', borderRadius: '8px', marginBottom: '4px',
-                  background: isNow ? `${s.color}22` : 'var(--input-bg)',
-                  border: `1px solid ${isNow ? s.color : 'var(--border-color)'}`,
-                }}>
-                  <span style={{ fontSize: '14px', flexShrink: 0 }}>{s.icon}</span>
-                  <span style={{ flex: 1, minWidth: 0, fontSize: '12px', fontWeight: isNow ? '700' : '600', color: 'var(--text-main)' }}>{t(s.label)}</span>
-                  <span style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{t(s.monthsLabel)}</span>
-                  {isNow && <span style={{ fontSize: '10px', fontWeight: '800', color: s.color, flexShrink: 0 }}>{t('now')}</span>}
+            {seasonsOpen && (
+              <>
+                {PH_SEASONS.map(s => {
+                  const isNow = s.months.includes(new Date().getMonth());
+                  return (
+                    <div key={s.key} style={{
+                      display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 9px', borderRadius: '8px', marginBottom: '4px',
+                      background: isNow ? `${s.color}22` : 'var(--input-bg)',
+                      border: `1px solid ${isNow ? s.color : 'var(--border-color)'}`,
+                    }}>
+                      <span style={{ fontSize: '14px', flexShrink: 0 }}>{s.icon}</span>
+                      <span style={{ flex: 1, minWidth: 0, fontSize: '12px', fontWeight: isNow ? '700' : '600', color: 'var(--text-main)' }}>{t(s.label)}</span>
+                      <span style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{t(s.monthsLabel)}</span>
+                      {isNow && <span style={{ fontSize: '10px', fontWeight: '800', color: s.color, flexShrink: 0 }}>{t('now')}</span>}
+                    </div>
+                  );
+                })}
+                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.4 }}>
+                  {t('Cabuyao, Laguna follows the PAGASA tropical seasons: rainy June to November, cool dry December to February, hot dry (summer) March to May.')}
                 </div>
-              );
-            })}
-            <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.4 }}>
-              {t('Cabuyao, Laguna follows the PAGASA tropical seasons: rainy June to November, cool dry December to February, hot dry (summer) March to May.')}
-            </div>
+              </>
+            )}
           </div>
         )}
 
@@ -4554,6 +4725,29 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
             {t('HD Map')}
           </button>
         </div>
+
+        {/* "JUST THE MAP" quick toggle - bottom right, always reachable without
+            opening the Filters panel (the map's only control for it). Clears
+            every marker and overlay so the map - or the phone - is the only
+            thing on screen. */}
+        <button
+          type="button"
+          onClick={() => setCleanMap(prev => !prev)}
+          title={cleanMap ? t('Show all markers and overlays again') : t('Just the map - hide all markers and overlays')}
+          aria-pressed={cleanMap}
+          style={{
+            position: 'absolute', bottom: '16px', right: '16px', zIndex: 1000,
+            display: 'inline-flex', alignItems: 'center', gap: '7px',
+            padding: '8px 13px', borderRadius: '9px', cursor: 'pointer',
+            background: cleanMap ? '#0891b2' : 'var(--bg-surface)',
+            color: cleanMap ? '#fff' : 'var(--text-main)',
+            border: '1px solid var(--border-color)',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
+            fontSize: '13px', fontWeight: '700',
+          }}
+        >
+          {cleanMap ? '👁' : '🗺'} {cleanMap ? t('Show layers') : t('Just the map')}
+        </button>
 
         {/* ZOOM LEVEL INDICATOR */}
         {mapZoom === 18 && (
@@ -5193,6 +5387,27 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
                 </div>
               </div>
 
+              {/* Date-driven status: the status above follows the calendar
+                  (planned -> ongoing -> completed) unless the CHO pins it. */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap',
+                padding: '8px 11px', marginBottom: '16px', borderRadius: '8px',
+                background: 'var(--input-bg)', border: '1px solid var(--border-color)',
+                fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.4,
+              }}>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', cursor: 'pointer', fontWeight: '600', color: 'var(--text-main)' }}>
+                  <input type="checkbox" checked={actionForm.status_auto !== 0}
+                    onChange={e => setActionForm({ ...actionForm, status_auto: e.target.checked ? 1 : 0 })}
+                    style={{ width: '14px', height: '14px', accentColor: '#0891b2' }} />
+                  {t('Set the status from the dates automatically')}
+                </label>
+                <span>
+                  {actionForm.status_auto !== 0
+                    ? t('Planned before the start date, ongoing from the start date, completed the day after the end date.')
+                    : t('The status is pinned to your choice above.')}
+                </span>
+              </div>
+
               <button onClick={saveAction} disabled={actionsSaving}
                 style={{
                   width: '100%', padding: '10px 14px', borderRadius: '8px',
@@ -5203,7 +5418,7 @@ export default function MapView({ setActiveTab, setCaseFilter, loginRole, loginB
               </button>
 
               {actionForm.id && (
-                <button onClick={() => setActionForm({ id: null, barangay_id: actionForm.barangay_id, barangay_name: actionForm.barangay_name, hazard_id: '', action_type: ACTION_TYPES[0], description: '', target_disease: '', date_started: '', date_ended: '', status: 'planned' })}
+                <button onClick={() => setActionForm({ id: null, barangay_id: actionForm.barangay_id, barangay_name: actionForm.barangay_name, hazard_id: '', action_type: ACTION_TYPES[0], description: '', target_disease: '', date_started: '', date_ended: '', status: 'planned', status_auto: 1 })}
                   style={{
                     width: '100%', marginTop: '8px', padding: '9px 14px', borderRadius: '8px',
                     background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-color)',

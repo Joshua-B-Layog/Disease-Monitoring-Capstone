@@ -2955,7 +2955,6 @@ useEffect(() => {
               {t('Offline - showing cached data. Changes will sync when reconnected.')}
             </div>
           )}
-          <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>{t('Dashboard / Manage Cases / Other Categories')}</div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
             <div>
               <h2 style={{ margin: '0 0 4px 0', fontSize: '22px' }}>{t('Other Categories')}</h2>
@@ -2980,7 +2979,6 @@ useEffect(() => {
               {t('Offline - showing cached data. Changes will sync when reconnected.')}
             </div>
           )}
-          <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>{t('Dashboard / Manage Cases / Other Exclusive Diseases')}</div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
             <div>
               <h2 style={{ margin: '0 0 4px 0', fontSize: '22px' }}>{t('⚠️ Other Exclusive Diseases')}</h2>
@@ -2996,40 +2994,39 @@ useEffect(() => {
     }
 
     return (
-      <div style={{ padding: compactMode ? '24px 14px 14px' : '48px 28px 28px', color: 'var(--text-main)', fontSize: `calc(15px * ${fs})` }}>
+      <div style={{ padding: compactMode ? '24px 14px 14px' : '24px 28px 20px', color: 'var(--text-main)', fontSize: `calc(15px * ${fs})` }}>
         {offlineMode && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', marginBottom: '16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', fontSize: '15px', color: '#D97706' }}>
             <span style={{ fontSize: '16px' }}>⚠</span>
             {t('Offline - showing cached data. Changes will sync when reconnected.')}
           </div>
         )}
-        <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '6px' }}>
-          {t('Dashboard / Manage Cases')} {category ? `/ ${category.name}` : ''}
+        {/* TOP BAR - Inbox / Outbox sit at the very top of the page so the
+            first screen shows them together with the category card (no
+            scrolling needed to reach either). */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+          <div data-tour="mc-inbox" onClick={() => { setView('inbox'); setInboxSubTab('referrals'); }}
+            style={{ padding: '6px 14px', borderRadius: '20px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '15px', fontWeight: '500', color: 'var(--text-main)', whiteSpace: 'nowrap', textAlign: 'center', minWidth: '70px' }}>
+            {t('Inbox')}
+          </div>
+          <div onClick={() => { setView('outbox'); }}
+            style={{ padding: '6px 14px', borderRadius: '20px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '15px', fontWeight: '500', color: 'var(--text-main)', whiteSpace: 'nowrap', textAlign: 'center', minWidth: '70px' }}>
+            {t('Outbox')}
+          </div>
         </div>
         {category && (
-          <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+          <div style={{ textAlign: 'center', marginBottom: '10px' }}>
             <h2 style={{ margin: '0 0 4px 0', fontSize: '22px' }}>{category.icon} {category.name}</h2>
             <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '15px' }}>
               {t('Select a disease to view, add, or manage cases')}
             </p>
           </div>
         )}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start', marginBottom: '24px' }}>
+        {category && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start', marginBottom: '16px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <div data-tour="mc-inbox" onClick={() => { setView('inbox'); setInboxSubTab('referrals'); }}
-                style={{ padding: '6px 14px', borderRadius: '20px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '15px', fontWeight: '500', color: 'var(--text-main)', whiteSpace: 'nowrap', textAlign: 'center', minWidth: '70px' }}>
-                {t('Inbox')}
-              </div>
-              <div onClick={() => { setView('outbox'); }}
-                style={{ padding: '6px 14px', borderRadius: '20px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '15px', fontWeight: '500', color: 'var(--text-main)', whiteSpace: 'nowrap', textAlign: 'center', minWidth: '70px' }}>
-                {t('Outbox')}
-              </div>
-            </div>
-            {category && (
-              <BackButton style={{ alignSelf: 'flex-end' }} onClick={() => { setSelectedCategory(null); setCategoryPage(0); setDiseasePage(0); setCarouselIndex(0); setBrowseAllCategories(false); setBrowseAllExclusive(false); }}>{t('Back to Categories')}</BackButton>
-            )}
-            {category && showDiseasePagination && (
+            <BackButton style={{ alignSelf: 'flex-end' }} onClick={() => { setSelectedCategory(null); setCategoryPage(0); setDiseasePage(0); setCarouselIndex(0); setBrowseAllCategories(false); setBrowseAllExclusive(false); }}>{t('Back to Categories')}</BackButton>
+            {showDiseasePagination && (
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                 <span style={{ color: 'var(--text-muted)', fontSize: '15px' }}>{t('Page ') + (diseasePage + 1) + ' / ' + totalDiseasePages}</span>
                 <button onClick={() => setDiseasePage(Math.max(0, diseasePage - 1))} disabled={diseasePage === 0}
@@ -3044,24 +3041,36 @@ useEffect(() => {
             )}
           </div>
         </div>
+        )}
 
         {!category && (
-        <div data-tour="mc-carousel" style={{ position: 'relative', marginBottom: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0px', minHeight: '220px' }}>
+        <div data-tour="mc-carousel" style={{ position: 'relative', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0px', minHeight: '180px' }}>
           {/* LEFT faded peek */}
           <div className="cdms-carousel-peek" style={{
-            width: '90px', height: '450px', background: 'var(--bg-surface)',
+            width: '90px', height: '360px', background: 'var(--bg-surface)',
             border: '1px solid var(--border-color)', borderRadius: '12px 0 0 12px',
             opacity: 0.35, flexShrink: 0, clipPath: 'polygon(0 0, 100% 10%, 100% 90%, 0 100%)',
           }} />
 
           {/* CENTER active card */}
           <div style={{
-            flex: '0 1 1120px', width: 'min(100%, 1120px)', minHeight: 'min(680px, calc(100vh - 200px))',
+            flex: '0 1 1120px', width: 'min(100%, 1120px)', minHeight: 'min(560px, calc(100vh - 170px))',
             background: 'var(--bg-surface)', border: '2px solid var(--border-color)',
-            borderRadius: '14px', padding: '26px', position: 'relative',
+            borderRadius: '14px', padding: '18px', position: 'relative',
             boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
           }}>
             <div key={carouselIndex} className="cdms-carousel-slide" style={{ textAlign: 'center' }}>
+              {/* Heading first - the title and its hint sit ABOVE the controls
+                  (search / list-grid / filters / year / ?), so the user reads
+                  what the page is before the tools that change it. */}
+              {carouselIndex === 0 && (
+                <div style={{ textAlign: 'center', marginBottom: '10px' }}>
+                  <h3 style={{ margin: '0 0 4px 0', fontSize: '18px', color: 'var(--text-main)' }}>{t('📋 All Diseases & Categories')}</h3>
+                  <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-muted)' }}>
+                    {t('Click any column header to expand that disease list. Use your mouse wheel to scroll sideways across the categories.')}
+                  </p>
+                </div>
+              )}
               {carouselIndex !== 2 && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end', marginBottom: '10px' }}>
                   {carouselIndex === 0 && (
@@ -3162,15 +3171,7 @@ useEffect(() => {
                 <div
                   ref={categoriesScrollRef}
                   data-scroll-y
-                  style={{ maxHeight: 'calc(100vh - 240px)', minHeight: 'min(600px, calc(100vh - 280px))', overflowY: 'auto', overflowX: 'hidden', padding: '2px 8px 12px 2px', textAlign: 'left' }}>
-
-                  {/* Heading (restored) */}
-                  <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-                    <h3 style={{ margin: '0 0 6px 0', fontSize: '18px', color: 'var(--text-main)' }}>{t('📋 All Diseases & Categories')}</h3>
-                    <p style={{ margin: 0, fontSize: '15px', color: 'var(--text-muted)' }}>
-                      {t('Click any column header to expand that disease list. Use your mouse wheel to scroll sideways across the categories.')}
-                    </p>
-                  </div>
+                  style={{ maxHeight: 'calc(100vh - 190px)', minHeight: 'min(480px, calc(100vh - 230px))', overflowY: 'auto', overflowX: 'hidden', padding: '2px 8px 12px 2px', textAlign: 'left' }}>
 
                   {/* Search results card (shows at the top while typing) */}
                   {searchResults && (
@@ -3644,7 +3645,6 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
       <div style={{ padding: compactMode ? '14px' : '28px', color: 'var(--text-main)', fontSize: `calc(15px * ${fs})` }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <div>
-            <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '4px' }}>{t('Dashboard / Manage Cases / Inbox')}</div>
             <h2 style={{ margin: 0, fontSize: '22px' }}>{t(' Inbox')}</h2>
           </div>
           <BackButton onClick={() => setView('categories')}>{t('Back')}</BackButton>
@@ -4056,7 +4056,6 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
       <div style={{ padding: compactMode ? '14px' : '28px', color: 'var(--text-main)', fontSize: `calc(15px * ${fs})` }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <div>
-            <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '4px' }}>{t('Dashboard / Manage Cases / Outbox')}</div>
             <h2 style={{ margin: 0, fontSize: '22px' }}>{t(' Outbox')}</h2>
           </div>
           <BackButton onClick={() => setView('categories')}>{t('Back')}</BackButton>
@@ -4152,9 +4151,6 @@ width: '90px', height: '450px', background: 'var(--bg-surface)',
         {/* Header */}
         <div className="cdms-cases-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <div>
-            <div style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '4px' }}>
-              {t('Dashboard / Manage Cases / ')}{selectedDisease?.name || t('All Cases')}
-            </div>
             <h2 style={{ margin: 0, fontSize: '22px', display: 'flex', alignItems: 'center', gap: '10px' }}>
               {selectedDisease ? <span>{selectedDisease.icon}</span> : <span>📋</span>} {selectedDisease?.name || t('All Cases')}
             </h2>

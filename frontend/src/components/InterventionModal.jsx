@@ -76,6 +76,9 @@ const InterventionModal = ({ open, context, barangays = [], diseases = [], dateF
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [touched, setTouched] = useState(false);
+  // Date-driven status: the server advances planned -> ongoing -> completed from
+  // the start/end dates. The CHO can still pin the status by hand.
+  const [statusAuto, setStatusAuto] = useState(true);
 
   // Re-seed on every new warning so a half-typed remark never leaks across cards.
   useEffect(() => {
@@ -84,7 +87,9 @@ const InterventionModal = ({ open, context, barangays = [], diseases = [], dateF
       barangay_id: context?.barangay_id ? String(context.barangay_id) : '',
       disease: context?.disease || '',
       action_type: 'Fogging',
-      status: 'Ongoing',
+      // Lowercase - the server vocabulary is planned / ongoing / completed and
+      // anything else is rejected with "Invalid action status."
+      status: 'ongoing',
       date_started: today,
       date_ended: '',
     });
@@ -92,6 +97,7 @@ const InterventionModal = ({ open, context, barangays = [], diseases = [], dateF
     setSaving(false);
     setError('');
     setTouched(false);
+    setStatusAuto(true);
   }, [open, context?.barangay, context?.disease, context?.alert_id, context?.alert_kind]);
 
   if (!open) return null;
@@ -116,6 +122,7 @@ const InterventionModal = ({ open, context, barangays = [], diseases = [], dateF
         date_started: form.date_started || null,
         date_ended: form.date_ended || null,
         status: form.status,
+        status_auto: statusAuto ? 1 : 0,
         epi_alert_id: context?.alert_id || null,
         alert_kind: context?.alert_kind || null,
       };
@@ -196,7 +203,7 @@ const InterventionModal = ({ open, context, barangays = [], diseases = [], dateF
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '8px' }}>
           <CustomDropdown
             label={t('Status')}
             value={form.status}
@@ -212,6 +219,26 @@ const InterventionModal = ({ open, context, barangays = [], diseases = [], dateF
             {t('Date ended')}
             <DatePicker value={form.date_ended} onChange={v => setForm({ ...form, date_ended: v })} dateFormat={dateFormat} placeholder={t('Date')} clearable anchorRight={true} />
           </label>
+        </div>
+
+        {/* Date-driven status. The status above follows the calendar unless the
+            CHO pins it by hand. */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap',
+          padding: '8px 11px', marginBottom: '12px', borderRadius: '8px',
+          background: 'var(--input-bg)', border: '1px solid var(--border-color)',
+          fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.4,
+        }}>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', cursor: 'pointer', fontWeight: '600', color: 'var(--text-main)' }}>
+            <input type="checkbox" checked={statusAuto} onChange={e => setStatusAuto(e.target.checked)}
+              style={{ width: '14px', height: '14px', accentColor: '#2563eb' }} />
+            {t('Set the status from the dates automatically')}
+          </label>
+          <span>
+            {statusAuto
+              ? t('Planned before the start date, ongoing from the start date, completed the day after the end date.')
+              : t('The status is pinned to your choice above.')}
+          </span>
         </div>
 
         {/* Label text + required marker must stay on ONE line: the old flex-column

@@ -45,6 +45,16 @@
   font-weight: 600;
 }
 
+/* Date filter controls (year dropdown + From/To DatePickers) read in Inter -
+   the body font - instead of the condensed heading font that the generic
+   `.resident-page button` rule applies, so the year list and calendar match
+   the From/To labels and the date fields. */
+.resident-date-filter button,
+.resident-date-filter input {
+  font-family: var(--sans);
+  font-weight: 600;
+}
+
 /* Form inputs */
 .resident-page input,
 .resident-page textarea,

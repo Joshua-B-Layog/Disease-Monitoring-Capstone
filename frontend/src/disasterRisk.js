@@ -63,6 +63,35 @@ export const wmoToHazardType = (code) => {
   return null;
 };
 
+// ── Sky conditions (the weather disc) ──────────────────────────────────────
+// A HAZARD is something that needs a response. A sky CONDITION is simply what
+// the sky is doing over that barangay right now. The two are separate: a light
+// drizzle is a condition, not a hazard, and every barangay can have a
+// different one - so the disc shows the condition, not a copied hazard.
+export const WEATHER_CONDITIONS = {
+  clear:           { icon: '☀️', color: '#f59e0b', label: 'Clear' },
+  partly_cloudy:   { icon: '⛅', color: '#60a5fa', label: 'Partly Cloudy' },
+  cloudy:          { icon: '☁️', color: '#94a3b8', label: 'Cloudy' },
+  overcast:        { icon: '☁️', color: '#64748b', label: 'Overcast' },
+  light_rain:      { icon: '🌦️', color: '#38bdf8', label: 'Light Rain' },
+  heavy_rain:      { icon: '🌧️', color: '#3b82f6', label: 'Heavy Rain' },
+  thunderstorm:    { icon: '⛈️', color: '#7c3aed', label: 'Thunderstorm' },
+  extreme_heat:    { icon: '🥵', color: '#ef4444', label: 'Extreme Heat' },
+  low_visibility:  { icon: '🌫️', color: '#a3a3a3', label: 'Low Visibility' },
+  strong_wind:     { icon: '💨', color: '#8b5cf6', label: 'Strong Winds' },
+  unknown:         { icon: '❓', color: '#94a3b8', label: 'Unknown' },
+};
+
+export const weatherConditionIcon = (condition) => (WEATHER_CONDITIONS[condition] || WEATHER_CONDITIONS.unknown).icon;
+export const weatherConditionColor = (condition) => (WEATHER_CONDITIONS[condition] || WEATHER_CONDITIONS.unknown).color;
+export const weatherConditionLabel = (condition) => (WEATHER_CONDITIONS[condition] || WEATHER_CONDITIONS.unknown).label;
+
+// Conditions that count as an active hazard - only these get the solid
+// (opaque) PAGASA-style disc; the calm ones are drawn translucent so the map
+// stays readable and the hazards are the ones that pop.
+export const HAZARD_CONDITIONS = ['heavy_rain', 'thunderstorm', 'extreme_heat', 'strong_wind'];
+export const isHazardCondition = (condition) => HAZARD_CONDITIONS.includes(condition);
+
 export const hazardDiseases = (type) => (HAZARD_CONFIG[type] || {}).diseases || [];
 export const hazardIcon = (type) => (HAZARD_CONFIG[type] || {}).icon || '⚠️';
 export const hazardColor = (type) => (HAZARD_CONFIG[type] || {}).color || '#94a3b8';
@@ -74,11 +103,18 @@ export const wmoToHazardLabel = (type) => (HAZARD_CONFIG[type] || {}).label || t
 const svgIdSafe = (s) => String(s || 'x').replace(/[^a-zA-Z0-9]/g, '');
 // Low-level PAGASA-style warning disc: emoji glyph as <text> inside a colored circle.
 // Works on any machine - no emoji font means you still see the colored warning disc.
-export const hazardSvgMarkup = (emoji, color = '#94a3b8', size = 26, tag = '') => {
+// `opacity` < 1 draws a calm/translucent disc (used for "no hazard here" weather
+// discs) so the solid hazard discs stay the ones that catch the eye.
+export const hazardSvgMarkup = (emoji, color = '#94a3b8', size = 26, tag = '', opacity = 1) => {
   const gid = 'hgr' + svgIdSafe(tag);
+  const op = Math.max(0, Math.min(1, Number(opacity) || 0));
+  const stops = op >= 1
+    ? `<stop offset="0%" stop-color="${color}" stop-opacity="0.85"/><stop offset="100%" stop-color="${color}"/>`
+    : `<stop offset="0%" stop-color="${color}" stop-opacity="${(0.85 * op).toFixed(2)}"/><stop offset="100%" stop-color="${color}" stop-opacity="${op.toFixed(2)}"/>`;
+  const stroke = op >= 1 ? 'rgba(255,255,255,0.85)' : `rgba(255,255,255,${(0.55 * op).toFixed(2)})`;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" style="display:block">` +
-    `<defs><radialGradient id="${gid}" cx="35%" cy="30%" r="90%"><stop offset="0%" stop-color="${color}" stop-opacity="0.85"/><stop offset="100%" stop-color="${color}"/></radialGradient></defs>` +
-    `<circle cx="12" cy="12" r="11" fill="url(#${gid})" stroke="rgba(255,255,255,0.85)" stroke-width="0.8"/>` +
+    `<defs><radialGradient id="${gid}" cx="35%" cy="30%" r="90%">${stops}</radialGradient></defs>` +
+    `<circle cx="12" cy="12" r="11" fill="url(#${gid})" stroke="${stroke}" stroke-width="0.8"/>` +
     `<text x="12" y="16.4" text-anchor="middle" font-size="12.5" font-family="'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji','Twemoji Mozilla',sans-serif">${emoji}</text>` +
     `</svg>`;
 };

@@ -6959,6 +6959,17 @@ db.query(`CREATE TABLE IF NOT EXISTS barangay_actions (
       });
     }
   });
+  // Self-migration: date-driven status. status_auto = 1 (default) lets the
+  // server advance planned -> ongoing -> completed from date_started/date_ended;
+  // status_auto = 0 pins the status so the CHO can override it by hand.
+  db.query("SHOW COLUMNS FROM barangay_actions LIKE 'status_auto'", (colErr, colRows) => {
+    if (!colErr && (!colRows || colRows.length === 0)) {
+      db.query('ALTER TABLE barangay_actions ADD COLUMN status_auto TINYINT(1) NOT NULL DEFAULT 1', (altErr) => {
+        if (altErr) console.error('Error migrating barangay_actions.status_auto:', altErr.message);
+        else console.log('barangay_actions status_auto column added');
+      });
+    }
+  });
 });
 
 const ACTION_TYPES = ['Fogging', 'Spraying', 'Community Cleaning', 'Vaccination Drive', 'Info Campaign', 'Active Case Finding', 'Home Visits', 'Sanitation'];
@@ -6968,6 +6979,45 @@ const ACTION_TYPE_GLYPH = {
   'Fogging': '💨', 'Spraying': '🚿', 'Community Cleaning': '🧼', 'Vaccination Drive': '💉', 'Info Campaign': '📢',
   'Active Case Finding': '🔍', 'Home Visits': '🏠', 'Sanitation': '🧹',
 };
+
+// ── Date-driven intervention status ─────────────────────────────────────────
+// A recorded intervention follows its own calendar: it is PLANNED before the
+// start date, ONGOING from the start date, and COMPLETED the day after the end
+// date. The CHO does not have to remember to flip a dropdown.
+//
+//   created Oct 21, start Oct 23, end Oct 26
+//     Oct 21-22  -> planned
+//     Oct 23-26  -> ongoing
+//     Oct 27+    -> completed
+//
+// `status_auto = 0` pins the status (manual override) and the derivation is
+// skipped for that row.
+function actionTodayIso() {
+  return isoDateFor(new Date());
+}
+
+// `today` is an ISO 'YYYY-MM-DD' string; the stored dates are DATE columns so
+// they arrive as 'YYYY-MM-DD' (or a JS Date, which we normalise).
+function actionDateOnly(value) {
+  if (!value) return null;
+  if (value instanceof Date) return isoDateFor(value);
+  const s = String(value).slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
+}
+
+function deriveActionStatus(row, today) {
+  const day = today || actionTodayIso();
+  const locked = Number(row.status_auto) === 0;
+  if (locked) return row.status || 'planned';
+  // A status already pushed to completed stays completed - the dates may have
+  // been edited afterwards, but the work is done.
+  if (row.status === 'completed') return 'completed';
+  const started = actionDateOnly(row.date_started);
+  const ended = actionDateOnly(row.date_ended);
+  if (ended && day > ended) return 'completed';
+  if (started && day >= started) return 'ongoing';
+  return 'planned';
+}
 
 // Disease-warning kinds an intervention can answer: the epi_* values come from
 // a real epi_alerts row, the rest tag Dashboard-computed warning cards (a
@@ -6990,13 +7040,20 @@ app.get('/api/barangay-actions', (req, res) => {
     WHERE 1=1`;
   const params = [];
   if (req.query.barangay_id) { sql += ' AND ba.barangay_id = ?'; params.push(req.query.barangay_id); }
-  if (req.query.status) { sql += ' AND ba.status = ?'; params.push(req.query.status); }
-  if (req.query.active === '1') { sql += " AND ba.status != 'completed'"; }
   if (req.query.interventions === '1') { sql += ' AND (ba.epi_alert_id IS NOT NULL OR ba.alert_kind IS NOT NULL)'; }
   sql += ' ORDER BY ba.created_at DESC';
   db.query(sql, params, (err, rows) => {
     if (err) return res.status(500).json({ error: 'Internal database error. Please try again.' });
-    res.json(rows || []);
+    // Derive the date-driven status on read so the client never has to wait for
+    // the sweep to see that an intervention started or finished.
+    const today = actionTodayIso();
+    let list = (rows || []).map(r => {
+      const derived = deriveActionStatus(r, today);
+      return derived === r.status ? r : Object.assign({}, r, { status: derived });
+    });
+    if (req.query.status) list = list.filter(r => r.status === req.query.status);
+    if (req.query.active === '1') list = list.filter(r => r.status !== 'completed');
+    res.json(list);
   });
 });
 
@@ -7078,10 +7135,12 @@ function alertContextLabel(alert, kind) {
 
 app.post('/api/barangay-actions', authenticate, (req, res) => {
   if (req.user.role !== 'CHO') return res.status(403).json({ error: 'Only CHO can add a barangay action.' });
-  const { barangay_id, action_type, description, target_disease, date_started, date_ended, status, hazard_id, epi_alert_id, alert_kind } = req.body;
+  const { barangay_id, action_type, description, target_disease, date_started, date_ended, status, status_auto, hazard_id, epi_alert_id, alert_kind } = req.body;
   if (!action_type || !ACTION_TYPES.includes(action_type)) return res.status(400).json({ error: 'A valid action type is required.' });
   const st = status || 'planned';
   if (!ACTION_STATUSES.includes(st)) return res.status(400).json({ error: 'Invalid action status.' });
+  // status_auto = 1 (default) advances the status from the dates; 0 pins it.
+  const autoStatus = status_auto === undefined || status_auto === null ? 1 : (Number(status_auto) ? 1 : 0);
   const hazardId = resolveActionHazardId(hazard_id, res);
   if (hazardId === undefined) return;
   const alertId = resolveActionAlertId(epi_alert_id, res);
@@ -7100,9 +7159,14 @@ app.post('/api/barangay-actions', authenticate, (req, res) => {
       if (aErr) return res.status(500).json({ error: 'Internal database error. Please try again.' });
       if (aMsg) return res.status(400).json({ error: aMsg });
       const ctx = alertContextLabel(alert, alertKind);
+      // With the automatic status on, the status is derived from the dates the
+      // moment the row is created (e.g. a back-dated entry is already finished).
+      const storedStatus = autoStatus
+        ? deriveActionStatus({ status: st, date_started, date_ended, status_auto: 1 }, actionTodayIso())
+        : st;
       db.query(
-        'INSERT INTO barangay_actions (barangay_id, hazard_id, epi_alert_id, alert_kind, action_type, description, target_disease, date_started, date_ended, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [barangay_id || null, hazardId, alertId, alertKind, action_type, remarks || null, target_disease || null, date_started || null, date_ended || null, st, req.user.user_id],
+        'INSERT INTO barangay_actions (barangay_id, hazard_id, epi_alert_id, alert_kind, action_type, description, target_disease, date_started, date_ended, status, status_auto, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [barangay_id || null, hazardId, alertId, alertKind, action_type, remarks || null, target_disease || null, date_started || null, date_ended || null, storedStatus, autoStatus, req.user.user_id],
         (err, result) => {
           if (err) return res.status(500).json({ error: 'Internal database error. Please try again.' });
           createAuditLog(
@@ -7112,10 +7176,10 @@ app.post('/api/barangay-actions', authenticate, (req, res) => {
           );
           // Field workers do the actual work - tell the affected barangay's BHW.
           notifyBhwOfAction({
-            action_type, hazard, barangay_id: barangay_id || null, status: st,
+            action_type, hazard, barangay_id: barangay_id || null, status: storedStatus,
             verb: 'logged', alertLabel: ctx,
           });
-          res.status(201).json({ id: result.insertId });
+          res.status(201).json({ id: result.insertId, status: storedStatus });
         }
       );
     });
@@ -7124,13 +7188,13 @@ app.post('/api/barangay-actions', authenticate, (req, res) => {
 
 app.put('/api/barangay-actions/:id', authenticate, (req, res) => {
   if (req.user.role !== 'CHO') return res.status(403).json({ error: 'Only CHO can update a barangay action.' });
-  const { barangay_id, action_type, description, target_disease, date_started, date_ended, status, hazard_id, epi_alert_id, alert_kind } = req.body;
+  const { barangay_id, action_type, description, target_disease, date_started, date_ended, status, status_auto, hazard_id, epi_alert_id, alert_kind } = req.body;
   if (status && !ACTION_STATUSES.includes(status)) return res.status(400).json({ error: 'Invalid action status.' });
   const hazardId = resolveActionHazardId(hazard_id, res);
   if (hazardId === undefined) return;
   // Read the row as it stands before writing, so the status-change test uses
   // the real prior value rather than something the client claims.
-  db.query('SELECT status, hazard_id, epi_alert_id, alert_kind FROM barangay_actions WHERE id = ?', [req.params.id], (gErr, existing) => {
+  db.query('SELECT status, status_auto, hazard_id, epi_alert_id, alert_kind, date_started, date_ended FROM barangay_actions WHERE id = ?', [req.params.id], (gErr, existing) => {
     if (gErr) return res.status(500).json({ error: 'Internal database error. Please try again.' });
     if (!existing || !existing.length) return res.status(404).json({ error: 'Barangay action not found.' });
     const row = existing[0];
@@ -7143,6 +7207,14 @@ app.put('/api/barangay-actions/:id', authenticate, (req, res) => {
     if ((alertId || alertKind) && !remarks) {
       return res.status(400).json({ error: 'Remarks are required for an intervention on a disease warning.' });
     }
+    // status_auto omitted -> keep the row's current setting.
+    const autoStatus = status_auto === undefined || status_auto === null
+      ? (Number(row.status_auto) === 0 ? 0 : 1)
+      : (Number(status_auto) ? 1 : 0);
+    // Dates omitted -> keep the row's current dates, otherwise the derivation
+    // would wipe a schedule the client simply did not resend.
+    const effStarted = (date_started === undefined) ? row.date_started : date_started;
+    const effEnded = (date_ended === undefined) ? row.date_ended : date_ended;
     verifyActionHazard(hazardId, (hErr, hazard, hMsg) => {
       if (hErr) return res.status(500).json({ error: 'Internal database error. Please try again.' });
       if (hMsg) return res.status(400).json({ error: hMsg });
@@ -7150,11 +7222,15 @@ app.put('/api/barangay-actions/:id', authenticate, (req, res) => {
         if (aErr) return res.status(500).json({ error: 'Internal database error. Please try again.' });
         if (aMsg) return res.status(400).json({ error: aMsg });
         const previousStatus = row.status;
-        const newStatus = status || previousStatus || 'planned';
+        // With the automatic status on, the dates decide the status; with it
+        // off the CHO's own value wins.
+        const newStatus = autoStatus
+          ? deriveActionStatus({ status: status || previousStatus, date_started: effStarted, date_ended: effEnded, status_auto: 1 }, actionTodayIso())
+          : (status || previousStatus || 'planned');
         const ctxLabel = alertContextLabel(alert, alertKind);
         db.query(
-          'UPDATE barangay_actions SET barangay_id = ?, hazard_id = ?, epi_alert_id = ?, alert_kind = ?, action_type = ?, description = ?, target_disease = ?, date_started = ?, date_ended = ?, status = ? WHERE id = ?',
-          [barangay_id || null, hazardId, alertId, alertKind, action_type, remarks || null, target_disease || null, date_started || null, date_ended || null, newStatus, req.params.id],
+          'UPDATE barangay_actions SET barangay_id = ?, hazard_id = ?, epi_alert_id = ?, alert_kind = ?, action_type = ?, description = ?, target_disease = ?, date_started = ?, date_ended = ?, status = ?, status_auto = ? WHERE id = ?',
+          [barangay_id || null, hazardId, alertId, alertKind, action_type, remarks || null, target_disease || null, effStarted || null, effEnded || null, newStatus, autoStatus, req.params.id],
           (err, result) => {
             if (err) return res.status(500).json({ error: 'Internal database error. Please try again.' });
             if (!result.affectedRows) return res.status(404).json({ error: 'Barangay action not found.' });
@@ -7173,7 +7249,7 @@ app.put('/api/barangay-actions/:id', authenticate, (req, res) => {
                 alertLabel: ctxLabel,
               });
             }
-            res.json({ message: 'Barangay action updated.' });
+            res.json({ message: 'Barangay action updated.', status: newStatus });
           }
         );
       });
@@ -7372,6 +7448,53 @@ const notifyBhwOfAction = ({ action_type, hazard, barangay_id, status, verb, ale
     send((bErr || !rows || !rows.length) ? null : rows[0].name);
   });
 };
+
+// ── Date-driven intervention status sweep ──────────────────────────────────
+// Every 15 minutes the recorded interventions are re-checked against their own
+// dates: an intervention becomes "ongoing" on its start date and "completed"
+// the day after its end date, with no one touching a dropdown. The change is
+// written, audited (so the trail keeps the history) and pushed to the affected
+// BHW, so the field team and the map always agree.
+function runActionStatusSweep() {
+  const today = actionTodayIso();
+  db.query(
+    `SELECT ba.id, ba.barangay_id, ba.action_type, ba.status, ba.date_started, ba.date_ended,
+            ba.epi_alert_id, ba.alert_kind, ba.status_auto,
+            ea.disease_name, ea.alert_value, ea.barangay_name
+     FROM barangay_actions ba
+     LEFT JOIN epi_alerts ea ON ba.epi_alert_id = ea.id
+     WHERE (ba.status_auto IS NULL OR ba.status_auto <> 0) AND ba.status <> 'completed'`,
+    (err, rows) => {
+      if (err) { console.error('Action status sweep query error:', err.message); return; }
+      (rows || []).forEach(r => {
+        const next = deriveActionStatus(r, today);
+        if (next === r.status) return;
+        db.query('UPDATE barangay_actions SET status = ? WHERE id = ?', [next, r.id], (uErr) => {
+          if (uErr) { console.error('Action status sweep update error:', uErr.message); return; }
+          const verb = next === 'completed' ? 'completed' : `now ${next}`;
+          const when = r.date_started ? ` (started ${actionDateOnly(r.date_started)}` : ' (started';
+          const tail = r.date_ended ? `, ends ${actionDateOnly(r.date_ended)})` : ')';
+          createAuditLog(
+            null, 'System', 'System', r.id, null, 'Barangay Action', 'Status Update',
+            `${r.action_type} intervention ${verb} automatically${r.date_started ? when + tail : ''}`
+          );
+          notifyBhwOfAction({
+            action_type: r.action_type, hazard: null, barangay_id: r.barangay_id || null,
+            status: next, verb,
+            alertLabel: r.alert_kind ? alertContextLabel(null, r.alert_kind) : null,
+          });
+          console.log(`\u2713 Action status auto-update: #${r.id} ${r.action_type} -> ${next}`);
+        });
+      });
+    }
+  );
+}
+
+// Every 15 minutes - the map reads the derived status live, so the sweep only
+// has to keep the stored value, the audit trail and the notifications in step.
+cron.schedule('*/15 * * * *', () => {
+  runActionStatusSweep();
+});
 
 const DISASTER_EVENT_TYPES = ['Flood', 'Typhoon', 'Extreme Heat', 'Heavy Rain', 'Fire'];
 const DISASTER_SEVERITIES = ['Minor', 'Moderate', 'Severe'];
@@ -7898,25 +8021,105 @@ async function fetchWithRetry(url, tries = 3, backoffMs = 600) {
   throw lastErr;
 }
 
-const wmoToHazard = (code) => {
-  if (code >= 95) return 'Thunderstorm';
-  if ((code >= 51 && code <= 67)) return 'Heavy Rain';
-  if (code >= 71) return 'Heavy Rain';
-  if (code >= 80 && code <= 82) return 'Heavy Rain';
-  return null;
+// ── Weather accuracy ────────────────────────────────────────────────────────
+// Open-Meteo's `weather_code` is a GRID value: every barangay inside the same
+// ~11 km model cell reports the SAME code. Only the quantitative fields
+// (precipitation, apparent_temperature, humidity, visibility, wind) are
+// interpolated to the exact point, so they genuinely differ per barangay.
+//
+// The old rule ("code 51..67 -> Heavy Rain", "code >= 71 -> Heavy Rain") painted
+// a Heavy Rain disc on every barangay for a 0.1 mm drizzle, and even mapped
+// SNOW codes to Heavy Rain. The rules are now quantitative:
+//
+//   Heavy Rain    - a real rain RATE (>= 2.5 mm/h) or a real 3h accumulation
+//   Thunderstorm  - a thunderstorm code CONFIRMED by rain or a strong gust
+//   Typhoon       - gusts >= 46 km/h (25 km/h is a breeze, not a typhoon)
+//   Extreme Heat  - feels-like >= 38 C (or dry-bulb >= 35 C)
+//
+// A drizzle is a sky CONDITION, not a hazard.
+const HEAVY_RAIN_RATE_MM_H = 2.5;   // mm/h at the point
+const HEAVY_RAIN_3H_MM = 10;        // mm accumulated over 3 h
+const TYPHOON_GUST_KMH = 46;        // strong-wind / typhoon territory
+const EXTREME_HEAT_FEELS_C = 38;
+const EXTREME_HEAT_TEMP_C = 35;
+const THUNDERSTORM_GUST_KMH = 40;    // gust that confirms a thunderstorm code
+const LOW_VISIBILITY_M = 4000;
+
+// WMO code -> broad sky class. Codes 71-77 / 85-86 are SNOW, never rain.
+const wmoSkyClass = (code) => {
+  if (code == null) return 'unknown';
+  if (code >= 95) return 'thunderstorm';
+  if (code === 85 || code === 86 || (code >= 71 && code <= 77)) return 'snow';
+  if (code === 80 || code === 81 || code === 82) return 'showers';
+  if (code >= 51 && code <= 67) return 'rain';
+  if (code === 45 || code === 48) return 'fog';
+  if (code === 3) return 'overcast';
+  if (code === 1 || code === 2) return 'partly';
+  if (code === 0) return 'clear';
+  return 'unknown';
 };
 
-const detectWeatherHazards = (cur) => {
+// The sky condition a person would actually report for THIS barangay right now.
+// Ordered so the most "active" reading wins.
+const deriveWeatherCondition = (m) => {
+  const code = m.weather_code;
+  const precip = Number(m.precipitation) || 0;
+  const rain3h = Number(m.rain_3h) || 0;
+  const cloud = m.cloud_cover != null ? Number(m.cloud_cover) : null;
+  const visibility = m.visibility != null ? Number(m.visibility) : null;
+  const feels = m.feels_like != null ? Number(m.feels_like) : null;
+  const gust = Number(m.wind_gust) || 0;
+  const sky = wmoSkyClass(code);
+
+  if (gust >= TYPHOON_GUST_KMH) return 'strong_wind';
+  if (sky === 'thunderstorm') return 'thunderstorm';
+  if (precip >= HEAVY_RAIN_RATE_MM_H || rain3h >= HEAVY_RAIN_3H_MM) return 'heavy_rain';
+  if (feels != null && feels >= EXTREME_HEAT_FEELS_C) return 'extreme_heat';
+  if (sky === 'fog' || (visibility != null && visibility < LOW_VISIBILITY_M)) return 'low_visibility';
+  if ((sky === 'rain' || sky === 'showers') && (precip > 0 || rain3h > 0)) return 'light_rain';
+  if (sky === 'snow') return 'light_rain';
+  if (cloud != null && cloud >= 80) return 'overcast';
+  if (cloud != null && cloud >= 40) return 'cloudy';
+  if (sky === 'partly' || (cloud != null && cloud >= 10)) return 'partly_cloudy';
+  return 'clear';
+};
+
+// Human label for each sky condition (used by the map tooltip and the resident map).
+const WEATHER_CONDITION_LABELS = {
+  clear: 'Clear',
+  partly_cloudy: 'Partly Cloudy',
+  cloudy: 'Cloudy',
+  overcast: 'Overcast',
+  light_rain: 'Light Rain',
+  heavy_rain: 'Heavy Rain',
+  thunderstorm: 'Thunderstorm',
+  extreme_heat: 'Extreme Heat',
+  low_visibility: 'Low Visibility',
+  strong_wind: 'Strong Winds',
+  unknown: 'Unknown',
+};
+
+const detectWeatherHazards = (m) => {
   const hazards = [];
-  const w = wmoToHazard(cur.weather_code);
-  if (w) hazards.push(w);
-  if (cur.wind_gusts_10m >= 25) hazards.push('Typhoon');
-  if (cur.temperature_2m >= 35) hazards.push('Extreme Heat');
+  const code = m.weather_code;
+  const precip = Number(m.precipitation) || 0;
+  const rain3h = Number(m.rain_3h) || 0;
+  const feels = m.feels_like != null ? Number(m.feels_like) : null;
+  const temp = m.temperature != null ? Number(m.temperature) : null;
+  const gust = Number(m.wind_gust) || 0;
+  const sky = wmoSkyClass(code);
+
+  // A thunderstorm CODE alone is not enough - it must be confirmed by real rain
+  // or a strong gust, otherwise every barangay in the grid cell lights up.
+  if (sky === 'thunderstorm' && (precip >= 0.5 || gust >= THUNDERSTORM_GUST_KMH)) hazards.push('Thunderstorm');
+  if (precip >= HEAVY_RAIN_RATE_MM_H || rain3h >= HEAVY_RAIN_3H_MM) hazards.push('Heavy Rain');
+  if (gust >= TYPHOON_GUST_KMH) hazards.push('Typhoon');
+  if ((feels != null && feels >= EXTREME_HEAT_FEELS_C) || (temp != null && temp >= EXTREME_HEAT_TEMP_C)) hazards.push('Extreme Heat');
   return [...new Set(hazards)];
 };
 
-const isRainyCode = (c) => c != null && ((c >= 51 && c <= 67) || c >= 71 || (c >= 80 && c <= 82));
-const isStormCode = (c) => c != null && c >= 95;
+const isRainyCode = (c) => { const s = wmoSkyClass(c); return s === 'rain' || s === 'showers' || s === 'snow'; };
+const isStormCode = (c) => wmoSkyClass(c) === 'thunderstorm';
 
 // PAGASA-style day-aware outlook: scan the next ~6 hours of hourly forecast plus today's
 // daily totals, so a thunderstorm due in 2 hours still lights the badge up now.
@@ -7944,11 +8147,22 @@ const buildWeatherInfo = (data) => {
   };
   const rain24 = sumBack(24);
   const rain72 = sumBack(72);
+  const rain3h = sumBack(3);
+  const hourlyGusts = hourly.wind_gusts_10m || [];
   const horizon = Math.min(startIdx + 6, times.length);
   let stormSoon = false, rainSoon = false, nextBadCode = null, nextBadTime = null;
   for (let i = startIdx; i < horizon; i++) {
-    if (isStormCode(codes[i])) { stormSoon = true; if (!nextBadCode) { nextBadCode = 'Thunderstorm'; nextBadTime = times[i]; } }
-    else if (isRainyCode(codes[i])) { rainSoon = true; if (!nextBadCode) { nextBadCode = 'Heavy Rain'; nextBadTime = times[i]; } }
+    const hp = Number(precip[i]) || 0;
+    const hg = Number(hourlyGusts[i]) || 0;
+    // A future thunderstorm code must be confirmed by rain or a strong gust,
+    // and future rain must be a real rate - otherwise the whole grid lights up.
+    if (isStormCode(codes[i]) && (hp >= 0.5 || hg >= THUNDERSTORM_GUST_KMH)) {
+      stormSoon = true;
+      if (!nextBadCode) { nextBadCode = 'Thunderstorm'; nextBadTime = times[i]; }
+    } else if (hp >= HEAVY_RAIN_RATE_MM_H) {
+      rainSoon = true;
+      if (!nextBadCode) { nextBadCode = 'Heavy Rain'; nextBadTime = times[i]; }
+    }
   }
   // Today's daily totals (precip + dominant code) for a summary line
   const today = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
@@ -7956,7 +8170,19 @@ const buildWeatherInfo = (data) => {
   (daily.time || []).forEach((t, i) => { if (t === today) dayIdx = i; });
   if (dayIdx >= 0) todayPrecip = (daily.precipitation_sum || [])[dayIdx] || 0;
 
-  const hazards = detectWeatherHazards(cur);
+  const measurements = {
+    weather_code: cur.weather_code != null ? cur.weather_code : null,
+    precipitation: cur.precipitation != null ? cur.precipitation : null,
+    rain_3h: rain3h,
+    cloud_cover: cur.cloud_cover != null ? cur.cloud_cover : null,
+    visibility: cur.visibility != null ? cur.visibility : null,
+    feels_like: cur.apparent_temperature != null ? cur.apparent_temperature : null,
+    temperature: cur.temperature_2m != null ? cur.temperature_2m : null,
+    wind_gust: cur.wind_gusts_10m != null ? cur.wind_gusts_10m : null,
+    wind_speed: cur.wind_speed_10m != null ? cur.wind_speed_10m : null,
+  };
+  const condition = deriveWeatherCondition(measurements);
+  const hazards = detectWeatherHazards(measurements);
   if (stormSoon) hazards.push('Thunderstorm');
   if (rainSoon) hazards.push('Heavy Rain');
   const unique = [...new Set(hazards)];
@@ -7971,9 +8197,19 @@ const buildWeatherInfo = (data) => {
   if (todayPrecip > 0) outlookParts.push(`~${Math.round(todayPrecip)} mm today`);
   return {
     hazards: unique,
+    // Sky condition at THIS point - the map disc and tooltip use this.
+    condition,
+    condition_label: WEATHER_CONDITION_LABELS[condition] || WEATHER_CONDITION_LABELS.unknown,
     temperature: cur.temperature_2m != null ? Math.round(cur.temperature_2m * 10) / 10 : null,
+    feels_like: cur.apparent_temperature != null ? Math.round(cur.apparent_temperature * 10) / 10 : null,
     precipitation: cur.precipitation != null ? Math.round(cur.precipitation * 10) / 10 : null,
+    humidity: cur.relative_humidity_2m != null ? Math.round(cur.relative_humidity_2m) : null,
+    visibility: cur.visibility != null ? Math.round(cur.visibility) : null,
+    wind_speed: cur.wind_speed_10m != null ? Math.round(cur.wind_speed_10m * 10) / 10 : null,
+    wind_gust: cur.wind_gusts_10m != null ? Math.round(cur.wind_gusts_10m * 10) / 10 : null,
+    cloud_cover: cur.cloud_cover != null ? Math.round(cur.cloud_cover) : null,
     // Trailing accumulations used by the zone (purok-level) hotspot environmental gate.
+    rain_3h: rain3h,
     rain_24h: rain24,
     rain_72h: rain72,
     weather_code: cur.weather_code || null,
@@ -7994,7 +8230,10 @@ const fetchWeatherForBarangays = async (barangays) => {
   const rows = barangays.map(b => ({
     barangay_id: b.id, name: b.name,
     hazards: [], temperature: null, precipitation: null, weather_code: null, outlook: '',
-    rain_24h: null, rain_72h: null,
+    rain_24h: null, rain_72h: null, rain_3h: null,
+    condition: 'unknown', condition_label: WEATHER_CONDITION_LABELS.unknown,
+    feels_like: null, humidity: null, visibility: null,
+    wind_speed: null, wind_gust: null, cloud_cover: null,
     next_hazard_type: null, next_hazard_time: null,
   }));
   if (barangays.length === 0) return rows;
@@ -8002,8 +8241,9 @@ const fetchWeatherForBarangays = async (barangays) => {
   const lats = barangays.map(b => WEATHER_BARANGAY_COORDS[b.name][0]).join(',');
   const lons = barangays.map(b => WEATHER_BARANGAY_COORDS[b.name][1]).join(',');
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}` +
-    `&current=weather_code,precipitation,temperature_2m,wind_gusts_10m,relative_humidity_2m` +
-    `&hourly=weather_code,precipitation&daily=weather_code,precipitation_sum` +
+    `&current=weather_code,precipitation,rain,showers,temperature_2m,apparent_temperature,relative_humidity_2m,cloud_cover,visibility,wind_speed_10m,wind_gusts_10m,dew_point_2m` +
+    `&hourly=weather_code,precipitation,rain,showers,cloud_cover,visibility,apparent_temperature,wind_gusts_10m` +
+    `&daily=weather_code,precipitation_sum` +
     `&forecast_days=2&past_days=3&timezone=Asia%2FManila`;
 
   const payload = await fetchWithRetry(url);
@@ -8036,7 +8276,10 @@ app.get('/api/weather/hazards', (req, res) => {
       }
       res.json(pending.map(b => ({
         barangay_id: b.id, name: b.name, hazards: [], temperature: null,
-        precipitation: null, rain_24h: null, rain_72h: null, weather_code: null, outlook: '', error: 'offline',
+        precipitation: null, rain_24h: null, rain_72h: null, rain_3h: null, weather_code: null, outlook: '',
+        condition: 'unknown', condition_label: WEATHER_CONDITION_LABELS.unknown,
+        feels_like: null, humidity: null, visibility: null,
+        wind_speed: null, wind_gust: null, cloud_cover: null, error: 'offline',
       })));
     }
   });
@@ -8084,8 +8327,9 @@ app.post('/api/weather/by-points', authenticate, async (req, res) => {
       const lats = missing.map(k => k.split(',')[0]).join(',');
       const lons = missing.map(k => k.split(',')[1]).join(',');
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}` +
-        `&current=weather_code,precipitation,temperature_2m,wind_gusts_10m,relative_humidity_2m` +
-        `&hourly=weather_code,precipitation&daily=weather_code,precipitation_sum` +
+        `&current=weather_code,precipitation,rain,showers,temperature_2m,apparent_temperature,relative_humidity_2m,cloud_cover,visibility,wind_speed_10m,wind_gusts_10m,dew_point_2m` +
+        `&hourly=weather_code,precipitation,rain,showers,cloud_cover,visibility,apparent_temperature,wind_gusts_10m` +
+        `&daily=weather_code,precipitation_sum` +
         `&forecast_days=2&past_days=3&timezone=Asia%2FManila`;
       const payload = await fetchWithRetry(url);
       const series = Array.isArray(payload) ? payload : [payload];

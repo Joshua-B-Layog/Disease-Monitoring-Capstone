@@ -11,7 +11,7 @@ import { onDiseasesChanged } from '../diseaseSignal';
 import { useI18n } from '../i18n';
 import DatePicker from '../components/DatePicker';
 import { precacheTiles } from '../mapTileCache';
-import { ACTION_TYPE_ICONS, hazardIcon, hazardDiseases, isDisasterActive, getDisasterWatch, WEATHER_ATTRIBUTION } from '../disasterRisk';
+import { ACTION_TYPE_ICONS, hazardIcon, hazardDiseases, isDisasterActive, getDisasterWatch, WEATHER_ATTRIBUTION, weatherConditionIcon, weatherConditionLabel } from '../disasterRisk';
 
 const CABUYAO_CENTER = [14.2253, 121.1254];
 const CABUYAO_BOUNDS = [
@@ -582,9 +582,24 @@ export default function ResidentMap() {
   }, []);
 
   const currentYear = new Date().getFullYear();
-  const [filterDateFrom, setFilterDateFrom] = useState(() => `${currentYear}-01-01`);
-  const [filterDateTo, setFilterDateTo]     = useState(() => `${currentYear}-12-31`);
-  const [filterYear, setFilterYear]         = useState(() => String(currentYear));
+  // Date filter default: the same rolling 2-month window the CHO/BHW map uses
+  // (e.g. 08/22 - 10/22), so the resident map opens on the newest cases
+  // instead of the whole calendar year. Picking "From / To dates" in the year
+  // dropdown restores this exact base window (it is not "no filter").
+  const rollingDateWindow = () => {
+    const t = new Date();
+    const s = new Date(t.getFullYear(), t.getMonth() - 2, t.getDate());
+    const p = (n) => String(n).padStart(2, '0');
+    return {
+      from: `${s.getFullYear()}-${p(s.getMonth() + 1)}-${p(s.getDate())}`,
+      to: `${t.getFullYear()}-${p(t.getMonth() + 1)}-${p(t.getDate())}`,
+    };
+  };
+  const [filterDateFrom, setFilterDateFrom] = useState(() => rollingDateWindow().from);
+  const [filterDateTo, setFilterDateTo] = useState(() => rollingDateWindow().to);
+  // The year preset only drives the dropdown label - the real filter is the
+  // From/To dates, so it starts empty and reads "From / To dates".
+  const [filterYear, setFilterYear]         = useState('');
   const [yearOpen, setYearOpen]             = useState(false);
   const yearRef = useRef(null);
 
@@ -1089,15 +1104,20 @@ export default function ResidentMap() {
       {/* Filter by Date - year + From/To */}
       <div style={{ marginBottom: '12px' }}>
         <div style={{ fontSize: '15px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '6px' }}>{t('Filter by Date')}</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+        <div className="resident-date-filter" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
           <div style={{ position: 'relative', marginTop: '30px' }} ref={yearRef}>
             <button type="button" onClick={() => setYearOpen(!yearOpen)}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '7px 10px', background: 'var(--bg-surface)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', minWidth: '110px' }}>
               <span>{filterYear || t('From / To dates')}</span>
               <span style={{ fontSize: '11px', opacity: 0.6, transition: 'transform 0.2s', transform: yearOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
             </button>
+            {/* The list must sit ABOVE the Leaflet map: its panes use
+                z-index 400, so the old zIndex 120 list was painted behind the
+                map and the years (2026, 2025, …) were unreachable. 3000 matches
+                DatePicker's popup, and the height cap lets a long year list
+                scroll instead of running under the map. */}
             {yearOpen && (
-              <div style={{ position: 'absolute', top: '105%', left: 0, width: '100%', minWidth: '150px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.25)', zIndex: 120, overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', top: '105%', left: 0, width: '100%', minWidth: '150px', maxHeight: '240px', overflowY: 'auto', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.25)', zIndex: 3000 }}>
                 {yearOptions.map(y => (
                   <button key={y} type="button"
                     onClick={() => { setFilterYear(y); setFilterDateFrom(`${y}-01-01`); setFilterDateTo(`${y}-12-31`); setYearOpen(false); }}
@@ -1107,7 +1127,7 @@ export default function ResidentMap() {
                 ))}
                 <div style={{ height: '1px', margin: '4px 12px', background: 'var(--border-color)' }} />
                 <button type="button"
-                  onClick={() => { setFilterYear(''); setYearOpen(false); }}
+                  onClick={() => { const win = rollingDateWindow(); setFilterYear(''); setFilterDateFrom(win.from); setFilterDateTo(win.to); setYearOpen(false); }}
                   style={{ display: 'block', width: '100%', padding: '8px 12px', background: filterYear === '' ? 'var(--input-bg)' : 'transparent', border: 'none', textAlign: 'left', fontSize: '15px', color: 'var(--text-main)', cursor: 'pointer', fontWeight: filterYear === '' ? '600' : '400' }}>
                   {t('From / To dates')}
                 </button>
@@ -1408,9 +1428,22 @@ export default function ResidentMap() {
                 const ongoing = actions.filter(a => a.barangay_name === bkey && a.status !== 'completed');
                 const watch = bkey ? getDisasterWatch(disasterEvents.filter(e => e.barangay_name === bkey)) : null;
                 const wx = bkey ? (Array.isArray(weatherHazards) ? weatherHazards.find(w => w.name === bkey) : null) : null;
+                // The sky condition measured AT this barangay - not a city-wide
+                // copy. Two neighbouring barangays can show two different skies.
+                const wxCondition = wx && wx.condition && wx.condition !== 'unknown'
+                  ? `${weatherConditionIcon(wx.condition)} ${t(wx.condition_label || weatherConditionLabel(wx.condition))}`
+                  : '';
+                const wxReadings = [];
+                if (wx && wx.temperature != null) {
+                  wxReadings.push(`${wx.temperature}°C`);
+                  if (wx.feels_like != null) wxReadings.push(`feels ${wx.feels_like}°C`);
+                }
+                if (wx && wx.humidity != null) wxReadings.push(`${wx.humidity}% humidity`);
+                if (wx && wx.wind_speed != null) wxReadings.push(`wind ${wx.wind_speed} km/h`);
+                const wxReadingLine = wxReadings.length ? wxReadings.join(' · ') : '';
                 const weatherLine = wx && wx.hazards && wx.hazards.length
                   ? `${wx.hazards.map(h => `${hazardIcon(h)} ${h}`).join(' ')}${wx.hazards.length ? ' — ' + [...new Set(wx.hazards.flatMap(hazardDiseases))].join(', ') : ''}`
-                  : '';
+                  : wxCondition;
                 if (ongoing.length === 0 && !watch && !weatherLine) return null;
                 return (
                   <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
@@ -1437,6 +1470,11 @@ export default function ResidentMap() {
                         <div style={{ fontSize: '16px', color: 'var(--text-muted)' }}>
                           {weatherLine}
                         </div>
+                        {wxReadingLine && (
+                          <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            {wxReadingLine}
+                          </div>
+                        )}
                         <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
                           {WEATHER_ATTRIBUTION}
                         </div>

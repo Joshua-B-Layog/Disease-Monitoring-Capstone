@@ -736,6 +736,9 @@ html, body, #root {
   flex: 1;
   overflow-y: auto;
   padding-bottom: 30px;
+  /* Matches the page background so any sub-pixel remainder at the bottom of a
+     scaled (zoom) page can never show up as a different-coloured band. */
+  background-color: var(--bg-main);
 }
 
 /* ── COMPACT MODE ── */
@@ -1600,7 +1603,22 @@ button:active { transform: scale(0.97); }
    ========================================================= */
 @media (min-width: 901px) {
   .cdms-map-filter-btn { display: none !important; }
+  /* The Filters toggle stays visible on a desktop - it collapses/expands the
+     sidebar so the map can use the full window width. */
+  .cdms-map-filter-btn.cdms-map-filters-toggle { display: flex !important; }
   .cdms-map-backdrop { display: none !important; }
+  /* Collapsible filter panel: the 280px sidebar slides shut and the map
+     takes the whole window. */
+  .cdms-map-sidebar {
+    transition: width .26s ease, min-width .26s ease, padding .26s ease;
+  }
+  .cdms-map-sidebar.cdms-map-sidebar-collapsed {
+    width: 0 !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    border-right: none !important;
+  }
 }
 @media (max-width: 900px) {
   .cdms-map-wrap { position: relative; }

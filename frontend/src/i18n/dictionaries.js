@@ -235,6 +235,74 @@ Object.assign(fil, {
   'Blue-zone barangays (near Laguna de Bay / a large water body, flood-prone or under extreme heat) and the water-/heat-borne diseases already present there this period.': 'Ang mga barangay na bughaw na sona (malapit sa Laguna de Bay / malaking anyong tubig, madaling bahain o sobrang init) at ang mga sakit na dala ng tubig/init na naroroon na sa panahong ito.',
 });
 
+// ── Weather conditions (per-barangay sky reading on the map) ──────────────
+// The map shows the condition measured AT each barangay, so the labels have to
+// be translatable - the condition KEY is the same on every map.
+Object.assign(fil, {
+  'Clear': 'Malinaw',
+  'Partly Cloudy': 'Bahagyang Makulumburan',
+  'Cloudy': 'Makulumburan',
+  'Overcast': 'Makapal na Ulap',
+  'Light Rain': 'Maliit na Ulan',
+  'Heavy Rain': 'Malakas na Ulan',
+  'Thunderstorm': 'Buhay na Ulan',
+  'Extreme Heat': 'Sobrang Init',
+  'Low Visibility': 'Mababang Paningin',
+  'Strong Winds': 'Malakas na Hangin',
+  'Weather disc - the sky condition measured over that barangay (solid = hazard)': 'Weather disc - ang estado ng langit na sukat sa barangay na iyon (solid = hazard)',
+  'No active weather hazard': 'Walang aktibong hazard sa panahon',
+  'Weather offline': 'Naka-offline ang datos ng panahon',
+});
+
+// ── "Just the map" + collapsible seasons card ──────────────────────────────
+Object.assign(fil, {
+  'Just the map': 'Saklaw na Mapa',
+  'Just the map (hide all markers and overlays)': 'Saklaw na Mapa (itago ang lahat ng marker at overlay)',
+  'Just the map - hide all markers and overlays': 'Saklaw na Mapa - itago ang lahat ng marker at overlay',
+  'Show layers': 'Ipakita ang Mga Layer',
+  'Show all markers and overlays again': 'Ipakita muli ang lahat ng marker at overlay',
+  'Keeps the barangay borders and labels. Useful on a small screen or when presenting.': 'Pinananatili ang mga hangganan at label ng barangay. Kapaki-pakinabang sa maliit na screen o kapag nag-uulat.',
+  'Collapse the seasons card': 'Tiklupan ang card ng mga panahon',
+  'Expand the seasons card': 'Palawakin ang card ng mga panahon',
+  // Collapsible Filters panel (map)
+  'Collapse filters': 'Tiklupan ang mga filter',
+  'Close filters': 'Isara ang mga filter',
+  'Collapse': 'Tiklupan',
+  'Open filters': 'Buksan ang mga filter',
+  'Show the filters': 'Ipakita ang mga filter',
+  'Hide the filters': 'Itago ang mga filter',
+  // Pins are coloured by the risk scale, not by the top disease
+  'Barangay / unit pin - number shows total cases, colour follows the risk scale': 'Pin ng barangay / unit - ang bilang ay kabuuang kaso, ang kulay ay sumusunod sa risk scale',
+  'Case dot colors (by disease)': 'Mga kulay ng tuldok ng kaso (ayon sa sakit)',
+});
+
+// ── Date-driven intervention status ────────────────────────────────────────
+Object.assign(fil, {
+  'Set the status from the dates automatically': 'Itakda ang katayuan mula sa mga petsa nang awtomatiko',
+  'Planned before the start date, ongoing from the start date, completed the day after the end date.': 'Nakatakda bago ang petsa ng pagsisimula, ongoing mula sa petsa ng pagsisimula, at natapos sa araw pagkatapos ng petsa ng pagtatapos.',
+  'The status is pinned to your choice above.': 'Naka-pin ang katayuan sa napili mong pagpipilian sa itaas.',
+});
+
+// ── Login / Sign-up: role pick + blue links ─────────────────────────────────
+Object.assign(fil, {
+  'Clear selection': 'Burahin ang napili',
+  'Change role': 'Palitan ang role',
+  'CHO Account Access': 'Pag-access ng Account ng CHO',
+  'For security purposes, City Health Office accounts cannot be created through self-registration. Please contact your CHO unit directly to request an account.': 'Para sa seguridad, ang mga account ng City Health Office ay hindi maaaring gawin sa sariling pagpaparehistro. Mangyaring makipag-ugnayan sa iyong CHO unit para humiling ng account.',
+  'Already have an account?': 'May account ka na?',
+  "Don't have an account?": 'Wala kang account?',
+  'Log-in here': 'Mag-log-in dito',
+  'Sign up here': 'Mag-sign up dito',
+  'Sign Up': 'Mag-sign up',
+  'Sign In': 'Mag-sign in',
+  'Log In': 'Mag-log in',
+  'Sign up': 'Mag-sign up',
+  'Back to Log-in': 'Bumalik sa Log-in',
+  'Back to Sign-up': 'Bumalik sa Sign-up',
+  'Choose your access role to get started with registration.': 'Piliin ang iyong role para makapagsimula ng pagpaparehistro.',
+  'Create an Account. Registrations require approval from the City Health Office administrator before account activation.': 'Gumawa ng Account. Kailangan ng pag-apruba ng City Health Office administrator bago mag-activate ang account.',
+});
+
 export const dictionaries = { en, fil };
 
 
